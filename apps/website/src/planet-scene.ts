@@ -116,6 +116,72 @@ void main(void) {
 }
 `;
 
+const ICE_GIANT_FRAGMENT_SHADER = `
+precision highp float;
+
+varying vec3 vWorldPosition;
+varying vec3 vWorldNormal;
+
+uniform float time;
+uniform float seed;
+uniform float bandScale;
+uniform float stormStrength;
+uniform vec3 cameraPosition;
+uniform vec3 lightDirection;
+uniform vec3 deepColor;
+uniform vec3 hazeColor;
+uniform vec3 lightColor;
+
+float hash(vec2 point) {
+  point = fract(point * vec2(127.1, 311.7));
+  point += dot(point, point + 19.19 + seed * 0.00007);
+  return fract(point.x * point.y);
+}
+
+float noise(vec2 point) {
+  vec2 index = floor(point);
+  vec2 fraction = fract(point);
+  fraction = fraction * fraction * (3.0 - 2.0 * fraction);
+  return mix(
+    mix(hash(index), hash(index + vec2(1.0, 0.0)), fraction.x),
+    mix(hash(index + vec2(0.0, 1.0)), hash(index + vec2(1.0, 1.0)), fraction.x),
+    fraction.y
+  );
+}
+
+float fbm(vec2 point) {
+  float value = 0.0;
+  float amplitude = 0.52;
+  for (int octave = 0; octave < 4; octave++) {
+    value += amplitude * noise(point);
+    point = point * 2.07 + vec2(9.3, 14.8);
+    amplitude *= 0.48;
+  }
+  return value;
+}
+
+void main(void) {
+  vec3 normal = normalize(vWorldNormal);
+  float longitude = atan(normal.z, normal.x);
+  float latitude = asin(clamp(normal.y, -1.0, 1.0));
+  float flow = time * 0.018;
+  float haze = fbm(vec2(longitude * 1.7 + flow, latitude * bandScale));
+  float bands = sin(latitude * bandScale * 2.4 + haze * 2.8) * 0.5 + 0.5;
+  float stormNoise = fbm(vec2(longitude * 4.2 - flow * 1.8, latitude * 8.0));
+  float storms = smoothstep(0.68, 0.92, stormNoise) * stormStrength;
+
+  vec3 atmosphereColor = mix(deepColor, hazeColor, 0.32 + haze * 0.5);
+  atmosphereColor = mix(atmosphereColor, lightColor, bands * 0.24 + storms);
+
+  float diffuse = max(dot(normal, lightDirection), 0.0);
+  float wrappedLight = 0.22 + diffuse * 0.9;
+  vec3 viewDirection = normalize(cameraPosition - vWorldPosition);
+  float rim = pow(1.0 - max(dot(normal, viewDirection), 0.0), 2.5);
+  vec3 finalColor = atmosphereColor * wrappedLight + hazeColor * rim * 0.46;
+  gl_FragColor = vec4(finalColor, 1.0);
+}
+`;
+
 const ROCKY_VERTEX_SHADER = `
 precision highp float;
 
@@ -376,6 +442,7 @@ const createPlanet = (
 } => {
   Effect.ShadersStore.exoraPlanetVertexShader = PLANET_VERTEX_SHADER;
   Effect.ShadersStore.exoraPlanetFragmentShader = PLANET_FRAGMENT_SHADER;
+  Effect.ShadersStore.exoraIceGiantFragmentShader = ICE_GIANT_FRAGMENT_SHADER;
   Effect.ShadersStore.exoraRockyVertexShader = ROCKY_VERTEX_SHADER;
   Effect.ShadersStore.exoraRockyFragmentShader = ROCKY_FRAGMENT_SHADER;
   Effect.ShadersStore.exoraAtmosphereVertexShader = ATMOSPHERE_VERTEX_SHADER;
@@ -390,52 +457,77 @@ const createPlanet = (
   planet.rotation.z = -0.09;
   planet.isPickable = false;
 
-  const shader =
-    recipe.renderer === "rocky"
-      ? new ShaderMaterial(
-          "rockyPlanetMaterial",
-          scene,
-          { vertex: "exoraRocky", fragment: "exoraRocky" },
-          {
-            attributes: ["position", "normal"],
-            uniforms: [
-              "world",
-              "worldViewProjection",
-              "cameraPosition",
-              "seed",
-              "elevation",
-              "roughness",
-              "craterDensity",
-              "waterLevel",
-              "lightDirection",
-              "lowColor",
-              "midColor",
-              "highColor",
-              "waterColor",
-            ],
-          },
-        )
-      : new ShaderMaterial(
-          "gasGiantPlanetMaterial",
-          scene,
-          { vertex: "exoraPlanet", fragment: "exoraPlanet" },
-          {
-            attributes: ["position", "normal"],
-            uniforms: [
-              "world",
-              "worldViewProjection",
-              "cameraPosition",
-              "time",
-              "seed",
-              "turbulence",
-              "contrast",
-              "lightDirection",
-              "deepColor",
-              "midColor",
-              "lightColor",
-            ],
-          },
-        );
+  let shader: ShaderMaterial;
+
+  if (recipe.renderer === "rocky") {
+    shader = new ShaderMaterial(
+      "rockyPlanetMaterial",
+      scene,
+      { vertex: "exoraRocky", fragment: "exoraRocky" },
+      {
+        attributes: ["position", "normal"],
+        uniforms: [
+          "world",
+          "worldViewProjection",
+          "cameraPosition",
+          "seed",
+          "elevation",
+          "roughness",
+          "craterDensity",
+          "waterLevel",
+          "lightDirection",
+          "lowColor",
+          "midColor",
+          "highColor",
+          "waterColor",
+        ],
+      },
+    );
+  } else if (recipe.renderer === "ice-giant") {
+    shader = new ShaderMaterial(
+      "iceGiantPlanetMaterial",
+      scene,
+      { vertex: "exoraPlanet", fragment: "exoraIceGiant" },
+      {
+        attributes: ["position", "normal"],
+        uniforms: [
+          "world",
+          "worldViewProjection",
+          "cameraPosition",
+          "time",
+          "seed",
+          "bandScale",
+          "stormStrength",
+          "lightDirection",
+          "deepColor",
+          "hazeColor",
+          "lightColor",
+        ],
+      },
+    );
+  } else {
+    shader = new ShaderMaterial(
+      "gasGiantPlanetMaterial",
+      scene,
+      { vertex: "exoraPlanet", fragment: "exoraPlanet" },
+      {
+        attributes: ["position", "normal"],
+        uniforms: [
+          "world",
+          "worldViewProjection",
+          "cameraPosition",
+          "time",
+          "seed",
+          "turbulence",
+          "contrast",
+          "lightDirection",
+          "deepColor",
+          "midColor",
+          "lightColor",
+        ],
+      },
+    );
+  }
 
   shader.setFloat("seed", recipe.seed);
   shader.setVector3("lightDirection", LIGHT_DIRECTION);
@@ -449,6 +541,12 @@ const createPlanet = (
     shader.setColor3("midColor", toColor3(recipe.surface.midColor));
     shader.setColor3("highColor", toColor3(recipe.surface.highColor));
     shader.setColor3("waterColor", toColor3(recipe.surface.waterColor));
+  } else if (recipe.renderer === "ice-giant") {
+    shader.setFloat("bandScale", recipe.atmosphereBands.bandScale);
+    shader.setFloat("stormStrength", recipe.atmosphereBands.stormStrength);
+    shader.setColor3("deepColor", toColor3(recipe.atmosphereBands.deepColor));
+    shader.setColor3("hazeColor", toColor3(recipe.atmosphereBands.hazeColor));
+    shader.setColor3("lightColor", toColor3(recipe.atmosphereBands.lightColor));
   } else {
     shader.setFloat("turbulence", recipe.cloudBands.turbulence);
     shader.setFloat("contrast", recipe.cloudBands.contrast);
@@ -457,6 +555,31 @@ const createPlanet = (
     shader.setColor3("lightColor", toColor3(recipe.cloudBands.lightColor));
   }
   planet.material = shader;
+
+  if (recipe.renderer === "ice-giant") {
+    const ring = MeshBuilder.CreateTorus(
+      "iceGiantRing",
+      {
+        diameter: recipe.radiusSceneUnits + recipe.rings.outerRadius,
+        thickness: recipe.rings.outerRadius - recipe.radiusSceneUnits,
+        tessellation: 128,
+      },
+      scene,
+    );
+    ring.position.copyFrom(PLANET_POSITION);
+    ring.rotation.x = 0.95;
+    ring.rotation.z = -0.08;
+    ring.isPickable = false;
+
+    const ringMaterial = new StandardMaterial("iceGiantRingMaterial", scene);
+    ringMaterial.disableLighting = true;
+    ringMaterial.diffuseColor = toColor3(recipe.rings.color);
+    ringMaterial.emissiveColor = toColor3(recipe.rings.color).scale(0.38);
+    ringMaterial.alpha = recipe.rings.opacity;
+    ringMaterial.backFaceCulling = false;
+    ringMaterial.disableDepthWrite = true;
+    ring.material = ringMaterial;
+  }
 
   const atmosphereMesh = MeshBuilder.CreateSphere(
     "atmosphere",
@@ -568,9 +691,10 @@ export const createPlanetExperience = async ({
     elapsedSeconds += deltaSeconds;
     planet.rotation.y += deltaSeconds * recipe.rotationSpeed;
     moonOrbit.rotation.y += deltaSeconds * recipe.moon.speed;
-    if (recipe.renderer === "gas-giant") {
+    if (recipe.renderer === "gas-giant")
       shader.setFloat("time", elapsedSeconds * recipe.cloudBands.speed * 18);
-    }
+    if (recipe.renderer === "ice-giant")
+      shader.setFloat("time", elapsedSeconds * recipe.atmosphereBands.speed * 18);
 
     const activePosition = scene.activeCamera?.globalPosition ?? camera.globalPosition;
     shader.setVector3("cameraPosition", activePosition);

@@ -49,7 +49,7 @@ const planetKindLabel = (planet: ExoplanetProfile): string =>
   planet.kind.replace("-", " ").toUpperCase();
 
 const hasRenderer = (planet: ExoplanetProfile): boolean =>
-  planet.kind === "gas-giant" || planet.kind === "rocky";
+  planet.kind === "gas-giant" || planet.kind === "ice-giant" || planet.kind === "rocky";
 
 const renderSearchResults = (planets: ExoplanetProfile[]): string => {
   if (planets.length === 0) {
@@ -197,7 +197,7 @@ const renderShell = (result: PlanetLoadResult): void => {
         </div>
         <div class="catalog-meta">
           <p id="catalog-status" role="status">Enter at least two characters to scan the archive.</p>
-          <span>Gas giants and rocky worlds available · ice giants coming next</span>
+          <span>Gas, ice, and rocky worlds available · unclassified worlds pending</span>
         </div>
         <ol id="catalog-results" class="catalog-results"></ol>
       </dialog>

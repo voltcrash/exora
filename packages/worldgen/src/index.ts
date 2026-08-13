@@ -32,6 +32,23 @@ export interface GasGiantWorldRecipe extends BaseWorldRecipe {
   renderer: "gas-giant";
 }
 
+export interface IceGiantWorldRecipe extends BaseWorldRecipe {
+  atmosphereBands: {
+    bandScale: number;
+    deepColor: Rgb;
+    hazeColor: Rgb;
+    lightColor: Rgb;
+    speed: number;
+    stormStrength: number;
+  };
+  renderer: "ice-giant";
+  rings: {
+    color: Rgb;
+    opacity: number;
+    outerRadius: number;
+  };
+}
+
 export interface RockyWorldRecipe extends BaseWorldRecipe {
   renderer: "rocky";
   surface: {
@@ -46,7 +63,7 @@ export interface RockyWorldRecipe extends BaseWorldRecipe {
   };
 }
 
-export type WorldRecipe = GasGiantWorldRecipe | RockyWorldRecipe;
+export type WorldRecipe = GasGiantWorldRecipe | IceGiantWorldRecipe | RockyWorldRecipe;
 
 const hashString = (value: string): number => {
   let hash = 2166136261;
@@ -210,11 +227,66 @@ const deriveRockyRecipe = (
   };
 };
 
+const deriveIceGiantRecipe = (
+  planet: ExoplanetProfile,
+  seed: number,
+  random: () => number,
+): IceGiantWorldRecipe => {
+  const temperature = planet.observation.equilibriumTemperatureKelvin;
+  const radiusEarth = planet.observation.radiusEarth ?? 4;
+  const scaledRadius = 3.55 + Math.min(Math.max(radiusEarth, 2), 6) * 0.11;
+  const isWarm = temperature !== null && temperature >= 700;
+  const palette = isWarm
+    ? {
+        deepColor: [0.025, 0.17, 0.25] as const,
+        hazeColor: [0.08, 0.54, 0.64] as const,
+        lightColor: [0.48, 0.88, 0.86] as const,
+        atmosphere: [0.16, 0.82, 0.92] as const,
+      }
+    : {
+        deepColor: [0.018, 0.055, 0.2] as const,
+        hazeColor: [0.09, 0.28, 0.68] as const,
+        lightColor: [0.42, 0.68, 1] as const,
+        atmosphere: [0.16, 0.48, 1] as const,
+      };
+
+  return {
+    seed,
+    renderer: "ice-giant",
+    classification: isWarm ? "Warm Neptune" : "Ice giant",
+    confidence: temperature === null ? "low" : "medium",
+    radiusSceneUnits: scaledRadius,
+    rotationSpeed: 0.024 + random() * 0.016,
+    atmosphere: {
+      color: palette.atmosphere,
+      label: "Hydrogen / helium / methane · inferred",
+    },
+    atmosphereBands: {
+      ...palette,
+      speed: 0.018 + random() * 0.015,
+      bandScale: 9 + random() * 5,
+      stormStrength: 0.32 + random() * 0.28,
+    },
+    rings: {
+      color: isWarm ? [0.28, 0.55, 0.58] : [0.3, 0.45, 0.72],
+      opacity: 0.1 + random() * 0.12,
+      outerRadius: scaledRadius * (1.35 + random() * 0.12),
+    },
+    moon: {
+      radius: scaledRadius * (0.045 + random() * 0.025),
+      orbitRadius: scaledRadius * (1.7 + random() * 0.24),
+      speed: 0.04 + random() * 0.025,
+    },
+    summary:
+      "A deep volatile-rich atmosphere rendered with methane-tinted haze, subdued cloud bands, and a faint debris ring inferred from its measured scale and temperature.",
+  };
+};
+
 export const deriveWorldRecipe = (planet: ExoplanetProfile): WorldRecipe => {
   const seed = hashString(planet.id);
   const random = createRandom(seed);
 
-  return planet.kind === "rocky"
-    ? deriveRockyRecipe(planet, seed, random)
-    : deriveGasGiantRecipe(planet, seed, random);
+  if (planet.kind === "rocky") return deriveRockyRecipe(planet, seed, random);
+  if (planet.kind === "ice-giant") return deriveIceGiantRecipe(planet, seed, random);
+  return deriveGasGiantRecipe(planet, seed, random);
 };

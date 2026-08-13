@@ -42,6 +42,22 @@ const temperateRockyPlanet: ExoplanetProfile = {
   },
 };
 
+const iceGiantPlanet: ExoplanetProfile = {
+  ...featuredPlanet,
+  id: "gj-436-b",
+  name: "GJ 436 b",
+  hostStar: "GJ 436",
+  kind: "ice-giant",
+  observation: {
+    ...featuredPlanet.observation,
+    radiusJupiter: 0.37,
+    massJupiter: 0.07,
+    radiusEarth: 4.17,
+    massEarth: 22.1,
+    equilibriumTemperatureKelvin: 686,
+  },
+};
+
 test("world recipes are deterministic for the same planet", () => {
   const first = deriveWorldRecipe(featuredPlanet);
   const second = deriveWorldRecipe(featuredPlanet);
@@ -80,4 +96,17 @@ test("rocky terrain changes deterministically between planets", () => {
 
   expect(first.seed).not.toBe(second.seed);
   expect(first).not.toEqual(second);
+});
+
+test("ice giants produce methane haze and a faint ring system", () => {
+  const recipe = deriveWorldRecipe(iceGiantPlanet);
+
+  expect(recipe.renderer).toBe("ice-giant");
+  expect(recipe.classification).toBe("Ice giant");
+  expect(recipe.atmosphere.label).toContain("methane");
+
+  if (recipe.renderer !== "ice-giant") throw new Error("Expected an ice-giant recipe.");
+  expect(recipe.atmosphereBands.bandScale).toBeGreaterThanOrEqual(9);
+  expect(recipe.rings.outerRadius).toBeGreaterThan(recipe.radiusSceneUnits);
+  expect(recipe.rings.opacity).toBeLessThan(0.25);
 });

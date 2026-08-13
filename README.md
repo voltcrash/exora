@@ -11,7 +11,7 @@ The current slice renders HIP 65426 b using a normalized response from the NASA 
 - a shared planet contract used by the API and renderer;
 - a searchable confirmed-planet catalog with live scene switching;
 - a deterministic data-to-world recipe;
-- procedural gas-giant clouds plus displaced rocky terrain shaders and atmosphere glow;
+- procedural gas-giant clouds, methane-hazed ice giants, and displaced rocky terrain;
 - an interactive Babylon.js scene with desktop orbit controls;
 - a responsive observation HUD; and
 - a WebXR entry flow with a teleportable viewing deck;
@@ -68,4 +68,4 @@ packages/worldgen        Deterministic data-to-world recipe engine
 packages/utils           Starter package (scheduled for replacement)
 ```
 
-Gas giants and rocky worlds can be explored from catalog results. Ice giants remain disabled until their dedicated renderer is implemented. World generation lives in a shared package, while the API can synchronize NASA's confirmed catalog into PostgreSQL for durable, low-latency queries.
+Gas giants, ice giants, and rocky worlds can be explored from catalog results. Only worlds without enough data for classification remain disabled. World generation lives in a shared package, while the API can synchronize NASA's confirmed catalog into PostgreSQL for durable, low-latency queries.
