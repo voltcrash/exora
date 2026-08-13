@@ -58,11 +58,16 @@ uniform float time;
 uniform float seed;
 uniform float turbulence;
 uniform float contrast;
+uniform float jetCount;
+uniform float stormLatitude;
+uniform float stormScale;
+uniform float stormStrength;
 uniform vec3 cameraPosition;
 uniform vec3 lightDirection;
 uniform vec3 deepColor;
 uniform vec3 midColor;
 uniform vec3 lightColor;
+uniform vec3 stormColor;
 
 float hash(vec2 point) {
   point = fract(point * vec2(123.34, 456.21));
@@ -105,12 +110,21 @@ void main(void) {
   vec2 cloudUv = vec2(longitude * 2.4 + flow, latitude * 11.5);
   float broadNoise = fbm(vec2(longitude * 1.2 - flow * 0.3, latitude * 5.0));
   float fineNoise = fbm(cloudUv * vec2(1.0, turbulence));
-  float bands = sin(latitude * 34.0 + broadNoise * 5.0 + fineNoise * 2.4);
+  float jetShear = sin(latitude * jetCount) * 0.18;
+  float bands = sin(latitude * jetCount * 2.0 + broadNoise * 5.0 + fineNoise * 2.4);
   float bandMix = smoothstep(-0.72, 0.78, bands) * contrast;
-  float storms = smoothstep(0.63, 0.9, fbm(vec2(longitude * 2.8 + flow, latitude * 7.0)));
+  float stormLongitude = sin(seed * 0.00013) * 2.4;
+  float wrappedLongitude = atan(sin(longitude - stormLongitude), cos(longitude - stormLongitude));
+  vec2 stormUv = vec2(wrappedLongitude * cos(stormLatitude), latitude - stormLatitude);
+  float stormDistance = length(stormUv * vec2(stormScale * 0.62, stormScale * 1.7));
+  float stormCore = 1.0 - smoothstep(0.48, 1.0, stormDistance);
+  float stormSpiral = sin(atan(stormUv.y, stormUv.x) * 4.0 - stormDistance * 17.0 + flow * 2.0);
+  float storms = stormCore * (0.72 + stormSpiral * 0.28) * stormStrength;
+  float cells = smoothstep(0.68, 0.9, fbm(vec2(longitude * 3.1 + flow + jetShear, latitude * 8.0)));
 
   vec3 cloudColor = mix(deepColor, midColor, 0.35 + broadNoise * 0.5);
-  cloudColor = mix(cloudColor, lightColor, clamp(bandMix + storms * 0.45, 0.0, 1.0));
+  cloudColor = mix(cloudColor, lightColor, clamp(bandMix + cells * 0.22, 0.0, 1.0));
+  cloudColor = mix(cloudColor, stormColor, clamp(storms, 0.0, 0.9));
 
   float diffuse = max(dot(normal, lightDirection), 0.0);
   float wrappedLight = 0.2 + diffuse * 0.92;
@@ -132,6 +146,8 @@ uniform float time;
 uniform float seed;
 uniform float bandScale;
 uniform float stormStrength;
+uniform float stormLatitude;
+uniform float polarGlow;
 uniform vec3 cameraPosition;
 uniform vec3 lightDirection;
 uniform vec3 deepColor;
@@ -174,7 +190,9 @@ void main(void) {
   float haze = fbm(vec2(longitude * 1.7 + flow, latitude * bandScale));
   float bands = sin(latitude * bandScale * 2.4 + haze * 2.8) * 0.5 + 0.5;
   float stormNoise = fbm(vec2(longitude * 4.2 - flow * 1.8, latitude * 8.0));
-  float storms = smoothstep(0.68, 0.92, stormNoise) * stormStrength;
+  float latitudeMask = 1.0 - smoothstep(0.08, 0.48, abs(latitude - stormLatitude));
+  float storms = smoothstep(0.64, 0.9, stormNoise) * stormStrength * latitudeMask;
+  float pole = pow(smoothstep(0.55, 1.3, abs(latitude)), 2.0) * polarGlow;
 
   vec3 atmosphereColor = mix(deepColor, hazeColor, 0.32 + haze * 0.5);
   atmosphereColor = mix(atmosphereColor, lightColor, bands * 0.24 + storms);
@@ -184,6 +202,7 @@ void main(void) {
   vec3 viewDirection = normalize(cameraPosition - vWorldPosition);
   float rim = pow(1.0 - max(dot(normal, viewDirection), 0.0), 2.5);
   vec3 finalColor = atmosphereColor * wrappedLight + hazeColor * rim * 0.46;
+  finalColor += lightColor * pole * (0.16 + 0.08 * sin(longitude * 5.0 + flow * 3.0));
   gl_FragColor = vec4(finalColor, 1.0);
 }
 `;
@@ -263,12 +282,16 @@ varying float vHeight;
 uniform float seed;
 uniform float craterDensity;
 uniform float waterLevel;
+uniform float time;
+uniform float lavaStrength;
+uniform float iceCapStrength;
 uniform vec3 cameraPosition;
 uniform vec3 lightDirection;
 uniform vec3 lowColor;
 uniform vec3 midColor;
 uniform vec3 highColor;
 uniform vec3 waterColor;
+uniform vec3 emissiveColor;
 
 float hash(vec3 point) {
   point = fract(point * 0.1031 + seed * 0.000017);
@@ -278,10 +301,17 @@ float hash(vec3 point) {
 
 void main(void) {
   vec3 normal = normalize(vWorldNormal);
-  vec3 craterCell = floor((vSurfacePosition + 1.0) * 18.0);
+  vec3 craterPoint = (vSurfacePosition + 1.0) * 18.0;
+  vec3 craterCell = floor(craterPoint);
+  vec3 craterLocal = fract(craterPoint) - 0.5;
   float craterNoise = hash(craterCell);
-  float crater = smoothstep(1.0 - craterDensity * 0.12, 1.0, craterNoise);
+  float craterRadius = 0.2 + hash(craterCell + 4.7) * 0.18;
+  float craterCandidate = step(1.0 - craterDensity * 0.12, craterNoise);
+  float crater = (1.0 - smoothstep(craterRadius * 0.58, craterRadius, length(craterLocal))) * craterCandidate;
   float detail = hash(floor((vSurfacePosition + 1.0) * 95.0)) - 0.5;
+  float fractureA = abs(sin((vSurfacePosition.x + vSurfacePosition.z * 0.7) * 42.0 + detail * 7.0));
+  float fractureB = abs(sin((vSurfacePosition.y - vSurfacePosition.x * 0.45) * 31.0 - detail * 5.0));
+  float fractures = (1.0 - smoothstep(0.0, 0.11, min(fractureA, fractureB))) * lavaStrength;
 
   vec3 rockColor = mix(lowColor, midColor, smoothstep(0.28, 0.62, vHeight));
   rockColor = mix(rockColor, highColor, smoothstep(0.62, 0.9, vHeight));
@@ -290,6 +320,8 @@ void main(void) {
 
   float waterMask = waterLevel > 0.0 ? 1.0 - smoothstep(waterLevel - 0.018, waterLevel + 0.018, vHeight) : 0.0;
   vec3 surfaceColor = mix(rockColor, waterColor, waterMask * 0.92);
+  float polarMask = smoothstep(0.58, 0.94, abs(vSurfacePosition.y)) * iceCapStrength;
+  surfaceColor = mix(surfaceColor, vec3(0.72, 0.84, 0.88), polarMask * (0.64 + detail * 0.14));
   float diffuse = max(dot(normal, lightDirection), 0.0);
   float wrappedLight = 0.16 + diffuse * 0.98;
   vec3 viewDirection = normalize(cameraPosition - vWorldPosition);
@@ -299,7 +331,64 @@ void main(void) {
 
   vec3 finalColor = surfaceColor * wrappedLight + vec3(0.34, 0.58, 0.72) * waterSpecular * 0.45;
   finalColor += highColor * rim * 0.08;
+  finalColor += emissiveColor * fractures * (0.72 + 0.28 * sin(time * 0.7 + detail * 8.0));
   gl_FragColor = vec4(finalColor, 1.0);
+}
+`;
+
+const CLOUD_FRAGMENT_SHADER = `
+precision highp float;
+
+varying vec3 vWorldPosition;
+varying vec3 vWorldNormal;
+
+uniform float time;
+uniform float seed;
+uniform float cloudCover;
+uniform vec3 cloudColor;
+uniform vec3 cameraPosition;
+uniform vec3 lightDirection;
+
+float hash(vec3 point) {
+  point = fract(point * 0.1031 + seed * 0.000021);
+  point += dot(point, point.yzx + 27.17);
+  return fract((point.x + point.y) * point.z);
+}
+
+float noise(vec3 point) {
+  vec3 index = floor(point);
+  vec3 fraction = fract(point);
+  fraction = fraction * fraction * (3.0 - 2.0 * fraction);
+  return mix(
+    mix(mix(hash(index), hash(index + vec3(1.0, 0.0, 0.0)), fraction.x),
+        mix(hash(index + vec3(0.0, 1.0, 0.0)), hash(index + vec3(1.0, 1.0, 0.0)), fraction.x), fraction.y),
+    mix(mix(hash(index + vec3(0.0, 0.0, 1.0)), hash(index + vec3(1.0, 0.0, 1.0)), fraction.x),
+        mix(hash(index + vec3(0.0, 1.0, 1.0)), hash(index + vec3(1.0, 1.0, 1.0)), fraction.x), fraction.y),
+    fraction.z
+  );
+}
+
+float fbm(vec3 point) {
+  float value = 0.0;
+  float amplitude = 0.54;
+  for (int octave = 0; octave < 4; octave++) {
+    value += amplitude * noise(point);
+    point = point * 2.06 + vec3(8.1, 13.4, 4.7);
+    amplitude *= 0.48;
+  }
+  return value;
+}
+
+void main(void) {
+  vec3 normal = normalize(vWorldNormal);
+  vec3 samplePosition = normal * 3.2 + vec3(time * 0.028, 0.0, time * -0.014);
+  float cloudNoise = fbm(samplePosition);
+  float threshold = mix(0.74, 0.43, cloudCover);
+  float cloud = smoothstep(threshold, threshold + 0.16, cloudNoise);
+  vec3 viewDirection = normalize(cameraPosition - vWorldPosition);
+  float rim = pow(1.0 - max(dot(normal, viewDirection), 0.0), 2.2);
+  float diffuse = 0.28 + max(dot(normal, lightDirection), 0.0) * 0.78;
+  gl_FragColor = vec4(cloudColor * (diffuse + rim * 0.34), cloud * (0.24 + cloudCover * 0.48));
 }
 `;
 
@@ -331,13 +420,16 @@ varying vec3 vWorldNormal;
 
 uniform vec3 atmosphereColor;
 uniform vec3 cameraPosition;
+uniform float time;
+uniform float activity;
 
 void main(void) {
   vec3 normal = normalize(vWorldNormal);
   vec3 viewDirection = normalize(cameraPosition - vWorldPosition);
   float rim = pow(1.0 - max(dot(normal, viewDirection), 0.0), 2.25);
-  float alpha = smoothstep(0.03, 1.0, rim) * 0.5;
-  gl_FragColor = vec4(atmosphereColor * (0.75 + rim * 1.5), alpha);
+  float pulse = 0.92 + sin(time * 0.42) * 0.08 * activity;
+  float alpha = smoothstep(0.03, 1.0, rim) * (0.42 + activity * 0.16) * pulse;
+  gl_FragColor = vec4(atmosphereColor * (0.75 + rim * (1.35 + activity * 0.5)), alpha);
 }
 `;
 
@@ -444,14 +536,63 @@ const createViewingDeck = (scene: Scene, profile: RenderQualityProfile): Mesh =>
   return deck;
 };
 
+const createRingSystem = (
+  scene: Scene,
+  profile: RenderQualityProfile,
+  radius: number,
+  outerRadius: number,
+  color: Rgb,
+  opacity: number,
+  tilt: number,
+): TransformNode => {
+  const ringSystem = new TransformNode("ringSystem", scene);
+  ringSystem.position.copyFrom(PLANET_POSITION);
+  ringSystem.rotation.x = 0.88 + tilt * 0.36;
+  ringSystem.rotation.z = tilt;
+  const ringCount = profile.tier === "desktop" ? 9 : 6;
+  const span = outerRadius - radius * 1.08;
+
+  for (let index = 0; index < ringCount; index += 1) {
+    const progress = (index + 0.35) / ringCount;
+    const ringRadius = radius * 1.08 + span * progress;
+    const ring = MeshBuilder.CreateTorus(
+      `planetRing-${index}`,
+      {
+        diameter: ringRadius * 2,
+        thickness: Math.max(0.016, span * (0.035 + (index % 3) * 0.012)),
+        tessellation: profile.ringTessellation,
+      },
+      scene,
+    );
+    ring.parent = ringSystem;
+    ring.isPickable = false;
+
+    const material = new StandardMaterial(`planetRingMaterial-${index}`, scene);
+    const ringColor = toColor3(color).scale(0.72 + (index % 4) * 0.09);
+    material.disableLighting = true;
+    material.diffuseColor = ringColor;
+    material.emissiveColor = ringColor.scale(0.32);
+    material.alpha = opacity * (0.48 + ((index * 7) % 5) * 0.13);
+    material.backFaceCulling = false;
+    material.disableDepthWrite = true;
+    material.freeze();
+    ring.material = material;
+  }
+
+  return ringSystem;
+};
+
 const createPlanet = (
   scene: Scene,
   recipe: WorldRecipe,
   profile: RenderQualityProfile,
 ): {
   atmosphere: ShaderMaterial;
+  cloudLayer: ShaderMaterial | null;
+  cloudMesh: Mesh | null;
   moonOrbit: TransformNode;
   planet: Mesh;
+  ringSystem: TransformNode | null;
   shader: ShaderMaterial;
 } => {
   Effect.ShadersStore.exoraPlanetVertexShader = PLANET_VERTEX_SHADER;
@@ -459,6 +600,7 @@ const createPlanet = (
   Effect.ShadersStore.exoraIceGiantFragmentShader = ICE_GIANT_FRAGMENT_SHADER;
   Effect.ShadersStore.exoraRockyVertexShader = ROCKY_VERTEX_SHADER;
   Effect.ShadersStore.exoraRockyFragmentShader = ROCKY_FRAGMENT_SHADER;
+  Effect.ShadersStore.exoraCloudFragmentShader = CLOUD_FRAGMENT_SHADER;
   Effect.ShadersStore.exoraAtmosphereVertexShader = ATMOSPHERE_VERTEX_SHADER;
   Effect.ShadersStore.exoraAtmosphereFragmentShader = ATMOSPHERE_FRAGMENT_SHADER;
 
@@ -468,7 +610,7 @@ const createPlanet = (
     scene,
   );
   planet.position.copyFrom(PLANET_POSITION);
-  planet.rotation.z = -0.09;
+  planet.rotation.z = recipe.axialTilt;
   planet.isPickable = false;
 
   let shader: ShaderMaterial;
@@ -489,11 +631,15 @@ const createPlanet = (
           "roughness",
           "craterDensity",
           "waterLevel",
+          "time",
+          "lavaStrength",
+          "iceCapStrength",
           "lightDirection",
           "lowColor",
           "midColor",
           "highColor",
           "waterColor",
+          "emissiveColor",
         ],
       },
     );
@@ -512,6 +658,8 @@ const createPlanet = (
           "seed",
           "bandScale",
           "stormStrength",
+          "stormLatitude",
+          "polarGlow",
           "lightDirection",
           "deepColor",
           "hazeColor",
@@ -534,10 +682,15 @@ const createPlanet = (
           "seed",
           "turbulence",
           "contrast",
+          "jetCount",
+          "stormLatitude",
+          "stormScale",
+          "stormStrength",
           "lightDirection",
           "deepColor",
           "midColor",
           "lightColor",
+          "stormColor",
         ],
       },
     );
@@ -551,50 +704,86 @@ const createPlanet = (
     shader.setFloat("roughness", recipe.surface.roughness);
     shader.setFloat("craterDensity", recipe.surface.craterDensity);
     shader.setFloat("waterLevel", recipe.surface.waterLevel);
+    shader.setFloat("lavaStrength", recipe.surface.lavaStrength);
+    shader.setFloat("iceCapStrength", recipe.surface.iceCapStrength);
     shader.setColor3("lowColor", toColor3(recipe.surface.lowColor));
     shader.setColor3("midColor", toColor3(recipe.surface.midColor));
     shader.setColor3("highColor", toColor3(recipe.surface.highColor));
     shader.setColor3("waterColor", toColor3(recipe.surface.waterColor));
+    shader.setColor3("emissiveColor", toColor3(recipe.surface.emissiveColor));
   } else if (recipe.renderer === "ice-giant") {
     shader.setFloat("bandScale", recipe.atmosphereBands.bandScale);
     shader.setFloat("stormStrength", recipe.atmosphereBands.stormStrength);
+    shader.setFloat("stormLatitude", recipe.atmosphereBands.stormLatitude);
+    shader.setFloat("polarGlow", recipe.atmosphereBands.polarGlow);
     shader.setColor3("deepColor", toColor3(recipe.atmosphereBands.deepColor));
     shader.setColor3("hazeColor", toColor3(recipe.atmosphereBands.hazeColor));
     shader.setColor3("lightColor", toColor3(recipe.atmosphereBands.lightColor));
   } else {
     shader.setFloat("turbulence", recipe.cloudBands.turbulence);
     shader.setFloat("contrast", recipe.cloudBands.contrast);
+    shader.setFloat("jetCount", recipe.cloudBands.jetCount);
+    shader.setFloat("stormLatitude", recipe.cloudBands.stormLatitude);
+    shader.setFloat("stormScale", recipe.cloudBands.stormScale);
+    shader.setFloat("stormStrength", recipe.cloudBands.stormStrength);
     shader.setColor3("deepColor", toColor3(recipe.cloudBands.deepColor));
     shader.setColor3("midColor", toColor3(recipe.cloudBands.midColor));
     shader.setColor3("lightColor", toColor3(recipe.cloudBands.lightColor));
+    shader.setColor3("stormColor", toColor3(recipe.cloudBands.stormColor));
   }
   planet.material = shader;
 
-  if (recipe.renderer === "ice-giant") {
-    const ring = MeshBuilder.CreateTorus(
-      "iceGiantRing",
-      {
-        diameter: recipe.radiusSceneUnits + recipe.rings.outerRadius,
-        thickness: recipe.rings.outerRadius - recipe.radiusSceneUnits,
-        tessellation: profile.ringTessellation,
-      },
+  const ringRecipe = recipe.renderer === "rocky" ? null : recipe.rings;
+  const ringSystem = ringRecipe
+    ? createRingSystem(
+        scene,
+        profile,
+        recipe.radiusSceneUnits,
+        ringRecipe.outerRadius,
+        ringRecipe.color,
+        ringRecipe.opacity,
+        recipe.axialTilt,
+      )
+    : null;
+
+  let cloudMesh: Mesh | null = null;
+  let cloudLayer: ShaderMaterial | null = null;
+  if (recipe.renderer === "rocky" && recipe.surface.cloudCover > 0) {
+    cloudMesh = MeshBuilder.CreateSphere(
+      "cloudLayer",
+      { diameter: recipe.radiusSceneUnits * 2.035, segments: profile.planetSegments },
       scene,
     );
-    ring.position.copyFrom(PLANET_POSITION);
-    ring.rotation.x = 0.95;
-    ring.rotation.z = -0.08;
-    ring.isPickable = false;
-
-    const ringMaterial = new StandardMaterial("iceGiantRingMaterial", scene);
-    ringMaterial.disableLighting = true;
-    ringMaterial.diffuseColor = toColor3(recipe.rings.color);
-    ringMaterial.emissiveColor = toColor3(recipe.rings.color).scale(0.38);
-    ringMaterial.alpha = recipe.rings.opacity;
-    ringMaterial.backFaceCulling = false;
-    ringMaterial.disableDepthWrite = true;
-    ringMaterial.freeze();
-    ring.material = ringMaterial;
-    ring.freezeWorldMatrix();
+    cloudMesh.position.copyFrom(PLANET_POSITION);
+    cloudMesh.rotation.z = recipe.axialTilt;
+    cloudMesh.isPickable = false;
+    cloudMesh.renderingGroupId = 1;
+    cloudLayer = new ShaderMaterial(
+      "cloudLayerMaterial",
+      scene,
+      { vertex: "exoraAtmosphere", fragment: "exoraCloud" },
+      {
+        attributes: ["position", "normal"],
+        uniforms: [
+          "world",
+          "worldViewProjection",
+          "cameraPosition",
+          "time",
+          "seed",
+          "cloudCover",
+          "cloudColor",
+          "lightDirection",
+        ],
+        needAlphaBlending: true,
+      },
+    );
+    cloudLayer.setFloat("seed", recipe.seed);
+    cloudLayer.setFloat("cloudCover", recipe.surface.cloudCover);
+    cloudLayer.setColor3("cloudColor", toColor3(recipe.surface.cloudColor));
+    cloudLayer.setVector3("lightDirection", LIGHT_DIRECTION);
+    cloudLayer.backFaceCulling = true;
+    cloudLayer.disableDepthWrite = true;
+    cloudMesh.material = cloudLayer;
   }
 
   const atmosphereMesh = MeshBuilder.CreateSphere(
@@ -612,11 +801,26 @@ const createPlanet = (
     { vertex: "exoraAtmosphere", fragment: "exoraAtmosphere" },
     {
       attributes: ["position", "normal"],
-      uniforms: ["world", "worldViewProjection", "cameraPosition", "atmosphereColor"],
+      uniforms: [
+        "world",
+        "worldViewProjection",
+        "cameraPosition",
+        "atmosphereColor",
+        "time",
+        "activity",
+      ],
       needAlphaBlending: true,
     },
   );
   atmosphere.setColor3("atmosphereColor", toColor3(recipe.atmosphere.color));
+  atmosphere.setFloat(
+    "activity",
+    recipe.renderer === "gas-giant"
+      ? recipe.cloudBands.stormStrength
+      : recipe.renderer === "ice-giant"
+        ? recipe.atmosphereBands.polarGlow
+        : Math.max(recipe.surface.cloudCover, recipe.surface.lavaStrength * 0.35),
+  );
   atmosphere.backFaceCulling = true;
   atmosphere.alphaMode = Engine.ALPHA_ADD;
   atmosphere.disableDepthWrite = true;
@@ -633,7 +837,7 @@ const createPlanet = (
     scene,
   );
   orbitGuide.position.copyFrom(PLANET_POSITION);
-  orbitGuide.rotation.z = 0.18;
+  orbitGuide.rotation.z = recipe.moon.inclination;
   orbitGuide.isPickable = false;
 
   const orbitMaterial = new StandardMaterial("orbitGuideMaterial", scene);
@@ -646,7 +850,7 @@ const createPlanet = (
 
   const moonOrbit = new TransformNode("moonOrbit", scene);
   moonOrbit.position.copyFrom(PLANET_POSITION);
-  moonOrbit.rotation.z = 0.18;
+  moonOrbit.rotation.z = recipe.moon.inclination;
 
   const moon = MeshBuilder.CreateSphere(
     "generatedMoon",
@@ -658,13 +862,13 @@ const createPlanet = (
   moon.isPickable = false;
 
   const moonMaterial = new StandardMaterial("moonMaterial", scene);
-  moonMaterial.diffuseColor = new Color3(0.19, 0.22, 0.25);
+  moonMaterial.diffuseColor = toColor3(recipe.moon.color);
   moonMaterial.emissiveColor = new Color3(0.01, 0.014, 0.018);
   moonMaterial.specularColor = new Color3(0.06, 0.07, 0.08);
   moonMaterial.freeze();
   moon.material = moonMaterial;
 
-  return { atmosphere, moonOrbit, planet, shader };
+  return { atmosphere, cloudLayer, cloudMesh, moonOrbit, planet, ringSystem, shader };
 };
 
 export const createPlanetExperience = async ({
@@ -716,7 +920,11 @@ export const createPlanetExperience = async ({
 
   createStarfield(scene, recipe.seed, profile.starCount);
   const viewingDeck = createViewingDeck(scene, profile);
-  const { atmosphere, moonOrbit, planet, shader } = createPlanet(scene, recipe, profile);
+  const { atmosphere, cloudLayer, cloudMesh, moonOrbit, planet, ringSystem, shader } = createPlanet(
+    scene,
+    recipe,
+    profile,
+  );
 
   let elapsedSeconds = 0;
   let qualitySampleSeconds = 0;
@@ -727,14 +935,22 @@ export const createPlanetExperience = async ({
     qualitySampleSeconds += deltaSeconds;
     planet.rotation.y += deltaSeconds * recipe.rotationSpeed;
     moonOrbit.rotation.y += deltaSeconds * recipe.moon.speed;
+    if (ringSystem) ringSystem.rotation.y += deltaSeconds * recipe.rotationSpeed * 0.045;
+    if (cloudMesh && recipe.renderer === "rocky")
+      cloudMesh.rotation.y += deltaSeconds * (recipe.rotationSpeed + recipe.surface.cloudSpeed);
     if (recipe.renderer === "gas-giant")
       shader.setFloat("time", elapsedSeconds * recipe.cloudBands.speed * 18);
     if (recipe.renderer === "ice-giant")
       shader.setFloat("time", elapsedSeconds * recipe.atmosphereBands.speed * 18);
+    if (recipe.renderer === "rocky") shader.setFloat("time", elapsedSeconds);
+    atmosphere.setFloat("time", elapsedSeconds);
+    if (cloudLayer && recipe.renderer === "rocky")
+      cloudLayer.setFloat("time", elapsedSeconds * recipe.surface.cloudSpeed * 18);
 
     const activePosition = scene.activeCamera?.globalPosition ?? camera.globalPosition;
     shader.setVector3("cameraPosition", activePosition);
     atmosphere.setVector3("cameraPosition", activePosition);
+    cloudLayer?.setVector3("cameraPosition", activePosition);
 
     if (qualitySampleSeconds >= 3) {
       qualitySampleSeconds = 0;

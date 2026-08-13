@@ -3,6 +3,7 @@ import type { ExoplanetProfile } from "@exora/contracts";
 export type Rgb = readonly [red: number, green: number, blue: number];
 
 interface BaseWorldRecipe {
+  axialTilt: number;
   atmosphere: {
     color: Rgb;
     label: string;
@@ -10,6 +11,8 @@ interface BaseWorldRecipe {
   classification: string;
   confidence: "low" | "medium" | "high";
   moon: {
+    color: Rgb;
+    inclination: number;
     orbitRadius: number;
     radius: number;
     speed: number;
@@ -24,12 +27,22 @@ export interface GasGiantWorldRecipe extends BaseWorldRecipe {
   cloudBands: {
     contrast: number;
     deepColor: Rgb;
+    jetCount: number;
     lightColor: Rgb;
     midColor: Rgb;
     speed: number;
+    stormColor: Rgb;
+    stormLatitude: number;
+    stormScale: number;
+    stormStrength: number;
     turbulence: number;
   };
   renderer: "gas-giant";
+  rings: {
+    color: Rgb;
+    opacity: number;
+    outerRadius: number;
+  } | null;
 }
 
 export interface IceGiantWorldRecipe extends BaseWorldRecipe {
@@ -38,7 +51,9 @@ export interface IceGiantWorldRecipe extends BaseWorldRecipe {
     deepColor: Rgb;
     hazeColor: Rgb;
     lightColor: Rgb;
+    polarGlow: number;
     speed: number;
+    stormLatitude: number;
     stormStrength: number;
   };
   renderer: "ice-giant";
@@ -52,9 +67,15 @@ export interface IceGiantWorldRecipe extends BaseWorldRecipe {
 export interface RockyWorldRecipe extends BaseWorldRecipe {
   renderer: "rocky";
   surface: {
+    cloudColor: Rgb;
+    cloudCover: number;
+    cloudSpeed: number;
     craterDensity: number;
     elevation: number;
+    emissiveColor: Rgb;
     highColor: Rgb;
+    iceCapStrength: number;
+    lavaStrength: number;
     lowColor: Rgb;
     midColor: Rgb;
     roughness: number;
@@ -102,6 +123,20 @@ const temperateGasGiantPalette = {
   atmosphere: [0.38, 0.66, 1] as const,
 };
 
+const coldGasGiantPalette = {
+  deepColor: [0.025, 0.045, 0.09] as const,
+  midColor: [0.2, 0.31, 0.45] as const,
+  lightColor: [0.68, 0.78, 0.83] as const,
+  atmosphere: [0.28, 0.56, 0.9] as const,
+};
+
+const ultraHotGasGiantPalette = {
+  deepColor: [0.075, 0.008, 0.025] as const,
+  midColor: [0.62, 0.055, 0.075] as const,
+  lightColor: [1, 0.82, 0.42] as const,
+  atmosphere: [1, 0.16, 0.12] as const,
+};
+
 const deriveGasGiantRecipe = (
   planet: ExoplanetProfile,
   seed: number,
@@ -111,22 +146,51 @@ const deriveGasGiantRecipe = (
   const radiusJupiter =
     planet.observation.radiusJupiter ??
     (planet.observation.radiusEarth !== null ? planet.observation.radiusEarth / 11.209 : 1);
+  const massJupiter = planet.observation.massJupiter ?? 0;
+  const isUltraHot = equilibriumTemperature >= 1_800;
   const isHot = equilibriumTemperature >= 1_000;
-  const palette = isHot ? hotGasGiantPalette : temperateGasGiantPalette;
+  const isCold = equilibriumTemperature > 0 && equilibriumTemperature < 220;
+  const palette = isUltraHot
+    ? ultraHotGasGiantPalette
+    : isHot
+      ? hotGasGiantPalette
+      : isCold
+        ? coldGasGiantPalette
+        : temperateGasGiantPalette;
   const scaledRadius = 3.8 + Math.min(radiusJupiter, 2) * 0.45;
+  const hasProminentRings = random() > 0.62;
+  const stormHue = random();
 
   return {
     seed,
     renderer: "gas-giant",
-    classification: isHot ? "Young super-Jupiter" : "Gas giant",
+    classification: isUltraHot
+      ? "Ultra-hot Jupiter"
+      : isHot && massJupiter >= 5
+        ? "Young super-Jupiter"
+        : isHot
+          ? "Hot Jupiter"
+          : isCold
+            ? "Cold gas giant"
+            : "Gas giant",
     confidence: "medium",
     radiusSceneUnits: scaledRadius,
     rotationSpeed: 0.022 + random() * 0.01,
+    axialTilt: -0.16 + random() * 0.32,
     cloudBands: {
       ...palette,
       speed: 0.022 + random() * 0.018,
       turbulence: 1.8 + random() * 1.4,
       contrast: 0.62 + random() * 0.16,
+      jetCount: 13 + Math.floor(random() * 12),
+      stormLatitude: -0.48 + random() * 0.96,
+      stormScale: 3.2 + random() * 3.8,
+      stormStrength: 0.32 + random() * 0.58,
+      stormColor: isUltraHot
+        ? [1, 0.44 + stormHue * 0.18, 0.12]
+        : isCold
+          ? [0.68, 0.84, 0.95]
+          : [0.92, 0.66 + stormHue * 0.16, 0.4],
     },
     atmosphere: {
       color: palette.atmosphere,
@@ -136,9 +200,19 @@ const deriveGasGiantRecipe = (
       radius: scaledRadius * (0.075 + random() * 0.025),
       orbitRadius: scaledRadius * (1.7 + random() * 0.2),
       speed: 0.055 + random() * 0.02,
+      inclination: -0.22 + random() * 0.44,
+      color: isHot ? [0.29, 0.19, 0.14] : [0.22, 0.25, 0.29],
     },
-    summary:
-      "A giant world rendered with turbulent cloud bands and a deep thermal glow derived from its measured scale and temperature.",
+    rings: hasProminentRings
+      ? {
+          color: isHot ? [0.66, 0.35, 0.19] : [0.42, 0.52, 0.62],
+          opacity: 0.12 + random() * 0.12,
+          outerRadius: scaledRadius * (1.42 + random() * 0.24),
+        }
+      : null,
+    summary: hasProminentRings
+      ? "A giant world with animated jet bands, a long-lived storm vortex, and a sparse ring system inferred from its measured scale and thermal regime."
+      : "A giant world with animated jet bands and a long-lived storm vortex, colored by its measured scale and thermal regime.",
   };
 };
 
@@ -201,6 +275,7 @@ const deriveRockyRecipe = (
     confidence: temperature === null ? "low" : "medium",
     radiusSceneUnits: scaledRadius,
     rotationSpeed: 0.014 + random() * 0.012,
+    axialTilt: -0.34 + random() * 0.68,
     atmosphere: {
       color: palette.atmosphere,
       label: isScorched
@@ -215,15 +290,25 @@ const deriveRockyRecipe = (
       roughness: 2.1 + random() * 1.4,
       craterDensity: 0.38 + random() * 0.34,
       waterLevel: isTemperate ? 0.4 + random() * 0.08 : 0,
+      lavaStrength: isScorched ? 0.5 + random() * 0.42 : 0,
+      emissiveColor: isScorched ? [1, 0.16, 0.015] : [0, 0, 0],
+      iceCapStrength: isFrozen ? 0.86 : isTemperate ? 0.28 + random() * 0.2 : 0,
+      cloudCover: isTemperate ? 0.3 + random() * 0.34 : isFrozen ? 0.12 + random() * 0.16 : 0,
+      cloudSpeed: 0.016 + random() * 0.016,
+      cloudColor: isFrozen ? [0.58, 0.75, 0.86] : [0.84, 0.9, 0.94],
     },
     moon: {
       radius: scaledRadius * (0.055 + random() * 0.025),
       orbitRadius: scaledRadius * (1.72 + random() * 0.22),
       speed: 0.045 + random() * 0.024,
+      inclination: -0.34 + random() * 0.68,
+      color: isFrozen ? [0.32, 0.38, 0.42] : [0.24, 0.22, 0.2],
     },
     summary: isTemperate
-      ? "A speculative temperate surface with fractured highlands and low basins, generated from the planet's measured radius and thermal regime."
-      : "A rugged mineral surface with procedurally displaced highlands and impact-worn basins, shaped by the planet's measured scale and temperature.",
+      ? "A speculative temperate world with ocean basins, drifting cloud systems, highland terrain, and polar ice generated from its measured scale and temperature."
+      : isScorched
+        ? "An intensely heated mineral world with glowing fracture networks, dark impact basins, and a thin vapor haze generated from its measured thermal regime."
+        : "A frozen rocky world with broad polar ice, weathered highlands, impact basins, and sparse drifting cloud systems.",
   };
 };
 
@@ -257,6 +342,7 @@ const deriveIceGiantRecipe = (
     confidence: temperature === null ? "low" : "medium",
     radiusSceneUnits: scaledRadius,
     rotationSpeed: 0.024 + random() * 0.016,
+    axialTilt: -0.46 + random() * 0.92,
     atmosphere: {
       color: palette.atmosphere,
       label: "Hydrogen / helium / methane · inferred",
@@ -266,6 +352,8 @@ const deriveIceGiantRecipe = (
       speed: 0.018 + random() * 0.015,
       bandScale: 9 + random() * 5,
       stormStrength: 0.32 + random() * 0.28,
+      stormLatitude: -0.5 + random(),
+      polarGlow: 0.2 + random() * 0.46,
     },
     rings: {
       color: isWarm ? [0.28, 0.55, 0.58] : [0.3, 0.45, 0.72],
@@ -276,6 +364,8 @@ const deriveIceGiantRecipe = (
       radius: scaledRadius * (0.045 + random() * 0.025),
       orbitRadius: scaledRadius * (1.7 + random() * 0.24),
       speed: 0.04 + random() * 0.025,
+      inclination: -0.42 + random() * 0.84,
+      color: isWarm ? [0.2, 0.29, 0.3] : [0.2, 0.24, 0.32],
     },
     summary:
       "A deep volatile-rich atmosphere rendered with methane-tinted haze, subdued cloud bands, and a faint debris ring inferred from its measured scale and temperature.",

@@ -72,6 +72,11 @@ test("hot massive gas giants produce the intended visual family", () => {
   expect(recipe.classification).toBe("Young super-Jupiter");
   expect(recipe.atmosphere.label).toContain("inferred");
   expect(recipe.radiusSceneUnits).toBeGreaterThan(4);
+
+  if (recipe.renderer !== "gas-giant") throw new Error("Expected a gas-giant recipe.");
+  expect(recipe.cloudBands.jetCount).toBeGreaterThanOrEqual(13);
+  expect(recipe.cloudBands.stormStrength).toBeGreaterThan(0);
+  expect(recipe.cloudBands.stormColor).toHaveLength(3);
 });
 
 test("temperate rocky planets produce displaced terrain with low basins", () => {
@@ -83,7 +88,28 @@ test("temperate rocky planets produce displaced terrain with low basins", () => 
   if (recipe.renderer !== "rocky") throw new Error("Expected a rocky recipe.");
   expect(recipe.surface.elevation).toBeGreaterThan(0);
   expect(recipe.surface.waterLevel).toBeGreaterThan(0);
+  expect(recipe.surface.cloudCover).toBeGreaterThan(0);
+  expect(recipe.surface.iceCapStrength).toBeGreaterThan(0);
+  expect(recipe.surface.lavaStrength).toBe(0);
   expect(recipe.atmosphere.label).toContain("inferred");
+});
+
+test("scorched rocky planets generate emissive fractures without water", () => {
+  const recipe = deriveWorldRecipe({
+    ...temperateRockyPlanet,
+    id: "lava-world",
+    observation: {
+      ...temperateRockyPlanet.observation,
+      equilibriumTemperatureKelvin: 1_120,
+    },
+  });
+
+  expect(recipe.renderer).toBe("rocky");
+  if (recipe.renderer !== "rocky") throw new Error("Expected a rocky recipe.");
+  expect(recipe.classification).toBe("Scorched rocky world");
+  expect(recipe.surface.lavaStrength).toBeGreaterThan(0);
+  expect(recipe.surface.waterLevel).toBe(0);
+  expect(recipe.surface.cloudCover).toBe(0);
 });
 
 test("rocky terrain changes deterministically between planets", () => {
@@ -107,6 +133,7 @@ test("ice giants produce methane haze and a faint ring system", () => {
 
   if (recipe.renderer !== "ice-giant") throw new Error("Expected an ice-giant recipe.");
   expect(recipe.atmosphereBands.bandScale).toBeGreaterThanOrEqual(9);
+  expect(recipe.atmosphereBands.polarGlow).toBeGreaterThan(0);
   expect(recipe.rings.outerRadius).toBeGreaterThan(recipe.radiusSceneUnits);
   expect(recipe.rings.opacity).toBeLessThan(0.25);
 });
