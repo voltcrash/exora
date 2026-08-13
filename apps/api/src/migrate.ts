@@ -5,7 +5,9 @@ import { createDatabaseClient } from "./database.ts";
 const connectionString = process.env.DATABASE_URL?.trim();
 if (!connectionString) throw new Error("DATABASE_URL is required to run database migrations.");
 
-const database = createDatabaseClient(connectionString);
+// Migration files manage their own BEGIN/COMMIT boundaries, so pin their raw
+// multi-statement queries to one physical connection.
+const database = createDatabaseClient(connectionString, { maxConnections: 1 });
 
 try {
   const migrationsUrl = new URL("../migrations/", import.meta.url);
