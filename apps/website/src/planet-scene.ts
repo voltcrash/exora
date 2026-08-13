@@ -34,6 +34,92 @@ const LIGHT_DIRECTION = new Vector3(-0.82, 0.3, -0.38).normalize();
 const DESKTOP_MOVE_SPEED = 5.2;
 const XR_MOVE_SPEED = 2.2;
 
+const SKY_VERTEX_SHADER = `
+precision highp float;
+
+attribute vec3 position;
+uniform mat4 worldViewProjection;
+varying vec3 vDirection;
+
+void main(void) {
+  vDirection = normalize(position);
+  gl_Position = worldViewProjection * vec4(position, 1.0);
+}
+`;
+
+const SKY_FRAGMENT_SHADER = `
+precision highp float;
+
+varying vec3 vDirection;
+
+uniform float time;
+uniform float seed;
+uniform float density;
+uniform float cloudiness;
+uniform float starVisibility;
+uniform vec3 horizonColor;
+uniform vec3 zenithColor;
+uniform vec3 cloudColor;
+uniform vec3 sunColor;
+
+float hash(vec2 point) {
+  point = fract(point * vec2(123.34, 345.45));
+  point += dot(point, point + 34.345 + seed * 0.0001);
+  return fract(point.x * point.y);
+}
+
+float noise(vec2 point) {
+  vec2 index = floor(point);
+  vec2 fraction = fract(point);
+  fraction = fraction * fraction * (3.0 - 2.0 * fraction);
+  return mix(
+    mix(hash(index), hash(index + vec2(1.0, 0.0)), fraction.x),
+    mix(hash(index + vec2(0.0, 1.0)), hash(index + vec2(1.0, 1.0)), fraction.x),
+    fraction.y
+  );
+}
+
+float fbm(vec2 point) {
+  float value = 0.0;
+  float amplitude = 0.52;
+  for (int octave = 0; octave < 5; octave++) {
+    value += noise(point) * amplitude;
+    point = point * 2.03 + vec2(13.1, 7.7);
+    amplitude *= 0.48;
+  }
+  return value;
+}
+
+void main(void) {
+  vec3 direction = normalize(vDirection);
+  float elevation = clamp(direction.y * 0.5 + 0.5, 0.0, 1.0);
+  float horizon = pow(1.0 - abs(direction.y), 2.2);
+  vec3 sky = mix(horizonColor, zenithColor, smoothstep(0.03, 0.78, elevation));
+  sky += horizonColor * horizon * density * 0.32;
+
+  float longitude = atan(direction.z, direction.x);
+  vec2 cloudUv = vec2(longitude * 2.1 + time * 0.006, direction.y * 5.2);
+  float cloudNoise = fbm(cloudUv + fbm(cloudUv * 0.63 + 4.2));
+  float cloudBand = smoothstep(0.48 + (1.0 - cloudiness) * 0.22, 0.78, cloudNoise);
+  cloudBand *= smoothstep(-0.14, 0.35, direction.y) * (1.0 - smoothstep(0.62, 0.96, direction.y));
+  sky = mix(sky, cloudColor, cloudBand * cloudiness * (0.34 + density * 0.46));
+
+  vec3 sunDirection = normalize(vec3(-0.62, 0.28, 0.73));
+  float sunAngle = max(dot(direction, sunDirection), 0.0);
+  float sunDisc = smoothstep(0.997, 0.9994, sunAngle);
+  float sunHalo = pow(sunAngle, 48.0) * (0.25 + density * 0.42);
+  sky += sunColor * (sunDisc * 1.8 + sunHalo);
+
+  vec2 starCell = floor(vec2(longitude * 210.0, asin(direction.y) * 180.0));
+  float star = step(0.994, hash(starCell)) * pow(hash(starCell + 9.4), 5.0);
+  star *= smoothstep(0.08, 0.72, direction.y) * starVisibility;
+  sky += vec3(0.72, 0.86, 1.0) * star * 2.4;
+
+  float dither = (hash(gl_FragCoord.xy) - 0.5) / 255.0;
+  gl_FragColor = vec4(sky + dither, 1.0);
+}
+`;
+
 const PLANET_VERTEX_SHADER = `
 precision highp float;
 
@@ -949,6 +1035,10 @@ const smoothTerrainNoise = (x: number, z: number, seed: number): number => {
 };
 
 const terrainNoise = (x: number, z: number, seed: number): number => {
+  const warpX = smoothTerrainNoise(x * 0.021, z * 0.021, seed ^ 0x51f2d3) - 0.5;
+  const warpZ = smoothTerrainNoise(x * 0.021, z * 0.021, seed ^ 0xa1c8e7) - 0.5;
+  x += warpX * 13;
+  z += warpZ * 13;
   let frequency = 0.055;
   let amplitude = 1;
   let height = 0;
@@ -964,7 +1054,54 @@ const terrainNoise = (x: number, z: number, seed: number): number => {
 
   const ridgeSample = smoothTerrainNoise(x * 0.092, z * 0.092, seed ^ 0x68bc21eb);
   const ridge = 1 - Math.abs(ridgeSample * 2 - 1);
-  return (height / normalizer) * 1.45 + ridge * ridge * 0.82 - 0.34;
+  const broadMass = smoothTerrainNoise(x * 0.018, z * 0.018, seed ^ 0x218bc4) * 2 - 1;
+  return (height / normalizer) * 1.32 + ridge ** 3 * 1.05 + broadMass * 0.72 - 0.43;
+};
+
+const craterField = (x: number, z: number, seed: number, density: number): number => {
+  const cellSize = 7.5 + (1 - density) * 5;
+  const cellX = Math.floor(x / cellSize);
+  const cellZ = Math.floor(z / cellSize);
+  let displacement = 0;
+
+  for (let offsetX = -1; offsetX <= 1; offsetX += 1) {
+    for (let offsetZ = -1; offsetZ <= 1; offsetZ += 1) {
+      const sampleX = cellX + offsetX;
+      const sampleZ = cellZ + offsetZ;
+      const chance = terrainHash(sampleX, sampleZ, seed ^ 0xc4a73);
+      if (chance > density * 0.58) continue;
+      const radius = cellSize * (0.16 + terrainHash(sampleX, sampleZ, seed ^ 0x91da2) * 0.23);
+      const centerX =
+        (sampleX + 0.18 + terrainHash(sampleX, sampleZ, seed ^ 0x3bd17) * 0.64) * cellSize;
+      const centerZ =
+        (sampleZ + 0.18 + terrainHash(sampleX, sampleZ, seed ^ 0x7fe91) * 0.64) * cellSize;
+      const distance = Math.hypot(x - centerX, z - centerZ) / radius;
+      const bowl = Math.max(0, 1 - distance) ** 2 * -1.15;
+      const rim = Math.max(0, 1 - Math.abs(distance - 1) / 0.22) * 0.42;
+      displacement += bowl + rim;
+    }
+  }
+
+  return displacement;
+};
+
+const surfaceTerrainHeight = (x: number, z: number, recipe: WorldRecipe): number => {
+  const base = terrainNoise(x, z, recipe.seed);
+  const horizonLift = Math.max(0, (z - 2) / 36) * 1.7;
+  if (recipe.renderer === "gas-giant") {
+    return base * 0.52 + Math.sin(z * 0.13 + recipe.seed) * 0.46 + horizonLift * 0.7;
+  }
+  if (recipe.renderer === "ice-giant") {
+    return base * 0.68 + Math.sin(z * 0.1 + recipe.seed) * 0.3 + horizonLift * 0.82;
+  }
+
+  const distance = Math.hypot(x * 0.72, z * 0.25);
+  const relief = 1.1 + Math.min(distance / 25, 1) * (1.5 + recipe.surface.elevation * 3.2);
+  const terraceAmount = Math.min(0.42, Math.max(0, recipe.surface.roughness - 2) * 0.12);
+  const terraced =
+    Math.round(base * (5 + recipe.surface.roughness)) / (5 + recipe.surface.roughness);
+  const crater = craterField(x, z, recipe.seed, recipe.surface.craterDensity);
+  return (base * (1 - terraceAmount) + terraced * terraceAmount) * relief + crater + horizonLift;
 };
 
 const mixRgb = (from: Rgb, to: Rgb, amount: number): Color4 =>
@@ -975,15 +1112,109 @@ const mixRgb = (from: Rgb, to: Rgb, amount: number): Color4 =>
     1,
   );
 
+const mixColor3 = (from: Rgb, to: Rgb, amount: number): Color3 => {
+  const mixed = mixRgb(from, to, Math.min(1, Math.max(0, amount)));
+  return new Color3(mixed.r, mixed.g, mixed.b);
+};
+
+const createSurfaceSky = (
+  scene: Scene,
+  root: TransformNode,
+  recipe: WorldRecipe,
+  profile: RenderQualityProfile,
+): { material: ShaderMaterial; mesh: Mesh } => {
+  Effect.ShadersStore.exoraSkyVertexShader = SKY_VERTEX_SHADER;
+  Effect.ShadersStore.exoraSkyFragmentShader = SKY_FRAGMENT_SHADER;
+  const atmosphere = recipe.atmosphere.color;
+  const isGasGiant = recipe.renderer === "gas-giant";
+  const isIceGiant = recipe.renderer === "ice-giant";
+  const cloudiness = isGasGiant
+    ? 0.94
+    : isIceGiant
+      ? 0.8
+      : Math.max(0.08, recipe.surface.cloudCover);
+  const density = isGasGiant
+    ? 1
+    : isIceGiant
+      ? 0.9
+      : Math.min(
+          0.82,
+          0.25 + recipe.surface.cloudCover * 0.72 + recipe.surface.lavaStrength * 0.22,
+        );
+  const zenithColor = isGasGiant
+    ? mixColor3(atmosphere, recipe.cloudBands.deepColor, 0.62)
+    : isIceGiant
+      ? mixColor3(atmosphere, recipe.atmosphereBands.deepColor, 0.66)
+      : mixColor3(atmosphere, [0.008, 0.014, 0.035], 0.64 - density * 0.24);
+  const horizonColor = isGasGiant
+    ? mixColor3(atmosphere, recipe.cloudBands.lightColor, 0.35)
+    : isIceGiant
+      ? mixColor3(atmosphere, recipe.atmosphereBands.hazeColor, 0.38)
+      : mixColor3(atmosphere, recipe.surface.highColor, 0.14);
+  const cloudColor = isGasGiant
+    ? toColor3(recipe.cloudBands.lightColor)
+    : isIceGiant
+      ? toColor3(recipe.atmosphereBands.hazeColor)
+      : toColor3(recipe.surface.cloudColor);
+  const sunColor =
+    recipe.renderer === "rocky" && recipe.surface.lavaStrength > 0
+      ? new Color3(1, 0.38, 0.08)
+      : mixColor3([1, 0.82, 0.56], atmosphere, isIceGiant ? 0.38 : 0.16);
+
+  const mesh = MeshBuilder.CreateSphere(
+    "surfaceSky",
+    { diameter: 180, segments: profile.tier === "desktop" ? 32 : 20 },
+    scene,
+  );
+  mesh.parent = root;
+  mesh.infiniteDistance = true;
+  mesh.isPickable = false;
+  mesh.renderingGroupId = 0;
+
+  const material = new ShaderMaterial(
+    "surfaceSkyMaterial",
+    scene,
+    { vertex: "exoraSky", fragment: "exoraSky" },
+    {
+      attributes: ["position"],
+      uniforms: [
+        "worldViewProjection",
+        "time",
+        "seed",
+        "density",
+        "cloudiness",
+        "starVisibility",
+        "horizonColor",
+        "zenithColor",
+        "cloudColor",
+        "sunColor",
+      ],
+    },
+  );
+  material.setFloat("time", 0);
+  material.setFloat("seed", recipe.seed);
+  material.setFloat("density", density);
+  material.setFloat("cloudiness", cloudiness);
+  material.setFloat("starVisibility", isGasGiant ? 0 : isIceGiant ? 0.02 : 1 - density);
+  material.setColor3("horizonColor", horizonColor);
+  material.setColor3("zenithColor", zenithColor);
+  material.setColor3("cloudColor", cloudColor);
+  material.setColor3("sunColor", sunColor);
+  material.backFaceCulling = false;
+  material.disableDepthWrite = true;
+  mesh.material = material;
+  return { material, mesh };
+};
+
 const createSurfaceEnvironment = (
   scene: Scene,
   recipe: WorldRecipe,
   profile: RenderQualityProfile,
-): { cloudLayers: Mesh[]; meshes: AbstractMesh[]; root: TransformNode } => {
+): { cloudLayers: Mesh[]; meshes: AbstractMesh[]; root: TransformNode; sky: ShaderMaterial } => {
   const root = new TransformNode("surfaceEnvironment", scene);
   const meshes: AbstractMesh[] = [];
   const random = createSeededRandom(recipe.seed ^ 0x9e3779b9);
-  const subdivisions = profile.tier === "desktop" ? 72 : 44;
+  const subdivisions = profile.tier === "desktop" ? 96 : 52;
   const terrainLowColor =
     recipe.renderer === "rocky"
       ? recipe.surface.lowColor
@@ -1005,22 +1236,17 @@ const createSurfaceEnvironment = (
   ground.position.set(0, -1.6, 18);
   ground.isPickable = false;
   meshes.push(ground);
+  const surfaceSky = createSurfaceSky(scene, root, recipe, profile);
+  meshes.push(surfaceSky.mesh);
 
   const positions = ground.getVerticesData("position");
   const indices = ground.getIndices();
   if (positions && indices) {
     const normals: number[] = [];
-    const isAtmospheric = recipe.renderer !== "rocky";
     for (let index = 0; index < positions.length; index += 3) {
       const x = positions[index] ?? 0;
       const z = positions[index + 2] ?? 0;
-      const distance = Math.hypot(x * 0.72, z * 0.25);
-      const noise = terrainNoise(x, z, recipe.seed);
-      const horizonLift = Math.max(0, (z - 2) / 36) * 1.7;
-      const height = isAtmospheric
-        ? noise * 1.35 + Math.sin(z * 0.16 + recipe.seed) * 0.32 + horizonLift
-        : noise * (1.05 + Math.min(distance / 25, 1) * 2.15) + horizonLift;
-      positions[index + 1] = height;
+      positions[index + 1] = surfaceTerrainHeight(x, z, recipe);
     }
 
     VertexData.ComputeNormals(positions, indices, normals);
@@ -1030,8 +1256,34 @@ const createSurfaceEnvironment = (
       const normalY = normals[index + 1] ?? 1;
       const altitude = Math.min(1, Math.max(0, 0.38 + height * 0.11));
       const exposedSlope = Math.min(1, Math.max(0, (0.88 - normalY) * 3.6));
-      const color = mixRgb(terrainLowColor, terrainHighColor, altitude * (1 - exposedSlope * 0.5));
-      const shade = 0.72 + normalY * 0.28 - exposedSlope * 0.12;
+      const biome = smoothTerrainNoise(
+        (positions[index] ?? 0) * 0.075,
+        (positions[index + 2] ?? 0) * 0.075,
+        recipe.seed ^ 0x7193a,
+      );
+      const midColor = recipe.renderer === "rocky" ? recipe.surface.midColor : terrainHighColor;
+      let color =
+        altitude < 0.52
+          ? mixRgb(terrainLowColor, midColor, altitude / 0.52)
+          : mixRgb(midColor, terrainHighColor, (altitude - 0.52) / 0.48);
+      if (recipe.renderer === "rocky") {
+        const slopeColor = mixRgb(
+          recipe.surface.midColor,
+          recipe.surface.highColor,
+          0.24 + biome * 0.2,
+        );
+        color = new Color4(
+          color.r + (slopeColor.r - color.r) * exposedSlope,
+          color.g + (slopeColor.g - color.g) * exposedSlope,
+          color.b + (slopeColor.b - color.b) * exposedSlope,
+          1,
+        );
+        if (recipe.surface.lavaStrength > 0 && height < -0.25) {
+          const lava = Math.min(1, (-height - 0.25) * recipe.surface.lavaStrength * 1.8);
+          color = mixRgb([color.r, color.g, color.b] as Rgb, recipe.surface.emissiveColor, lava);
+        }
+      }
+      const shade = 0.62 + normalY * 0.38 - exposedSlope * 0.14 + (biome - 0.5) * 0.08;
       colors.push(color.r * shade, color.g * shade, color.b * shade, 1);
     }
     ground.updateVerticesData("position", positions);
@@ -1052,6 +1304,26 @@ const createSurfaceEnvironment = (
   groundMaterial.freeze();
   ground.material = groundMaterial;
 
+  if (recipe.renderer === "rocky" && recipe.surface.waterLevel > 0) {
+    const water = MeshBuilder.CreateGround(
+      "surfaceWater",
+      { width: 72, height: 82, subdivisions: 1 },
+      scene,
+    );
+    water.parent = root;
+    water.position.set(0, -1.42 + recipe.surface.waterLevel * 0.55, 18);
+    water.isPickable = false;
+    const waterMaterial = new StandardMaterial("surfaceWaterMaterial", scene);
+    waterMaterial.diffuseColor = toColor3(recipe.surface.waterColor);
+    waterMaterial.emissiveColor = toColor3(recipe.surface.waterColor).scale(0.34);
+    waterMaterial.specularColor = mixColor3(recipe.surface.waterColor, [0.72, 0.9, 1], 0.62);
+    waterMaterial.alpha = 0.88;
+    waterMaterial.roughness = 0.18;
+    waterMaterial.freeze();
+    water.material = waterMaterial;
+    meshes.push(water);
+  }
+
   if (recipe.renderer === "rocky") {
     const rockMaterial = new StandardMaterial("surfaceRockMaterial", scene);
     const rockColor = mixRgb(terrainLowColor, terrainHighColor, 0.34);
@@ -1059,17 +1331,23 @@ const createSurfaceEnvironment = (
     rockMaterial.emissiveColor = rockMaterial.diffuseColor.scale(0.06);
     rockMaterial.specularColor = new Color3(0.018, 0.02, 0.022);
     rockMaterial.freeze();
-    const rockCount = profile.tier === "desktop" ? 42 : 20;
+    const rockCount = profile.tier === "desktop" ? 62 : 28;
     for (let index = 0; index < rockCount; index += 1) {
       const rock = MeshBuilder.CreateSphere(
         `surfaceRock-${index}`,
-        { diameter: 0.7 + random() * 1.45, segments: 4 },
+        { diameter: 0.55 + random() * 1.25, segments: 5 },
         scene,
       );
       const x = -25 + random() * 50;
-      const z = 4 + random() * 42;
-      rock.position.set(x, -0.72 + terrainNoise(x, z, recipe.seed) * 1.35, z + 18);
-      rock.scaling.set(0.55 + random() * 0.8, 0.55 + random() * 1.7, 0.55 + random());
+      const z = -2 + random() * 50;
+      const terrainHeight = surfaceTerrainHeight(x, z, recipe);
+      rock.position.set(x, -1.42 + terrainHeight, z + 18);
+      const formation = random() > 0.9 ? 1.35 + random() * 0.9 : 1;
+      rock.scaling.set(
+        (0.42 + random() * 0.9) * formation,
+        (0.48 + random() * 1.45) * formation,
+        (0.42 + random() * 0.9) * formation,
+      );
       rock.rotation.set(random() * 0.4, random() * Math.PI, random() * 0.35);
       rock.parent = root;
       rock.isPickable = false;
@@ -1128,7 +1406,7 @@ const createSurfaceEnvironment = (
     mesh.setEnabled(false);
   }
   root.setEnabled(false);
-  return { cloudLayers, meshes, root };
+  return { cloudLayers, meshes, root, sky: surfaceSky.material };
 };
 
 const setEnvironmentEnabled = (
@@ -1241,13 +1519,21 @@ export const createPlanetExperience = ({
     setEnvironmentEnabled(orbitalRoot, orbitalMeshes, !surface);
     setEnvironmentEnabled(surfaceEnvironment.root, surfaceEnvironment.meshes, surface);
     scene.fogMode = surface ? Scene.FOGMODE_EXP2 : Scene.FOGMODE_NONE;
-    scene.fogDensity = surface ? (recipe.renderer === "rocky" ? 0.012 : 0.019) : 0;
-    scene.fogColor = toColor3(recipe.atmosphere.color).scale(0.16);
+    scene.fogDensity = surface
+      ? recipe.renderer === "gas-giant"
+        ? 0.024
+        : recipe.renderer === "ice-giant"
+          ? 0.019
+          : 0.008 + recipe.surface.cloudCover * 0.008 + recipe.surface.lavaStrength * 0.004
+      : 0;
+    scene.fogColor = toColor3(recipe.atmosphere.color).scale(
+      recipe.renderer === "rocky" ? 0.38 : 0.52,
+    );
     scene.clearColor = surface
       ? new Color4(
-          recipe.atmosphere.color[0] * 0.025,
-          recipe.atmosphere.color[1] * 0.025,
-          recipe.atmosphere.color[2] * 0.025,
+          recipe.atmosphere.color[0] * 0.18,
+          recipe.atmosphere.color[1] * 0.18,
+          recipe.atmosphere.color[2] * 0.18,
           1,
         )
       : new Color4(0.0015, 0.003, 0.008, 1);
@@ -1344,6 +1630,7 @@ export const createPlanetExperience = ({
       shader.setFloat("time", elapsedSeconds * recipe.atmosphereBands.speed * 18);
     if (recipe.renderer === "rocky") shader.setFloat("time", elapsedSeconds);
     atmosphere.setFloat("time", elapsedSeconds);
+    surfaceEnvironment.sky.setFloat("time", elapsedSeconds);
     if (cloudLayer && recipe.renderer === "rocky")
       cloudLayer.setFloat("time", elapsedSeconds * recipe.surface.cloudSpeed * 18);
     for (let index = 0; index < surfaceEnvironment.cloudLayers.length; index += 1) {
