@@ -69,7 +69,6 @@ apps/api                 Hono API and NASA TAP adapter
 apps/website             React + Vite interface and Babylon.js experience
 packages/contracts       Shared API and exoplanet types
 packages/worldgen        Deterministic data-to-world recipe engine
-packages/utils           Starter package (scheduled for replacement)
 ```
 
 Gas giants, ice giants, and rocky worlds can be explored from catalog results. Only worlds without enough data for classification remain disabled. World generation lives in a shared package, while the API can synchronize NASA's confirmed catalog into PostgreSQL for durable, low-latency queries.
