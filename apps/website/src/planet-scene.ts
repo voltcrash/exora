@@ -16,7 +16,7 @@ import "@babylonjs/core/XR/features/WebXRControllerPointerSelection.js";
 import "@babylonjs/core/XR/features/WebXRControllerTeleportation.js";
 import "@babylonjs/core/XR/features/WebXRHandTracking.js";
 import { WebXRState } from "@babylonjs/core/XR/webXRTypes.js";
-import type { Rgb, WorldRecipe } from "./world-recipe.ts";
+import type { Rgb, WorldRecipe } from "@exora/worldgen";
 
 const PLANET_POSITION = new Vector3(0, 1.35, 9.5);
 const VIEWING_DECK_POSITION = new Vector3(0, 0, -7.4);

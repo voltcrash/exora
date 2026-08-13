@@ -1,0 +1,21 @@
+{
+  "name": "@exora/worldgen",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "scripts": {
+    "build": "vp pack",
+    "test": "vp test"
+  },
+  "dependencies": {
+    "@exora/contracts": "workspace:*"
+  },
+  "devDependencies": {
+    "typescript": "catalog:",
+    "vite": "catalog:",
+    "vite-plus": "catalog:"
+  }
+}

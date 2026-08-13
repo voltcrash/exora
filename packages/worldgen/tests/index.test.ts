@@ -1,12 +1,37 @@
 import { expect, test } from "vite-plus/test";
-import { featuredPlanet } from "./planet-profile.ts";
-import { deriveWorldRecipe } from "./world-recipe.ts";
+import type { ExoplanetProfile } from "@exora/contracts";
+import { deriveWorldRecipe } from "../src/index.ts";
 
-const temperateRockyPlanet = {
+const featuredPlanet: ExoplanetProfile = {
+  id: "hip-65426-b",
+  name: "HIP 65426 b",
+  hostStar: "HIP 65426",
+  kind: "gas-giant",
+  observation: {
+    radiusJupiter: 1.5,
+    massJupiter: 9,
+    radiusEarth: 16.8,
+    massEarth: 2860.4,
+    equilibriumTemperatureKelvin: 1500,
+    orbitalPeriodDays: null,
+    semiMajorAxisAu: 92,
+    distanceParsecs: 108.875,
+    discoveryYear: 2017,
+    discoveryMethod: "Imaging",
+    hostSpectralType: "A2 V",
+  },
+  source: {
+    archive: "NASA Exoplanet Archive",
+    table: "pscomppars",
+    retrievedOn: "2026-08-13",
+  },
+};
+
+const temperateRockyPlanet: ExoplanetProfile = {
   ...featuredPlanet,
   id: "kepler-62-f",
   name: "Kepler-62 f",
-  kind: "rocky" as const,
+  kind: "rocky",
   observation: {
     ...featuredPlanet.observation,
     radiusJupiter: null,

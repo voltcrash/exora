@@ -1,4 +1,5 @@
 import type { ExoplanetProfile } from "@exora/contracts";
+import { deriveWorldRecipe } from "@exora/worldgen";
 import "./style.css";
 import {
   loadFeaturedPlanet,
@@ -8,7 +9,6 @@ import {
 } from "./api-client.ts";
 import { createPlanetExperience, type PlanetExperience, type XrStatus } from "./planet-scene.ts";
 import { featuredPlanet } from "./planet-profile.ts";
-import { deriveWorldRecipe } from "./world-recipe.ts";
 
 const app = document.querySelector<HTMLDivElement>("#app");
 if (!app) throw new Error("Exora could not find its application root.");

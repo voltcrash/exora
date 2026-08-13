@@ -1,4 +1,4 @@
-import type { ExoplanetProfile } from "./planet-profile.ts";
+import type { ExoplanetProfile } from "@exora/contracts";
 
 export type Rgb = readonly [red: number, green: number, blue: number];
 

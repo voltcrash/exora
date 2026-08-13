@@ -52,7 +52,8 @@ WebXR requires a secure context. Localhost works for desktop development; testin
 apps/api                 Hono API and NASA TAP adapter
 apps/website             Babylon.js experience and interface
 packages/contracts       Shared API and exoplanet types
+packages/worldgen        Deterministic data-to-world recipe engine
 packages/utils           Starter package (scheduled for replacement)
 ```
 
-Gas giants and rocky worlds can be explored from catalog results. Ice giants remain disabled until their dedicated renderer is implemented. The next vertical slice should move world generation into a shared package and introduce PostgreSQL-backed catalog synchronization.
+Gas giants and rocky worlds can be explored from catalog results. Ice giants remain disabled until their dedicated renderer is implemented. World generation now lives in a shared package so the next vertical slice can introduce PostgreSQL-backed catalog synchronization without duplicating recipe logic.

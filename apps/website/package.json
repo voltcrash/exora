@@ -11,7 +11,8 @@
   },
   "dependencies": {
     "@babylonjs/core": "catalog:",
-    "@exora/contracts": "workspace:*"
+    "@exora/contracts": "workspace:*",
+    "@exora/worldgen": "workspace:*"
   },
   "devDependencies": {
     "typescript": "^7.0.2",
