@@ -1,6 +1,6 @@
 import { expect, test } from "vite-plus/test";
 import type { ExoplanetProfile } from "@exora/contracts";
-import { deriveWorldRecipe } from "../src/index.ts";
+import { deriveWorldRecipe, generateCustomWorld } from "../src/index.ts";
 
 const featuredPlanet: ExoplanetProfile = {
   id: "hip-65426-b",
@@ -136,4 +136,53 @@ test("ice giants produce methane haze and a faint ring system", () => {
   expect(recipe.atmosphereBands.polarGlow).toBeGreaterThan(0);
   expect(recipe.rings.outerRadius).toBeGreaterThan(recipe.radiusSceneUnits);
   expect(recipe.rings.opacity).toBeLessThan(0.25);
+});
+
+test("custom world parameters directly tune the generated renderer recipe", () => {
+  const world = generateCustomWorld({
+    activity: 0.9,
+    atmosphere: 0.75,
+    axialTilt: 0.8,
+    baseColor: [0.15, 0.55, 0.72],
+    kind: "gas-giant",
+    name: "Asteria Prime",
+    radius: 0.7,
+    rings: true,
+    rotation: 0.6,
+    seed: 7319,
+    temperatureKelvin: 840,
+    water: 0,
+  });
+
+  expect(world.planet.name).toBe("Asteria Prime");
+  expect(world.planet.source.archive).toBe("Exora Custom Generator");
+  expect(world.recipe.renderer).toBe("gas-giant");
+  expect(world.recipe.rotationSpeed).toBeCloseTo(0.0412);
+
+  if (world.recipe.renderer !== "gas-giant") throw new Error("Expected a gas giant.");
+  expect(world.recipe.cloudBands.stormStrength).toBe(0.9);
+  expect(world.recipe.cloudBands.jetCount).toBe(30);
+  expect(world.recipe.rings?.opacity).toBeCloseTo(0.265);
+});
+
+test("custom rocky worlds vaporize selected water at extreme temperatures", () => {
+  const world = generateCustomWorld({
+    activity: 0.5,
+    atmosphere: 0.4,
+    axialTilt: 0.5,
+    baseColor: [0.7, 0.15, 0.05],
+    kind: "rocky",
+    name: "Caldera",
+    radius: 0.5,
+    rings: false,
+    rotation: 0.5,
+    seed: 42,
+    temperatureKelvin: 1_300,
+    water: 1,
+  });
+
+  if (world.recipe.renderer !== "rocky") throw new Error("Expected a rocky world.");
+  expect(world.recipe.surface.waterLevel).toBe(0);
+  expect(world.recipe.surface.lavaStrength).toBeGreaterThan(0);
+  expect(world.recipe.surface.midColor).toEqual([0.504, 0.108, 0.036]);
 });

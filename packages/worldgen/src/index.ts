@@ -86,6 +86,26 @@ export interface RockyWorldRecipe extends BaseWorldRecipe {
 
 export type WorldRecipe = GasGiantWorldRecipe | IceGiantWorldRecipe | RockyWorldRecipe;
 
+export interface CustomPlanetParameters {
+  activity: number;
+  atmosphere: number;
+  axialTilt: number;
+  baseColor: Rgb;
+  kind: Exclude<ExoplanetProfile["kind"], "unknown">;
+  name: string;
+  radius: number;
+  rings: boolean;
+  rotation: number;
+  seed: number;
+  temperatureKelvin: number;
+  water: number;
+}
+
+export interface CustomWorld {
+  planet: ExoplanetProfile;
+  recipe: WorldRecipe;
+}
+
 const hashString = (value: string): number => {
   let hash = 2166136261;
 
@@ -379,4 +399,163 @@ export const deriveWorldRecipe = (planet: ExoplanetProfile): WorldRecipe => {
   if (planet.kind === "rocky") return deriveRockyRecipe(planet, seed, random);
   if (planet.kind === "ice-giant") return deriveIceGiantRecipe(planet, seed, random);
   return deriveGasGiantRecipe(planet, seed, random);
+};
+
+const clampUnit = (value: number): number => Math.min(1, Math.max(0, value));
+
+const scaleColor = (color: Rgb, amount: number): Rgb =>
+  color.map((channel) => clampUnit(channel * amount)) as unknown as Rgb;
+
+const mixColor = (from: Rgb, to: Rgb, amount: number): Rgb =>
+  from.map(
+    (channel, index) => channel + (to[index] - channel) * clampUnit(amount),
+  ) as unknown as Rgb;
+
+export const generateCustomWorld = (parameters: CustomPlanetParameters): CustomWorld => {
+  const radius = clampUnit(parameters.radius);
+  const activity = clampUnit(parameters.activity);
+  const atmosphere = clampUnit(parameters.atmosphere);
+  const water = clampUnit(parameters.water);
+  const seed = Math.max(0, Math.trunc(parameters.seed));
+  const temperatureKelvin = Math.max(40, Math.round(parameters.temperatureKelvin));
+  const radiusEarth =
+    parameters.kind === "rocky"
+      ? 0.45 + radius * 1.65
+      : parameters.kind === "ice-giant"
+        ? 2.1 + radius * 4.2
+        : (0.72 + radius * 1.18) * 11.209;
+  const massEarth =
+    parameters.kind === "rocky"
+      ? radiusEarth ** 3.1
+      : parameters.kind === "ice-giant"
+        ? 8 + radius * 35
+        : (0.25 + radius * 9.75) * 317.83;
+  const date = new Date().toISOString().slice(0, 10);
+  const planet: ExoplanetProfile = {
+    id: `custom-${parameters.kind}-${seed}`,
+    name: parameters.name.trim() || "Untitled World",
+    hostStar: "Custom star system",
+    kind: parameters.kind,
+    observation: {
+      distanceParsecs: null,
+      discoveryMethod: "Procedural synthesis",
+      discoveryYear: null,
+      equilibriumTemperatureKelvin: temperatureKelvin,
+      hostSpectralType: "USER DEFINED",
+      massEarth,
+      massJupiter: parameters.kind === "gas-giant" ? massEarth / 317.83 : null,
+      orbitalPeriodDays: null,
+      radiusEarth,
+      radiusJupiter: parameters.kind === "gas-giant" ? radiusEarth / 11.209 : null,
+      semiMajorAxisAu: null,
+    },
+    source: {
+      archive: "Exora Custom Generator",
+      retrievedOn: date,
+      table: "procedural",
+    },
+  };
+
+  const generated = deriveWorldRecipe(planet);
+  const shared = {
+    ...generated,
+    axialTilt: ((parameters.axialTilt - 0.5) * Math.PI) / 2,
+    rotationSpeed: 0.004 + clampUnit(parameters.rotation) * 0.062,
+    atmosphere: {
+      ...generated.atmosphere,
+      color: mixColor(scaleColor(parameters.baseColor, 0.65), [0.72, 0.9, 1], atmosphere * 0.45),
+      label: `User-defined atmosphere · ${Math.round(atmosphere * 100)}% density`,
+    },
+    confidence: "high" as const,
+  };
+
+  if (generated.renderer === "rocky") {
+    const isHot = temperatureKelvin >= 650;
+    const isCold = temperatureKelvin < 180;
+    return {
+      planet,
+      recipe: {
+        ...shared,
+        renderer: "rocky",
+        classification: "Custom rocky world",
+        surface: {
+          ...generated.surface,
+          lowColor: scaleColor(parameters.baseColor, 0.2),
+          midColor: scaleColor(parameters.baseColor, 0.72),
+          highColor: mixColor(parameters.baseColor, [0.95, 0.92, 0.84], 0.52),
+          elevation: 0.045 + activity * 0.3,
+          roughness: 1.5 + activity * 3.6,
+          craterDensity: 0.12 + activity * 0.82,
+          waterLevel: isHot || water < 0.03 ? 0 : 0.22 + water * 0.32,
+          waterColor: mixColor([0.005, 0.06, 0.16], parameters.baseColor, 0.12),
+          cloudCover: atmosphere * (isHot ? 0.15 : 0.82),
+          cloudSpeed: 0.008 + activity * 0.04,
+          lavaStrength: isHot ? 0.2 + activity * 0.8 : 0,
+          emissiveColor: isHot ? [1, 0.11, 0.008] : [0, 0, 0],
+          iceCapStrength: isCold ? 0.45 + water * 0.55 : Math.max(0, water * 0.25 - 0.05),
+        },
+        summary:
+          "A user-tuned rocky world synthesized from its chosen terrain, hydrology, atmosphere, temperature, rotation, and color parameters.",
+      },
+    };
+  }
+
+  if (generated.renderer === "ice-giant") {
+    return {
+      planet,
+      recipe: {
+        ...shared,
+        renderer: "ice-giant",
+        classification: "Custom ice giant",
+        atmosphereBands: {
+          ...generated.atmosphereBands,
+          deepColor: scaleColor(parameters.baseColor, 0.18),
+          hazeColor: scaleColor(parameters.baseColor, 0.75),
+          lightColor: mixColor(parameters.baseColor, [0.88, 0.98, 1], 0.58),
+          bandScale: 7 + activity * 13,
+          stormStrength: activity,
+          polarGlow: atmosphere * 0.75,
+          speed: 0.008 + clampUnit(parameters.rotation) * 0.04,
+        },
+        rings: {
+          ...generated.rings,
+          color: mixColor(parameters.baseColor, [0.82, 0.9, 1], 0.42),
+          opacity: parameters.rings ? 0.08 + atmosphere * 0.22 : 0,
+        },
+        summary:
+          "A user-tuned volatile giant synthesized from its chosen haze, storm activity, rings, temperature, rotation, and color parameters.",
+      },
+    };
+  }
+
+  return {
+    planet,
+    recipe: {
+      ...shared,
+      renderer: "gas-giant",
+      classification: "Custom gas giant",
+      cloudBands: {
+        ...generated.cloudBands,
+        deepColor: scaleColor(parameters.baseColor, 0.16),
+        midColor: scaleColor(parameters.baseColor, 0.72),
+        lightColor: mixColor(parameters.baseColor, [1, 0.92, 0.75], 0.62),
+        stormColor: mixColor(parameters.baseColor, [1, 0.72, 0.3], 0.68),
+        contrast: 0.4 + atmosphere * 0.5,
+        jetCount: 8 + Math.round(activity * 24),
+        stormScale: 2.8 + activity * 5,
+        stormStrength: activity,
+        turbulence: 1.2 + activity * 3,
+        speed: 0.01 + clampUnit(parameters.rotation) * 0.05,
+      },
+      rings: parameters.rings
+        ? {
+            color: mixColor(parameters.baseColor, [0.92, 0.78, 0.58], 0.5),
+            opacity: 0.1 + atmosphere * 0.22,
+            outerRadius: shared.radiusSceneUnits * (1.42 + radius * 0.25),
+          }
+        : null,
+      summary:
+        "A user-tuned gas giant synthesized from its chosen jet activity, storm strength, rings, temperature, rotation, and color parameters.",
+    },
+  };
 };

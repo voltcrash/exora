@@ -4,7 +4,7 @@ type Fetcher = (input: string | URL | Request, init?: RequestInit) => Promise<Re
 
 export interface PlanetLoadResult {
   cached: boolean;
-  mode: "fallback" | "live";
+  mode: "custom" | "fallback" | "live";
   planet: ExoplanetProfile;
 }
 

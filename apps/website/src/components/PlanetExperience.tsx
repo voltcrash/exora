@@ -1,4 +1,4 @@
-import { deriveWorldRecipe } from "@exora/worldgen";
+import { deriveWorldRecipe, type WorldRecipe } from "@exora/worldgen";
 import { useEffect, useMemo, useRef, useState } from "react";
 import type { PlanetLoadResult } from "../api-client.ts";
 import type { PlanetExperience as BabylonExperience, ViewMode, XrStatus } from "../planet-scene.ts";
@@ -6,6 +6,8 @@ import { archiveStateLabel, formatNumber, formatPlanetName } from "../planet-uti
 
 interface PlanetExperienceProps {
   onOpenCatalog: () => void;
+  onOpenBuilder: () => void;
+  recipeOverride: WorldRecipe | null;
   result: PlanetLoadResult;
 }
 
@@ -17,7 +19,12 @@ const xrCopy: Record<XrStatus, { button: string; label: string }> = {
   unavailable: { button: "VR UNAVAILABLE", label: "DESKTOP EXPLORATION" },
 };
 
-export const PlanetExperience = ({ onOpenCatalog, result }: PlanetExperienceProps) => {
+export const PlanetExperience = ({
+  onOpenBuilder,
+  onOpenCatalog,
+  recipeOverride,
+  result,
+}: PlanetExperienceProps) => {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const experienceRef = useRef<BabylonExperience | null>(null);
   const [fps, setFps] = useState("--");
@@ -27,7 +34,10 @@ export const PlanetExperience = ({ onOpenCatalog, result }: PlanetExperienceProp
   const [xrStatus, setXrStatus] = useState<XrStatus>("checking");
   const planet = result.planet;
   const observation = planet.observation;
-  const recipe = useMemo(() => deriveWorldRecipe(planet), [planet]);
+  const recipe = useMemo(
+    () => recipeOverride ?? deriveWorldRecipe(planet),
+    [planet, recipeOverride],
+  );
 
   useEffect(() => {
     document.body.dataset.xrStatus = xrStatus;
@@ -142,20 +152,29 @@ export const PlanetExperience = ({ onOpenCatalog, result }: PlanetExperienceProp
             <small>EXOPLANET OBSERVATORY</small>
           </span>
         </a>
-        <button
-          id="open-catalog"
-          className="catalog-trigger"
-          type="button"
-          aria-label="Open NASA exoplanet catalog"
-          onClick={onOpenCatalog}
-        >
-          <span className="catalog-radar" aria-hidden="true" />
-          <span>
-            <small>NASA CATALOG</small>
-            <strong>EXPLORE WORLDS</strong>
-          </span>
-          <kbd>/</kbd>
-        </button>
+        <div className="exploration-actions">
+          <button
+            id="open-catalog"
+            className="catalog-trigger"
+            type="button"
+            aria-label="Open NASA exoplanet catalog"
+            onClick={onOpenCatalog}
+          >
+            <span className="catalog-radar" aria-hidden="true" />
+            <span>
+              <small>NASA CATALOG</small>
+              <strong>EXPLORE WORLDS</strong>
+            </span>
+            <kbd>/</kbd>
+          </button>
+          <button className="forge-trigger" type="button" onClick={onOpenBuilder}>
+            <span aria-hidden="true">＋</span>
+            <span>
+              <small>WORLD FORGE</small>
+              <strong>CREATE PLANET</strong>
+            </span>
+          </button>
+        </div>
         <div className="archive-state">
           <span className="pulse-dot" aria-hidden="true" />
           {archiveStateLabel(result)}
@@ -165,7 +184,7 @@ export const PlanetExperience = ({ onOpenCatalog, result }: PlanetExperienceProp
       <main className="hud">
         <section className="world-intro" aria-labelledby="world-name">
           <p className="eyebrow">
-            <span>CONFIRMED WORLD</span>
+            <span>{result.mode === "custom" ? "GENERATED WORLD" : "CONFIRMED WORLD"}</span>
             <span>{planet.kind.replace("-", " ")}</span>
           </p>
           <h1 id="world-name">{formatPlanetName(planet.name)}</h1>
@@ -184,11 +203,14 @@ export const PlanetExperience = ({ onOpenCatalog, result }: PlanetExperienceProp
           </p>
         </section>
 
-        <aside className="telemetry" aria-label="Observed planet data">
+        <aside
+          className="telemetry"
+          aria-label={result.mode === "custom" ? "Custom planet data" : "Observed planet data"}
+        >
           <div className="telemetry-heading">
             <span>
-              <small>NASA ARCHIVE</small>
-              Observed properties
+              <small>{result.mode === "custom" ? "WORLD FORGE" : "NASA ARCHIVE"}</small>
+              {result.mode === "custom" ? "Chosen properties" : "Observed properties"}
             </span>
             <span className="signal-bars" aria-hidden="true">
               <i />
@@ -225,7 +247,7 @@ export const PlanetExperience = ({ onOpenCatalog, result }: PlanetExperienceProp
           </dl>
           <div className="telemetry-detail">
             <span>HOST SYSTEM</span>
-            <strong>{planet.hostStar}</strong>
+            <strong>{result.mode === "custom" ? "USER DEFINED" : planet.hostStar}</strong>
             <small>{observation.hostSpectralType ?? "Spectrum unavailable"}</small>
           </div>
           <div className="telemetry-detail">

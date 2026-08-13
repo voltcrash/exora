@@ -19,6 +19,7 @@ export const formatPlanetName = (name: string): ReactNode => {
 };
 
 export const archiveStateLabel = (result: PlanetLoadResult): string => {
+  if (result.mode === "custom") return "CUSTOM WORLD · LOCAL";
   if (result.mode === "fallback") return "LOCAL ARCHIVE FALLBACK";
   return result.cached ? "NASA ARCHIVE · CACHED" : "NASA ARCHIVE · LIVE";
 };

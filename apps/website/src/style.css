@@ -38,6 +38,7 @@ body {
 
 button,
 input,
+select,
 kbd {
   font: inherit;
 }
@@ -293,6 +294,66 @@ button {
     border-color 160ms ease,
     background 160ms ease,
     transform 160ms ease;
+}
+
+.exploration-actions {
+  display: flex;
+  align-items: stretch;
+  gap: 8px;
+  pointer-events: auto;
+}
+
+.forge-trigger {
+  min-width: 142px;
+  display: grid;
+  grid-template-columns: 24px 1fr;
+  align-items: center;
+  gap: 8px;
+  padding: 7px 11px;
+  border: 1px solid rgb(255 107 50 / 26%);
+  border-radius: 14px;
+  color: var(--ink);
+  background: rgb(19 12 10 / 72%);
+  backdrop-filter: blur(18px);
+  cursor: pointer;
+  text-align: left;
+  transition:
+    border-color 160ms ease,
+    background 160ms ease,
+    transform 160ms ease;
+}
+
+.forge-trigger:hover {
+  border-color: rgb(255 107 50 / 58%);
+  background: rgb(42 20 12 / 82%);
+  transform: translateY(-1px);
+}
+
+.forge-trigger > span:first-child {
+  color: var(--accent);
+  font-family: var(--mono);
+  font-size: 23px;
+  font-weight: 300;
+}
+
+.forge-trigger > span:last-child {
+  display: grid;
+  gap: 2px;
+}
+
+.forge-trigger small,
+.forge-trigger strong {
+  font-size: 7px;
+  font-weight: 500;
+  letter-spacing: 0.1em;
+}
+
+.forge-trigger small {
+  color: #8b6253;
+}
+
+.forge-trigger strong {
+  color: #ffd8c9;
 }
 
 .catalog-trigger:hover {
@@ -803,11 +864,276 @@ body[data-xr-status="unavailable"] .status-light {
 }
 
 .catalog-trigger:focus-visible,
+.forge-trigger:focus-visible,
 .catalog-close:focus-visible,
 .catalog-result:focus-visible,
-.enter-vr:focus-visible {
+.enter-vr:focus-visible,
+.generate-world:focus-visible,
+.planet-builder input:focus-visible,
+.planet-builder select:focus-visible {
   outline: 2px solid var(--cyan);
   outline-offset: 3px;
+}
+
+.planet-builder {
+  width: min(920px, calc(100vw - 32px));
+  max-height: min(780px, calc(100vh - 32px));
+  margin: auto;
+  padding: 0;
+  overflow: hidden auto;
+  border: 1px solid rgb(255 137 91 / 22%);
+  border-radius: 24px;
+  color: var(--ink);
+  background:
+    radial-gradient(circle at 16% 0, rgb(255 107 50 / 13%), transparent 38%),
+    radial-gradient(circle at 90% 28%, rgb(139 230 234 / 8%), transparent 36%), #080c0e;
+  box-shadow: 0 32px 120px rgb(0 0 0 / 82%);
+  scrollbar-color: rgb(255 107 50 / 30%) transparent;
+}
+
+.planet-builder::backdrop {
+  background: rgb(0 2 3 / 78%);
+  backdrop-filter: blur(14px);
+}
+
+.planet-builder[open] {
+  animation: catalog-in 180ms ease-out;
+}
+
+.planet-builder form {
+  min-height: 100%;
+}
+
+.builder-header {
+  min-height: 104px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 24px 28px;
+  border-bottom: 1px solid var(--line);
+}
+
+.builder-header p,
+.builder-header h2,
+.builder-footer p {
+  margin: 0;
+}
+
+.builder-header p {
+  margin-bottom: 7px;
+  color: var(--accent);
+  font-family: var(--mono);
+  font-size: 7px;
+  letter-spacing: 0.1em;
+}
+
+.builder-header h2 {
+  font-size: clamp(26px, 4vw, 36px);
+  font-weight: 500;
+  letter-spacing: -0.045em;
+}
+
+.builder-body {
+  display: grid;
+  grid-template-columns: minmax(220px, 0.7fr) minmax(360px, 1.3fr);
+  gap: 28px;
+  padding: 26px 28px 30px;
+}
+
+.builder-identity,
+.builder-parameters {
+  display: grid;
+  align-content: start;
+  gap: 18px;
+}
+
+.builder-identity {
+  padding: 20px;
+  border: 1px solid rgb(255 107 50 / 15%);
+  border-radius: 18px;
+  background: rgb(255 107 50 / 3%);
+}
+
+.builder-identity label,
+.parameter-control,
+.toggle-control {
+  display: grid;
+  gap: 8px;
+}
+
+.builder-identity label > span:first-child,
+.parameter-control > span:first-child,
+.toggle-control > span:first-child {
+  color: var(--faint);
+  font-family: var(--mono);
+  font-size: 7px;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+}
+
+.builder-identity input[type="text"],
+.builder-identity input[type="number"],
+.builder-identity select {
+  width: 100%;
+  height: 44px;
+  padding: 0 12px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  outline: 0;
+  color: #eaf1f2;
+  background: rgb(0 0 0 / 24%);
+  font-size: 11px;
+}
+
+.builder-identity select {
+  color-scheme: dark;
+}
+
+.color-input,
+.seed-input {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.color-input input[type="color"] {
+  width: 44px;
+  height: 44px;
+  padding: 3px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: rgb(0 0 0 / 24%);
+  cursor: pointer;
+}
+
+.color-input output {
+  color: #d4dfe1;
+  font-family: var(--mono);
+  font-size: 10px;
+}
+
+.seed-input input {
+  min-width: 0;
+}
+
+.seed-input button {
+  height: 44px;
+  padding: 0 10px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  color: var(--muted);
+  background: rgb(255 255 255 / 3%);
+  cursor: pointer;
+  font-family: var(--mono);
+  font-size: 7px;
+}
+
+.builder-parameters {
+  grid-template-columns: 1fr 1fr;
+  gap: 25px 26px;
+  padding: 9px 2px;
+}
+
+.parameter-control > span,
+.toggle-control > span {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.parameter-control output,
+.toggle-control small {
+  color: var(--cyan);
+  font: inherit;
+}
+
+.parameter-control input[type="range"] {
+  width: 100%;
+  height: 18px;
+  margin: 0;
+  accent-color: var(--accent);
+  cursor: pointer;
+}
+
+.toggle-control {
+  align-content: center;
+  padding-top: 2px;
+}
+
+.toggle-control input {
+  width: 42px;
+  height: 22px;
+  margin: 0;
+  accent-color: var(--accent);
+  cursor: pointer;
+}
+
+.builder-footer {
+  min-height: 82px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 22px;
+  padding: 14px 28px;
+  border-top: 1px solid var(--line);
+  background: rgb(0 0 0 / 16%);
+}
+
+.builder-footer p {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  color: var(--faint);
+  font-family: var(--mono);
+  font-size: 7px;
+  letter-spacing: 0.04em;
+  line-height: 1.5;
+  text-transform: uppercase;
+}
+
+.builder-footer p span {
+  width: 6px;
+  height: 6px;
+  flex: 0 0 auto;
+  border-radius: 50%;
+  background: var(--accent);
+  box-shadow: 0 0 10px rgb(255 107 50 / 55%);
+}
+
+.generate-world {
+  min-width: 220px;
+  min-height: 52px;
+  display: grid;
+  grid-template-columns: 28px 1fr 16px;
+  align-items: center;
+  gap: 10px;
+  padding: 7px 11px;
+  border: 1px solid rgb(255 107 50 / 45%);
+  border-radius: 14px;
+  color: #fff4ef;
+  background: rgb(61 24 11 / 72%);
+  cursor: pointer;
+  text-align: left;
+}
+
+.generate-world > span:nth-child(2) {
+  display: grid;
+  gap: 3px;
+}
+
+.generate-world small {
+  color: #a96850;
+  font-family: var(--mono);
+  font-size: 7px;
+}
+
+.generate-world strong {
+  font-size: 9px;
+  letter-spacing: 0.04em;
+}
+
+.generate-world > span:last-child {
+  color: var(--accent);
 }
 
 .planet-catalog {
@@ -1176,6 +1502,28 @@ body[data-xr-status="unavailable"] .status-light {
   }
 }
 
+@media (max-width: 760px) {
+  .forge-trigger {
+    min-width: 46px;
+    width: 46px;
+    grid-template-columns: 1fr;
+    place-items: center;
+    padding: 8px;
+  }
+
+  .forge-trigger > span:last-child {
+    display: none;
+  }
+
+  .builder-body {
+    grid-template-columns: 1fr;
+  }
+
+  .builder-identity {
+    grid-template-columns: 1fr 1fr;
+  }
+}
+
 @media (max-width: 640px) {
   .approach-status {
     top: 78px;
@@ -1199,6 +1547,41 @@ body[data-xr-status="unavailable"] .status-light {
     grid-template-columns: 1fr;
     place-items: center;
     padding: 8px;
+  }
+
+  .exploration-actions {
+    gap: 6px;
+  }
+
+  .planet-builder {
+    width: calc(100vw - 16px);
+    max-height: calc(100vh - 16px);
+    border-radius: 18px;
+  }
+
+  .builder-header {
+    min-height: 90px;
+    padding: 18px;
+  }
+
+  .builder-body {
+    gap: 20px;
+    padding: 18px;
+  }
+
+  .builder-identity,
+  .builder-parameters {
+    grid-template-columns: 1fr;
+  }
+
+  .builder-footer {
+    align-items: stretch;
+    flex-direction: column;
+    padding: 16px 18px 18px;
+  }
+
+  .generate-world {
+    width: 100%;
   }
 
   .hud {
@@ -1329,6 +1712,7 @@ body[data-xr-status="unavailable"] .status-light {
   }
 
   .catalog-trigger,
+  .forge-trigger,
   .catalog-result,
   .enter-vr,
   .loading-screen,

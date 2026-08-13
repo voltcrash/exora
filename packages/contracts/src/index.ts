@@ -20,11 +20,17 @@ export interface ExoplanetProfile {
   kind: PlanetKind;
   name: string;
   observation: ExoplanetObservation;
-  source: {
-    archive: "NASA Exoplanet Archive";
-    retrievedOn: string;
-    table: "pscomppars";
-  };
+  source:
+    | {
+        archive: "NASA Exoplanet Archive";
+        retrievedOn: string;
+        table: "pscomppars";
+      }
+    | {
+        archive: "Exora Custom Generator";
+        retrievedOn: string;
+        table: "procedural";
+      };
 }
 
 export interface ApiMetadata {
