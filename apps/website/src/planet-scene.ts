@@ -61,6 +61,8 @@ uniform vec3 horizonColor;
 uniform vec3 zenithColor;
 uniform vec3 cloudColor;
 uniform vec3 sunColor;
+uniform float sunAngularRadius;
+uniform float sunIntensity;
 
 float hash(vec2 point) {
   point = fract(point * vec2(123.34, 345.45));
@@ -104,11 +106,11 @@ void main(void) {
   cloudBand *= smoothstep(-0.14, 0.35, direction.y) * (1.0 - smoothstep(0.62, 0.96, direction.y));
   sky = mix(sky, cloudColor, cloudBand * cloudiness * (0.34 + density * 0.46));
 
-  vec3 sunDirection = normalize(vec3(-0.62, 0.28, 0.73));
+  vec3 sunDirection = normalize(vec3(-0.28, -0.05, 0.96));
   float sunAngle = max(dot(direction, sunDirection), 0.0);
-  float sunDisc = smoothstep(0.997, 0.9994, sunAngle);
-  float sunHalo = pow(sunAngle, 48.0) * (0.25 + density * 0.42);
-  sky += sunColor * (sunDisc * 1.8 + sunHalo);
+  float sunDisc = smoothstep(cos(sunAngularRadius), cos(sunAngularRadius * 0.72), sunAngle);
+  float sunHalo = pow(sunAngle, max(10.0, 1.2 / sunAngularRadius)) * (0.28 + density * 0.42);
+  sky += sunColor * (sunDisc * 1.8 + sunHalo) * sunIntensity;
 
   vec2 starCell = floor(vec2(longitude * 210.0, asin(direction.y) * 180.0));
   float star = step(0.994, hash(starCell)) * pow(hash(starCell + 9.4), 5.0);
@@ -156,6 +158,8 @@ uniform float stormScale;
 uniform float stormStrength;
 uniform vec3 cameraPosition;
 uniform vec3 lightDirection;
+uniform vec3 stellarColor;
+uniform float stellarIntensity;
 uniform vec3 deepColor;
 uniform vec3 midColor;
 uniform vec3 lightColor;
@@ -222,7 +226,7 @@ void main(void) {
   float wrappedLight = 0.2 + diffuse * 0.92;
   vec3 viewDirection = normalize(cameraPosition - vWorldPosition);
   float rim = pow(1.0 - max(dot(normal, viewDirection), 0.0), 3.0);
-  vec3 finalColor = cloudColor * wrappedLight + midColor * rim * 0.38;
+  vec3 finalColor = cloudColor * wrappedLight * mix(vec3(1.0), stellarColor, diffuse * 0.32) * stellarIntensity + midColor * rim * 0.38;
 
   gl_FragColor = vec4(finalColor, 1.0);
 }
@@ -242,6 +246,8 @@ uniform float stormLatitude;
 uniform float polarGlow;
 uniform vec3 cameraPosition;
 uniform vec3 lightDirection;
+uniform vec3 stellarColor;
+uniform float stellarIntensity;
 uniform vec3 deepColor;
 uniform vec3 hazeColor;
 uniform vec3 lightColor;
@@ -293,7 +299,7 @@ void main(void) {
   float wrappedLight = 0.22 + diffuse * 0.9;
   vec3 viewDirection = normalize(cameraPosition - vWorldPosition);
   float rim = pow(1.0 - max(dot(normal, viewDirection), 0.0), 2.5);
-  vec3 finalColor = atmosphereColor * wrappedLight + hazeColor * rim * 0.46;
+  vec3 finalColor = atmosphereColor * wrappedLight * mix(vec3(1.0), stellarColor, diffuse * 0.32) * stellarIntensity + hazeColor * rim * 0.46;
   finalColor += lightColor * pole * (0.16 + 0.08 * sin(longitude * 5.0 + flow * 3.0));
   gl_FragColor = vec4(finalColor, 1.0);
 }
@@ -379,6 +385,8 @@ uniform float lavaStrength;
 uniform float iceCapStrength;
 uniform vec3 cameraPosition;
 uniform vec3 lightDirection;
+uniform vec3 stellarColor;
+uniform float stellarIntensity;
 uniform vec3 lowColor;
 uniform vec3 midColor;
 uniform vec3 highColor;
@@ -421,7 +429,7 @@ void main(void) {
   float waterSpecular = pow(max(dot(normal, halfDirection), 0.0), 46.0) * waterMask;
   float rim = pow(1.0 - max(dot(normal, viewDirection), 0.0), 3.0);
 
-  vec3 finalColor = surfaceColor * wrappedLight + vec3(0.34, 0.58, 0.72) * waterSpecular * 0.45;
+  vec3 finalColor = surfaceColor * wrappedLight * mix(vec3(1.0), stellarColor, diffuse * 0.38) * stellarIntensity + vec3(0.34, 0.58, 0.72) * waterSpecular * 0.45;
   finalColor += highColor * rim * 0.08;
   finalColor += emissiveColor * fractures * (0.72 + 0.28 * sin(time * 0.7 + detail * 8.0));
   gl_FragColor = vec4(finalColor, 1.0);
@@ -440,6 +448,7 @@ uniform float cloudCover;
 uniform vec3 cloudColor;
 uniform vec3 cameraPosition;
 uniform vec3 lightDirection;
+uniform vec3 stellarColor;
 
 float hash(vec3 point) {
   point = fract(point * 0.1031 + seed * 0.000021);
@@ -480,7 +489,7 @@ void main(void) {
   vec3 viewDirection = normalize(cameraPosition - vWorldPosition);
   float rim = pow(1.0 - max(dot(normal, viewDirection), 0.0), 2.2);
   float diffuse = 0.28 + max(dot(normal, lightDirection), 0.0) * 0.78;
-  gl_FragColor = vec4(cloudColor * (diffuse + rim * 0.34), cloud * (0.24 + cloudCover * 0.48));
+  gl_FragColor = vec4(cloudColor * mix(vec3(1.0), stellarColor, 0.28) * (diffuse + rim * 0.34), cloud * (0.24 + cloudCover * 0.48));
 }
 `;
 
@@ -592,6 +601,56 @@ const createStarfield = (scene: Scene, seed: number, starCount: number): Mesh =>
   starfield.freezeWorldMatrix();
 
   return starfield;
+};
+
+const createHostStar = (
+  scene: Scene,
+  recipe: WorldRecipe,
+  profile: RenderQualityProfile,
+  parent: TransformNode,
+): AbstractMesh[] => {
+  const starPosition = PLANET_POSITION.add(new Vector3(-18, 11, 32));
+  const star = MeshBuilder.CreateSphere(
+    "hostStar",
+    {
+      diameter: recipe.star.radiusSceneUnits * 2,
+      segments: profile.tier === "desktop" ? 40 : 24,
+    },
+    scene,
+  );
+  star.parent = parent;
+  star.position.copyFrom(starPosition);
+  star.isPickable = false;
+
+  const starMaterial = new StandardMaterial("hostStarMaterial", scene);
+  starMaterial.disableLighting = true;
+  starMaterial.diffuseColor = toColor3(recipe.star.color);
+  starMaterial.emissiveColor = toColor3(recipe.star.color).scale(recipe.star.intensity);
+  starMaterial.freeze();
+  star.material = starMaterial;
+
+  const corona = MeshBuilder.CreateSphere(
+    "hostStarCorona",
+    {
+      diameter: recipe.star.radiusSceneUnits * 2.7,
+      segments: profile.tier === "desktop" ? 32 : 20,
+    },
+    scene,
+  );
+  corona.parent = parent;
+  corona.position.copyFrom(starPosition);
+  corona.isPickable = false;
+  corona.renderingGroupId = 1;
+  const coronaMaterial = new StandardMaterial("hostStarCoronaMaterial", scene);
+  coronaMaterial.disableLighting = true;
+  coronaMaterial.emissiveColor = toColor3(recipe.star.color).scale(0.85);
+  coronaMaterial.alpha = Math.min(0.38, 0.16 + recipe.star.intensity * 0.065);
+  coronaMaterial.backFaceCulling = false;
+  coronaMaterial.disableDepthWrite = true;
+  coronaMaterial.freeze();
+  corona.material = coronaMaterial;
+
+  return [star, corona];
 };
 
 interface ViewingDeck {
@@ -748,6 +807,8 @@ const createPlanet = (
           "lavaStrength",
           "iceCapStrength",
           "lightDirection",
+          "stellarColor",
+          "stellarIntensity",
           "lowColor",
           "midColor",
           "highColor",
@@ -774,6 +835,8 @@ const createPlanet = (
           "stormLatitude",
           "polarGlow",
           "lightDirection",
+          "stellarColor",
+          "stellarIntensity",
           "deepColor",
           "hazeColor",
           "lightColor",
@@ -800,6 +863,8 @@ const createPlanet = (
           "stormScale",
           "stormStrength",
           "lightDirection",
+          "stellarColor",
+          "stellarIntensity",
           "deepColor",
           "midColor",
           "lightColor",
@@ -811,6 +876,8 @@ const createPlanet = (
 
   shader.setFloat("seed", recipe.seed);
   shader.setVector3("lightDirection", LIGHT_DIRECTION);
+  shader.setColor3("stellarColor", toColor3(recipe.star.color));
+  shader.setFloat("stellarIntensity", recipe.star.intensity);
 
   if (recipe.renderer === "rocky") {
     shader.setFloat("elevation", recipe.surface.elevation);
@@ -892,6 +959,7 @@ const createPlanet = (
           "cloudCover",
           "cloudColor",
           "lightDirection",
+          "stellarColor",
         ],
         needAlphaBlending: true,
       },
@@ -900,6 +968,7 @@ const createPlanet = (
     cloudLayer.setFloat("cloudCover", recipe.surface.cloudCover);
     cloudLayer.setColor3("cloudColor", toColor3(recipe.surface.cloudColor));
     cloudLayer.setVector3("lightDirection", LIGHT_DIRECTION);
+    cloudLayer.setColor3("stellarColor", toColor3(recipe.star.color));
     cloudLayer.backFaceCulling = true;
     cloudLayer.disableDepthWrite = true;
     cloudMesh.material = cloudLayer;
@@ -1156,10 +1225,7 @@ const createSurfaceSky = (
     : isIceGiant
       ? toColor3(recipe.atmosphereBands.hazeColor)
       : toColor3(recipe.surface.cloudColor);
-  const sunColor =
-    recipe.renderer === "rocky" && recipe.surface.lavaStrength > 0
-      ? new Color3(1, 0.38, 0.08)
-      : mixColor3([1, 0.82, 0.56], atmosphere, isIceGiant ? 0.38 : 0.16);
+  const sunColor = mixColor3(recipe.star.color, atmosphere, isIceGiant ? 0.18 : 0.07);
 
   const mesh = MeshBuilder.CreateSphere(
     "surfaceSky",
@@ -1188,6 +1254,8 @@ const createSurfaceSky = (
         "zenithColor",
         "cloudColor",
         "sunColor",
+        "sunAngularRadius",
+        "sunIntensity",
       ],
     },
   );
@@ -1200,6 +1268,8 @@ const createSurfaceSky = (
   material.setColor3("zenithColor", zenithColor);
   material.setColor3("cloudColor", cloudColor);
   material.setColor3("sunColor", sunColor);
+  material.setFloat("sunAngularRadius", recipe.star.apparentRadiusRadians);
+  material.setFloat("sunIntensity", recipe.star.intensity);
   material.backFaceCulling = false;
   material.disableDepthWrite = true;
   mesh.material = material;
@@ -1382,24 +1452,24 @@ const createSurfaceEnvironment = (
     meshes.push(haze);
   }
 
-  const horizonLight = MeshBuilder.CreateSphere(
-    "surfaceHorizonLight",
-    { diameter: recipe.renderer === "rocky" ? 2.4 : 4.2, segments: 16 },
+  const surfaceStarDiameter = 1.6 + recipe.star.apparentRadiusRadians * 30;
+  const surfaceStar = MeshBuilder.CreateSphere(
+    "surfaceHostStar",
+    { diameter: surfaceStarDiameter, segments: profile.tier === "desktop" ? 28 : 18 },
     scene,
   );
-  horizonLight.parent = root;
-  horizonLight.position.set(-21, 10.5, 48);
-  horizonLight.isPickable = false;
-  const horizonMaterial = new StandardMaterial("surfaceHorizonLightMaterial", scene);
-  horizonMaterial.disableLighting = true;
-  horizonMaterial.emissiveColor =
-    recipe.renderer === "rocky" && recipe.surface.lavaStrength > 0
-      ? new Color3(1, 0.19, 0.025)
-      : toColor3(recipe.atmosphere.color).scale(1.25);
-  horizonMaterial.alpha = 0.88;
-  horizonMaterial.freeze();
-  horizonLight.material = horizonMaterial;
-  meshes.push(horizonLight);
+  surfaceStar.parent = root;
+  surfaceStar.position.set(-8, 3.8, 48);
+  surfaceStar.isPickable = false;
+  surfaceStar.applyFog = false;
+  surfaceStar.renderingGroupId = 1;
+  const surfaceStarMaterial = new StandardMaterial("surfaceHostStarMaterial", scene);
+  surfaceStarMaterial.disableLighting = true;
+  surfaceStarMaterial.diffuseColor = toColor3(recipe.star.color);
+  surfaceStarMaterial.emissiveColor = toColor3(recipe.star.color).scale(recipe.star.intensity);
+  surfaceStarMaterial.freeze();
+  surfaceStar.material = surfaceStarMaterial;
+  meshes.push(surfaceStar);
 
   for (const mesh of meshes) {
     mesh.isVisible = false;
@@ -1467,7 +1537,8 @@ export const createPlanetExperience = ({
   camera.attachControl(canvas, true);
 
   const keyLight = new DirectionalLight("stellarLight", LIGHT_DIRECTION.scale(-1), scene);
-  keyLight.intensity = 2.2;
+  keyLight.diffuse = toColor3(recipe.star.color);
+  keyLight.intensity = 2.2 * recipe.star.intensity;
 
   createStarfield(scene, recipe.seed, profile.starCount);
   const viewingDeck = createViewingDeck(scene, profile);
@@ -1482,6 +1553,7 @@ export const createPlanetExperience = ({
     ringSystem,
     shader,
   } = createPlanet(scene, recipe, profile);
+  orbitalMeshes.push(...createHostStar(scene, recipe, profile, orbitalRoot));
   const surfaceEnvironment = createSurfaceEnvironment(scene, recipe, profile);
 
   let elapsedSeconds = 0;

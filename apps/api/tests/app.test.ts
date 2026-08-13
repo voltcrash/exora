@@ -20,6 +20,10 @@ const planet: ExoplanetProfile = {
     discoveryYear: 2017,
     discoveryMethod: "Imaging",
     hostSpectralType: "A2 V",
+    hostTemperatureKelvin: 8_840,
+    hostRadiusSolar: 1.77,
+    hostMassSolar: 1.96,
+    hostLuminosityLogSolar: 1.02,
   },
   source: {
     archive: "NASA Exoplanet Archive",

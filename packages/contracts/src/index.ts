@@ -5,7 +5,11 @@ export interface ExoplanetObservation {
   discoveryMethod: string;
   discoveryYear: number | null;
   equilibriumTemperatureKelvin: number | null;
+  hostLuminosityLogSolar: number | null;
+  hostMassSolar: number | null;
+  hostRadiusSolar: number | null;
   hostSpectralType: string | null;
+  hostTemperatureKelvin: number | null;
   massEarth: number | null;
   massJupiter: number | null;
   orbitalPeriodDays: number | null;

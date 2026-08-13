@@ -1,6 +1,6 @@
 import { expect, test } from "vite-plus/test";
 import type { ExoplanetProfile } from "@exora/contracts";
-import { deriveWorldRecipe, generateCustomWorld } from "../src/index.ts";
+import { deriveHostStar, deriveWorldRecipe, generateCustomWorld } from "../src/index.ts";
 
 const featuredPlanet: ExoplanetProfile = {
   id: "hip-65426-b",
@@ -19,6 +19,10 @@ const featuredPlanet: ExoplanetProfile = {
     discoveryYear: 2017,
     discoveryMethod: "Imaging",
     hostSpectralType: "A2 V",
+    hostTemperatureKelvin: 8_840,
+    hostRadiusSolar: 1.77,
+    hostMassSolar: 1.96,
+    hostLuminosityLogSolar: 1.02,
   },
   source: {
     archive: "NASA Exoplanet Archive",
@@ -63,6 +67,39 @@ test("world recipes are deterministic for the same planet", () => {
   const second = deriveWorldRecipe(featuredPlanet);
 
   expect(second).toEqual(first);
+});
+
+test("host-star visuals respond to NASA stellar temperature, radius, luminosity, and orbit", () => {
+  const hotStar = deriveHostStar(featuredPlanet);
+  const coolNearbyStar = deriveHostStar({
+    ...featuredPlanet,
+    observation: {
+      ...featuredPlanet.observation,
+      hostTemperatureKelvin: 2_800,
+      hostRadiusSolar: 0.12,
+      hostMassSolar: 0.09,
+      hostLuminosityLogSolar: -3.2,
+      semiMajorAxisAu: 0.02,
+    },
+  });
+  const massFallbackStar = deriveHostStar({
+    ...featuredPlanet,
+    observation: {
+      ...featuredPlanet.observation,
+      hostTemperatureKelvin: null,
+      hostRadiusSolar: null,
+      hostMassSolar: 0.2,
+      hostLuminosityLogSolar: null,
+    },
+  });
+
+  expect(hotStar.color[2]).toBeGreaterThan(coolNearbyStar.color[2]);
+  expect(coolNearbyStar.color[0]).toBeGreaterThan(coolNearbyStar.color[2]);
+  expect(hotStar.radiusSceneUnits).toBeGreaterThan(coolNearbyStar.radiusSceneUnits);
+  expect(hotStar.intensity).toBeGreaterThan(coolNearbyStar.intensity);
+  expect(coolNearbyStar.apparentRadiusRadians).toBeGreaterThan(hotStar.apparentRadiusRadians);
+  expect(massFallbackStar.radiusSceneUnits).toBeLessThan(hotStar.radiusSceneUnits);
+  expect(massFallbackStar.intensity).toBeLessThan(hotStar.intensity);
 });
 
 test("hot massive gas giants produce the intended visual family", () => {

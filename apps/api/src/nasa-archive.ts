@@ -15,6 +15,10 @@ const NASA_COLUMNS = [
   "disc_year",
   "discoverymethod",
   "st_spectype",
+  "st_teff",
+  "st_rad",
+  "st_mass",
+  "st_lum",
 ].join(",");
 
 type Fetcher = (input: string | URL | Request, init?: RequestInit) => Promise<Response>;
@@ -32,6 +36,10 @@ interface NasaPlanetRow {
   pl_rade: number | null;
   pl_radj: number | null;
   st_spectype: string | null;
+  st_teff: number | null;
+  st_rad: number | null;
+  st_mass: number | null;
+  st_lum: number | null;
   sy_dist: number | null;
 }
 
@@ -128,6 +136,10 @@ export const normalizeNasaPlanet = (
       discoveryYear: numberOrNull(row.disc_year),
       discoveryMethod: stringOrNull(row.discoverymethod) ?? "Unknown",
       hostSpectralType: stringOrNull(row.st_spectype),
+      hostTemperatureKelvin: numberOrNull(row.st_teff),
+      hostRadiusSolar: numberOrNull(row.st_rad),
+      hostMassSolar: numberOrNull(row.st_mass),
+      hostLuminosityLogSolar: numberOrNull(row.st_lum),
     },
     source: {
       archive: "NASA Exoplanet Archive",

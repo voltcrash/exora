@@ -20,6 +20,12 @@ interface BaseWorldRecipe {
   radiusSceneUnits: number;
   rotationSpeed: number;
   seed: number;
+  star: {
+    apparentRadiusRadians: number;
+    color: Rgb;
+    intensity: number;
+    radiusSceneUnits: number;
+  };
   summary: string;
 }
 
@@ -129,6 +135,52 @@ const createRandom = (seed: number): (() => number) => {
   };
 };
 
+const clamp = (value: number, minimum: number, maximum: number): number =>
+  Math.min(maximum, Math.max(minimum, value));
+
+/** Approximate a black-body color from NASA's stellar effective temperature. */
+const temperatureToRgb = (temperatureKelvin: number): Rgb => {
+  const temperature = clamp(temperatureKelvin, 1_000, 40_000) / 100;
+  const red = temperature <= 66 ? 255 : 329.698727446 * (temperature - 60) ** -0.1332047592;
+  const green =
+    temperature <= 66
+      ? 99.4708025861 * Math.log(temperature) - 161.1195681661
+      : 288.1221695283 * (temperature - 60) ** -0.0755148492;
+  const blue =
+    temperature >= 66
+      ? 255
+      : temperature <= 19
+        ? 0
+        : 138.5177312231 * Math.log(temperature - 10) - 305.0447927307;
+
+  return [clamp(red, 0, 255) / 255, clamp(green, 0, 255) / 255, clamp(blue, 0, 255) / 255];
+};
+
+export const deriveHostStar = (planet: ExoplanetProfile): BaseWorldRecipe["star"] => {
+  const massSolar = Math.max(0.08, planet.observation.hostMassSolar ?? 1);
+  const radiusSolar = Math.max(0.08, planet.observation.hostRadiusSolar ?? massSolar ** 0.8);
+  const luminositySolar =
+    planet.observation.hostLuminosityLogSolar === null
+      ? massSolar ** 3.5
+      : 10 ** planet.observation.hostLuminosityLogSolar;
+  const temperatureKelvin =
+    planet.observation.hostTemperatureKelvin ??
+    5_772 * (luminositySolar / radiusSolar ** 2) ** 0.25;
+  const orbitalDistanceAu = planet.observation.semiMajorAxisAu;
+  const physicalAngularRadius =
+    orbitalDistanceAu !== null && orbitalDistanceAu > 0
+      ? Math.asin(clamp((radiusSolar * 0.00465047) / orbitalDistanceAu, 0, 0.95))
+      : 0.00465047 * Math.sqrt(radiusSolar);
+
+  return {
+    color: temperatureToRgb(temperatureKelvin),
+    radiusSceneUnits: clamp(1.5 + Math.log2(radiusSolar + 0.5) * 1.1, 1.1, 5.5),
+    intensity: clamp(1.45 + Math.log10(Math.max(0.001, luminositySolar)) * 0.34, 0.65, 3.2),
+    // Preserve the relative apparent sizes while keeping ordinary stars legible in the terrain sky.
+    apparentRadiusRadians: clamp(physicalAngularRadius * 2.4, 0.012, 0.09),
+  };
+};
+
 const hotGasGiantPalette = {
   deepColor: [0.16, 0.025, 0.025] as const,
   midColor: [0.78, 0.2, 0.07] as const,
@@ -183,6 +235,7 @@ const deriveGasGiantRecipe = (
 
   return {
     seed,
+    star: deriveHostStar(planet),
     renderer: "gas-giant",
     classification: isUltraHot
       ? "Ultra-hot Jupiter"
@@ -290,6 +343,7 @@ const deriveRockyRecipe = (
 
   return {
     seed,
+    star: deriveHostStar(planet),
     renderer: "rocky",
     classification,
     confidence: temperature === null ? "low" : "medium",
@@ -357,6 +411,7 @@ const deriveIceGiantRecipe = (
 
   return {
     seed,
+    star: deriveHostStar(planet),
     renderer: "ice-giant",
     classification: isWarm ? "Warm Neptune" : "Ice giant",
     confidence: temperature === null ? "low" : "medium",
@@ -442,6 +497,10 @@ export const generateCustomWorld = (parameters: CustomPlanetParameters): CustomW
       discoveryYear: null,
       equilibriumTemperatureKelvin: temperatureKelvin,
       hostSpectralType: "USER DEFINED",
+      hostTemperatureKelvin: 5_772,
+      hostRadiusSolar: 1,
+      hostMassSolar: 1,
+      hostLuminosityLogSolar: 0,
       massEarth,
       massJupiter: parameters.kind === "gas-giant" ? massEarth / 317.83 : null,
       orbitalPeriodDays: null,

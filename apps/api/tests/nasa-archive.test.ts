@@ -15,6 +15,10 @@ const nasaRow = {
   disc_year: 2017,
   discoverymethod: "Imaging",
   st_spectype: "A2 V",
+  st_teff: 8840,
+  st_rad: 1.77,
+  st_mass: 1.96,
+  st_lum: 1.02,
 };
 
 test("normalizes NASA columns into the Exora contract", () => {
@@ -28,6 +32,10 @@ test("normalizes NASA columns into the Exora contract", () => {
       equilibriumTemperatureKelvin: 1500,
       massJupiter: 9,
       radiusJupiter: 1.5,
+      hostTemperatureKelvin: 8840,
+      hostRadiusSolar: 1.77,
+      hostMassSolar: 1.96,
+      hostLuminosityLogSolar: 1.02,
     },
   });
 });

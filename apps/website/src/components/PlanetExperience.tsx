@@ -248,7 +248,15 @@ export const PlanetExperience = ({
           <div className="telemetry-detail">
             <span>HOST SYSTEM</span>
             <strong>{result.mode === "custom" ? "USER DEFINED" : planet.hostStar}</strong>
-            <small>{observation.hostSpectralType ?? "Spectrum unavailable"}</small>
+            <small>
+              {observation.hostSpectralType ?? "Spectrum unavailable"}
+              {observation.hostTemperatureKelvin === null
+                ? ""
+                : ` · ${formatNumber(observation.hostTemperatureKelvin, 0)} K`}
+              {observation.hostRadiusSolar === null
+                ? ""
+                : ` · ${formatNumber(observation.hostRadiusSolar, 2)} R☉`}
+            </small>
           </div>
           <div className="telemetry-detail">
             <span>ATMOSPHERE MODEL</span>

@@ -1,4 +1,5 @@
 import { readFile } from "node:fs/promises";
+import { readdir } from "node:fs/promises";
 import { createDatabaseClient } from "./database.ts";
 
 const connectionString = process.env.DATABASE_URL?.trim();
@@ -7,10 +8,16 @@ if (!connectionString) throw new Error("DATABASE_URL is required to run database
 const database = createDatabaseClient(connectionString);
 
 try {
-  const migrationUrl = new URL("../migrations/0001_exoplanet_catalog.sql", import.meta.url);
-  const migration = await readFile(migrationUrl, "utf8");
-  await database.query(migration);
-  console.log("Applied PostgreSQL migration 0001_exoplanet_catalog.");
+  const migrationsUrl = new URL("../migrations/", import.meta.url);
+  const migrationFiles = (await readdir(migrationsUrl))
+    .filter((file) => /^\d+_[a-z0-9_]+\.sql$/.test(file))
+    .sort();
+
+  for (const migrationFile of migrationFiles) {
+    const migration = await readFile(new URL(migrationFile, migrationsUrl), "utf8");
+    await database.query(migration);
+    console.log(`Applied PostgreSQL migration ${migrationFile.replace(".sql", "")}.`);
+  }
 } finally {
   await database.close();
 }

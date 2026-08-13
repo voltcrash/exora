@@ -8,6 +8,10 @@ interface PlanetRow extends Record<string, unknown> {
   distance_parsecs: number | null;
   equilibrium_temperature_kelvin: number | null;
   host_spectral_type: string | null;
+  host_temperature_kelvin: number | null;
+  host_radius_solar: number | null;
+  host_mass_solar: number | null;
+  host_luminosity_log_solar: number | null;
   host_star: string;
   id: string;
   kind: ExoplanetProfile["kind"];
@@ -39,6 +43,10 @@ const PLANET_COLUMNS = `
   discovery_year,
   discovery_method,
   host_spectral_type,
+  host_temperature_kelvin,
+  host_radius_solar,
+  host_mass_solar,
+  host_luminosity_log_solar,
   source_archive,
   source_table,
   retrieved_on
@@ -64,6 +72,10 @@ const toPlanet = (row: PlanetRow): ExoplanetProfile => ({
     discoveryYear: row.discovery_year,
     discoveryMethod: row.discovery_method,
     hostSpectralType: row.host_spectral_type,
+    hostTemperatureKelvin: row.host_temperature_kelvin,
+    hostRadiusSolar: row.host_radius_solar,
+    hostMassSolar: row.host_mass_solar,
+    hostLuminosityLogSolar: row.host_luminosity_log_solar,
   },
   source: {
     archive: row.source_archive,
