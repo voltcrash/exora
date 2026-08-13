@@ -6,13 +6,17 @@
   "scripts": {
     "ready": "vp check && vp run -r test && vp run -r build",
     "dev": "vp run --parallel --filter website --filter @exora/api dev",
+    "dev:vercel": "vercel dev",
     "dev:api": "vp run @exora/api#dev",
     "dev:web": "vp run website#dev",
+    "deploy": "vercel",
+    "deploy:prod": "vercel --prod",
     "db:migrate": "vp run @exora/api#db:migrate",
     "db:sync": "vp run @exora/api#db:sync",
     "prepare": "vp config"
   },
   "devDependencies": {
+    "vercel": "catalog:",
     "vite": "catalog:",
     "vite-plus": "catalog:"
   },

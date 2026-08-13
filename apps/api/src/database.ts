@@ -11,6 +11,10 @@ export interface DatabaseClient {
 
 type SqlClient = ReturnType<typeof postgres>;
 
+interface DatabaseClientOptions {
+  maxConnections?: number;
+}
+
 class PostgresDatabaseClient implements DatabaseClient {
   readonly #ownsConnection: boolean;
   readonly #sql: SqlClient;
@@ -40,11 +44,14 @@ class PostgresDatabaseClient implements DatabaseClient {
   }
 }
 
-export const createDatabaseClient = (connectionString: string): DatabaseClient =>
+export const createDatabaseClient = (
+  connectionString: string,
+  { maxConnections = 10 }: DatabaseClientOptions = {},
+): DatabaseClient =>
   new PostgresDatabaseClient(
     postgres(connectionString, {
       connect_timeout: 10,
       idle_timeout: 20,
-      max: 10,
+      max: maxConnections,
     }),
   );
