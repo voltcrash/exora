@@ -805,7 +805,6 @@ body[data-xr-status="unavailable"] .status-light {
 .catalog-trigger:focus-visible,
 .catalog-close:focus-visible,
 .catalog-result:focus-visible,
-.catalog-search input:focus-visible,
 .enter-vr:focus-visible {
   outline: 2px solid var(--cyan);
   outline-offset: 3px;

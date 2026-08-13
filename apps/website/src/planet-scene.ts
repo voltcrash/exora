@@ -1,4 +1,5 @@
 import { ArcRotateCamera } from "@babylonjs/core/Cameras/arcRotateCamera.js";
+import "@babylonjs/core/Culling/ray.js";
 import { Engine } from "@babylonjs/core/Engines/engine.js";
 import { DirectionalLight } from "@babylonjs/core/Lights/directionalLight.js";
 import { Color3, Color4 } from "@babylonjs/core/Maths/math.color.js";
@@ -13,9 +14,11 @@ import { VertexData } from "@babylonjs/core/Meshes/mesh.vertexData.js";
 import { Scene, ScenePerformancePriority } from "@babylonjs/core/scene.js";
 import { TransformNode } from "@babylonjs/core/Meshes/transformNode.js";
 import { WebXRDefaultExperience } from "@babylonjs/core/XR/webXRDefaultExperience.js";
+import "@babylonjs/core/XR/features/WebXRControllerMovement.js";
 import "@babylonjs/core/XR/features/WebXRControllerPointerSelection.js";
 import "@babylonjs/core/XR/features/WebXRControllerTeleportation.js";
 import "@babylonjs/core/XR/features/WebXRHandTracking.js";
+import { WebXRFeatureName } from "@babylonjs/core/XR/webXRFeaturesManager.js";
 import { WebXRState } from "@babylonjs/core/XR/webXRTypes.js";
 import type { Rgb, WorldRecipe } from "@exora/worldgen";
 import {
@@ -28,6 +31,8 @@ import {
 const PLANET_POSITION = new Vector3(0, 1.35, 9.5);
 const VIEWING_DECK_POSITION = new Vector3(0, 0, -7.4);
 const LIGHT_DIRECTION = new Vector3(-0.82, 0.3, -0.38).normalize();
+const DESKTOP_MOVE_SPEED = 5.2;
+const XR_MOVE_SPEED = 2.2;
 
 const PLANET_VERTEX_SHADER = `
 precision highp float;
@@ -923,12 +928,43 @@ const createSeededRandom = (seed: number): (() => number) => {
   };
 };
 
+const terrainHash = (x: number, z: number, seed: number): number => {
+  const value = Math.sin(x * 127.1 + z * 311.7 + seed * 0.000_071) * 43_758.545_312_3;
+  return value - Math.floor(value);
+};
+
+const smoothTerrainNoise = (x: number, z: number, seed: number): number => {
+  const cellX = Math.floor(x);
+  const cellZ = Math.floor(z);
+  const fractionX = x - cellX;
+  const fractionZ = z - cellZ;
+  const blendX = fractionX * fractionX * (3 - 2 * fractionX);
+  const blendZ = fractionZ * fractionZ * (3 - 2 * fractionZ);
+  const near =
+    terrainHash(cellX, cellZ, seed) * (1 - blendX) + terrainHash(cellX + 1, cellZ, seed) * blendX;
+  const far =
+    terrainHash(cellX, cellZ + 1, seed) * (1 - blendX) +
+    terrainHash(cellX + 1, cellZ + 1, seed) * blendX;
+  return near * (1 - blendZ) + far * blendZ;
+};
+
 const terrainNoise = (x: number, z: number, seed: number): number => {
-  const seedPhase = seed * 0.000013;
-  const broad = Math.sin(x * 0.105 + seedPhase) * Math.cos(z * 0.082 - seedPhase * 1.7);
-  const ridges = Math.sin((x + z) * 0.19 + seedPhase * 2.4) * 0.45;
-  const detail = Math.sin(x * 0.43 - z * 0.31 + seedPhase * 4.1) * 0.18;
-  return broad * 0.72 + ridges + detail;
+  let frequency = 0.055;
+  let amplitude = 1;
+  let height = 0;
+  let normalizer = 0;
+
+  for (let octave = 0; octave < 5; octave += 1) {
+    const sample = smoothTerrainNoise(x * frequency, z * frequency, seed + octave * 1_013);
+    height += (sample * 2 - 1) * amplitude;
+    normalizer += amplitude;
+    frequency *= 2.08;
+    amplitude *= 0.5;
+  }
+
+  const ridgeSample = smoothTerrainNoise(x * 0.092, z * 0.092, seed ^ 0x68bc21eb);
+  const ridge = 1 - Math.abs(ridgeSample * 2 - 1);
+  return (height / normalizer) * 1.45 + ridge * ridge * 0.82 - 0.34;
 };
 
 const mixRgb = (from: Rgb, to: Rgb, amount: number): Color4 =>
@@ -973,7 +1009,6 @@ const createSurfaceEnvironment = (
   const positions = ground.getVerticesData("position");
   const indices = ground.getIndices();
   if (positions && indices) {
-    const colors: number[] = [];
     const normals: number[] = [];
     const isAtmospheric = recipe.renderer !== "rocky";
     for (let index = 0; index < positions.length; index += 3) {
@@ -983,18 +1018,22 @@ const createSurfaceEnvironment = (
       const noise = terrainNoise(x, z, recipe.seed);
       const horizonLift = Math.max(0, (z - 2) / 36) * 1.7;
       const height = isAtmospheric
-        ? noise * 1.15 + Math.sin(z * 0.16 + recipe.seed) * 0.42 + horizonLift
-        : noise * (0.85 + Math.min(distance / 25, 1) * 1.9) + horizonLift;
+        ? noise * 1.35 + Math.sin(z * 0.16 + recipe.seed) * 0.32 + horizonLift
+        : noise * (1.05 + Math.min(distance / 25, 1) * 2.15) + horizonLift;
       positions[index + 1] = height;
-      const color = mixRgb(
-        terrainLowColor,
-        terrainHighColor,
-        Math.min(1, Math.max(0, 0.42 + height * 0.13)),
-      );
-      colors.push(color.r, color.g, color.b, 1);
     }
 
     VertexData.ComputeNormals(positions, indices, normals);
+    const colors: number[] = [];
+    for (let index = 0; index < positions.length; index += 3) {
+      const height = positions[index + 1] ?? 0;
+      const normalY = normals[index + 1] ?? 1;
+      const altitude = Math.min(1, Math.max(0, 0.38 + height * 0.11));
+      const exposedSlope = Math.min(1, Math.max(0, (0.88 - normalY) * 3.6));
+      const color = mixRgb(terrainLowColor, terrainHighColor, altitude * (1 - exposedSlope * 0.5));
+      const shade = 0.72 + normalY * 0.28 - exposedSlope * 0.12;
+      colors.push(color.r * shade, color.g * shade, color.b * shade, 1);
+    }
     ground.updateVerticesData("position", positions);
     ground.setVerticesData("normal", normals);
     ground.setVerticesData("color", colors, false, 4);
@@ -1020,7 +1059,7 @@ const createSurfaceEnvironment = (
     rockMaterial.emissiveColor = rockMaterial.diffuseColor.scale(0.06);
     rockMaterial.specularColor = new Color3(0.018, 0.02, 0.022);
     rockMaterial.freeze();
-    const rockCount = profile.tier === "desktop" ? 22 : 12;
+    const rockCount = profile.tier === "desktop" ? 42 : 20;
     for (let index = 0; index < rockCount; index += 1) {
       const rock = MeshBuilder.CreateSphere(
         `surfaceRock-${index}`,
@@ -1029,7 +1068,7 @@ const createSurfaceEnvironment = (
       );
       const x = -25 + random() * 50;
       const z = 4 + random() * 42;
-      rock.position.set(x, -0.9 + terrainNoise(x, z, recipe.seed), z + 18);
+      rock.position.set(x, -0.72 + terrainNoise(x, z, recipe.seed) * 1.35, z + 18);
       rock.scaling.set(0.55 + random() * 0.8, 0.55 + random() * 1.7, 0.55 + random());
       rock.rotation.set(random() * 0.4, random() * Math.PI, random() * 0.35);
       rock.parent = root;
@@ -1172,8 +1211,31 @@ export const createPlanetExperience = ({
   let isInXr = false;
   let viewState: "entering" | "leaving" | "orbit" | "surface" = "orbit";
   let viewTransitionSeconds = 0;
+  const pressedMovementKeys = new Set<string>();
   const orbitTarget = PLANET_POSITION.clone();
   const surfaceTarget = new Vector3(0, 0.1, 25);
+  const movementForward = new Vector3();
+  const movementRight = new Vector3();
+  const movementDelta = new Vector3();
+
+  const isTypingTarget = (target: EventTarget | null): boolean =>
+    target instanceof HTMLInputElement ||
+    target instanceof HTMLTextAreaElement ||
+    (target instanceof HTMLElement && target.isContentEditable);
+
+  const onMovementKeyDown = (event: KeyboardEvent): void => {
+    if (isTypingTarget(event.target) || !["KeyW", "KeyA", "KeyS", "KeyD"].includes(event.code))
+      return;
+    event.preventDefault();
+    pressedMovementKeys.add(event.code);
+  };
+  const onMovementKeyUp = (event: KeyboardEvent): void => {
+    pressedMovementKeys.delete(event.code);
+  };
+  const clearMovementKeys = (): void => pressedMovementKeys.clear();
+  window.addEventListener("keydown", onMovementKeyDown);
+  window.addEventListener("keyup", onMovementKeyUp);
+  window.addEventListener("blur", clearMovementKeys);
 
   const applyViewEnvironment = (surface: boolean): void => {
     setEnvironmentEnabled(orbitalRoot, orbitalMeshes, !surface);
@@ -1206,6 +1268,42 @@ export const createPlanetExperience = ({
     const deltaSeconds = Math.min(engine.getDeltaTime() / 1_000, 0.05);
     elapsedSeconds += deltaSeconds;
     qualitySampleSeconds += deltaSeconds;
+
+    const movementX =
+      Number(pressedMovementKeys.has("KeyD")) - Number(pressedMovementKeys.has("KeyA"));
+    const movementZ =
+      Number(pressedMovementKeys.has("KeyW")) - Number(pressedMovementKeys.has("KeyS"));
+    if (
+      (movementX !== 0 || movementZ !== 0) &&
+      viewState !== "entering" &&
+      viewState !== "leaving"
+    ) {
+      const activeCamera = scene.activeCamera ?? camera;
+      const forwardRay = activeCamera.getForwardRay();
+      movementForward.set(forwardRay.direction.x, 0, forwardRay.direction.z);
+      if (movementForward.lengthSquared() < 0.001) movementForward.set(0, 0, 1);
+      movementForward.normalize();
+      movementRight.set(movementForward.z, 0, -movementForward.x);
+      movementDelta
+        .copyFrom(movementForward)
+        .scaleInPlace(movementZ)
+        .addInPlace(movementRight.scale(movementX))
+        .normalize()
+        .scaleInPlace(DESKTOP_MOVE_SPEED * deltaSeconds);
+
+      if (isInXr) {
+        activeCamera.position.addInPlace(movementDelta);
+      } else {
+        camera.target.addInPlace(movementDelta);
+        if (viewState === "surface") {
+          camera.target.x = Math.min(30, Math.max(-30, camera.target.x));
+          camera.target.z = Math.min(53, Math.max(-14, camera.target.z));
+          surfaceTarget.copyFrom(camera.target);
+        } else {
+          orbitTarget.copyFrom(camera.target);
+        }
+      }
+    }
 
     if (!isInXr && viewState === "orbit" && camera.radius <= 10.62) beginViewTransition("entering");
     if (!isInXr && viewState === "surface" && camera.radius >= 18.1) beginViewTransition("leaving");
@@ -1284,6 +1382,7 @@ export const createPlanetExperience = ({
   void WebXRDefaultExperience.CreateAsync(scene, {
     disableDefaultUI: true,
     disableNearInteraction: true,
+    disableTeleportation: true,
     floorMeshes: [viewingDeck.floor],
     inputOptions: { doNotLoadControllerMeshes: true },
     optionalFeatures: ["hand-tracking"],
@@ -1303,6 +1402,17 @@ export const createPlanetExperience = ({
       }
 
       xr = createdXr;
+      createdXr.baseExperience.featuresManager.enableFeature(WebXRFeatureName.MOVEMENT, "latest", {
+        movementEnabled: true,
+        movementOrientationFollowsController: false,
+        movementOrientationFollowsViewerPose: true,
+        movementSpeed: XR_MOVE_SPEED,
+        movementThreshold: 0.16,
+        rotationEnabled: true,
+        rotationSpeed: 0.42,
+        rotationThreshold: 0.18,
+        xrInput: createdXr.input,
+      });
       createdXr.baseExperience.onInitialXRPoseSetObservable.add((xrCamera) => {
         xrCamera.position.copyFrom(VIEWING_DECK_POSITION);
       });
@@ -1356,6 +1466,9 @@ export const createPlanetExperience = ({
       if (disposed) return;
       disposed = true;
       window.removeEventListener("resize", resize);
+      window.removeEventListener("keydown", onMovementKeyDown);
+      window.removeEventListener("keyup", onMovementKeyUp);
+      window.removeEventListener("blur", clearMovementKeys);
       xr?.dispose();
       engine.stopRenderLoop();
       scene.dispose();

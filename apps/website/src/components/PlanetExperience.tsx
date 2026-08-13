@@ -251,6 +251,10 @@ export const PlanetExperience = ({ onOpenCatalog, result }: PlanetExperienceProp
         </div>
         <div className="interaction-hint" aria-label="Desktop controls">
           <span>
+            <kbd>WASD</kbd>
+            <small>MOVE</small>
+          </span>
+          <span>
             <kbd>DRAG</kbd>
             <small>{viewMode === "surface" ? "LOOK" : "ORBIT"}</small>
           </span>
