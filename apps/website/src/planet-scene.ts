@@ -124,11 +124,13 @@ uniform mat4 worldViewProjection;
 
 varying vec3 vWorldPosition;
 varying vec3 vWorldNormal;
+varying vec3 vSurfacePosition;
 
 void main(void) {
   vec4 worldPosition = world * vec4(position, 1.0);
   vWorldPosition = worldPosition.xyz;
   vWorldNormal = normalize(mat3(world) * normal);
+  vSurfacePosition = normalize(position);
   gl_Position = worldViewProjection * vec4(position, 1.0);
 }
 `;
@@ -138,6 +140,7 @@ precision highp float;
 
 varying vec3 vWorldPosition;
 varying vec3 vWorldNormal;
+varying vec3 vSurfacePosition;
 
 uniform float time;
 uniform float seed;
@@ -156,70 +159,92 @@ uniform vec3 midColor;
 uniform vec3 lightColor;
 uniform vec3 stormColor;
 
-float hash(vec2 point) {
-  point = fract(point * vec2(123.34, 456.21));
-  point += dot(point, point + 45.32 + seed * 0.0001);
-  return fract(point.x * point.y);
+float hash(vec3 point) {
+  point = fract(point * 0.1031 + seed * 0.000013);
+  point += dot(point, point.yzx + 33.33);
+  return fract((point.x + point.y) * point.z);
 }
 
-float noise(vec2 point) {
-  vec2 index = floor(point);
-  vec2 fraction = fract(point);
+float noise(vec3 point) {
+  vec3 index = floor(point);
+  vec3 fraction = fract(point);
   fraction = fraction * fraction * (3.0 - 2.0 * fraction);
-
   return mix(
-    mix(hash(index), hash(index + vec2(1.0, 0.0)), fraction.x),
-    mix(hash(index + vec2(0.0, 1.0)), hash(index + vec2(1.0, 1.0)), fraction.x),
-    fraction.y
+    mix(mix(hash(index), hash(index + vec3(1.0, 0.0, 0.0)), fraction.x),
+        mix(hash(index + vec3(0.0, 1.0, 0.0)), hash(index + vec3(1.0, 1.0, 0.0)), fraction.x), fraction.y),
+    mix(mix(hash(index + vec3(0.0, 0.0, 1.0)), hash(index + vec3(1.0, 0.0, 1.0)), fraction.x),
+        mix(hash(index + vec3(0.0, 1.0, 1.0)), hash(index + vec3(1.0, 1.0, 1.0)), fraction.x), fraction.y),
+    fraction.z
   );
 }
 
-float fbm(vec2 point) {
+float fbm(vec3 point) {
   float value = 0.0;
-  float amplitude = 0.5;
-  mat2 rotation = mat2(0.8, -0.6, 0.6, 0.8);
-
-  for (int octave = 0; octave < 5; octave++) {
+  float amplitude = 0.52;
+  for (int octave = 0; octave < 6; octave++) {
     value += amplitude * noise(point);
-    point = rotation * point * 2.04 + 11.7;
-    amplitude *= 0.5;
+    point = point.yzx * 2.03 + vec3(11.7, 7.9, 15.3);
+    amplitude *= 0.48;
   }
-
   return value;
+}
+
+vec3 rotateY(vec3 point, float angle) {
+  float sine = sin(angle);
+  float cosine = cos(angle);
+  return vec3(cosine * point.x - sine * point.z, point.y, sine * point.x + cosine * point.z);
 }
 
 void main(void) {
   vec3 normal = normalize(vWorldNormal);
-  float longitude = atan(normal.z, normal.x);
-  float latitude = asin(clamp(normal.y, -1.0, 1.0));
+  vec3 surface = normalize(vSurfacePosition);
+  float latitude = asin(clamp(surface.y, -1.0, 1.0));
   float flow = time * 0.035;
+  vec3 flowingSurface = rotateY(surface, flow);
+  float broadNoise = fbm(flowingSurface * 2.15 + vec3(4.1, 8.7, 2.3));
+  float warpNoise = fbm(
+    flowingSurface * 4.4 + vec3(broadNoise * 2.7, -broadNoise * 1.3, broadNoise * 2.1)
+  );
+  float filamentNoise = fbm(
+    vec3(flowingSurface.x * 7.0, flowingSurface.y * (16.0 + turbulence * 3.0), flowingSurface.z * 7.0) + vec3(17.1, flow * 0.45, 3.7)
+  );
+  float bandPhase = latitude * jetCount * 1.42 + (broadNoise - 0.5) * 5.4 + (warpNoise - 0.5) * 2.2;
+  float bandWave = 0.5 + sin(bandPhase) * 0.34 + sin(bandPhase * 0.51 + 1.8) * 0.12;
+  float bandMix = smoothstep(0.12, 0.88, bandWave);
+  bandMix = mix(0.5, bandMix, contrast);
 
-  vec2 cloudUv = vec2(longitude * 2.4 + flow, latitude * 11.5);
-  float broadNoise = fbm(vec2(longitude * 1.2 - flow * 0.3, latitude * 5.0));
-  float fineNoise = fbm(cloudUv * vec2(1.0, turbulence));
-  float jetShear = sin(latitude * jetCount) * 0.18;
-  float bands = sin(latitude * jetCount * 2.0 + broadNoise * 5.0 + fineNoise * 2.4);
-  float bandMix = smoothstep(-0.72, 0.78, bands) * contrast;
   float stormLongitude = sin(seed * 0.00013) * 2.4;
-  float wrappedLongitude = atan(sin(longitude - stormLongitude), cos(longitude - stormLongitude));
-  vec2 stormUv = vec2(wrappedLongitude * cos(stormLatitude), latitude - stormLatitude);
-  float stormDistance = length(stormUv * vec2(stormScale * 0.62, stormScale * 1.7));
-  float stormCore = 1.0 - smoothstep(0.48, 1.0, stormDistance);
-  float stormSpiral = sin(atan(stormUv.y, stormUv.x) * 4.0 - stormDistance * 17.0 + flow * 2.0);
-  float storms = stormCore * (0.72 + stormSpiral * 0.28) * stormStrength;
-  float cells = smoothstep(0.68, 0.9, fbm(vec2(longitude * 3.1 + flow + jetShear, latitude * 8.0)));
+  vec3 stormCenter = vec3(
+    cos(stormLatitude) * cos(stormLongitude),
+    sin(stormLatitude),
+    cos(stormLatitude) * sin(stormLongitude)
+  );
+  vec3 stormEast = normalize(cross(vec3(0.0, 1.0, 0.0), stormCenter));
+  vec3 stormNorth = normalize(cross(stormCenter, stormEast));
+  vec2 stormUv = vec2(dot(surface, stormEast), dot(surface, stormNorth));
+  float stormDistance = length(stormUv * vec2(stormScale * 0.7, stormScale * 1.65));
+  float stormCore = (1.0 - smoothstep(0.38, 1.0, stormDistance)) * smoothstep(-0.2, 0.72, dot(surface, stormCenter));
+  float stormAngle = atan(stormUv.y, stormUv.x);
+  float stormSpiral = sin(stormAngle * 5.0 - stormDistance * 19.0 + flow * 2.0 + warpNoise * 2.0);
+  float storms = stormCore * (0.7 + stormSpiral * 0.18 + filamentNoise * 0.12) * stormStrength;
+  float cells = smoothstep(0.66, 0.9, filamentNoise) * (0.35 + 0.65 * abs(cos(bandPhase)));
 
-  vec3 cloudColor = mix(deepColor, midColor, 0.35 + broadNoise * 0.5);
-  cloudColor = mix(cloudColor, lightColor, clamp(bandMix + cells * 0.22, 0.0, 1.0));
+  vec3 cloudColor = mix(deepColor, midColor, clamp(0.22 + broadNoise * 0.62 + warpNoise * 0.12, 0.0, 1.0));
+  cloudColor = mix(cloudColor, lightColor, clamp(bandMix * 0.82 + filamentNoise * 0.12 + cells * 0.16, 0.0, 1.0));
+  cloudColor *= 0.92 + (filamentNoise - 0.5) * 0.12;
   cloudColor = mix(cloudColor, stormColor, clamp(storms, 0.0, 0.9));
 
   float diffuse = max(dot(normal, lightDirection), 0.0);
-  float wrappedLight = 0.2 + diffuse * 0.92;
+  float wrappedLight = 0.18 + diffuse * 0.94;
   vec3 viewDirection = normalize(cameraPosition - vWorldPosition);
-  float rim = pow(1.0 - max(dot(normal, viewDirection), 0.0), 3.0);
-  vec3 finalColor = cloudColor * wrappedLight * mix(vec3(1.0), stellarColor, diffuse * 0.32) * stellarIntensity + midColor * rim * 0.38;
+  vec3 halfDirection = normalize(lightDirection + viewDirection);
+  float sheen = pow(max(dot(normal, halfDirection), 0.0), 28.0) * (0.08 + cells * 0.12);
+  float rim = pow(1.0 - max(dot(normal, viewDirection), 0.0), 2.7);
+  vec3 finalColor = cloudColor * wrappedLight * mix(vec3(1.0), stellarColor, diffuse * 0.32) * stellarIntensity;
+  finalColor += lightColor * sheen + midColor * rim * 0.28;
+  float dither = (hash(vec3(gl_FragCoord.xy, seed)) - 0.5) / 255.0;
 
-  gl_FragColor = vec4(finalColor, 1.0);
+  gl_FragColor = vec4(finalColor + dither, 1.0);
 }
 `;
 
@@ -228,6 +253,7 @@ precision highp float;
 
 varying vec3 vWorldPosition;
 varying vec3 vWorldNormal;
+varying vec3 vSurfacePosition;
 
 uniform float time;
 uniform float seed;
@@ -243,56 +269,71 @@ uniform vec3 deepColor;
 uniform vec3 hazeColor;
 uniform vec3 lightColor;
 
-float hash(vec2 point) {
-  point = fract(point * vec2(127.1, 311.7));
-  point += dot(point, point + 19.19 + seed * 0.00007);
-  return fract(point.x * point.y);
+float hash(vec3 point) {
+  point = fract(point * 0.1031 + seed * 0.000019);
+  point += dot(point, point.yzx + 31.32);
+  return fract((point.x + point.y) * point.z);
 }
 
-float noise(vec2 point) {
-  vec2 index = floor(point);
-  vec2 fraction = fract(point);
+float noise(vec3 point) {
+  vec3 index = floor(point);
+  vec3 fraction = fract(point);
   fraction = fraction * fraction * (3.0 - 2.0 * fraction);
   return mix(
-    mix(hash(index), hash(index + vec2(1.0, 0.0)), fraction.x),
-    mix(hash(index + vec2(0.0, 1.0)), hash(index + vec2(1.0, 1.0)), fraction.x),
-    fraction.y
+    mix(mix(hash(index), hash(index + vec3(1.0, 0.0, 0.0)), fraction.x),
+        mix(hash(index + vec3(0.0, 1.0, 0.0)), hash(index + vec3(1.0, 1.0, 0.0)), fraction.x), fraction.y),
+    mix(mix(hash(index + vec3(0.0, 0.0, 1.0)), hash(index + vec3(1.0, 0.0, 1.0)), fraction.x),
+        mix(hash(index + vec3(0.0, 1.0, 1.0)), hash(index + vec3(1.0, 1.0, 1.0)), fraction.x), fraction.y),
+    fraction.z
   );
 }
 
-float fbm(vec2 point) {
+float fbm(vec3 point) {
   float value = 0.0;
   float amplitude = 0.52;
-  for (int octave = 0; octave < 4; octave++) {
+  for (int octave = 0; octave < 5; octave++) {
     value += amplitude * noise(point);
-    point = point * 2.07 + vec2(9.3, 14.8);
+    point = point.yzx * 2.07 + vec3(9.3, 14.8, 5.6);
     amplitude *= 0.48;
   }
   return value;
 }
 
+vec3 rotateY(vec3 point, float angle) {
+  float sine = sin(angle);
+  float cosine = cos(angle);
+  return vec3(cosine * point.x - sine * point.z, point.y, sine * point.x + cosine * point.z);
+}
+
 void main(void) {
   vec3 normal = normalize(vWorldNormal);
-  float longitude = atan(normal.z, normal.x);
-  float latitude = asin(clamp(normal.y, -1.0, 1.0));
+  vec3 surface = normalize(vSurfacePosition);
+  float latitude = asin(clamp(surface.y, -1.0, 1.0));
   float flow = time * 0.018;
-  float haze = fbm(vec2(longitude * 1.7 + flow, latitude * bandScale));
-  float bands = sin(latitude * bandScale * 2.4 + haze * 2.8) * 0.5 + 0.5;
-  float stormNoise = fbm(vec2(longitude * 4.2 - flow * 1.8, latitude * 8.0));
+  vec3 flowingSurface = rotateY(surface, flow);
+  float haze = fbm(flowingSurface * 2.6 + vec3(3.7, 11.9, 6.2));
+  float detail = fbm(
+    vec3(flowingSurface.x * 6.0, flowingSurface.y * 15.0, flowingSurface.z * 6.0) + vec3(haze * 2.0)
+  );
+  float bandPhase = latitude * bandScale * 1.65 + (haze - 0.5) * 3.5 + (detail - 0.5) * 0.9;
+  float bands = 0.5 + sin(bandPhase) * 0.25 + sin(bandPhase * 0.47 + 2.2) * 0.08;
+  bands = smoothstep(0.12, 0.88, bands);
+  float stormNoise = fbm(rotateY(surface, -flow * 1.8) * 6.5 + vec3(12.4, 4.2, 8.7));
   float latitudeMask = 1.0 - smoothstep(0.08, 0.48, abs(latitude - stormLatitude));
   float storms = smoothstep(0.64, 0.9, stormNoise) * stormStrength * latitudeMask;
   float pole = pow(smoothstep(0.55, 1.3, abs(latitude)), 2.0) * polarGlow;
 
-  vec3 atmosphereColor = mix(deepColor, hazeColor, 0.32 + haze * 0.5);
-  atmosphereColor = mix(atmosphereColor, lightColor, bands * 0.24 + storms);
+  vec3 atmosphereColor = mix(deepColor, hazeColor, clamp(0.3 + haze * 0.5 + detail * 0.08, 0.0, 1.0));
+  atmosphereColor = mix(atmosphereColor, lightColor, bands * 0.2 + storms + detail * 0.05);
 
   float diffuse = max(dot(normal, lightDirection), 0.0);
   float wrappedLight = 0.22 + diffuse * 0.9;
   vec3 viewDirection = normalize(cameraPosition - vWorldPosition);
   float rim = pow(1.0 - max(dot(normal, viewDirection), 0.0), 2.5);
   vec3 finalColor = atmosphereColor * wrappedLight * mix(vec3(1.0), stellarColor, diffuse * 0.32) * stellarIntensity + hazeColor * rim * 0.46;
-  finalColor += lightColor * pole * (0.16 + 0.08 * sin(longitude * 5.0 + flow * 3.0));
-  gl_FragColor = vec4(finalColor, 1.0);
+  finalColor += lightColor * pole * (0.14 + detail * 0.11);
+  float dither = (hash(vec3(gl_FragCoord.xy, seed)) - 0.5) / 255.0;
+  gl_FragColor = vec4(finalColor + dither, 1.0);
 }
 `;
 
@@ -370,6 +411,7 @@ varying float vHeight;
 
 uniform float seed;
 uniform float craterDensity;
+uniform float roughness;
 uniform float waterLevel;
 uniform float time;
 uniform float lavaStrength;
@@ -390,29 +432,86 @@ float hash(vec3 point) {
   return fract((point.x + point.y) * point.z);
 }
 
+float noise(vec3 point) {
+  vec3 index = floor(point);
+  vec3 fraction = fract(point);
+  fraction = fraction * fraction * (3.0 - 2.0 * fraction);
+  return mix(
+    mix(mix(hash(index), hash(index + vec3(1.0, 0.0, 0.0)), fraction.x),
+        mix(hash(index + vec3(0.0, 1.0, 0.0)), hash(index + vec3(1.0, 1.0, 0.0)), fraction.x), fraction.y),
+    mix(mix(hash(index + vec3(0.0, 0.0, 1.0)), hash(index + vec3(1.0, 0.0, 1.0)), fraction.x),
+        mix(hash(index + vec3(0.0, 1.0, 1.0)), hash(index + vec3(1.0, 1.0, 1.0)), fraction.x), fraction.y),
+    fraction.z
+  );
+}
+
+float fbm(vec3 point) {
+  float value = 0.0;
+  float amplitude = 0.52;
+  for (int octave = 0; octave < 5; octave++) {
+    value += amplitude * noise(point);
+    point = point.yzx * 2.04 + vec3(8.7, 13.1, 5.9);
+    amplitude *= 0.48;
+  }
+  return value;
+}
+
+float ridgedFbm(vec3 point) {
+  float value = 0.0;
+  float amplitude = 0.54;
+  for (int octave = 0; octave < 4; octave++) {
+    float ridge = 1.0 - abs(noise(point) * 2.0 - 1.0);
+    value += ridge * ridge * amplitude;
+    point = point.zxy * 2.12 + vec3(4.3, 17.2, 9.1);
+    amplitude *= 0.47;
+  }
+  return value;
+}
+
+vec3 perturbNormal(vec3 position, vec3 normal, float height) {
+  vec3 positionDx = dFdx(position);
+  vec3 positionDy = dFdy(position);
+  vec3 crossY = cross(positionDy, normal);
+  vec3 crossX = cross(normal, positionDx);
+  float determinant = dot(positionDx, crossY);
+  vec3 gradient = sign(determinant) * (dFdx(height) * crossY + dFdy(height) * crossX);
+  return normalize(abs(determinant) * normal - gradient * 0.07);
+}
+
 void main(void) {
-  vec3 normal = normalize(vWorldNormal);
-  vec3 craterPoint = (vSurfacePosition + 1.0) * 18.0;
-  vec3 craterCell = floor(craterPoint);
-  vec3 craterLocal = fract(craterPoint) - 0.5;
-  float craterNoise = hash(craterCell);
-  float craterRadius = 0.2 + hash(craterCell + 4.7) * 0.18;
-  float craterCandidate = step(1.0 - craterDensity * 0.12, craterNoise);
-  float crater = (1.0 - smoothstep(craterRadius * 0.58, craterRadius, length(craterLocal))) * craterCandidate;
-  float detail = hash(floor((vSurfacePosition + 1.0) * 95.0)) - 0.5;
-  float fractureA = abs(sin((vSurfacePosition.x + vSurfacePosition.z * 0.7) * 42.0 + detail * 7.0));
-  float fractureB = abs(sin((vSurfacePosition.y - vSurfacePosition.x * 0.45) * 31.0 - detail * 5.0));
-  float fractures = (1.0 - smoothstep(0.0, 0.11, min(fractureA, fractureB))) * lavaStrength;
+  vec3 surface = normalize(vSurfacePosition);
+  vec3 baseNormal = normalize(vWorldNormal);
+  float macroDetail = fbm(surface * (roughness * 1.35) + vec3(3.2, 7.1, 11.8));
+  float erosion = ridgedFbm(surface * (roughness * 4.6) + vec3(13.7, 2.4, 8.1));
+  float mineralDetail = fbm(surface * 12.0 + vec3(5.1, 19.4, 7.7));
+  float microDetail = fbm(surface * 28.0 + vec3(27.1, 4.6, 15.3));
+  float craterNoise = fbm(surface * 7.5 + vec3(31.2, 8.3, 17.9));
+  float craterThreshold = mix(0.91, 0.76, craterDensity);
+  float crater = smoothstep(craterThreshold, craterThreshold + 0.09, craterNoise);
+  float craterRim = smoothstep(craterThreshold - 0.035, craterThreshold, craterNoise) - crater;
+  float fractureField = abs(
+    ridgedFbm(surface * 7.8 + vec3(2.4, 18.1, 9.7)) -
+    ridgedFbm(surface * 7.8 + vec3(9.6, 3.2, 21.4))
+  );
+  float fractures = (1.0 - smoothstep(0.012, 0.085, fractureField)) * lavaStrength;
+  float surfaceHeight = macroDetail * 0.32 + erosion * 0.1 + mineralDetail * 0.025 - crater * 0.04 + craterRim * 0.025;
+  vec3 normal = perturbNormal(vWorldPosition, baseNormal, surfaceHeight);
 
   vec3 rockColor = mix(lowColor, midColor, smoothstep(0.28, 0.62, vHeight));
   rockColor = mix(rockColor, highColor, smoothstep(0.62, 0.9, vHeight));
-  rockColor *= 0.9 + detail * 0.16;
-  rockColor = mix(rockColor, lowColor * 0.45, crater * 0.72);
+  vec3 mineralTint = mix(lowColor, highColor, clamp(mineralDetail * 0.88 + erosion * 0.18, 0.0, 1.0));
+  rockColor = mix(rockColor, mineralTint, 0.18 + erosion * 0.12);
+  rockColor *= 0.94 + (microDetail - 0.5) * 0.06;
+  rockColor = mix(rockColor, highColor * 1.08, craterRim * 0.36);
+  rockColor = mix(rockColor, lowColor * 0.38, crater * 0.68);
 
-  float waterMask = waterLevel > 0.0 ? 1.0 - smoothstep(waterLevel - 0.018, waterLevel + 0.018, vHeight) : 0.0;
+  float coastline = vHeight + (macroDetail - 0.5) * 0.025;
+  float waterMask = waterLevel > 0.0 ? 1.0 - smoothstep(waterLevel - 0.012, waterLevel + 0.016, coastline) : 0.0;
+  normal = normalize(mix(normal, baseNormal, waterMask * 0.94));
   vec3 surfaceColor = mix(rockColor, waterColor, waterMask * 0.92);
-  float polarMask = smoothstep(0.58, 0.94, abs(vSurfacePosition.y)) * iceCapStrength;
-  surfaceColor = mix(surfaceColor, vec3(0.72, 0.84, 0.88), polarMask * (0.64 + detail * 0.14));
+  float polarBoundary = abs(surface.y) + (macroDetail - 0.5) * 0.16 + (mineralDetail - 0.5) * 0.04;
+  float polarMask = smoothstep(0.58, 0.88, polarBoundary) * iceCapStrength;
+  surfaceColor = mix(surfaceColor, vec3(0.72, 0.84, 0.88), polarMask * (0.62 + microDetail * 0.16));
   float diffuse = max(dot(normal, lightDirection), 0.0);
   float wrappedLight = 0.16 + diffuse * 0.98;
   vec3 viewDirection = normalize(cameraPosition - vWorldPosition);
@@ -422,8 +521,9 @@ void main(void) {
 
   vec3 finalColor = surfaceColor * wrappedLight * mix(vec3(1.0), stellarColor, diffuse * 0.38) * stellarIntensity + vec3(0.34, 0.58, 0.72) * waterSpecular * 0.45;
   finalColor += highColor * rim * 0.08;
-  finalColor += emissiveColor * fractures * (0.72 + 0.28 * sin(time * 0.7 + detail * 8.0));
-  gl_FragColor = vec4(finalColor, 1.0);
+  finalColor += emissiveColor * fractures * (0.72 + 0.28 * sin(time * 0.7 + microDetail * 8.0));
+  float dither = (hash(vec3(gl_FragCoord.xy, seed)) - 0.5) / 255.0;
+  gl_FragColor = vec4(finalColor + dither, 1.0);
 }
 `;
 
