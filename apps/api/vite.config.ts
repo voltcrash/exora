@@ -11,7 +11,11 @@ export default defineConfig({
     },
   },
   pack: {
-    entry: ["src/index.ts"],
+    entry: ["src/index.ts", "src/vercel.ts"],
+    deps: {
+      alwaysBundle: [/^hono(?:\/.*)?$/, "postgres"],
+      onlyBundle: ["hono", "postgres"],
+    },
     format: ["esm"],
     platform: "node",
     sourcemap: true,

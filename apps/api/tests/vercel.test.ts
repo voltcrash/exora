@@ -1,5 +1,5 @@
 import { expect, test } from "vite-plus/test";
-import vercelApp from "../../../api/index.ts";
+import vercelApp from "../src/vercel.ts";
 
 test("serves the Hono app through the Vercel entry point", async () => {
   const response = await vercelApp.request("https://exora.test/api/health");
