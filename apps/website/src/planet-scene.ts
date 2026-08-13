@@ -503,7 +503,12 @@ const createStarfield = (scene: Scene, seed: number, starCount: number): Mesh =>
   return starfield;
 };
 
-const createViewingDeck = (scene: Scene, profile: RenderQualityProfile): Mesh => {
+interface ViewingDeck {
+  floor: Mesh;
+  ring: Mesh;
+}
+
+const createViewingDeck = (scene: Scene, profile: RenderQualityProfile): ViewingDeck => {
   const deck = MeshBuilder.CreateCylinder(
     "viewingDeck",
     { diameter: 5.8, height: 0.12, tessellation: 64 },
@@ -520,6 +525,7 @@ const createViewingDeck = (scene: Scene, profile: RenderQualityProfile): Mesh =>
   deckMaterial.freeze();
   deck.material = deckMaterial;
   deck.freezeWorldMatrix();
+  deck.isVisible = false;
 
   const deckRing = MeshBuilder.CreateTorus(
     "deckRing",
@@ -535,8 +541,14 @@ const createViewingDeck = (scene: Scene, profile: RenderQualityProfile): Mesh =>
   ringMaterial.freeze();
   deckRing.material = ringMaterial;
   deckRing.freezeWorldMatrix();
+  deckRing.isVisible = false;
 
-  return deck;
+  return { floor: deck, ring: deckRing };
+};
+
+const setViewingDeckVisible = (viewingDeck: ViewingDeck, visible: boolean): void => {
+  viewingDeck.floor.isVisible = visible;
+  viewingDeck.ring.isVisible = visible;
 };
 
 const createRingSystem = (
@@ -1272,7 +1284,7 @@ export const createPlanetExperience = ({
   void WebXRDefaultExperience.CreateAsync(scene, {
     disableDefaultUI: true,
     disableNearInteraction: true,
-    floorMeshes: [viewingDeck],
+    floorMeshes: [viewingDeck.floor],
     inputOptions: { doNotLoadControllerMeshes: true },
     optionalFeatures: ["hand-tracking"],
     outputCanvasOptions: {
@@ -1297,7 +1309,10 @@ export const createPlanetExperience = ({
 
       createdXr.baseExperience.onStateChangedObservable.add((state) => {
         if (disposed) return;
-        if (state === WebXRState.ENTERING_XR) onXrStatusChange("entering");
+        if (state === WebXRState.ENTERING_XR) {
+          setViewingDeckVisible(viewingDeck, true);
+          onXrStatusChange("entering");
+        }
         if (state === WebXRState.IN_XR) {
           isInXr = true;
           if (createdXr.baseExperience.sessionManager.isFixedFoveationSupported) {
@@ -1307,6 +1322,7 @@ export const createPlanetExperience = ({
         }
         if (state === WebXRState.NOT_IN_XR) {
           isInXr = false;
+          setViewingDeckVisible(viewingDeck, false);
           onXrStatusChange(isVrSupported ? "ready" : "unavailable");
         }
       });
