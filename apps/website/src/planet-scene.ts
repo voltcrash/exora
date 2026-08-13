@@ -6,6 +6,7 @@ import { Vector3 } from "@babylonjs/core/Maths/math.vector.js";
 import { Effect } from "@babylonjs/core/Materials/effect.js";
 import { ShaderMaterial } from "@babylonjs/core/Materials/shaderMaterial.js";
 import { StandardMaterial } from "@babylonjs/core/Materials/standardMaterial.js";
+import type { AbstractMesh } from "@babylonjs/core/Meshes/abstractMesh.js";
 import { Mesh } from "@babylonjs/core/Meshes/mesh.js";
 import { MeshBuilder } from "@babylonjs/core/Meshes/meshBuilder.js";
 import { VertexData } from "@babylonjs/core/Meshes/mesh.vertexData.js";
@@ -593,6 +594,7 @@ const createPlanet = (
   cloudLayer: ShaderMaterial | null;
   cloudMesh: Mesh | null;
   moonOrbit: TransformNode;
+  orbitalMeshes: AbstractMesh[];
   orbitalRoot: TransformNode;
   planet: Mesh;
   ringSystem: TransformNode | null;
@@ -608,6 +610,7 @@ const createPlanet = (
   Effect.ShadersStore.exoraAtmosphereFragmentShader = ATMOSPHERE_FRAGMENT_SHADER;
 
   const orbitalRoot = new TransformNode("orbitalWorld", scene);
+  const orbitalMeshes: AbstractMesh[] = [];
 
   const planet = MeshBuilder.CreateSphere(
     "planet",
@@ -618,6 +621,7 @@ const createPlanet = (
   planet.parent = orbitalRoot;
   planet.rotation.z = recipe.axialTilt;
   planet.isPickable = false;
+  orbitalMeshes.push(planet);
 
   let shader: ShaderMaterial;
 
@@ -751,7 +755,10 @@ const createPlanet = (
         recipe.axialTilt,
       )
     : null;
-  if (ringSystem) ringSystem.parent = orbitalRoot;
+  if (ringSystem) {
+    ringSystem.parent = orbitalRoot;
+    orbitalMeshes.push(...ringSystem.getChildMeshes(false));
+  }
 
   let cloudMesh: Mesh | null = null;
   let cloudLayer: ShaderMaterial | null = null;
@@ -766,6 +773,7 @@ const createPlanet = (
     cloudMesh.rotation.z = recipe.axialTilt;
     cloudMesh.isPickable = false;
     cloudMesh.renderingGroupId = 1;
+    orbitalMeshes.push(cloudMesh);
     cloudLayer = new ShaderMaterial(
       "cloudLayerMaterial",
       scene,
@@ -803,6 +811,7 @@ const createPlanet = (
   atmosphereMesh.parent = orbitalRoot;
   atmosphereMesh.isPickable = false;
   atmosphereMesh.renderingGroupId = 1;
+  orbitalMeshes.push(atmosphereMesh);
 
   const atmosphere = new ShaderMaterial(
     "atmosphereMaterial",
@@ -849,6 +858,7 @@ const createPlanet = (
   orbitGuide.parent = orbitalRoot;
   orbitGuide.rotation.z = recipe.moon.inclination;
   orbitGuide.isPickable = false;
+  orbitalMeshes.push(orbitGuide);
 
   const orbitMaterial = new StandardMaterial("orbitGuideMaterial", scene);
   orbitMaterial.disableLighting = true;
@@ -871,6 +881,7 @@ const createPlanet = (
   moon.parent = moonOrbit;
   moon.position.set(recipe.moon.orbitRadius, 0, 0);
   moon.isPickable = false;
+  orbitalMeshes.push(moon);
 
   const moonMaterial = new StandardMaterial("moonMaterial", scene);
   moonMaterial.diffuseColor = toColor3(recipe.moon.color);
@@ -884,6 +895,7 @@ const createPlanet = (
     cloudLayer,
     cloudMesh,
     moonOrbit,
+    orbitalMeshes,
     orbitalRoot,
     planet,
     ringSystem,
@@ -919,8 +931,9 @@ const createSurfaceEnvironment = (
   scene: Scene,
   recipe: WorldRecipe,
   profile: RenderQualityProfile,
-): { cloudLayers: Mesh[]; root: TransformNode } => {
+): { cloudLayers: Mesh[]; meshes: AbstractMesh[]; root: TransformNode } => {
   const root = new TransformNode("surfaceEnvironment", scene);
+  const meshes: AbstractMesh[] = [];
   const random = createSeededRandom(recipe.seed ^ 0x9e3779b9);
   const subdivisions = profile.tier === "desktop" ? 72 : 44;
   const terrainLowColor =
@@ -943,6 +956,7 @@ const createSurfaceEnvironment = (
   ground.parent = root;
   ground.position.set(0, -1.6, 18);
   ground.isPickable = false;
+  meshes.push(ground);
 
   const positions = ground.getVerticesData("position");
   const indices = ground.getIndices();
@@ -1009,6 +1023,7 @@ const createSurfaceEnvironment = (
       rock.parent = root;
       rock.isPickable = false;
       rock.material = rockMaterial;
+      meshes.push(rock);
     }
   }
 
@@ -1035,6 +1050,7 @@ const createSurfaceEnvironment = (
     hazeMaterial.disableDepthWrite = true;
     haze.material = hazeMaterial;
     cloudLayers.push(haze);
+    meshes.push(haze);
   }
 
   const horizonLight = MeshBuilder.CreateSphere(
@@ -1054,9 +1070,20 @@ const createSurfaceEnvironment = (
   horizonMaterial.alpha = 0.88;
   horizonMaterial.freeze();
   horizonLight.material = horizonMaterial;
+  meshes.push(horizonLight);
 
+  for (const mesh of meshes) mesh.setEnabled(false);
   root.setEnabled(false);
-  return { cloudLayers, root };
+  return { cloudLayers, meshes, root };
+};
+
+const setEnvironmentEnabled = (
+  root: TransformNode,
+  meshes: readonly AbstractMesh[],
+  enabled: boolean,
+): void => {
+  root.setEnabled(enabled);
+  for (const mesh of meshes) mesh.setEnabled(enabled);
 };
 
 export const createPlanetExperience = async ({
@@ -1109,9 +1136,20 @@ export const createPlanetExperience = async ({
 
   createStarfield(scene, recipe.seed, profile.starCount);
   const viewingDeck = createViewingDeck(scene, profile);
-  const { atmosphere, cloudLayer, cloudMesh, moonOrbit, orbitalRoot, planet, ringSystem, shader } =
-    createPlanet(scene, recipe, profile);
+  const {
+    atmosphere,
+    cloudLayer,
+    cloudMesh,
+    moonOrbit,
+    orbitalMeshes,
+    orbitalRoot,
+    planet,
+    ringSystem,
+    shader,
+  } = createPlanet(scene, recipe, profile);
   const surfaceEnvironment = createSurfaceEnvironment(scene, recipe, profile);
+  setEnvironmentEnabled(orbitalRoot, orbitalMeshes, true);
+  setEnvironmentEnabled(surfaceEnvironment.root, surfaceEnvironment.meshes, false);
 
   let elapsedSeconds = 0;
   let qualitySampleSeconds = 0;
@@ -1127,7 +1165,6 @@ export const createPlanetExperience = async ({
     viewTransitionSeconds = 0;
     camera.detachControl();
     onViewModeChange("transition");
-    if (direction === "entering") surfaceEnvironment.root.setEnabled(true);
   };
 
   scene.onBeforeRenderObservable.add(() => {
@@ -1152,8 +1189,8 @@ export const createPlanetExperience = async ({
       camera.alpha += (-Math.PI / 2 - camera.alpha) * Math.min(1, eased * 0.16 + 0.05);
 
       if (progress >= 0.38) {
-        orbitalRoot.setEnabled(!entering);
-        surfaceEnvironment.root.setEnabled(entering);
+        setEnvironmentEnabled(orbitalRoot, orbitalMeshes, !entering);
+        setEnvironmentEnabled(surfaceEnvironment.root, surfaceEnvironment.meshes, entering);
         scene.fogMode = entering ? Scene.FOGMODE_EXP2 : Scene.FOGMODE_NONE;
         scene.fogDensity = entering ? (recipe.renderer === "rocky" ? 0.012 : 0.019) : 0;
         scene.fogColor = toColor3(recipe.atmosphere.color).scale(0.16);
