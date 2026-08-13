@@ -434,6 +434,7 @@ void main(void) {
 `;
 
 export type XrStatus = "checking" | "entering" | "in-xr" | "ready" | "unavailable";
+export type ViewMode = "orbit" | "surface" | "transition";
 
 export interface PlanetExperience {
   dispose: () => void;
@@ -446,6 +447,7 @@ export interface PlanetExperience {
 interface PlanetExperienceOptions {
   canvas: HTMLCanvasElement;
   onFirstFrame: () => void;
+  onViewModeChange: (mode: ViewMode) => void;
   onXrStatusChange: (status: XrStatus) => void;
   recipe: WorldRecipe;
 }
@@ -591,6 +593,7 @@ const createPlanet = (
   cloudLayer: ShaderMaterial | null;
   cloudMesh: Mesh | null;
   moonOrbit: TransformNode;
+  orbitalRoot: TransformNode;
   planet: Mesh;
   ringSystem: TransformNode | null;
   shader: ShaderMaterial;
@@ -604,12 +607,15 @@ const createPlanet = (
   Effect.ShadersStore.exoraAtmosphereVertexShader = ATMOSPHERE_VERTEX_SHADER;
   Effect.ShadersStore.exoraAtmosphereFragmentShader = ATMOSPHERE_FRAGMENT_SHADER;
 
+  const orbitalRoot = new TransformNode("orbitalWorld", scene);
+
   const planet = MeshBuilder.CreateSphere(
     "planet",
     { diameter: recipe.radiusSceneUnits * 2, segments: profile.planetSegments },
     scene,
   );
   planet.position.copyFrom(PLANET_POSITION);
+  planet.parent = orbitalRoot;
   planet.rotation.z = recipe.axialTilt;
   planet.isPickable = false;
 
@@ -745,6 +751,7 @@ const createPlanet = (
         recipe.axialTilt,
       )
     : null;
+  if (ringSystem) ringSystem.parent = orbitalRoot;
 
   let cloudMesh: Mesh | null = null;
   let cloudLayer: ShaderMaterial | null = null;
@@ -755,6 +762,7 @@ const createPlanet = (
       scene,
     );
     cloudMesh.position.copyFrom(PLANET_POSITION);
+    cloudMesh.parent = orbitalRoot;
     cloudMesh.rotation.z = recipe.axialTilt;
     cloudMesh.isPickable = false;
     cloudMesh.renderingGroupId = 1;
@@ -792,6 +800,7 @@ const createPlanet = (
     scene,
   );
   atmosphereMesh.position.copyFrom(PLANET_POSITION);
+  atmosphereMesh.parent = orbitalRoot;
   atmosphereMesh.isPickable = false;
   atmosphereMesh.renderingGroupId = 1;
 
@@ -837,6 +846,7 @@ const createPlanet = (
     scene,
   );
   orbitGuide.position.copyFrom(PLANET_POSITION);
+  orbitGuide.parent = orbitalRoot;
   orbitGuide.rotation.z = recipe.moon.inclination;
   orbitGuide.isPickable = false;
 
@@ -850,6 +860,7 @@ const createPlanet = (
 
   const moonOrbit = new TransformNode("moonOrbit", scene);
   moonOrbit.position.copyFrom(PLANET_POSITION);
+  moonOrbit.parent = orbitalRoot;
   moonOrbit.rotation.z = recipe.moon.inclination;
 
   const moon = MeshBuilder.CreateSphere(
@@ -868,12 +879,190 @@ const createPlanet = (
   moonMaterial.freeze();
   moon.material = moonMaterial;
 
-  return { atmosphere, cloudLayer, cloudMesh, moonOrbit, planet, ringSystem, shader };
+  return {
+    atmosphere,
+    cloudLayer,
+    cloudMesh,
+    moonOrbit,
+    orbitalRoot,
+    planet,
+    ringSystem,
+    shader,
+  };
+};
+
+const createSeededRandom = (seed: number): (() => number) => {
+  let state = seed || 1;
+  return () => {
+    state = (state * 1664525 + 1013904223) >>> 0;
+    return state / 4294967296;
+  };
+};
+
+const terrainNoise = (x: number, z: number, seed: number): number => {
+  const seedPhase = seed * 0.000013;
+  const broad = Math.sin(x * 0.105 + seedPhase) * Math.cos(z * 0.082 - seedPhase * 1.7);
+  const ridges = Math.sin((x + z) * 0.19 + seedPhase * 2.4) * 0.45;
+  const detail = Math.sin(x * 0.43 - z * 0.31 + seedPhase * 4.1) * 0.18;
+  return broad * 0.72 + ridges + detail;
+};
+
+const mixRgb = (from: Rgb, to: Rgb, amount: number): Color4 =>
+  new Color4(
+    from[0] + (to[0] - from[0]) * amount,
+    from[1] + (to[1] - from[1]) * amount,
+    from[2] + (to[2] - from[2]) * amount,
+    1,
+  );
+
+const createSurfaceEnvironment = (
+  scene: Scene,
+  recipe: WorldRecipe,
+  profile: RenderQualityProfile,
+): { cloudLayers: Mesh[]; root: TransformNode } => {
+  const root = new TransformNode("surfaceEnvironment", scene);
+  const random = createSeededRandom(recipe.seed ^ 0x9e3779b9);
+  const subdivisions = profile.tier === "desktop" ? 72 : 44;
+  const terrainLowColor =
+    recipe.renderer === "rocky"
+      ? recipe.surface.lowColor
+      : recipe.renderer === "gas-giant"
+        ? recipe.cloudBands.deepColor
+        : recipe.atmosphereBands.deepColor;
+  const terrainHighColor =
+    recipe.renderer === "rocky"
+      ? recipe.surface.highColor
+      : recipe.renderer === "gas-giant"
+        ? recipe.cloudBands.lightColor
+        : recipe.atmosphereBands.lightColor;
+  const ground = MeshBuilder.CreateGround(
+    "surfaceTerrain",
+    { width: 72, height: 82, subdivisions, updatable: true },
+    scene,
+  );
+  ground.parent = root;
+  ground.position.set(0, -1.6, 18);
+  ground.isPickable = false;
+
+  const positions = ground.getVerticesData("position");
+  const indices = ground.getIndices();
+  if (positions && indices) {
+    const colors: number[] = [];
+    const normals: number[] = [];
+    const isAtmospheric = recipe.renderer !== "rocky";
+    for (let index = 0; index < positions.length; index += 3) {
+      const x = positions[index] ?? 0;
+      const z = positions[index + 2] ?? 0;
+      const distance = Math.hypot(x * 0.72, z * 0.25);
+      const noise = terrainNoise(x, z, recipe.seed);
+      const horizonLift = Math.max(0, (z - 2) / 36) * 1.7;
+      const height = isAtmospheric
+        ? noise * 1.15 + Math.sin(z * 0.16 + recipe.seed) * 0.42 + horizonLift
+        : noise * (0.85 + Math.min(distance / 25, 1) * 1.9) + horizonLift;
+      positions[index + 1] = height;
+      const color = mixRgb(
+        terrainLowColor,
+        terrainHighColor,
+        Math.min(1, Math.max(0, 0.42 + height * 0.13)),
+      );
+      colors.push(color.r, color.g, color.b, 1);
+    }
+
+    VertexData.ComputeNormals(positions, indices, normals);
+    ground.updateVerticesData("position", positions);
+    ground.setVerticesData("normal", normals);
+    ground.setVerticesData("color", colors, false, 4);
+  }
+
+  const groundMaterial = new StandardMaterial("surfaceTerrainMaterial", scene);
+  groundMaterial.diffuseColor = Color3.White();
+  groundMaterial.emissiveColor = toColor3(terrainHighColor).scale(
+    recipe.renderer === "rocky" ? 0.1 : 0.22,
+  );
+  groundMaterial.specularColor =
+    recipe.renderer === "rocky" && recipe.surface.waterLevel > 0
+      ? new Color3(0.2, 0.32, 0.38)
+      : new Color3(0.025, 0.035, 0.04);
+  groundMaterial.roughness = recipe.renderer === "rocky" ? 0.92 : 0.7;
+  groundMaterial.freeze();
+  ground.material = groundMaterial;
+
+  if (recipe.renderer === "rocky") {
+    const rockMaterial = new StandardMaterial("surfaceRockMaterial", scene);
+    const rockColor = mixRgb(terrainLowColor, terrainHighColor, 0.34);
+    rockMaterial.diffuseColor = new Color3(rockColor.r, rockColor.g, rockColor.b);
+    rockMaterial.emissiveColor = rockMaterial.diffuseColor.scale(0.06);
+    rockMaterial.specularColor = new Color3(0.018, 0.02, 0.022);
+    rockMaterial.freeze();
+    const rockCount = profile.tier === "desktop" ? 22 : 12;
+    for (let index = 0; index < rockCount; index += 1) {
+      const rock = MeshBuilder.CreateSphere(
+        `surfaceRock-${index}`,
+        { diameter: 0.7 + random() * 1.45, segments: 4 },
+        scene,
+      );
+      const x = -25 + random() * 50;
+      const z = 4 + random() * 42;
+      rock.position.set(x, -0.9 + terrainNoise(x, z, recipe.seed), z + 18);
+      rock.scaling.set(0.55 + random() * 0.8, 0.55 + random() * 1.7, 0.55 + random());
+      rock.rotation.set(random() * 0.4, random() * Math.PI, random() * 0.35);
+      rock.parent = root;
+      rock.isPickable = false;
+      rock.material = rockMaterial;
+    }
+  }
+
+  const cloudLayers: Mesh[] = [];
+  const hazeCount = recipe.renderer === "rocky" ? (recipe.surface.cloudCover > 0 ? 3 : 1) : 5;
+  for (let index = 0; index < hazeCount; index += 1) {
+    const haze = MeshBuilder.CreateSphere(
+      `surfaceHaze-${index}`,
+      { diameter: 8 + random() * 9, segments: profile.tier === "desktop" ? 20 : 12 },
+      scene,
+    );
+    haze.parent = root;
+    haze.position.set(-24 + random() * 48, 5 + random() * 8, 22 + random() * 34);
+    haze.scaling.set(1.8 + random() * 1.8, 0.18 + random() * 0.22, 0.8 + random() * 1.3);
+    haze.isPickable = false;
+    const hazeMaterial = new StandardMaterial(`surfaceHazeMaterial-${index}`, scene);
+    hazeMaterial.disableLighting = true;
+    hazeMaterial.emissiveColor =
+      recipe.renderer === "rocky"
+        ? toColor3(recipe.surface.cloudColor).scale(0.38)
+        : toColor3(recipe.atmosphere.color).scale(0.48);
+    hazeMaterial.alpha = recipe.renderer === "rocky" ? 0.075 : 0.14;
+    hazeMaterial.backFaceCulling = false;
+    hazeMaterial.disableDepthWrite = true;
+    haze.material = hazeMaterial;
+    cloudLayers.push(haze);
+  }
+
+  const horizonLight = MeshBuilder.CreateSphere(
+    "surfaceHorizonLight",
+    { diameter: recipe.renderer === "rocky" ? 2.4 : 4.2, segments: 16 },
+    scene,
+  );
+  horizonLight.parent = root;
+  horizonLight.position.set(-21, 10.5, 48);
+  horizonLight.isPickable = false;
+  const horizonMaterial = new StandardMaterial("surfaceHorizonLightMaterial", scene);
+  horizonMaterial.disableLighting = true;
+  horizonMaterial.emissiveColor =
+    recipe.renderer === "rocky" && recipe.surface.lavaStrength > 0
+      ? new Color3(1, 0.19, 0.025)
+      : toColor3(recipe.atmosphere.color).scale(1.25);
+  horizonMaterial.alpha = 0.88;
+  horizonMaterial.freeze();
+  horizonLight.material = horizonMaterial;
+
+  root.setEnabled(false);
+  return { cloudLayers, root };
 };
 
 export const createPlanetExperience = async ({
   canvas,
   onFirstFrame,
+  onViewModeChange,
   onXrStatusChange,
   recipe,
 }: PlanetExperienceOptions): Promise<PlanetExperience> => {
@@ -920,19 +1109,75 @@ export const createPlanetExperience = async ({
 
   createStarfield(scene, recipe.seed, profile.starCount);
   const viewingDeck = createViewingDeck(scene, profile);
-  const { atmosphere, cloudLayer, cloudMesh, moonOrbit, planet, ringSystem, shader } = createPlanet(
-    scene,
-    recipe,
-    profile,
-  );
+  const { atmosphere, cloudLayer, cloudMesh, moonOrbit, orbitalRoot, planet, ringSystem, shader } =
+    createPlanet(scene, recipe, profile);
+  const surfaceEnvironment = createSurfaceEnvironment(scene, recipe, profile);
 
   let elapsedSeconds = 0;
   let qualitySampleSeconds = 0;
   let isInXr = false;
+  let viewState: "entering" | "leaving" | "orbit" | "surface" = "orbit";
+  let viewTransitionSeconds = 0;
+  const orbitTarget = PLANET_POSITION.clone();
+  const surfaceTarget = new Vector3(0, 0.1, 25);
+
+  const beginViewTransition = (direction: "entering" | "leaving"): void => {
+    if (viewState !== "orbit" && viewState !== "surface") return;
+    viewState = direction;
+    viewTransitionSeconds = 0;
+    camera.detachControl();
+    onViewModeChange("transition");
+    if (direction === "entering") surfaceEnvironment.root.setEnabled(true);
+  };
+
   scene.onBeforeRenderObservable.add(() => {
     const deltaSeconds = Math.min(engine.getDeltaTime() / 1_000, 0.05);
     elapsedSeconds += deltaSeconds;
     qualitySampleSeconds += deltaSeconds;
+
+    if (!isInXr && viewState === "orbit" && camera.radius <= 10.62) beginViewTransition("entering");
+    if (!isInXr && viewState === "surface" && camera.radius >= 18.1) beginViewTransition("leaving");
+
+    if (viewState === "entering" || viewState === "leaving") {
+      viewTransitionSeconds += deltaSeconds;
+      const progress = Math.min(1, viewTransitionSeconds / 0.95);
+      const eased = progress * progress * (3 - 2 * progress);
+      const entering = viewState === "entering";
+      const target = entering ? surfaceTarget : orbitTarget;
+      const targetRadius = entering ? 12.8 : 12.2;
+      const targetBeta = entering ? 1.23 : Math.PI / 2.13;
+      camera.target = Vector3.Lerp(camera.target, target, Math.min(1, eased * 0.18 + 0.06));
+      camera.radius += (targetRadius - camera.radius) * Math.min(1, eased * 0.18 + 0.06);
+      camera.beta += (targetBeta - camera.beta) * Math.min(1, eased * 0.16 + 0.05);
+      camera.alpha += (-Math.PI / 2 - camera.alpha) * Math.min(1, eased * 0.16 + 0.05);
+
+      if (progress >= 0.38) {
+        orbitalRoot.setEnabled(!entering);
+        surfaceEnvironment.root.setEnabled(entering);
+        scene.fogMode = entering ? Scene.FOGMODE_EXP2 : Scene.FOGMODE_NONE;
+        scene.fogDensity = entering ? (recipe.renderer === "rocky" ? 0.012 : 0.019) : 0;
+        scene.fogColor = toColor3(recipe.atmosphere.color).scale(0.16);
+        scene.clearColor = entering
+          ? new Color4(
+              recipe.atmosphere.color[0] * 0.025,
+              recipe.atmosphere.color[1] * 0.025,
+              recipe.atmosphere.color[2] * 0.025,
+              1,
+            )
+          : new Color4(0.0015, 0.003, 0.008, 1);
+      }
+
+      if (progress >= 1) {
+        viewState = entering ? "surface" : "orbit";
+        camera.lowerRadiusLimit = entering ? 7.5 : 10.5;
+        camera.upperRadiusLimit = entering ? 18.4 : 25;
+        camera.lowerBetaLimit = entering ? 1.02 : 0.58;
+        camera.upperBetaLimit = entering ? 1.48 : Math.PI - 0.58;
+        camera.attachControl(canvas, true);
+        onViewModeChange(entering ? "surface" : "orbit");
+      }
+    }
+
     planet.rotation.y += deltaSeconds * recipe.rotationSpeed;
     moonOrbit.rotation.y += deltaSeconds * recipe.moon.speed;
     if (ringSystem) ringSystem.rotation.y += deltaSeconds * recipe.rotationSpeed * 0.045;
@@ -946,6 +1191,11 @@ export const createPlanetExperience = async ({
     atmosphere.setFloat("time", elapsedSeconds);
     if (cloudLayer && recipe.renderer === "rocky")
       cloudLayer.setFloat("time", elapsedSeconds * recipe.surface.cloudSpeed * 18);
+    for (let index = 0; index < surfaceEnvironment.cloudLayers.length; index += 1) {
+      const haze = surfaceEnvironment.cloudLayers[index];
+      if (haze) haze.position.x += deltaSeconds * (0.11 + index * 0.025);
+      if (haze && haze.position.x > 34) haze.position.x = -34;
+    }
 
     const activePosition = scene.activeCamera?.globalPosition ?? camera.globalPosition;
     shader.setVector3("cameraPosition", activePosition);

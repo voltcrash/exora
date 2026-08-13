@@ -57,10 +57,123 @@ button {
 }
 
 .space-haze,
-.viewport-grid {
+.viewport-grid,
+.surface-veil {
   position: fixed;
   inset: 0;
   pointer-events: none;
+}
+
+.surface-veil {
+  z-index: 1;
+  background: #020405;
+  visibility: hidden;
+  opacity: 0;
+  transition:
+    opacity 420ms ease,
+    visibility 420ms ease;
+}
+
+.view-transition .surface-veil {
+  visibility: visible;
+  opacity: 0.78;
+}
+
+.approach-status {
+  position: fixed;
+  z-index: 3;
+  top: 90px;
+  left: 50%;
+  min-width: 330px;
+  display: grid;
+  grid-template-columns: 26px 1fr auto;
+  align-items: center;
+  gap: 11px;
+  padding: 9px 12px;
+  border: 1px solid rgb(139 230 234 / 28%);
+  border-radius: 14px;
+  color: var(--cyan);
+  background: rgb(7 15 17 / 78%);
+  backdrop-filter: blur(18px);
+  box-shadow: 0 12px 42px rgb(0 0 0 / 28%);
+  pointer-events: none;
+  opacity: 0;
+  transform: translate(-50%, -8px);
+  transition:
+    opacity 260ms ease,
+    transform 260ms ease;
+}
+
+.view-surface .approach-status {
+  opacity: 1;
+  transform: translate(-50%, 0);
+}
+
+.approach-status > span:nth-child(2) {
+  display: grid;
+  gap: 2px;
+}
+
+.approach-status small,
+.approach-status > span:last-child {
+  color: var(--faint);
+  font-family: var(--mono);
+  font-size: 6px;
+  letter-spacing: 0.08em;
+}
+
+.approach-status strong {
+  color: #dff7f7;
+  font-size: 8px;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+}
+
+.approach-status > span:last-child {
+  padding-left: 10px;
+  border-left: 1px solid var(--line);
+  color: var(--cyan);
+}
+
+.approach-reticle {
+  width: 24px;
+  height: 24px;
+  border: 1px solid rgb(139 230 234 / 55%);
+  border-radius: 50%;
+  position: relative;
+}
+
+.approach-reticle::before,
+.approach-reticle::after {
+  content: "";
+  position: absolute;
+  background: var(--cyan);
+  opacity: 0.6;
+}
+
+.approach-reticle::before {
+  width: 8px;
+  height: 1px;
+  top: 11px;
+  left: 7px;
+}
+
+.approach-reticle::after {
+  width: 1px;
+  height: 8px;
+  top: 7px;
+  left: 11px;
+}
+
+.view-surface .world-intro,
+.view-surface .telemetry {
+  opacity: 0.34;
+  transition: opacity 240ms ease;
+}
+
+.view-surface .world-intro:hover,
+.view-surface .telemetry:hover {
+  opacity: 0.88;
 }
 
 .space-haze {
@@ -1065,6 +1178,16 @@ body[data-xr-status="unavailable"] .status-light {
 }
 
 @media (max-width: 640px) {
+  .approach-status {
+    top: 78px;
+    min-width: 0;
+    width: calc(100vw - 32px);
+  }
+
+  .approach-status > span:last-child {
+    display: none;
+  }
+
   .brand-copy small,
   .catalog-trigger > span:nth-child(2),
   .catalog-trigger kbd {
@@ -1209,7 +1332,9 @@ body[data-xr-status="unavailable"] .status-light {
   .catalog-trigger,
   .catalog-result,
   .enter-vr,
-  .loading-screen {
+  .loading-screen,
+  .approach-status,
+  .surface-veil {
     transition: none;
   }
 }

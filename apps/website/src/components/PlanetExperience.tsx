@@ -1,7 +1,7 @@
 import { deriveWorldRecipe } from "@exora/worldgen";
 import { useEffect, useMemo, useRef, useState } from "react";
 import type { PlanetLoadResult } from "../api-client.ts";
-import type { PlanetExperience as BabylonExperience, XrStatus } from "../planet-scene.ts";
+import type { PlanetExperience as BabylonExperience, ViewMode, XrStatus } from "../planet-scene.ts";
 import { archiveStateLabel, formatNumber, formatPlanetName } from "../planet-utils.tsx";
 
 interface PlanetExperienceProps {
@@ -23,6 +23,7 @@ export const PlanetExperience = ({ onOpenCatalog, result }: PlanetExperienceProp
   const [fps, setFps] = useState("--");
   const [qualityTier, setQualityTier] = useState("AUTO");
   const [sceneState, setSceneState] = useState<"loading" | "ready" | "error">("loading");
+  const [viewMode, setViewMode] = useState<ViewMode>("orbit");
   const [xrStatus, setXrStatus] = useState<XrStatus>("checking");
   const planet = result.planet;
   const observation = planet.observation;
@@ -40,6 +41,7 @@ export const PlanetExperience = ({ onOpenCatalog, result }: PlanetExperienceProp
     let fpsTimer: number | undefined;
     setSceneState("loading");
     setXrStatus("checking");
+    setViewMode("orbit");
     setFps("--");
 
     void import("../planet-scene.ts")
@@ -47,6 +49,7 @@ export const PlanetExperience = ({ onOpenCatalog, result }: PlanetExperienceProp
         createPlanetExperience({
           canvas,
           recipe,
+          onViewModeChange: setViewMode,
           onXrStatusChange: setXrStatus,
           onFirstFrame: () => {
             if (!disposed) setSceneState("ready");
@@ -103,7 +106,7 @@ export const PlanetExperience = ({ onOpenCatalog, result }: PlanetExperienceProp
 
   return (
     <div
-      className={`experience-shell ${sceneState === "ready" || sceneState === "error" ? "scene-ready" : ""} ${sceneState === "error" ? "scene-error" : ""}`}
+      className={`experience-shell view-${viewMode} ${sceneState === "ready" || sceneState === "error" ? "scene-ready" : ""} ${sceneState === "error" ? "scene-error" : ""}`}
     >
       <canvas
         ref={canvasRef}
@@ -113,6 +116,23 @@ export const PlanetExperience = ({ onOpenCatalog, result }: PlanetExperienceProp
       />
       <div className="space-haze" aria-hidden="true" />
       <div className="viewport-grid" aria-hidden="true" />
+      <div className="surface-veil" aria-hidden="true" />
+
+      <div
+        className="approach-status"
+        role={viewMode === "surface" ? "status" : undefined}
+        aria-hidden={viewMode !== "surface"}
+        aria-live="polite"
+      >
+        <span className="approach-reticle" aria-hidden="true" />
+        <span>
+          <small>{recipe.renderer === "rocky" ? "SURFACE APPROACH" : "ATMOSPHERIC APPROACH"}</small>
+          <strong>
+            {recipe.renderer === "rocky" ? "TERRAIN VISTA ACTIVE" : "CLOUD DECK VISTA ACTIVE"}
+          </strong>
+        </span>
+        <span>SCROLL OUT TO ORBIT</span>
+      </div>
 
       <header className="topbar">
         <a className="brand" href="/" aria-label="Exora home">
@@ -232,11 +252,11 @@ export const PlanetExperience = ({ onOpenCatalog, result }: PlanetExperienceProp
         <div className="interaction-hint" aria-label="Desktop controls">
           <span>
             <kbd>DRAG</kbd>
-            <small>ORBIT</small>
+            <small>{viewMode === "surface" ? "LOOK" : "ORBIT"}</small>
           </span>
           <span>
             <kbd>SCROLL</kbd>
-            <small>ZOOM</small>
+            <small>{viewMode === "surface" ? "RETURN" : "ZOOM / APPROACH"}</small>
           </span>
           <span className="performance-readout">
             <strong>{fps}</strong>
