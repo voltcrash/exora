@@ -205,6 +205,9 @@ settings:
 
 catalogs:
   default:
+    '@babylonjs/core':
+      specifier: ^9.20.0
+      version: 9.20.0
     vite-plus:
       specifier: 0.2.9
       version: 0.2.9
@@ -224,6 +227,10 @@ importers:
         version: 0.2.9(@types/node@26.2.0)(@voidzero-dev/vite-plus-core@0.2.9(@types/node@26.2.0)(jiti@2.7.0)(typescript@7.0.2)(yaml@2.9.0))(jiti@2.7.0)(typescript@7.0.2)(yaml@2.9.0)
 
   apps/website:
+    dependencies:
+      '@babylonjs/core':
+        specifier: 'catalog:'
+        version: 9.20.0
     devDependencies:
       typescript:
         specifier: ^7.0.2
@@ -266,6 +273,9 @@ packages:
   '@babel/runtime@7.29.7':
     resolution: {integrity: sha512-Nq8OhGWiZIZGV6hLHoyAKLLcJihP/xFeBMGJoUrxTX2psI8dCifzLhZISFb+VWS3wFMRDmCGw5R+dOySCqPLhw==}
     engines: {node: '>=6.9.0'}
+
+  '@babylonjs/core@9.20.0':
+    resolution: {integrity: sha512-iWM/Re+FnqTEOxkGxvjRjChcPZzydcb0OGtnVk5o0vDQizqwkcpWFlJzfIv1Ij7Li2edJJJDZd6jRzC8QSWuuw==}
 
   '@blazediff/core@1.9.1':
     resolution: {integrity: sha512-ehg3jIkYKulZh+8om/O25vkvSsXXwC+skXmyA87FFx6A/45eqOkZsBltMw/TVteb0mloiGT8oGRTcjRAz66zaA==}
@@ -1374,6 +1384,8 @@ snapshots:
   '@babel/helper-validator-identifier@7.29.7': {}
 
   '@babel/runtime@7.29.7': {}
+
+  '@babylonjs/core@9.20.0': {}
 
   '@blazediff/core@1.9.1': {}
 
