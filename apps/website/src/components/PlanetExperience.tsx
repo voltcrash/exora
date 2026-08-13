@@ -117,13 +117,22 @@ export const PlanetExperience = ({ onOpenCatalog, result }: PlanetExperienceProp
       <header className="topbar">
         <a className="brand" href="/" aria-label="Exora home">
           <span className="brand-mark" aria-hidden="true" />
-          <span>EXORA</span>
+          <span className="brand-copy">
+            <strong>EXORA</strong>
+            <small>EXOPLANET OBSERVATORY</small>
+          </span>
         </a>
-        <button id="open-catalog" className="catalog-trigger" type="button" onClick={onOpenCatalog}>
+        <button
+          id="open-catalog"
+          className="catalog-trigger"
+          type="button"
+          aria-label="Open NASA exoplanet catalog"
+          onClick={onOpenCatalog}
+        >
           <span className="catalog-radar" aria-hidden="true" />
           <span>
-            <small>WORLD CATALOG</small>
-            <strong>FIND A PLANET</strong>
+            <small>NASA CATALOG</small>
+            <strong>EXPLORE WORLDS</strong>
           </span>
           <kbd>/</kbd>
         </button>
@@ -136,8 +145,8 @@ export const PlanetExperience = ({ onOpenCatalog, result }: PlanetExperienceProp
       <main className="hud">
         <section className="world-intro" aria-labelledby="world-name">
           <p className="eyebrow">
-            <span>CONFIRMED EXOPLANET</span>
-            <span>ACTIVE WORLD</span>
+            <span>CONFIRMED WORLD</span>
+            <span>{planet.kind.replace("-", " ")}</span>
           </p>
           <h1 id="world-name">{formatPlanetName(planet.name)}</h1>
           <div className="world-tags" aria-label="World classification">
@@ -151,13 +160,16 @@ export const PlanetExperience = ({ onOpenCatalog, result }: PlanetExperienceProp
           </div>
           <p className="world-summary">{recipe.summary}</p>
           <p className="visual-note">
-            <span aria-hidden="true">◈</span> Visual synthesis — not observed imagery
+            <span aria-hidden="true" /> PLAUSIBLE VISUALIZATION FROM OBSERVED DATA
           </p>
         </section>
 
         <aside className="telemetry" aria-label="Observed planet data">
           <div className="telemetry-heading">
-            <span>OBSERVED SIGNAL</span>
+            <span>
+              <small>NASA ARCHIVE</small>
+              Observed properties
+            </span>
             <span className="signal-bars" aria-hidden="true">
               <i />
               <i />
@@ -192,7 +204,7 @@ export const PlanetExperience = ({ onOpenCatalog, result }: PlanetExperienceProp
             </div>
           </dl>
           <div className="telemetry-detail">
-            <span>HOST STAR</span>
+            <span>HOST SYSTEM</span>
             <strong>{planet.hostStar}</strong>
             <small>{observation.hostSpectralType ?? "Spectrum unavailable"}</small>
           </div>
@@ -211,7 +223,7 @@ export const PlanetExperience = ({ onOpenCatalog, result }: PlanetExperienceProp
         <div className="system-status" aria-live="polite">
           <span className="status-light" aria-hidden="true" />
           <span>
-            <small>EXPLORATION MODE</small>
+            <small>SESSION STATUS</small>
             <strong>
               {sceneState === "error" ? "RENDERER UNAVAILABLE" : xrCopy[xrStatus].label}
             </strong>
@@ -219,13 +231,16 @@ export const PlanetExperience = ({ onOpenCatalog, result }: PlanetExperienceProp
         </div>
         <div className="interaction-hint" aria-label="Desktop controls">
           <span>
-            <kbd>DRAG</kbd> ORBIT
+            <kbd>DRAG</kbd>
+            <small>ORBIT</small>
           </span>
           <span>
-            <kbd>SCROLL</kbd> RANGE
+            <kbd>SCROLL</kbd>
+            <small>ZOOM</small>
           </span>
-          <span>
-            <strong>{fps}</strong> FPS · <strong>{qualityTier}</strong>
+          <span className="performance-readout">
+            <strong>{fps}</strong>
+            <small>FPS · {qualityTier}</small>
           </span>
         </div>
         <button
@@ -236,7 +251,7 @@ export const PlanetExperience = ({ onOpenCatalog, result }: PlanetExperienceProp
         >
           <span className="button-orbit" aria-hidden="true" />
           <span>
-            <small>QUEST / WEBXR</small>
+            <small>IMMERSIVE MODE</small>
             <strong>{xrCopy[xrStatus].button}</strong>
           </span>
           <span className="button-arrow" aria-hidden="true">

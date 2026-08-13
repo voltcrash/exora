@@ -97,8 +97,8 @@ export const PlanetCatalog = ({ onClose, onSelect, open }: PlanetCatalogProps) =
     >
       <div className="catalog-header">
         <div>
-          <p>NASA EXOPLANET ARCHIVE</p>
-          <h2 id="catalog-title">Choose another world</h2>
+          <p>NASA EXOPLANET ARCHIVE · THOUSANDS OF CONFIRMED WORLDS</p>
+          <h2 id="catalog-title">Where should we go next?</h2>
         </div>
         <button
           className="catalog-close"
@@ -116,7 +116,7 @@ export const PlanetCatalog = ({ onClose, onSelect, open }: PlanetCatalogProps) =
           type="search"
           value={query}
           onChange={(event) => setQuery(event.target.value)}
-          placeholder="Search by planet name — try WASP, Kepler, or HD 209458"
+          placeholder="Search Kepler, WASP, TRAPPIST or any known planet"
           autoComplete="off"
           minLength={2}
           aria-describedby="catalog-status"
@@ -127,7 +127,7 @@ export const PlanetCatalog = ({ onClose, onSelect, open }: PlanetCatalogProps) =
         <p id="catalog-status" role="status">
           {status}
         </p>
-        <span>Gas, ice, and rocky worlds available · unclassified worlds pending</span>
+        <span>Gas · ice · rocky worlds</span>
       </div>
       <ol className="catalog-results">
         {searchState === "loading" && (
