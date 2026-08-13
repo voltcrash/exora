@@ -5,12 +5,15 @@
   "type": "module",
   "scripts": {
     "build": "vp pack",
+    "db:migrate": "node --env-file-if-exists=../../.env --use-system-ca src/migrate.ts",
+    "db:sync": "node --env-file-if-exists=../../.env --use-system-ca src/sync-planets.ts",
     "test": "vp test"
   },
   "dependencies": {
     "@exora/contracts": "workspace:*",
     "@hono/node-server": "catalog:",
-    "hono": "catalog:"
+    "hono": "catalog:",
+    "postgres": "catalog:"
   },
   "devDependencies": {
     "@types/node": "catalog:",

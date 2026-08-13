@@ -10,6 +10,7 @@ catalog:
   "@hono/node-server": ^2.1.0
   "@types/node": ^24.13.3
   hono: ^4.13.1
+  postgres: ^3.4.9
   typescript: ^7.0.2
   vite: npm:@voidzero-dev/vite-plus-core@0.2.9
   vite-plus: 0.2.9

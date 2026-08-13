@@ -50,3 +50,21 @@ test("caches identical TAP queries", async () => {
   expect(second.value?.name).toBe("HIP 65426 b");
   expect(requests).toBe(1);
 });
+
+test("loads the complete normalized catalog for synchronization", async () => {
+  let requestedUrl = "";
+  const repository = new NasaPlanetRepository({
+    fetcher: async (input) => {
+      requestedUrl =
+        typeof input === "string" ? input : input instanceof URL ? input.href : input.url;
+      return Response.json([nasaRow]);
+    },
+  });
+
+  const result = await repository.listAll();
+  const query = new URL(requestedUrl).searchParams.get("query");
+
+  expect(result.value).toHaveLength(1);
+  expect(query).toContain("from pscomppars order by pl_name");
+  expect(query).not.toContain("select top");
+});

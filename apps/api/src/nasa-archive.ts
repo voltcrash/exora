@@ -172,6 +172,11 @@ export class NasaPlanetRepository implements PlanetRepository {
     return this.#query(adql);
   }
 
+  async listAll(): Promise<RepositoryResult<ExoplanetProfile[]>> {
+    const adql = `select ${NASA_COLUMNS} from pscomppars order by pl_name`;
+    return this.#query(adql);
+  }
+
   async #query(adql: string): Promise<RepositoryResult<ExoplanetProfile[]>> {
     const cached = this.#cache.get(adql);
     const requestTime = this.#now();

@@ -7,6 +7,7 @@ Explore plausible procedural alien worlds generated from real NASA exoplanet dat
 The current slice renders HIP 65426 b using a normalized response from the NASA Exoplanet Archive. It includes:
 
 - a Hono API with NASA TAP queries, response normalization, and a six-hour in-memory cache;
+- an optional PostgreSQL catalog with idempotent NASA synchronization;
 - a shared planet contract used by the API and renderer;
 - a searchable confirmed-planet catalog with live scene switching;
 - a deterministic data-to-world recipe;
@@ -44,6 +45,17 @@ Run the complete validation suite:
 vp run ready
 ```
 
+## PostgreSQL catalog
+
+Copy `.env.example` to `.env` and provide `DATABASE_URL`, then initialize and synchronize the catalog:
+
+```bash
+vp run db:migrate
+vp run db:sync
+```
+
+When `DATABASE_URL` is present, the API serves lookups and searches from PostgreSQL. Without it, local development continues to query NASA directly. Catalog synchronization runs as an explicit job so production can schedule it independently from API startup.
+
 WebXR requires a secure context. Localhost works for desktop development; testing from a Quest on the local network will require serving the app over HTTPS or deploying it to an HTTPS host.
 
 ## Current workspace
@@ -56,4 +68,4 @@ packages/worldgen        Deterministic data-to-world recipe engine
 packages/utils           Starter package (scheduled for replacement)
 ```
 
-Gas giants and rocky worlds can be explored from catalog results. Ice giants remain disabled until their dedicated renderer is implemented. World generation now lives in a shared package so the next vertical slice can introduce PostgreSQL-backed catalog synchronization without duplicating recipe logic.
+Gas giants and rocky worlds can be explored from catalog results. Ice giants remain disabled until their dedicated renderer is implemented. World generation lives in a shared package, while the API can synchronize NASA's confirmed catalog into PostgreSQL for durable, low-latency queries.

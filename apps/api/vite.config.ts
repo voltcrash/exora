@@ -3,10 +3,10 @@ import { defineConfig } from "vite-plus";
 export default defineConfig({
   run: {
     tasks: {
-      dev: "node --use-system-ca --watch src/index.ts",
+      dev: "node --env-file-if-exists=../../.env --use-system-ca --watch src/index.ts",
       start: {
         command: "node --use-system-ca dist/index.mjs",
-        env: ["PORT"],
+        env: ["DATABASE_URL", "PORT"],
       },
     },
   },
