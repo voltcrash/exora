@@ -1072,7 +1072,10 @@ const createSurfaceEnvironment = (
   horizonLight.material = horizonMaterial;
   meshes.push(horizonLight);
 
-  for (const mesh of meshes) mesh.setEnabled(false);
+  for (const mesh of meshes) {
+    mesh.isVisible = false;
+    mesh.setEnabled(false);
+  }
   root.setEnabled(false);
   return { cloudLayers, meshes, root };
 };
@@ -1083,16 +1086,19 @@ const setEnvironmentEnabled = (
   enabled: boolean,
 ): void => {
   root.setEnabled(enabled);
-  for (const mesh of meshes) mesh.setEnabled(enabled);
+  for (const mesh of meshes) {
+    mesh.isVisible = enabled;
+    mesh.setEnabled(enabled);
+  }
 };
 
-export const createPlanetExperience = async ({
+export const createPlanetExperience = ({
   canvas,
   onFirstFrame,
   onViewModeChange,
   onXrStatusChange,
   recipe,
-}: PlanetExperienceOptions): Promise<PlanetExperience> => {
+}: PlanetExperienceOptions): PlanetExperience => {
   const deviceNavigator = window.navigator as Navigator & { deviceMemory?: number };
   const profile = deriveRenderQuality({
     userAgent: deviceNavigator.userAgent,
@@ -1110,7 +1116,7 @@ export const createPlanetExperience = async ({
 
   const scene = new Scene(engine);
   scene.clearColor = new Color4(0.0015, 0.003, 0.008, 1);
-  scene.performancePriority = ScenePerformancePriority.Aggressive;
+  scene.performancePriority = ScenePerformancePriority.Intermediate;
   scene.autoClear = true;
   scene.skipPointerMovePicking = true;
 
@@ -1148,8 +1154,6 @@ export const createPlanetExperience = async ({
     shader,
   } = createPlanet(scene, recipe, profile);
   const surfaceEnvironment = createSurfaceEnvironment(scene, recipe, profile);
-  setEnvironmentEnabled(orbitalRoot, orbitalMeshes, true);
-  setEnvironmentEnabled(surfaceEnvironment.root, surfaceEnvironment.meshes, false);
 
   let elapsedSeconds = 0;
   let qualitySampleSeconds = 0;
@@ -1159,11 +1163,30 @@ export const createPlanetExperience = async ({
   const orbitTarget = PLANET_POSITION.clone();
   const surfaceTarget = new Vector3(0, 0.1, 25);
 
+  const applyViewEnvironment = (surface: boolean): void => {
+    setEnvironmentEnabled(orbitalRoot, orbitalMeshes, !surface);
+    setEnvironmentEnabled(surfaceEnvironment.root, surfaceEnvironment.meshes, surface);
+    scene.fogMode = surface ? Scene.FOGMODE_EXP2 : Scene.FOGMODE_NONE;
+    scene.fogDensity = surface ? (recipe.renderer === "rocky" ? 0.012 : 0.019) : 0;
+    scene.fogColor = toColor3(recipe.atmosphere.color).scale(0.16);
+    scene.clearColor = surface
+      ? new Color4(
+          recipe.atmosphere.color[0] * 0.025,
+          recipe.atmosphere.color[1] * 0.025,
+          recipe.atmosphere.color[2] * 0.025,
+          1,
+        )
+      : new Color4(0.0015, 0.003, 0.008, 1);
+  };
+
+  applyViewEnvironment(false);
+
   const beginViewTransition = (direction: "entering" | "leaving"): void => {
     if (viewState !== "orbit" && viewState !== "surface") return;
     viewState = direction;
     viewTransitionSeconds = 0;
     camera.detachControl();
+    applyViewEnvironment(direction === "entering");
     onViewModeChange("transition");
   };
 
@@ -1188,24 +1211,9 @@ export const createPlanetExperience = async ({
       camera.beta += (targetBeta - camera.beta) * Math.min(1, eased * 0.16 + 0.05);
       camera.alpha += (-Math.PI / 2 - camera.alpha) * Math.min(1, eased * 0.16 + 0.05);
 
-      if (progress >= 0.38) {
-        setEnvironmentEnabled(orbitalRoot, orbitalMeshes, !entering);
-        setEnvironmentEnabled(surfaceEnvironment.root, surfaceEnvironment.meshes, entering);
-        scene.fogMode = entering ? Scene.FOGMODE_EXP2 : Scene.FOGMODE_NONE;
-        scene.fogDensity = entering ? (recipe.renderer === "rocky" ? 0.012 : 0.019) : 0;
-        scene.fogColor = toColor3(recipe.atmosphere.color).scale(0.16);
-        scene.clearColor = entering
-          ? new Color4(
-              recipe.atmosphere.color[0] * 0.025,
-              recipe.atmosphere.color[1] * 0.025,
-              recipe.atmosphere.color[2] * 0.025,
-              1,
-            )
-          : new Color4(0.0015, 0.003, 0.008, 1);
-      }
-
       if (progress >= 1) {
         viewState = entering ? "surface" : "orbit";
+        applyViewEnvironment(entering);
         camera.lowerRadiusLimit = entering ? 7.5 : 10.5;
         camera.upperRadiusLimit = entering ? 18.4 : 25;
         camera.lowerBetaLimit = entering ? 1.02 : 0.58;
@@ -1259,51 +1267,67 @@ export const createPlanetExperience = async ({
   onXrStatusChange("checking");
   let xr: WebXRDefaultExperience | null = null;
   let isVrSupported = false;
+  let disposed = false;
 
-  try {
-    xr = await WebXRDefaultExperience.CreateAsync(scene, {
-      disableDefaultUI: true,
-      disableNearInteraction: true,
-      floorMeshes: [viewingDeck],
-      inputOptions: { doNotLoadControllerMeshes: true },
-      optionalFeatures: ["hand-tracking"],
-      outputCanvasOptions: {
-        canvasOptions: {
-          antialias: false,
-          depth: true,
-          stencil: false,
-          framebufferScaleFactor: profile.xrFramebufferScaleFactor,
-        },
+  void WebXRDefaultExperience.CreateAsync(scene, {
+    disableDefaultUI: true,
+    disableNearInteraction: true,
+    floorMeshes: [viewingDeck],
+    inputOptions: { doNotLoadControllerMeshes: true },
+    optionalFeatures: ["hand-tracking"],
+    outputCanvasOptions: {
+      canvasOptions: {
+        antialias: false,
+        depth: true,
+        stencil: false,
+        framebufferScaleFactor: profile.xrFramebufferScaleFactor,
       },
-    });
+    },
+  })
+    .then(async (createdXr) => {
+      if (disposed) {
+        createdXr.dispose();
+        return;
+      }
 
-    xr.baseExperience.onInitialXRPoseSetObservable.add((xrCamera) => {
-      xrCamera.position.copyFrom(VIEWING_DECK_POSITION);
-    });
+      xr = createdXr;
+      createdXr.baseExperience.onInitialXRPoseSetObservable.add((xrCamera) => {
+        xrCamera.position.copyFrom(VIEWING_DECK_POSITION);
+      });
 
-    xr.baseExperience.onStateChangedObservable.add((state) => {
-      if (state === WebXRState.ENTERING_XR) onXrStatusChange("entering");
-      if (state === WebXRState.IN_XR) {
-        isInXr = true;
-        if (xr?.baseExperience.sessionManager.isFixedFoveationSupported) {
-          xr.baseExperience.sessionManager.fixedFoveation = profile.xrFixedFoveation;
+      createdXr.baseExperience.onStateChangedObservable.add((state) => {
+        if (disposed) return;
+        if (state === WebXRState.ENTERING_XR) onXrStatusChange("entering");
+        if (state === WebXRState.IN_XR) {
+          isInXr = true;
+          if (createdXr.baseExperience.sessionManager.isFixedFoveationSupported) {
+            createdXr.baseExperience.sessionManager.fixedFoveation = profile.xrFixedFoveation;
+          }
+          onXrStatusChange("in-xr");
         }
-        onXrStatusChange("in-xr");
-      }
-      if (state === WebXRState.NOT_IN_XR) {
-        isInXr = false;
-        onXrStatusChange(isVrSupported ? "ready" : "unavailable");
-      }
-    });
+        if (state === WebXRState.NOT_IN_XR) {
+          isInXr = false;
+          onXrStatusChange(isVrSupported ? "ready" : "unavailable");
+        }
+      });
 
-    isVrSupported = await xr.baseExperience.sessionManager.isSessionSupportedAsync("immersive-vr");
-    onXrStatusChange(isVrSupported ? "ready" : "unavailable");
-  } catch {
-    onXrStatusChange("unavailable");
-  }
+      isVrSupported =
+        await createdXr.baseExperience.sessionManager.isSessionSupportedAsync("immersive-vr");
+      if (disposed) {
+        createdXr.dispose();
+        if (xr === createdXr) xr = null;
+        return;
+      }
+      onXrStatusChange(isVrSupported ? "ready" : "unavailable");
+    })
+    .catch(() => {
+      if (!disposed) onXrStatusChange("unavailable");
+    });
 
   return {
-    isVrSupported,
+    get isVrSupported() {
+      return isVrSupported;
+    },
     qualityTier: profile.tier,
     getFps: () => engine.getFps(),
     enterVr: async () => {
@@ -1313,8 +1337,11 @@ export const createPlanetExperience = async ({
       });
     },
     dispose: () => {
+      if (disposed) return;
+      disposed = true;
       window.removeEventListener("resize", resize);
       xr?.dispose();
+      engine.stopRenderLoop();
       scene.dispose();
       engine.dispose();
     },
