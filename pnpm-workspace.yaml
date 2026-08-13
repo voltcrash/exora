@@ -9,8 +9,13 @@ catalog:
   "@babylonjs/core": ^9.20.0
   "@hono/node-server": ^2.1.0
   "@types/node": ^24.13.3
+  "@types/react": ^19.2.18
+  "@types/react-dom": ^19.2.4
+  "@vitejs/plugin-react": ^6.0.5
   hono: ^4.13.1
   postgres: ^3.4.9
+  react: ^19.2.8
+  react-dom: ^19.2.8
   typescript: ^7.0.2
   vite: npm:@voidzero-dev/vite-plus-core@0.2.9
   vite-plus: 0.2.9

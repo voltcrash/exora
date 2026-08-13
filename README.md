@@ -1,11 +1,12 @@
 # Exora
 
-Explore plausible procedural alien worlds generated from real NASA exoplanet data. The project is VR-first and currently targets WebXR in Meta Quest Browser.
+Explore plausible procedural alien worlds generated from real NASA exoplanet data. The React + Vite frontend is VR-first and currently targets WebXR in Meta Quest Browser.
 
 ## Current vertical slice
 
 The current slice renders HIP 65426 b using a normalized response from the NASA Exoplanet Archive. It includes:
 
+- a React interface composed around an isolated Babylon.js rendering lifecycle;
 - a Hono API with NASA TAP queries, response normalization, and a six-hour in-memory cache;
 - an optional PostgreSQL catalog with idempotent NASA synchronization;
 - a shared planet contract used by the API and renderer;
@@ -65,7 +66,7 @@ Use the [Meta Quest smoke-test checklist](docs/quest-testing.md) for headset val
 
 ```text
 apps/api                 Hono API and NASA TAP adapter
-apps/website             Babylon.js experience and interface
+apps/website             React + Vite interface and Babylon.js experience
 packages/contracts       Shared API and exoplanet types
 packages/worldgen        Deterministic data-to-world recipe engine
 packages/utils           Starter package (scheduled for replacement)
