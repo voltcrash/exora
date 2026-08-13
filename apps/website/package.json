@@ -13,6 +13,8 @@
     "@babylonjs/core": "catalog:",
     "@exora/contracts": "workspace:*",
     "@exora/worldgen": "workspace:*",
+    "@vercel/analytics": "catalog:",
+    "@vercel/speed-insights": "catalog:",
     "react": "catalog:",
     "react-dom": "catalog:"
   },
