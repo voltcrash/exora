@@ -8,9 +8,9 @@ The current slice renders HIP 65426 b using a normalized response from the NASA 
 
 - a Hono API with NASA TAP queries, response normalization, and a six-hour in-memory cache;
 - a shared planet contract used by the API and renderer;
-- a searchable confirmed-planet catalog with live gas-giant scene switching;
+- a searchable confirmed-planet catalog with live scene switching;
 - a deterministic data-to-world recipe;
-- procedural gas-giant cloud shaders and atmosphere glow;
+- procedural gas-giant clouds plus displaced rocky terrain shaders and atmosphere glow;
 - an interactive Babylon.js scene with desktop orbit controls;
 - a responsive observation HUD; and
 - a WebXR entry flow with a teleportable viewing deck;
@@ -55,4 +55,4 @@ packages/contracts       Shared API and exoplanet types
 packages/utils           Starter package (scheduled for replacement)
 ```
 
-Rocky and ice worlds appear in catalog results but remain disabled until their dedicated renderers are implemented. The next vertical slice should move world generation into a shared package and introduce PostgreSQL-backed catalog synchronization.
+Gas giants and rocky worlds can be explored from catalog results. Ice giants remain disabled until their dedicated renderer is implemented. The next vertical slice should move world generation into a shared package and introduce PostgreSQL-backed catalog synchronization.

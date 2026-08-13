@@ -48,6 +48,9 @@ const archiveStateLabel = (result: PlanetLoadResult): string => {
 const planetKindLabel = (planet: ExoplanetProfile): string =>
   planet.kind.replace("-", " ").toUpperCase();
 
+const hasRenderer = (planet: ExoplanetProfile): boolean =>
+  planet.kind === "gas-giant" || planet.kind === "rocky";
+
 const renderSearchResults = (planets: ExoplanetProfile[]): string => {
   if (planets.length === 0) {
     return `<li class="catalog-empty">No confirmed planets matched this signal.</li>`;
@@ -55,7 +58,7 @@ const renderSearchResults = (planets: ExoplanetProfile[]): string => {
 
   return planets
     .map((planet, index) => {
-      const supported = planet.kind === "gas-giant";
+      const supported = hasRenderer(planet);
       const temperature =
         planet.observation.equilibriumTemperatureKelvin === null
           ? "TEMP UNKNOWN"
@@ -194,7 +197,7 @@ const renderShell = (result: PlanetLoadResult): void => {
         </div>
         <div class="catalog-meta">
           <p id="catalog-status" role="status">Enter at least two characters to scan the archive.</p>
-          <span>Gas giants available now · other world types coming next</span>
+          <span>Gas giants and rocky worlds available · ice giants coming next</span>
         </div>
         <ol id="catalog-results" class="catalog-results"></ol>
       </dialog>
@@ -332,7 +335,7 @@ const bindCatalog = (): void => {
       if (!button || button.disabled) return;
 
       const planet = searchResults[Number(button.dataset.resultIndex)];
-      if (!planet || planet.kind !== "gas-giant") return;
+      if (!planet || !hasRenderer(planet)) return;
 
       dialog.close();
       const nextResult: PlanetLoadResult = {
@@ -393,7 +396,7 @@ const activatePlanet = async (result: PlanetLoadResult): Promise<void> => {
 const requestedPlanetName = new URLSearchParams(window.location.search).get("planet");
 const requestedPlanet = requestedPlanetName ? await loadPlanetByName(requestedPlanetName) : null;
 const initialPlanet =
-  requestedPlanet?.planet.kind === "gas-giant"
+  requestedPlanet && hasRenderer(requestedPlanet.planet)
     ? requestedPlanet
     : await loadFeaturedPlanet(featuredPlanet);
 
