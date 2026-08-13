@@ -60,9 +60,6 @@ uniform float starVisibility;
 uniform vec3 horizonColor;
 uniform vec3 zenithColor;
 uniform vec3 cloudColor;
-uniform vec3 sunColor;
-uniform float sunAngularRadius;
-uniform float sunIntensity;
 
 float hash(vec2 point) {
   point = fract(point * vec2(123.34, 345.45));
@@ -105,12 +102,6 @@ void main(void) {
   float cloudBand = smoothstep(0.48 + (1.0 - cloudiness) * 0.22, 0.78, cloudNoise);
   cloudBand *= smoothstep(-0.14, 0.35, direction.y) * (1.0 - smoothstep(0.62, 0.96, direction.y));
   sky = mix(sky, cloudColor, cloudBand * cloudiness * (0.34 + density * 0.46));
-
-  vec3 sunDirection = normalize(vec3(-0.28, -0.05, 0.96));
-  float sunAngle = max(dot(direction, sunDirection), 0.0);
-  float sunDisc = smoothstep(cos(sunAngularRadius), cos(sunAngularRadius * 0.72), sunAngle);
-  float sunHalo = pow(sunAngle, max(10.0, 1.2 / sunAngularRadius)) * (0.28 + density * 0.42);
-  sky += sunColor * (sunDisc * 1.8 + sunHalo) * sunIntensity;
 
   vec2 starCell = floor(vec2(longitude * 210.0, asin(direction.y) * 180.0));
   float star = step(0.994, hash(starCell)) * pow(hash(starCell + 9.4), 5.0);
@@ -1225,8 +1216,6 @@ const createSurfaceSky = (
     : isIceGiant
       ? toColor3(recipe.atmosphereBands.hazeColor)
       : toColor3(recipe.surface.cloudColor);
-  const sunColor = mixColor3(recipe.star.color, atmosphere, isIceGiant ? 0.18 : 0.07);
-
   const mesh = MeshBuilder.CreateSphere(
     "surfaceSky",
     { diameter: 180, segments: profile.tier === "desktop" ? 32 : 20 },
@@ -1253,9 +1242,6 @@ const createSurfaceSky = (
         "horizonColor",
         "zenithColor",
         "cloudColor",
-        "sunColor",
-        "sunAngularRadius",
-        "sunIntensity",
       ],
     },
   );
@@ -1267,9 +1253,6 @@ const createSurfaceSky = (
   material.setColor3("horizonColor", horizonColor);
   material.setColor3("zenithColor", zenithColor);
   material.setColor3("cloudColor", cloudColor);
-  material.setColor3("sunColor", sunColor);
-  material.setFloat("sunAngularRadius", recipe.star.apparentRadiusRadians);
-  material.setFloat("sunIntensity", recipe.star.intensity);
   material.backFaceCulling = false;
   material.disableDepthWrite = true;
   mesh.material = material;
@@ -1470,6 +1453,29 @@ const createSurfaceEnvironment = (
   surfaceStarMaterial.freeze();
   surfaceStar.material = surfaceStarMaterial;
   meshes.push(surfaceStar);
+
+  const surfaceStarHalo = MeshBuilder.CreateSphere(
+    "surfaceHostStarHalo",
+    {
+      diameter: surfaceStarDiameter * 1.65,
+      segments: profile.tier === "desktop" ? 24 : 16,
+    },
+    scene,
+  );
+  surfaceStarHalo.parent = root;
+  surfaceStarHalo.position.copyFrom(surfaceStar.position);
+  surfaceStarHalo.isPickable = false;
+  surfaceStarHalo.applyFog = false;
+  surfaceStarHalo.renderingGroupId = 1;
+  const surfaceStarHaloMaterial = new StandardMaterial("surfaceHostStarHaloMaterial", scene);
+  surfaceStarHaloMaterial.disableLighting = true;
+  surfaceStarHaloMaterial.emissiveColor = toColor3(recipe.star.color).scale(0.75);
+  surfaceStarHaloMaterial.alpha = Math.min(0.24, 0.1 + recipe.star.intensity * 0.04);
+  surfaceStarHaloMaterial.backFaceCulling = false;
+  surfaceStarHaloMaterial.disableDepthWrite = true;
+  surfaceStarHaloMaterial.freeze();
+  surfaceStarHalo.material = surfaceStarHaloMaterial;
+  meshes.push(surfaceStarHalo);
 
   for (const mesh of meshes) {
     mesh.isVisible = false;
