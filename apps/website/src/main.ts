@@ -166,7 +166,7 @@ const renderShell = (result: PlanetLoadResult): void => {
         <div class="interaction-hint" aria-label="Desktop controls">
           <span><kbd>DRAG</kbd> ORBIT</span>
           <span><kbd>SCROLL</kbd> RANGE</span>
-          <span><strong id="fps">--</strong> FPS</span>
+          <span><strong id="fps">--</strong> FPS · <strong id="quality-tier">AUTO</strong></span>
         </div>
         <button id="enter-vr" class="enter-vr" type="button" disabled>
           <span class="button-orbit" aria-hidden="true"></span>
@@ -360,8 +360,9 @@ const activatePlanet = async (result: PlanetLoadResult): Promise<void> => {
   const canvas = document.querySelector<HTMLCanvasElement>("#render-canvas");
   const enterVrButton = document.querySelector<HTMLButtonElement>("#enter-vr");
   const fpsLabel = document.querySelector<HTMLElement>("#fps");
+  const qualityTierLabel = document.querySelector<HTMLElement>("#quality-tier");
   const xrStatusLabel = document.querySelector<HTMLElement>("#xr-status");
-  if (!canvas || !enterVrButton || !fpsLabel || !xrStatusLabel) return;
+  if (!canvas || !enterVrButton || !fpsLabel || !qualityTierLabel || !xrStatusLabel) return;
 
   try {
     const experience = await createPlanetExperience({
@@ -379,6 +380,8 @@ const activatePlanet = async (result: PlanetLoadResult): Promise<void> => {
     }
 
     activeExperience = experience;
+    qualityTierLabel.textContent = experience.qualityTier.toUpperCase();
+    document.body.dataset.qualityTier = experience.qualityTier;
     activeFpsTimer = window.setInterval(() => {
       fpsLabel.textContent = Math.round(experience.getFps()).toString();
     }, 1_000);

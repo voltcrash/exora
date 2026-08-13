@@ -15,6 +15,7 @@ The current slice renders HIP 65426 b using a normalized response from the NASA 
 - an interactive Babylon.js scene with desktop orbit controls;
 - a responsive observation HUD; and
 - a WebXR entry flow with a teleportable viewing deck;
+- adaptive Quest rendering with reduced geometry, dynamic desktop resolution, and fixed foveation;
 - a local data fallback when NASA or the API is unavailable.
 
 The visualization distinguishes archive observations from Exora's inferred and generated details. It is not observed imagery.
@@ -57,6 +58,8 @@ vp run db:sync
 When `DATABASE_URL` is present, the API serves lookups and searches from PostgreSQL. Without it, local development continues to query NASA directly. Catalog synchronization runs as an explicit job so production can schedule it independently from API startup.
 
 WebXR requires a secure context. Localhost works for desktop development; testing from a Quest on the local network will require serving the app over HTTPS or deploying it to an HTTPS host.
+
+Use the [Meta Quest smoke-test checklist](docs/quest-testing.md) for headset validation and performance targets.
 
 ## Current workspace
 

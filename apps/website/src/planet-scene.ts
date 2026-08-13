@@ -9,7 +9,7 @@ import { StandardMaterial } from "@babylonjs/core/Materials/standardMaterial.js"
 import { Mesh } from "@babylonjs/core/Meshes/mesh.js";
 import { MeshBuilder } from "@babylonjs/core/Meshes/meshBuilder.js";
 import { VertexData } from "@babylonjs/core/Meshes/mesh.vertexData.js";
-import { Scene } from "@babylonjs/core/scene.js";
+import { Scene, ScenePerformancePriority } from "@babylonjs/core/scene.js";
 import { TransformNode } from "@babylonjs/core/Meshes/transformNode.js";
 import { WebXRDefaultExperience } from "@babylonjs/core/XR/webXRDefaultExperience.js";
 import "@babylonjs/core/XR/features/WebXRControllerPointerSelection.js";
@@ -17,6 +17,12 @@ import "@babylonjs/core/XR/features/WebXRControllerTeleportation.js";
 import "@babylonjs/core/XR/features/WebXRHandTracking.js";
 import { WebXRState } from "@babylonjs/core/XR/webXRTypes.js";
 import type { Rgb, WorldRecipe } from "@exora/worldgen";
+import {
+  adaptHardwareScaling,
+  deriveRenderQuality,
+  type RenderQualityProfile,
+  type RenderQualityTier,
+} from "./render-quality.ts";
 
 const PLANET_POSITION = new Vector3(0, 1.35, 9.5);
 const VIEWING_DECK_POSITION = new Vector3(0, 0, -7.4);
@@ -342,6 +348,7 @@ export interface PlanetExperience {
   enterVr: () => Promise<void>;
   getFps: () => number;
   isVrSupported: boolean;
+  qualityTier: RenderQualityTier;
 }
 
 interface PlanetExperienceOptions {
@@ -353,7 +360,7 @@ interface PlanetExperienceOptions {
 
 const toColor3 = ([red, green, blue]: Rgb): Color3 => new Color3(red, green, blue);
 
-const createStarfield = (scene: Scene, seed: number): Mesh => {
+const createStarfield = (scene: Scene, seed: number, starCount: number): Mesh => {
   const starfield = new Mesh("starfield", scene);
   const positions: number[] = [];
   const colors: number[] = [];
@@ -365,7 +372,7 @@ const createStarfield = (scene: Scene, seed: number): Mesh => {
     return randomState / 4294967296;
   };
 
-  for (let index = 0; index < 1_100; index += 1) {
+  for (let index = 0; index < starCount; index += 1) {
     const distance = 70 + random() * 45;
     const theta = random() * Math.PI * 2;
     const phi = Math.acos(2 * random() - 1);
@@ -392,14 +399,16 @@ const createStarfield = (scene: Scene, seed: number): Mesh => {
   starMaterial.pointsCloud = true;
   starMaterial.pointSize = 1.7;
   starMaterial.disableDepthWrite = true;
+  starMaterial.freeze();
   starfield.material = starMaterial;
   starfield.isPickable = false;
   starfield.alwaysSelectAsActiveMesh = true;
+  starfield.freezeWorldMatrix();
 
   return starfield;
 };
 
-const createViewingDeck = (scene: Scene): Mesh => {
+const createViewingDeck = (scene: Scene, profile: RenderQualityProfile): Mesh => {
   const deck = MeshBuilder.CreateCylinder(
     "viewingDeck",
     { diameter: 5.8, height: 0.12, tessellation: 64 },
@@ -413,11 +422,13 @@ const createViewingDeck = (scene: Scene): Mesh => {
   deckMaterial.emissiveColor = new Color3(0.015, 0.045, 0.07);
   deckMaterial.specularColor = new Color3(0.1, 0.36, 0.46);
   deckMaterial.alpha = 0.82;
+  deckMaterial.freeze();
   deck.material = deckMaterial;
+  deck.freezeWorldMatrix();
 
   const deckRing = MeshBuilder.CreateTorus(
     "deckRing",
-    { diameter: 5.25, thickness: 0.026, tessellation: 96 },
+    { diameter: 5.25, thickness: 0.026, tessellation: profile.ringTessellation },
     scene,
   );
   deckRing.position.set(VIEWING_DECK_POSITION.x, 0.015, VIEWING_DECK_POSITION.z);
@@ -426,7 +437,9 @@ const createViewingDeck = (scene: Scene): Mesh => {
   ringMaterial.disableLighting = true;
   ringMaterial.emissiveColor = new Color3(0.08, 0.82, 1);
   ringMaterial.alpha = 0.68;
+  ringMaterial.freeze();
   deckRing.material = ringMaterial;
+  deckRing.freezeWorldMatrix();
 
   return deck;
 };
@@ -434,6 +447,7 @@ const createViewingDeck = (scene: Scene): Mesh => {
 const createPlanet = (
   scene: Scene,
   recipe: WorldRecipe,
+  profile: RenderQualityProfile,
 ): {
   atmosphere: ShaderMaterial;
   moonOrbit: TransformNode;
@@ -450,7 +464,7 @@ const createPlanet = (
 
   const planet = MeshBuilder.CreateSphere(
     "planet",
-    { diameter: recipe.radiusSceneUnits * 2, segments: 64 },
+    { diameter: recipe.radiusSceneUnits * 2, segments: profile.planetSegments },
     scene,
   );
   planet.position.copyFrom(PLANET_POSITION);
@@ -562,7 +576,7 @@ const createPlanet = (
       {
         diameter: recipe.radiusSceneUnits + recipe.rings.outerRadius,
         thickness: recipe.rings.outerRadius - recipe.radiusSceneUnits,
-        tessellation: 128,
+        tessellation: profile.ringTessellation,
       },
       scene,
     );
@@ -578,12 +592,14 @@ const createPlanet = (
     ringMaterial.alpha = recipe.rings.opacity;
     ringMaterial.backFaceCulling = false;
     ringMaterial.disableDepthWrite = true;
+    ringMaterial.freeze();
     ring.material = ringMaterial;
+    ring.freezeWorldMatrix();
   }
 
   const atmosphereMesh = MeshBuilder.CreateSphere(
     "atmosphere",
-    { diameter: recipe.radiusSceneUnits * 2.08, segments: 64 },
+    { diameter: recipe.radiusSceneUnits * 2.08, segments: profile.planetSegments },
     scene,
   );
   atmosphereMesh.position.copyFrom(PLANET_POSITION);
@@ -605,10 +621,15 @@ const createPlanet = (
   atmosphere.alphaMode = Engine.ALPHA_ADD;
   atmosphere.disableDepthWrite = true;
   atmosphereMesh.material = atmosphere;
+  atmosphereMesh.freezeWorldMatrix();
 
   const orbitGuide = MeshBuilder.CreateTorus(
     "moonOrbitGuide",
-    { diameter: recipe.moon.orbitRadius * 2, thickness: 0.012, tessellation: 128 },
+    {
+      diameter: recipe.moon.orbitRadius * 2,
+      thickness: 0.012,
+      tessellation: profile.ringTessellation,
+    },
     scene,
   );
   orbitGuide.position.copyFrom(PLANET_POSITION);
@@ -619,7 +640,9 @@ const createPlanet = (
   orbitMaterial.disableLighting = true;
   orbitMaterial.emissiveColor = new Color3(0.18, 0.58, 0.72);
   orbitMaterial.alpha = 0.12;
+  orbitMaterial.freeze();
   orbitGuide.material = orbitMaterial;
+  orbitGuide.freezeWorldMatrix();
 
   const moonOrbit = new TransformNode("moonOrbit", scene);
   moonOrbit.position.copyFrom(PLANET_POSITION);
@@ -627,7 +650,7 @@ const createPlanet = (
 
   const moon = MeshBuilder.CreateSphere(
     "generatedMoon",
-    { diameter: recipe.moon.radius * 2, segments: 24 },
+    { diameter: recipe.moon.radius * 2, segments: profile.moonSegments },
     scene,
   );
   moon.parent = moonOrbit;
@@ -638,6 +661,7 @@ const createPlanet = (
   moonMaterial.diffuseColor = new Color3(0.19, 0.22, 0.25);
   moonMaterial.emissiveColor = new Color3(0.01, 0.014, 0.018);
   moonMaterial.specularColor = new Color3(0.06, 0.07, 0.08);
+  moonMaterial.freeze();
   moon.material = moonMaterial;
 
   return { atmosphere, moonOrbit, planet, shader };
@@ -649,16 +673,25 @@ export const createPlanetExperience = async ({
   onXrStatusChange,
   recipe,
 }: PlanetExperienceOptions): Promise<PlanetExperience> => {
+  const deviceNavigator = window.navigator as Navigator & { deviceMemory?: number };
+  const profile = deriveRenderQuality({
+    userAgent: deviceNavigator.userAgent,
+    pixelRatio: window.devicePixelRatio,
+    hardwareConcurrency: deviceNavigator.hardwareConcurrency,
+    deviceMemory: deviceNavigator.deviceMemory,
+  });
   const engine = new Engine(
     canvas,
-    true,
-    { antialias: true, preserveDrawingBuffer: false, stencil: true },
-    true,
+    profile.tier === "desktop",
+    { antialias: profile.tier === "desktop", preserveDrawingBuffer: false, stencil: false },
+    false,
   );
-  engine.setHardwareScalingLevel(Math.max(1, window.devicePixelRatio / 1.65));
+  engine.setHardwareScalingLevel(profile.hardwareScalingLevel);
 
   const scene = new Scene(engine);
   scene.clearColor = new Color4(0.0015, 0.003, 0.008, 1);
+  scene.performancePriority = ScenePerformancePriority.Aggressive;
+  scene.autoClear = true;
   scene.skipPointerMovePicking = true;
 
   const camera = new ArcRotateCamera(
@@ -681,14 +714,17 @@ export const createPlanetExperience = async ({
   const keyLight = new DirectionalLight("stellarLight", LIGHT_DIRECTION.scale(-1), scene);
   keyLight.intensity = 2.2;
 
-  createStarfield(scene, recipe.seed);
-  const viewingDeck = createViewingDeck(scene);
-  const { atmosphere, moonOrbit, planet, shader } = createPlanet(scene, recipe);
+  createStarfield(scene, recipe.seed, profile.starCount);
+  const viewingDeck = createViewingDeck(scene, profile);
+  const { atmosphere, moonOrbit, planet, shader } = createPlanet(scene, recipe, profile);
 
   let elapsedSeconds = 0;
+  let qualitySampleSeconds = 0;
+  let isInXr = false;
   scene.onBeforeRenderObservable.add(() => {
     const deltaSeconds = Math.min(engine.getDeltaTime() / 1_000, 0.05);
     elapsedSeconds += deltaSeconds;
+    qualitySampleSeconds += deltaSeconds;
     planet.rotation.y += deltaSeconds * recipe.rotationSpeed;
     moonOrbit.rotation.y += deltaSeconds * recipe.moon.speed;
     if (recipe.renderer === "gas-giant")
@@ -699,6 +735,16 @@ export const createPlanetExperience = async ({
     const activePosition = scene.activeCamera?.globalPosition ?? camera.globalPosition;
     shader.setVector3("cameraPosition", activePosition);
     atmosphere.setVector3("cameraPosition", activePosition);
+
+    if (qualitySampleSeconds >= 3) {
+      qualitySampleSeconds = 0;
+      const currentLevel = engine.getHardwareScalingLevel();
+      const nextLevel = adaptHardwareScaling(currentLevel, engine.getFps(), profile, isInXr);
+      if (nextLevel !== currentLevel) {
+        engine.setHardwareScalingLevel(nextLevel);
+        engine.resize();
+      }
+    }
   });
 
   scene.onAfterRenderObservable.addOnce(onFirstFrame);
@@ -717,7 +763,15 @@ export const createPlanetExperience = async ({
       disableNearInteraction: true,
       floorMeshes: [viewingDeck],
       inputOptions: { doNotLoadControllerMeshes: true },
-      optionalFeatures: true,
+      optionalFeatures: ["hand-tracking"],
+      outputCanvasOptions: {
+        canvasOptions: {
+          antialias: false,
+          depth: true,
+          stencil: false,
+          framebufferScaleFactor: profile.xrFramebufferScaleFactor,
+        },
+      },
     });
 
     xr.baseExperience.onInitialXRPoseSetObservable.add((xrCamera) => {
@@ -726,8 +780,17 @@ export const createPlanetExperience = async ({
 
     xr.baseExperience.onStateChangedObservable.add((state) => {
       if (state === WebXRState.ENTERING_XR) onXrStatusChange("entering");
-      if (state === WebXRState.IN_XR) onXrStatusChange("in-xr");
-      if (state === WebXRState.NOT_IN_XR) onXrStatusChange(isVrSupported ? "ready" : "unavailable");
+      if (state === WebXRState.IN_XR) {
+        isInXr = true;
+        if (xr?.baseExperience.sessionManager.isFixedFoveationSupported) {
+          xr.baseExperience.sessionManager.fixedFoveation = profile.xrFixedFoveation;
+        }
+        onXrStatusChange("in-xr");
+      }
+      if (state === WebXRState.NOT_IN_XR) {
+        isInXr = false;
+        onXrStatusChange(isVrSupported ? "ready" : "unavailable");
+      }
     });
 
     isVrSupported = await xr.baseExperience.sessionManager.isSessionSupportedAsync("immersive-vr");
@@ -738,6 +801,7 @@ export const createPlanetExperience = async ({
 
   return {
     isVrSupported,
+    qualityTier: profile.tier,
     getFps: () => engine.getFps(),
     enterVr: async () => {
       if (!xr || !isVrSupported) return;
