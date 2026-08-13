@@ -68,9 +68,13 @@ const temperateGasGiantPalette = {
 export const deriveWorldRecipe = (planet: ExoplanetProfile): WorldRecipe => {
   const seed = hashString(planet.id);
   const random = createRandom(seed);
-  const isHot = planet.observation.equilibriumTemperatureKelvin >= 1_000;
+  const equilibriumTemperature = planet.observation.equilibriumTemperatureKelvin ?? 0;
+  const radiusJupiter =
+    planet.observation.radiusJupiter ??
+    (planet.observation.radiusEarth !== null ? planet.observation.radiusEarth / 11.209 : 1);
+  const isHot = equilibriumTemperature >= 1_000;
   const palette = isHot ? hotGasGiantPalette : temperateGasGiantPalette;
-  const scaledRadius = 3.8 + Math.min(planet.observation.radiusJupiter, 2) * 0.45;
+  const scaledRadius = 3.8 + Math.min(radiusJupiter, 2) * 0.45;
 
   return {
     seed,

@@ -12,6 +12,9 @@ import { VertexData } from "@babylonjs/core/Meshes/mesh.vertexData.js";
 import { Scene } from "@babylonjs/core/scene.js";
 import { TransformNode } from "@babylonjs/core/Meshes/transformNode.js";
 import { WebXRDefaultExperience } from "@babylonjs/core/XR/webXRDefaultExperience.js";
+import "@babylonjs/core/XR/features/WebXRControllerPointerSelection.js";
+import "@babylonjs/core/XR/features/WebXRControllerTeleportation.js";
+import "@babylonjs/core/XR/features/WebXRHandTracking.js";
 import { WebXRState } from "@babylonjs/core/XR/webXRTypes.js";
 import type { Rgb, WorldRecipe } from "./world-recipe.ts";
 

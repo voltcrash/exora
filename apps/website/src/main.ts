@@ -1,4 +1,5 @@
 import "./style.css";
+import { loadFeaturedPlanet } from "./api-client.ts";
 import { createPlanetExperience, type XrStatus } from "./planet-scene.ts";
 import { featuredPlanet } from "./planet-profile.ts";
 import { deriveWorldRecipe } from "./world-recipe.ts";
@@ -7,15 +8,42 @@ const app = document.querySelector<HTMLDivElement>("#app");
 
 if (!app) throw new Error("Exora could not find its application root.");
 
-const observation = featuredPlanet.observation;
-const recipe = deriveWorldRecipe(featuredPlanet);
+const planetResult = await loadFeaturedPlanet(featuredPlanet);
+const planet = planetResult.planet;
+const observation = planet.observation;
+const recipe = deriveWorldRecipe(planet);
 
-const formatNumber = (value: number, maximumFractionDigits = 1): string =>
-  new Intl.NumberFormat("en", { maximumFractionDigits }).format(value);
+const escapeHtml = (value: string): string =>
+  value
+    .replaceAll("&", "&amp;")
+    .replaceAll("<", "&lt;")
+    .replaceAll(">", "&gt;")
+    .replaceAll('"', "&quot;")
+    .replaceAll("'", "&#039;");
+
+const formatNumber = (value: number | null, maximumFractionDigits = 1): string =>
+  value === null ? "—" : new Intl.NumberFormat("en", { maximumFractionDigits }).format(value);
+
+const nameSegments = planet.name.split(" ");
+const planetSuffix = nameSegments.at(-1);
+const hasPlanetSuffix = Boolean(planetSuffix && /^[a-z]$/i.test(planetSuffix));
+const displayName = hasPlanetSuffix
+  ? `${escapeHtml(nameSegments.slice(0, -1).join(" "))} <em>${escapeHtml(planetSuffix ?? "")}</em>`
+  : escapeHtml(planet.name);
+const archiveState =
+  planetResult.mode === "fallback"
+    ? "LOCAL ARCHIVE FALLBACK"
+    : planetResult.cached
+      ? "NASA ARCHIVE · CACHED"
+      : "NASA ARCHIVE · LIVE";
+const massUnit = observation.massJupiter !== null ? "M<sub>J</sub>" : "M<sub>⊕</sub>";
+const massValue = observation.massJupiter ?? observation.massEarth;
+const radiusUnit = observation.radiusJupiter !== null ? "R<sub>J</sub>" : "R<sub>⊕</sub>";
+const radiusValue = observation.radiusJupiter ?? observation.radiusEarth;
 
 app.innerHTML = `
   <div class="experience-shell">
-    <canvas id="render-canvas" aria-label="Interactive visualization of ${featuredPlanet.name}" tabindex="0"></canvas>
+    <canvas id="render-canvas" aria-label="Interactive visualization of ${escapeHtml(planet.name)}" tabindex="0"></canvas>
     <div class="space-haze" aria-hidden="true"></div>
     <div class="viewport-grid" aria-hidden="true"></div>
 
@@ -30,18 +58,18 @@ app.innerHTML = `
       </div>
       <div class="archive-state">
         <span class="pulse-dot" aria-hidden="true"></span>
-        NASA ARCHIVE FIXTURE
+        ${archiveState}
       </div>
     </header>
 
     <main class="hud">
       <section class="world-intro" aria-labelledby="world-name">
         <p class="eyebrow"><span>CONFIRMED EXOPLANET</span><span>01 / 01</span></p>
-        <h1 id="world-name">HIP 65426 <em>b</em></h1>
+        <h1 id="world-name">${displayName}</h1>
         <div class="world-tags" aria-label="World classification">
           <span>${recipe.classification}</span>
-          <span>${formatNumber(observation.equilibriumTemperatureKelvin, 0)} K</span>
-          <span>${observation.discoveryMethod}</span>
+          <span>${observation.equilibriumTemperatureKelvin === null ? "TEMP UNKNOWN" : `${formatNumber(observation.equilibriumTemperatureKelvin, 0)} K`}</span>
+          <span>${escapeHtml(observation.discoveryMethod)}</span>
         </div>
         <p class="world-summary">${recipe.summary}</p>
         <p class="visual-note"><span aria-hidden="true">◈</span> Visual synthesis — not observed imagery</p>
@@ -55,15 +83,15 @@ app.innerHTML = `
         <dl>
           <div>
             <dt>Mass</dt>
-            <dd>${formatNumber(observation.massJupiter)} <small>M<sub>J</sub></small></dd>
+            <dd>${formatNumber(massValue)} <small>${massUnit}</small></dd>
           </div>
           <div>
             <dt>Radius</dt>
-            <dd>${formatNumber(observation.radiusJupiter)} <small>R<sub>J</sub></small></dd>
+            <dd>${formatNumber(radiusValue)} <small>${radiusUnit}</small></dd>
           </div>
           <div>
             <dt>Orbit</dt>
-            <dd>${formatNumber(observation.semiMajorAxisAu ?? 0, 0)} <small>AU</small></dd>
+            <dd>${formatNumber(observation.semiMajorAxisAu, 0)} <small>AU</small></dd>
           </div>
           <div>
             <dt>Distance</dt>
@@ -72,15 +100,15 @@ app.innerHTML = `
         </dl>
         <div class="telemetry-detail">
           <span>HOST STAR</span>
-          <strong>${featuredPlanet.hostStar}</strong>
-          <small>${observation.hostSpectralType ?? "Spectrum unavailable"}</small>
+          <strong>${escapeHtml(planet.hostStar)}</strong>
+          <small>${escapeHtml(observation.hostSpectralType ?? "Spectrum unavailable")}</small>
         </div>
         <div class="telemetry-detail">
           <span>ATMOSPHERE MODEL</span>
           <strong>${recipe.atmosphere.label.split(" · ")[0]}</strong>
           <small>Exora inference · ${recipe.confidence} confidence</small>
         </div>
-        <p class="source-note">${featuredPlanet.source.archive} · ${featuredPlanet.source.table}</p>
+        <p class="source-note">${planet.source.archive} · ${planet.source.table} · ${planet.source.retrievedOn}</p>
       </aside>
     </main>
 
@@ -104,7 +132,7 @@ app.innerHTML = `
     <div class="loading-screen" role="status">
       <div class="loading-orbit" aria-hidden="true"><span></span></div>
       <p>CALCULATING WORLD</p>
-      <small>${featuredPlanet.name.toUpperCase()} · SEED ${recipe.seed.toString(16).toUpperCase()}</small>
+      <small>${escapeHtml(planet.name.toUpperCase())} · SEED ${recipe.seed.toString(16).toUpperCase()}</small>
     </div>
   </div>
 `;

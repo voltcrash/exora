@@ -1,20 +1,20 @@
 {
-  "name": "website",
+  "name": "@exora/api",
   "version": "0.0.0",
   "private": true,
   "type": "module",
   "scripts": {
-    "dev": "vp dev",
-    "build": "tsc && vp build",
-    "preview": "vp preview",
+    "build": "vp pack",
     "test": "vp test"
   },
   "dependencies": {
-    "@babylonjs/core": "catalog:",
-    "@exora/contracts": "workspace:*"
+    "@exora/contracts": "workspace:*",
+    "@hono/node-server": "catalog:",
+    "hono": "catalog:"
   },
   "devDependencies": {
-    "typescript": "^7.0.2",
+    "@types/node": "catalog:",
+    "typescript": "catalog:",
     "vite": "catalog:",
     "vite-plus": "catalog:"
   }

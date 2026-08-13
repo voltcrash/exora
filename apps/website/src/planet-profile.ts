@@ -1,33 +1,10 @@
-export type PlanetKind = "gas-giant" | "rocky" | "ice-giant";
+import type { ExoplanetProfile } from "@exora/contracts";
 
-export interface ExoplanetObservation {
-  distanceParsecs: number;
-  discoveryMethod: string;
-  discoveryYear: number;
-  equilibriumTemperatureKelvin: number;
-  hostSpectralType: string | null;
-  massJupiter: number;
-  orbitalPeriodDays: number | null;
-  radiusJupiter: number;
-  semiMajorAxisAu: number | null;
-}
-
-export interface ExoplanetProfile {
-  hostStar: string;
-  id: string;
-  kind: PlanetKind;
-  name: string;
-  observation: ExoplanetObservation;
-  source: {
-    archive: string;
-    retrievedOn: string;
-    table: string;
-  };
-}
+export type { ExoplanetProfile } from "@exora/contracts";
 
 /**
- * A local first-draft fixture from the NASA Exoplanet Archive composite table.
- * The renderer consumes this shape instead of depending on archive column names.
+ * A resilient local fixture used while the API starts or when NASA TAP cannot
+ * be reached. The renderer consumes Exora's normalized contract either way.
  */
 export const featuredPlanet: ExoplanetProfile = {
   id: "hip-65426-b",
@@ -37,6 +14,8 @@ export const featuredPlanet: ExoplanetProfile = {
   observation: {
     radiusJupiter: 1.5,
     massJupiter: 9,
+    radiusEarth: 16.8,
+    massEarth: 2860.4,
     equilibriumTemperatureKelvin: 1500,
     orbitalPeriodDays: null,
     semiMajorAxisAu: 92,
