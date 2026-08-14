@@ -1,5 +1,11 @@
 import { expect, test } from "vite-plus/test";
-import { loadFeaturedPlanet, loadPlanetByName, searchPlanets } from "./api-client.ts";
+import {
+  loadFeaturedPlanet,
+  loadPlanetByName,
+  loadStarByName,
+  searchPlanets,
+  searchStars,
+} from "./api-client.ts";
 import { featuredPlanet } from "./planet-profile.ts";
 
 test("uses normalized live API data", async () => {
@@ -53,4 +59,50 @@ test("returns normalized planet search results", async () => {
   });
 
   expect(result).toMatchObject({ planets: [{ id: "hip-65426-b" }], query: "wasp" });
+});
+
+const starPayload = {
+  data: {
+    id: "alf-cma",
+    name: "Sirius",
+    catalogName: "* alf CMa",
+    kind: "binary",
+    objectType: "Spectroscopic binary",
+    observation: {
+      rightAscensionDegrees: 101.287,
+      declinationDegrees: -16.716,
+      parallaxMas: 379.21,
+      distanceParsecs: 2.637,
+      properMotionRaMasPerYear: -546.01,
+      properMotionDecMasPerYear: -1223.07,
+      radialVelocityKmPerSecond: -5.5,
+      spectralType: "A0mA1Va",
+      visualMagnitude: -1.46,
+      gaiaMagnitude: null,
+    },
+    source: {
+      archive: "SIMBAD",
+      tables: ["basic", "ident", "allfluxes"],
+      retrievedOn: "2026-08-14",
+    },
+  },
+  meta: { cached: false, source: "SIMBAD" },
+} as const;
+
+test("loads a star by its familiar name", async () => {
+  const result = await loadStarByName("Sirius", async () => Response.json(starPayload));
+  expect(result?.star).toMatchObject({ id: "alf-cma", name: "Sirius" });
+});
+
+test("loads featured stars for an empty catalog query", async () => {
+  const result = await searchStars("", {
+    fetcher: async (input) => {
+      expect(input).toBe("/api/stars/featured");
+      return Response.json({
+        data: [starPayload.data],
+        meta: { cached: true, count: 1, query: "", source: "SIMBAD" },
+      });
+    },
+  });
+  expect(result).toMatchObject({ cached: true, stars: [{ name: "Sirius" }] });
 });

@@ -7,6 +7,7 @@ import { archiveStateLabel, formatNumber, formatPlanetName } from "../planet-uti
 interface PlanetExperienceProps {
   onOpenCatalog: () => void;
   onOpenBuilder: () => void;
+  onOpenStars: () => void;
   recipeOverride: WorldRecipe | null;
   result: PlanetLoadResult;
 }
@@ -22,6 +23,7 @@ const xrCopy: Record<XrStatus, { button: string; label: string }> = {
 export const PlanetExperience = ({
   onOpenBuilder,
   onOpenCatalog,
+  onOpenStars,
   recipeOverride,
   result,
 }: PlanetExperienceProps) => {
@@ -149,7 +151,7 @@ export const PlanetExperience = ({
           <span className="brand-mark" aria-hidden="true" />
           <span className="brand-copy">
             <strong>EXORA</strong>
-            <small>EXOPLANET OBSERVATORY</small>
+            <small>UNIVERSE OBSERVATORY</small>
           </span>
         </a>
         <div className="exploration-actions">
@@ -166,6 +168,15 @@ export const PlanetExperience = ({
               <strong>EXPLORE WORLDS</strong>
             </span>
             <kbd>/</kbd>
+          </button>
+          <button className="star-trigger" type="button" onClick={onOpenStars}>
+            <span className="star-symbol" aria-hidden="true">
+              ✦
+            </span>
+            <span>
+              <small>SIMBAD CATALOG</small>
+              <strong>EXPLORE STARS</strong>
+            </span>
           </button>
           <button className="forge-trigger" type="button" onClick={onOpenBuilder}>
             <span aria-hidden="true">＋</span>

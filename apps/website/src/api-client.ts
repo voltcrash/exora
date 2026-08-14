@@ -1,4 +1,11 @@
-import type { ExoplanetProfile, PlanetResponse, PlanetSearchResponse } from "@exora/contracts";
+import type {
+  ExoplanetProfile,
+  PlanetResponse,
+  PlanetSearchResponse,
+  StarProfile,
+  StarResponse,
+  StarSearchResponse,
+} from "@exora/contracts";
 
 type Fetcher = (input: string | URL | Request, init?: RequestInit) => Promise<Response>;
 
@@ -12,6 +19,17 @@ export interface PlanetSearchResult {
   cached: boolean;
   planets: ExoplanetProfile[];
   query: string;
+}
+
+export interface StarLoadResult {
+  cached: boolean;
+  star: StarProfile;
+}
+
+export interface StarSearchResult {
+  cached: boolean;
+  query: string;
+  stars: StarProfile[];
 }
 
 const isPlanetResponse = (value: unknown): value is PlanetResponse => {
@@ -37,6 +55,28 @@ const isPlanetSearchResponse = (value: unknown): value is PlanetSearchResponse =
     ) &&
     typeof candidate.meta?.query === "string" &&
     candidate.meta.source === "NASA Exoplanet Archive",
+  );
+};
+
+const isStarResponse = (value: unknown): value is StarResponse => {
+  if (!value || typeof value !== "object") return false;
+  const candidate = value as Partial<StarResponse>;
+  return Boolean(
+    candidate.data &&
+    typeof candidate.data.id === "string" &&
+    typeof candidate.data.name === "string" &&
+    candidate.meta?.source === "SIMBAD",
+  );
+};
+
+const isStarSearchResponse = (value: unknown): value is StarSearchResponse => {
+  if (!value || typeof value !== "object") return false;
+  const candidate = value as Partial<StarSearchResponse>;
+  return Boolean(
+    Array.isArray(candidate.data) &&
+    candidate.data.every((star) => typeof star.id === "string" && typeof star.name === "string") &&
+    typeof candidate.meta?.query === "string" &&
+    candidate.meta.source === "SIMBAD",
   );
 };
 
@@ -108,5 +148,54 @@ export const searchPlanets = async (
     cached: payload.meta.cached,
     planets: payload.data,
     query: payload.meta.query,
+  };
+};
+
+const requestStar = async (
+  path: string,
+  fetcher: Fetcher,
+  signal?: AbortSignal,
+): Promise<StarResponse | null> => {
+  try {
+    const response = await fetcher(path, {
+      headers: { accept: "application/json" },
+      signal: signal ?? AbortSignal.timeout(8_000),
+    });
+    if (!response.ok) return null;
+    const payload: unknown = await response.json();
+    return isStarResponse(payload) ? payload : null;
+  } catch {
+    return null;
+  }
+};
+
+export const loadStarByName = async (
+  name: string,
+  fetcher: Fetcher = fetch,
+): Promise<StarLoadResult | null> => {
+  const payload = await requestStar(`/api/stars/${encodeURIComponent(name)}`, fetcher);
+  return payload ? { cached: payload.meta.cached, star: payload.data } : null;
+};
+
+export const searchStars = async (
+  query: string,
+  options: { fetcher?: Fetcher; signal?: AbortSignal } = {},
+): Promise<StarSearchResult> => {
+  const normalizedQuery = query.trim();
+  const path =
+    normalizedQuery.length >= 2
+      ? `/api/stars?q=${encodeURIComponent(normalizedQuery)}&limit=12`
+      : "/api/stars/featured";
+  const response = await (options.fetcher ?? fetch)(path, {
+    headers: { accept: "application/json" },
+    signal: options.signal ?? AbortSignal.timeout(10_000),
+  });
+  if (!response.ok) throw new Error(`Star search failed with status ${response.status}.`);
+  const payload: unknown = await response.json();
+  if (!isStarSearchResponse(payload)) throw new Error("Star search returned an invalid response.");
+  return {
+    cached: payload.meta.cached,
+    query: payload.meta.query,
+    stars: payload.data,
   };
 };

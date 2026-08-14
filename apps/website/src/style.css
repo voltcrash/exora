@@ -303,6 +303,67 @@ button {
     transform 160ms ease;
 }
 
+.star-trigger {
+  min-width: 152px;
+  display: grid;
+  grid-template-columns: 24px 1fr;
+  align-items: center;
+  gap: 8px;
+  padding: 7px 11px;
+  border: 1px solid rgb(255 197 102 / 24%);
+  border-radius: 14px;
+  color: var(--ink);
+  background: rgb(24 18 9 / 72%);
+  backdrop-filter: blur(18px);
+  cursor: pointer;
+  text-align: left;
+  transition:
+    border-color 160ms ease,
+    background 160ms ease,
+    transform 160ms ease;
+}
+
+.star-trigger:hover,
+.star-trigger.active {
+  border-color: rgb(255 200 106 / 52%);
+  background: rgb(44 30 10 / 82%);
+  transform: translateY(-1px);
+}
+
+.star-trigger > span:last-child {
+  display: grid;
+  gap: 2px;
+}
+
+.star-trigger small,
+.star-trigger strong {
+  font-size: 7px;
+  font-weight: 500;
+  letter-spacing: 0.1em;
+}
+
+.star-trigger small {
+  color: #8e744a;
+}
+
+.star-trigger strong {
+  color: #ffe4b8;
+}
+
+.star-symbol,
+.star-search-mark {
+  color: #ffc96f;
+  font-size: 19px;
+  line-height: 1;
+  text-align: center;
+  text-shadow: 0 0 12px rgb(255 190 80 / 78%);
+}
+
+.compact-trigger {
+  min-width: 142px;
+  grid-template-columns: 25px 1fr;
+}
+
 .forge-trigger:hover {
   border-color: rgb(255 107 50 / 58%);
   background: rgb(42 20 12 / 82%);
@@ -845,6 +906,7 @@ body[data-xr-status="unavailable"] .status-light {
 
 .catalog-trigger:focus-visible,
 .forge-trigger:focus-visible,
+.star-trigger:focus-visible,
 .catalog-close:focus-visible,
 .catalog-result:focus-visible,
 .enter-vr:focus-visible,
@@ -1136,6 +1198,55 @@ body[data-xr-status="unavailable"] .status-light {
 
 .planet-catalog[open] {
   animation: catalog-in 180ms ease-out;
+}
+
+.star-catalog {
+  border-color: rgb(255 202 112 / 17%);
+  background: radial-gradient(circle at 50% 0, rgb(118 76 21 / 20%), transparent 44%), #0b0d0e;
+}
+
+.star-catalog .catalog-header p,
+.star-catalog .result-state {
+  color: #ffc96f;
+}
+
+.star-catalog .catalog-search:focus-within {
+  border-color: rgb(255 201 105 / 52%);
+  box-shadow: 0 0 0 3px rgb(255 201 105 / 6%);
+}
+
+.star-result-marker {
+  background: #ffc96f;
+  box-shadow: 0 0 12px rgb(255 190 80 / 72%);
+}
+
+.star-experience .space-haze {
+  background:
+    radial-gradient(circle at 50% 48%, rgb(255 150 45 / 4%), transparent 26%),
+    radial-gradient(
+      circle at 53% 45%,
+      transparent 20%,
+      rgb(0 0 0 / 11%) 56%,
+      rgb(0 0 0 / 68%) 112%
+    ),
+    linear-gradient(
+      90deg,
+      rgb(1 3 5 / 76%) 0%,
+      transparent 30%,
+      transparent 70%,
+      rgb(1 3 5 / 68%) 100%
+    );
+}
+
+.star-experience .world-tags span:first-child {
+  border-color: rgb(255 198 98 / 30%);
+  color: #ffdda4;
+  background: rgb(255 187 71 / 10%);
+}
+
+.star-experience .visual-note span {
+  background: #ffc96f;
+  box-shadow: 0 0 10px rgb(255 190 80 / 65%);
 }
 
 .catalog-header {
@@ -1483,7 +1594,8 @@ body[data-xr-status="unavailable"] .status-light {
 }
 
 @media (max-width: 760px) {
-  .forge-trigger {
+  .forge-trigger,
+  .star-trigger {
     min-width: 46px;
     width: 46px;
     grid-template-columns: 1fr;
@@ -1491,7 +1603,8 @@ body[data-xr-status="unavailable"] .status-light {
     padding: 8px;
   }
 
-  .forge-trigger > span:last-child {
+  .forge-trigger > span:last-child,
+  .star-trigger > span:last-child {
     display: none;
   }
 
@@ -1531,6 +1644,15 @@ body[data-xr-status="unavailable"] .status-light {
 
   .exploration-actions {
     gap: 6px;
+  }
+
+  .star-trigger,
+  .compact-trigger {
+    min-width: 46px;
+    width: 46px;
+    grid-template-columns: 1fr;
+    place-items: center;
+    padding: 8px;
   }
 
   .planet-builder {
@@ -1693,6 +1815,7 @@ body[data-xr-status="unavailable"] .status-light {
 
   .catalog-trigger,
   .forge-trigger,
+  .star-trigger,
   .catalog-result,
   .enter-vr,
   .loading-screen,

@@ -1,7 +1,8 @@
-import type { ExoplanetProfile } from "@exora/contracts";
+import type { ExoplanetProfile, StarProfile } from "@exora/contracts";
 import { expect, test } from "vite-plus/test";
 import { createApp } from "../src/app.ts";
 import type { PlanetRepository } from "../src/nasa-archive.ts";
+import type { StarRepository } from "../src/simbad-archive.ts";
 
 const planet: ExoplanetProfile = {
   id: "hip-65426-b",
@@ -37,6 +38,37 @@ const repository: PlanetRepository = {
   search: async () => ({ cached: true, value: [planet] }),
 };
 
+const star: StarProfile = {
+  id: "alf-cma",
+  name: "Sirius",
+  catalogName: "* alf CMa",
+  kind: "binary",
+  objectType: "Spectroscopic binary",
+  observation: {
+    rightAscensionDegrees: 101.287,
+    declinationDegrees: -16.716,
+    parallaxMas: 379.21,
+    distanceParsecs: 2.637,
+    properMotionRaMasPerYear: -546.01,
+    properMotionDecMasPerYear: -1223.07,
+    radialVelocityKmPerSecond: -5.5,
+    spectralType: "A0mA1Va",
+    visualMagnitude: -1.46,
+    gaiaMagnitude: null,
+  },
+  source: {
+    archive: "SIMBAD",
+    tables: ["basic", "ident", "allfluxes"],
+    retrievedOn: "2026-08-14",
+  },
+};
+
+const starRepository: StarRepository = {
+  featured: async () => ({ cached: true, value: [star] }),
+  findByName: async () => ({ cached: false, value: star }),
+  search: async () => ({ cached: false, value: [star] }),
+};
+
 test("returns service health", async () => {
   const response = await createApp({ repository }).request("/api/health");
 
@@ -60,4 +92,19 @@ test("rejects undersized search queries", async () => {
 
   expect(response.status).toBe(400);
   expect(await response.json()).toMatchObject({ error: { code: "INVALID_REQUEST" } });
+});
+
+test("returns featured and exact SIMBAD star results", async () => {
+  const app = createApp({ repository, starRepository });
+  const featuredResponse = await app.request("/api/stars/featured");
+  const searchResponse = await app.request("/api/stars?q=sirius");
+  const detailResponse = await app.request("/api/stars/Sirius");
+
+  expect(featuredResponse.status).toBe(200);
+  expect(await featuredResponse.json()).toMatchObject({
+    data: [{ name: "Sirius" }],
+    meta: { source: "SIMBAD" },
+  });
+  expect(await searchResponse.json()).toMatchObject({ meta: { count: 1, query: "sirius" } });
+  expect(await detailResponse.json()).toMatchObject({ data: { id: "alf-cma" } });
 });

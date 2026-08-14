@@ -1,30 +1,52 @@
-import type { ExoplanetProfile } from "@exora/contracts";
+import type { ExoplanetProfile, StarProfile } from "@exora/contracts";
 import type { CustomWorld, WorldRecipe } from "@exora/worldgen";
 import { useCallback, useEffect, useState } from "react";
-import { loadFeaturedPlanet, loadPlanetByName, type PlanetLoadResult } from "./api-client.ts";
+import {
+  loadFeaturedPlanet,
+  loadPlanetByName,
+  loadStarByName,
+  type PlanetLoadResult,
+  type StarLoadResult,
+} from "./api-client.ts";
 import { PlanetCatalog } from "./components/PlanetCatalog.tsx";
 import { CustomPlanetBuilder } from "./components/CustomPlanetBuilder.tsx";
 import { PlanetExperience } from "./components/PlanetExperience.tsx";
+import { StarCatalog } from "./components/StarCatalog.tsx";
+import { StarExperience } from "./components/StarExperience.tsx";
 import { featuredPlanet } from "./planet-profile.ts";
 import { hasRenderer } from "./planet-utils.tsx";
 
-const loadRequestedPlanet = async (): Promise<PlanetLoadResult> => {
-  const name = new URLSearchParams(window.location.search).get("planet");
+type ActiveObject =
+  | { result: PlanetLoadResult; type: "planet" }
+  | { result: StarLoadResult; type: "star" };
+
+const loadRequestedObject = async (): Promise<ActiveObject> => {
+  const parameters = new URLSearchParams(window.location.search);
+  const starName = parameters.get("star");
+  if (starName) {
+    const star = await loadStarByName(starName);
+    if (star) return { result: star, type: "star" };
+  }
+
+  const name = parameters.get("planet");
   const requested = name ? await loadPlanetByName(name) : null;
-  return requested && hasRenderer(requested.planet)
-    ? requested
-    : loadFeaturedPlanet(featuredPlanet);
+  const result =
+    requested && hasRenderer(requested.planet)
+      ? requested
+      : await loadFeaturedPlanet(featuredPlanet);
+  return { result, type: "planet" };
 };
 
 export const App = () => {
   const [catalogOpen, setCatalogOpen] = useState(false);
+  const [starCatalogOpen, setStarCatalogOpen] = useState(false);
   const [builderOpen, setBuilderOpen] = useState(false);
-  const [result, setResult] = useState<PlanetLoadResult | null>(null);
+  const [activeObject, setActiveObject] = useState<ActiveObject | null>(null);
   const [customRecipe, setCustomRecipe] = useState<WorldRecipe | null>(null);
 
   const loadFromLocation = useCallback(() => {
     setCustomRecipe(null);
-    void loadRequestedPlanet().then(setResult);
+    void loadRequestedObject().then(setActiveObject);
   }, []);
 
   useEffect(() => {
@@ -37,41 +59,67 @@ export const App = () => {
     window.history.pushState({}, "", `?planet=${encodeURIComponent(planet.name)}`);
     setCatalogOpen(false);
     setCustomRecipe(null);
-    setResult({ cached, mode: "live", planet });
+    setActiveObject({ result: { cached, mode: "live", planet }, type: "planet" });
+  };
+
+  const selectStar = (star: StarProfile, cached: boolean): void => {
+    window.history.pushState({}, "", `?star=${encodeURIComponent(star.name)}`);
+    setStarCatalogOpen(false);
+    setCustomRecipe(null);
+    setActiveObject({ result: { cached, star }, type: "star" });
   };
 
   const generatePlanet = ({ planet, recipe }: CustomWorld): void => {
     window.history.pushState({}, "", `?custom=${encodeURIComponent(planet.name)}`);
     setBuilderOpen(false);
     setCustomRecipe(recipe);
-    setResult({ cached: false, mode: "custom", planet });
+    setActiveObject({
+      result: { cached: false, mode: "custom", planet },
+      type: "planet",
+    });
   };
 
-  if (!result) {
+  if (!activeObject) {
     return (
       <div className="loading-screen initial-loading" role="status">
         <div className="loading-orbit" aria-hidden="true">
           <span />
         </div>
-        <p>CONTACTING NASA ARCHIVE</p>
-        <small>RESOLVING CONFIRMED WORLD</small>
+        <p>CONTACTING OBSERVATORIES</p>
+        <small>RESOLVING CELESTIAL OBJECT</small>
       </div>
     );
   }
 
   return (
     <>
-      <PlanetExperience
-        key={result.planet.id}
-        result={result}
-        onOpenCatalog={() => setCatalogOpen(true)}
-        onOpenBuilder={() => setBuilderOpen(true)}
-        recipeOverride={customRecipe}
-      />
+      {activeObject.type === "planet" ? (
+        <PlanetExperience
+          key={activeObject.result.planet.id}
+          result={activeObject.result}
+          onOpenCatalog={() => setCatalogOpen(true)}
+          onOpenBuilder={() => setBuilderOpen(true)}
+          onOpenStars={() => setStarCatalogOpen(true)}
+          recipeOverride={customRecipe}
+        />
+      ) : (
+        <StarExperience
+          key={activeObject.result.star.id}
+          cached={activeObject.result.cached}
+          star={activeObject.result.star}
+          onOpenPlanets={() => setCatalogOpen(true)}
+          onOpenStars={() => setStarCatalogOpen(true)}
+        />
+      )}
       <PlanetCatalog
         open={catalogOpen}
         onClose={() => setCatalogOpen(false)}
         onSelect={selectPlanet}
+      />
+      <StarCatalog
+        open={starCatalogOpen}
+        onClose={() => setStarCatalogOpen(false)}
+        onSelect={selectStar}
       />
       <CustomPlanetBuilder
         open={builderOpen}
