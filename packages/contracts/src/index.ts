@@ -65,30 +65,43 @@ export type StarKind =
   | "white-dwarf";
 
 export interface StarObservation {
-  declinationDegrees: number;
+  declinationDegrees: number | null;
   distanceParsecs: number | null;
   gaiaMagnitude: number | null;
   parallaxMas: number | null;
   properMotionDecMasPerYear: number | null;
   properMotionRaMasPerYear: number | null;
   radialVelocityKmPerSecond: number | null;
-  rightAscensionDegrees: number;
+  rightAscensionDegrees: number | null;
   spectralType: string | null;
   visualMagnitude: number | null;
 }
 
 export interface StarProfile {
   catalogName: string;
+  customization?: {
+    activity: number;
+    radius: number;
+    rotation: number;
+    seed: number;
+    temperatureKelvin: number;
+  };
   id: string;
   kind: StarKind;
   name: string;
   objectType: string;
   observation: StarObservation;
-  source: {
-    archive: "SIMBAD";
-    retrievedOn: string;
-    tables: readonly ["basic", "ident", "allfluxes"];
-  };
+  source:
+    | {
+        archive: "SIMBAD";
+        retrievedOn: string;
+        tables: readonly ["basic", "ident", "allfluxes"];
+      }
+    | {
+        archive: "Exora Custom Generator";
+        retrievedOn: string;
+        table: "procedural";
+      };
 }
 
 export interface StarApiMetadata {

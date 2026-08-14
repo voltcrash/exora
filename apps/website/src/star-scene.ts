@@ -39,6 +39,7 @@ varying vec3 vPosition;
 varying vec3 vNormal;
 uniform float time;
 uniform float seed;
+uniform float activity;
 uniform vec3 baseColor;
 uniform vec3 hotColor;
 
@@ -73,8 +74,8 @@ void main(void) {
   float cells = fbm(p * 10.0 + vec3(broad * 2.8, drift * 0.6, 4.2));
   float granules = smoothstep(0.46, 0.82, cells + broad * 0.22);
   float darkLane = smoothstep(0.42, 0.7, 1.0 - abs(cells * 2.0 - 1.0));
-  float flare = pow(max(0.0, sin(p.y * 15.0 + p.x * 9.0 + time * 0.7)), 14.0) * step(0.72, broad);
-  vec3 color = mix(baseColor * 0.72, hotColor, granules * 0.72 + broad * 0.24);
+  float flare = pow(max(0.0, sin(p.y * 15.0 + p.x * 9.0 + time * 0.7)), 14.0) * step(0.84 - activity * 0.2, broad);
+  vec3 color = mix(baseColor * 0.72, hotColor, granules * (0.52 + activity * 0.34) + broad * 0.24);
   color *= 0.92 + darkLane * 0.12;
   color += hotColor * flare * 0.55;
   float pulse = 0.98 + sin(time * 0.65 + seed) * 0.018;
@@ -184,13 +185,15 @@ export const createStarScene = ({
 
   const seed = hashName(star.catalogName);
   const visual = deriveStarVisual(star);
+  const activity = star.customization?.activity ?? 0.55;
+  const diameter = 5.6 + (star.customization?.radius ?? 0.5) * 3.2;
   createStarfield(scene, seed, profile.starCount);
   Effect.ShadersStore.exoraStarVertexShader = STAR_VERTEX_SHADER;
   Effect.ShadersStore.exoraStarFragmentShader = STAR_FRAGMENT_SHADER;
 
   const starMesh = MeshBuilder.CreateSphere(
     "observed-star",
-    { diameter: 7.2, segments: profile.tier === "desktop" ? 128 : 64 },
+    { diameter, segments: profile.tier === "desktop" ? 128 : 64 },
     scene,
   );
   starMesh.position.set(0, 0.8, 7.5);
@@ -201,7 +204,15 @@ export const createStarScene = ({
     { vertex: "exoraStar", fragment: "exoraStar" },
     {
       attributes: ["position", "normal"],
-      uniforms: ["world", "worldViewProjection", "time", "seed", "baseColor", "hotColor"],
+      uniforms: [
+        "world",
+        "worldViewProjection",
+        "time",
+        "seed",
+        "activity",
+        "baseColor",
+        "hotColor",
+      ],
     },
   );
   const [red, green, blue] = visual.color;
@@ -209,6 +220,7 @@ export const createStarScene = ({
   material.setColor3("baseColor", baseColor);
   material.setColor3("hotColor", Color3.Lerp(baseColor, Color3.White(), 0.68));
   material.setFloat("seed", seed);
+  material.setFloat("activity", activity);
   material.setFloat("time", 0);
   starMesh.material = material;
 
@@ -216,7 +228,7 @@ export const createStarScene = ({
     blurKernelSize: profile.tier === "desktop" ? 48 : 24,
     mainTextureFixedSize: profile.tier === "desktop" ? 512 : 256,
   });
-  glow.intensity = 0.72;
+  glow.intensity = 0.5 + activity * 0.42;
   glow.addIncludedOnlyMesh(starMesh);
 
   let elapsed = 0;
@@ -224,7 +236,7 @@ export const createStarScene = ({
   scene.onBeforeRenderObservable.add(() => {
     elapsed += Math.min(engine.getDeltaTime() / 1_000, 0.05);
     material.setFloat("time", elapsed);
-    starMesh.rotation.y = elapsed * 0.025;
+    starMesh.rotation.y = elapsed * (0.008 + (star.customization?.rotation ?? 0.35) * 0.07);
   });
   engine.runRenderLoop(() => {
     scene.render();

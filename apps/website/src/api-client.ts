@@ -23,6 +23,7 @@ export interface PlanetSearchResult {
 
 export interface StarLoadResult {
   cached: boolean;
+  mode: "custom" | "live";
   star: StarProfile;
 }
 
@@ -174,7 +175,7 @@ export const loadStarByName = async (
   fetcher: Fetcher = fetch,
 ): Promise<StarLoadResult | null> => {
   const payload = await requestStar(`/api/stars/${encodeURIComponent(name)}`, fetcher);
-  return payload ? { cached: payload.meta.cached, star: payload.data } : null;
+  return payload ? { cached: payload.meta.cached, mode: "live", star: payload.data } : null;
 };
 
 export const searchStars = async (

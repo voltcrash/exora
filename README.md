@@ -13,6 +13,7 @@ The current slice renders HIP 65426 b using a normalized response from the NASA 
 - a searchable confirmed-planet catalog with live scene switching;
 - a keyless SIMBAD TAP integration with exact-name star resolution, featured stellar destinations, and twelve-hour caching;
 - interactive stellar visualizations inferred from observed spectral classes;
+- a two-mode World Forge for procedural planets and custom stars;
 - a deterministic data-to-world recipe;
 - procedural gas-giant clouds, methane-hazed ice giants, and displaced rocky terrain;
 - an interactive Babylon.js scene with desktop orbit controls;

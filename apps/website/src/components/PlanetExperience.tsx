@@ -182,7 +182,7 @@ export const PlanetExperience = ({
             <span aria-hidden="true">＋</span>
             <span>
               <small>WORLD FORGE</small>
-              <strong>CREATE PLANET</strong>
+              <strong>CREATE OBJECT</strong>
             </span>
           </button>
         </div>

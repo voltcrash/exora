@@ -1,6 +1,11 @@
 import { expect, test } from "vite-plus/test";
 import type { ExoplanetProfile } from "@exora/contracts";
-import { deriveHostStar, deriveWorldRecipe, generateCustomWorld } from "../src/index.ts";
+import {
+  deriveHostStar,
+  deriveWorldRecipe,
+  generateCustomStar,
+  generateCustomWorld,
+} from "../src/index.ts";
 
 const featuredPlanet: ExoplanetProfile = {
   id: "hip-65426-b",
@@ -222,4 +227,32 @@ test("custom rocky worlds vaporize selected water at extreme temperatures", () =
   expect(world.recipe.surface.waterLevel).toBe(0);
   expect(world.recipe.surface.lavaStrength).toBeGreaterThan(0);
   expect(world.recipe.surface.midColor).toEqual([0.504, 0.108, 0.036]);
+});
+
+test("custom star parameters create a local renderer profile", () => {
+  const { star } = generateCustomStar({
+    activity: 0.82,
+    kind: "evolved",
+    name: "Solara",
+    radius: 0.9,
+    rotation: 0.35,
+    seed: 911,
+    temperatureKelvin: 3_450,
+  });
+
+  expect(star).toMatchObject({
+    id: "custom-star-911",
+    kind: "evolved",
+    name: "Solara",
+    observation: { spectralType: "MIII" },
+    source: { archive: "Exora Custom Generator", table: "procedural" },
+    customization: {
+      activity: 0.82,
+      radius: 0.9,
+      rotation: 0.35,
+      temperatureKelvin: 3_450,
+    },
+  });
+  expect(star.observation.rightAscensionDegrees).toBeNull();
+  expect(star.observation.visualMagnitude).toBeNull();
 });

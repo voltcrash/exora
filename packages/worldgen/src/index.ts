@@ -1,4 +1,4 @@
-import type { ExoplanetProfile } from "@exora/contracts";
+import type { ExoplanetProfile, StarKind, StarProfile } from "@exora/contracts";
 
 export type Rgb = readonly [red: number, green: number, blue: number];
 
@@ -110,6 +110,20 @@ export interface CustomPlanetParameters {
 export interface CustomWorld {
   planet: ExoplanetProfile;
   recipe: WorldRecipe;
+}
+
+export interface CustomStarParameters {
+  activity: number;
+  kind: StarKind;
+  name: string;
+  radius: number;
+  rotation: number;
+  seed: number;
+  temperatureKelvin: number;
+}
+
+export interface CustomStar {
+  star: StarProfile;
 }
 
 const hashString = (value: string): number => {
@@ -457,6 +471,75 @@ export const deriveWorldRecipe = (planet: ExoplanetProfile): WorldRecipe => {
 };
 
 const clampUnit = (value: number): number => Math.min(1, Math.max(0, value));
+
+const temperatureToSpectralClass = (temperatureKelvin: number): string => {
+  if (temperatureKelvin >= 30_000) return "O";
+  if (temperatureKelvin >= 10_000) return "B";
+  if (temperatureKelvin >= 7_500) return "A";
+  if (temperatureKelvin >= 6_000) return "F";
+  if (temperatureKelvin >= 5_200) return "G";
+  if (temperatureKelvin >= 3_700) return "K";
+  return "M";
+};
+
+const luminosityClass = (kind: StarKind): string => {
+  if (kind === "white-dwarf") return "D";
+  if (kind === "neutron-star") return "NS";
+  if (kind === "evolved") return "III";
+  return "V";
+};
+
+const starKindDescription: Record<StarKind, string> = {
+  binary: "Custom binary star",
+  evolved: "Custom giant star",
+  "main-sequence": "Custom main-sequence star",
+  "neutron-star": "Custom neutron star",
+  star: "Custom star",
+  variable: "Custom variable star",
+  "white-dwarf": "Custom white dwarf",
+};
+
+export const generateCustomStar = (parameters: CustomStarParameters): CustomStar => {
+  const seed = Math.max(0, Math.trunc(parameters.seed));
+  const temperatureKelvin = Math.round(
+    Math.min(40_000, Math.max(2_000, parameters.temperatureKelvin)),
+  );
+  const spectralClass = temperatureToSpectralClass(temperatureKelvin);
+  const name = parameters.name.trim() || "Untitled Star";
+  return {
+    star: {
+      id: `custom-star-${seed}`,
+      name,
+      catalogName: `FORGE ${seed.toString().padStart(6, "0")}`,
+      kind: parameters.kind,
+      objectType: starKindDescription[parameters.kind],
+      observation: {
+        rightAscensionDegrees: null,
+        declinationDegrees: null,
+        parallaxMas: null,
+        distanceParsecs: null,
+        properMotionRaMasPerYear: null,
+        properMotionDecMasPerYear: null,
+        radialVelocityKmPerSecond: null,
+        spectralType: `${spectralClass}${luminosityClass(parameters.kind)}`,
+        visualMagnitude: null,
+        gaiaMagnitude: null,
+      },
+      customization: {
+        activity: clampUnit(parameters.activity),
+        radius: clampUnit(parameters.radius),
+        rotation: clampUnit(parameters.rotation),
+        seed,
+        temperatureKelvin,
+      },
+      source: {
+        archive: "Exora Custom Generator",
+        retrievedOn: new Date().toISOString().slice(0, 10),
+        table: "procedural",
+      },
+    },
+  };
+};
 
 const scaleColor = (color: Rgb, amount: number): Rgb =>
   color.map((channel) => clampUnit(channel * amount)) as unknown as Rgb;

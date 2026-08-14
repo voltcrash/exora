@@ -1,5 +1,5 @@
 import type { ExoplanetProfile, StarProfile } from "@exora/contracts";
-import type { CustomWorld, WorldRecipe } from "@exora/worldgen";
+import type { CustomStar, CustomWorld, WorldRecipe } from "@exora/worldgen";
 import { useCallback, useEffect, useState } from "react";
 import {
   loadFeaturedPlanet,
@@ -9,7 +9,7 @@ import {
   type StarLoadResult,
 } from "./api-client.ts";
 import { PlanetCatalog } from "./components/PlanetCatalog.tsx";
-import { CustomPlanetBuilder } from "./components/CustomPlanetBuilder.tsx";
+import { WorldForge } from "./components/CustomPlanetBuilder.tsx";
 import { PlanetExperience } from "./components/PlanetExperience.tsx";
 import { StarCatalog } from "./components/StarCatalog.tsx";
 import { StarExperience } from "./components/StarExperience.tsx";
@@ -66,7 +66,7 @@ export const App = () => {
     window.history.pushState({}, "", `?star=${encodeURIComponent(star.name)}`);
     setStarCatalogOpen(false);
     setCustomRecipe(null);
-    setActiveObject({ result: { cached, star }, type: "star" });
+    setActiveObject({ result: { cached, mode: "live", star }, type: "star" });
   };
 
   const generatePlanet = ({ planet, recipe }: CustomWorld): void => {
@@ -76,6 +76,16 @@ export const App = () => {
     setActiveObject({
       result: { cached: false, mode: "custom", planet },
       type: "planet",
+    });
+  };
+
+  const generateStar = ({ star }: CustomStar): void => {
+    window.history.pushState({}, "", `?customStar=${encodeURIComponent(star.name)}`);
+    setBuilderOpen(false);
+    setCustomRecipe(null);
+    setActiveObject({
+      result: { cached: false, mode: "custom", star },
+      type: "star",
     });
   };
 
@@ -105,10 +115,10 @@ export const App = () => {
       ) : (
         <StarExperience
           key={activeObject.result.star.id}
-          cached={activeObject.result.cached}
-          star={activeObject.result.star}
+          result={activeObject.result}
           onOpenPlanets={() => setCatalogOpen(true)}
           onOpenStars={() => setStarCatalogOpen(true)}
+          onOpenBuilder={() => setBuilderOpen(true)}
         />
       )}
       <PlanetCatalog
@@ -121,10 +131,12 @@ export const App = () => {
         onClose={() => setStarCatalogOpen(false)}
         onSelect={selectStar}
       />
-      <CustomPlanetBuilder
+      <WorldForge
+        initialMode={activeObject.type}
         open={builderOpen}
         onClose={() => setBuilderOpen(false)}
-        onGenerate={generatePlanet}
+        onGeneratePlanet={generatePlanet}
+        onGenerateStar={generateStar}
       />
     </>
   );

@@ -1,15 +1,15 @@
-import type { StarProfile } from "@exora/contracts";
 import { useEffect, useRef, useState } from "react";
+import type { StarLoadResult } from "../api-client.ts";
 import type { StarSceneExperience } from "../star-scene.ts";
 import { formatNumber } from "../planet-utils.tsx";
 import { deriveStarVisual, starKindLabel, starSummary } from "../star-utils.ts";
 import type { XrStatus } from "../planet-scene.ts";
 
 interface StarExperienceProps {
-  cached: boolean;
+  onOpenBuilder: () => void;
   onOpenPlanets: () => void;
   onOpenStars: () => void;
-  star: StarProfile;
+  result: StarLoadResult;
 }
 
 const xrCopy: Record<XrStatus, { button: string; label: string }> = {
@@ -21,10 +21,10 @@ const xrCopy: Record<XrStatus, { button: string; label: string }> = {
 };
 
 export const StarExperience = ({
-  cached,
+  onOpenBuilder,
   onOpenPlanets,
   onOpenStars,
-  star,
+  result,
 }: StarExperienceProps) => {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const experienceRef = useRef<StarSceneExperience | null>(null);
@@ -32,8 +32,10 @@ export const StarExperience = ({
   const [qualityTier, setQualityTier] = useState("AUTO");
   const [sceneState, setSceneState] = useState<"loading" | "ready" | "error">("loading");
   const [xrStatus, setXrStatus] = useState<XrStatus>("checking");
+  const star = result.star;
   const observation = star.observation;
   const visual = deriveStarVisual(star);
+  const custom = result.mode === "custom";
 
   useEffect(() => {
     document.body.dataset.xrStatus = xrStatus;
@@ -121,35 +123,52 @@ export const StarExperience = ({
               <strong>EXPLORE STARS</strong>
             </span>
           </button>
+          <button className="forge-trigger" type="button" onClick={onOpenBuilder}>
+            <span aria-hidden="true">＋</span>
+            <span>
+              <small>WORLD FORGE</small>
+              <strong>CREATE OBJECT</strong>
+            </span>
+          </button>
         </div>
         <div className="archive-state">
           <span className="pulse-dot" aria-hidden="true" />
-          SIMBAD · {cached ? "CACHED" : "LIVE"}
+          {custom ? "CUSTOM STAR · LOCAL" : `SIMBAD · ${result.cached ? "CACHED" : "LIVE"}`}
         </div>
       </header>
 
       <main className="hud">
         <section className="world-intro" aria-labelledby="star-name">
           <p className="eyebrow">
-            <span>OBSERVED STAR</span>
+            <span>{custom ? "GENERATED STAR" : "OBSERVED STAR"}</span>
             <span>{starKindLabel(star)}</span>
           </p>
           <h1 id="star-name">{star.name}</h1>
           <div className="world-tags">
             <span>{visual.label}</span>
             <span>{observation.spectralType ?? "SPECTRUM UNKNOWN"}</span>
-            <span>~{formatNumber(visual.estimatedTemperatureKelvin, 0)} K</span>
+            <span>
+              {custom ? "" : "~"}
+              {formatNumber(visual.estimatedTemperatureKelvin, 0)} K
+            </span>
           </div>
           <p className="world-summary">{starSummary(star)}</p>
           <p className="visual-note">
-            <span aria-hidden="true" /> STELLAR APPEARANCE INFERRED FROM SPECTRAL CLASS
+            <span aria-hidden="true" />{" "}
+            {custom
+              ? "USER-DESIGNED PROCEDURAL STAR"
+              : "STELLAR APPEARANCE INFERRED FROM SPECTRAL CLASS"}
           </p>
         </section>
 
-        <aside className="telemetry" aria-label="Observed star data">
+        <aside
+          className="telemetry"
+          aria-label={custom ? "Custom star data" : "Observed star data"}
+        >
           <div className="telemetry-heading">
             <span>
-              <small>SIMBAD ARCHIVE</small>Observed properties
+              <small>{custom ? "WORLD FORGE" : "SIMBAD ARCHIVE"}</small>
+              {custom ? "Chosen properties" : "Observed properties"}
             </span>
             <span className="signal-bars" aria-hidden="true">
               <i />
@@ -159,30 +178,62 @@ export const StarExperience = ({
             </span>
           </div>
           <dl>
-            <div>
-              <dt>Distance</dt>
-              <dd>
-                {formatNumber(observation.distanceParsecs, 2)} <small>PC</small>
-              </dd>
-            </div>
-            <div>
-              <dt>V magnitude</dt>
-              <dd>
-                {formatNumber(observation.visualMagnitude, 2)} <small>MAG</small>
-              </dd>
-            </div>
-            <div>
-              <dt>RA</dt>
-              <dd>
-                {formatNumber(observation.rightAscensionDegrees, 2)} <small>°</small>
-              </dd>
-            </div>
-            <div>
-              <dt>DEC</dt>
-              <dd>
-                {formatNumber(observation.declinationDegrees, 2)} <small>°</small>
-              </dd>
-            </div>
+            {custom ? (
+              <>
+                <div>
+                  <dt>Temperature</dt>
+                  <dd>
+                    {formatNumber(star.customization?.temperatureKelvin ?? null, 0)}{" "}
+                    <small>K</small>
+                  </dd>
+                </div>
+                <div>
+                  <dt>Scale</dt>
+                  <dd>
+                    {formatNumber((star.customization?.radius ?? 0) * 100, 0)} <small>%</small>
+                  </dd>
+                </div>
+                <div>
+                  <dt>Activity</dt>
+                  <dd>
+                    {formatNumber((star.customization?.activity ?? 0) * 100, 0)} <small>%</small>
+                  </dd>
+                </div>
+                <div>
+                  <dt>Rotation</dt>
+                  <dd>
+                    {formatNumber((star.customization?.rotation ?? 0) * 100, 0)} <small>%</small>
+                  </dd>
+                </div>
+              </>
+            ) : (
+              <>
+                <div>
+                  <dt>Distance</dt>
+                  <dd>
+                    {formatNumber(observation.distanceParsecs, 2)} <small>PC</small>
+                  </dd>
+                </div>
+                <div>
+                  <dt>V magnitude</dt>
+                  <dd>
+                    {formatNumber(observation.visualMagnitude, 2)} <small>MAG</small>
+                  </dd>
+                </div>
+                <div>
+                  <dt>RA</dt>
+                  <dd>
+                    {formatNumber(observation.rightAscensionDegrees, 2)} <small>°</small>
+                  </dd>
+                </div>
+                <div>
+                  <dt>DEC</dt>
+                  <dd>
+                    {formatNumber(observation.declinationDegrees, 2)} <small>°</small>
+                  </dd>
+                </div>
+              </>
+            )}
           </dl>
           <div className="telemetry-detail">
             <span>CATALOG ID</span>
@@ -192,15 +243,21 @@ export const StarExperience = ({
             </small>
           </div>
           <div className="telemetry-detail">
-            <span>SPACE MOTION</span>
-            <strong>{formatNumber(observation.radialVelocityKmPerSecond, 1)} KM/S RADIAL</strong>
+            <span>{custom ? "GENERATION SEED" : "SPACE MOTION"}</span>
+            <strong>
+              {custom
+                ? star.customization?.seed
+                : `${formatNumber(observation.radialVelocityKmPerSecond, 1)} KM/S RADIAL`}
+            </strong>
             <small>
-              RA {formatNumber(observation.properMotionRaMasPerYear, 1)} · DEC{" "}
-              {formatNumber(observation.properMotionDecMasPerYear, 1)} MAS/YR
+              {custom
+                ? "REPRODUCIBLE PROCEDURAL PROFILE"
+                : `RA ${formatNumber(observation.properMotionRaMasPerYear, 1)} · DEC ${formatNumber(observation.properMotionDecMasPerYear, 1)} MAS/YR`}
             </small>
           </div>
           <p className="source-note">
-            SIMBAD · BASIC + IDENT + ALLFLUXES · {star.source.retrievedOn}
+            {custom ? "EXORA CUSTOM GENERATOR · PROCEDURAL" : "SIMBAD · BASIC + IDENT + ALLFLUXES"}{" "}
+            · {star.source.retrievedOn}
           </p>
         </aside>
       </main>
