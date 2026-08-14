@@ -33,6 +33,16 @@ export interface StarSearchResult {
   stars: StarProfile[];
 }
 
+export interface RandomPlanetResult {
+  cached: boolean;
+  planet: ExoplanetProfile;
+}
+
+export interface RandomStarResult {
+  cached: boolean;
+  star: StarProfile;
+}
+
 const isPlanetResponse = (value: unknown): value is PlanetResponse => {
   if (!value || typeof value !== "object") return false;
 
@@ -158,6 +168,38 @@ export const discoverPlanets = async (
 ): Promise<PlanetSearchResult> =>
   searchPlanetsRequest(`/api/planets?category=${encodeURIComponent(category)}&limit=12`, options);
 
+const PLANET_SURPRISE_CATEGORIES = [
+  "most-earth-like",
+  "nearest-rocky-worlds",
+  "record-breakers",
+  "gas-giants",
+  "frozen-worlds",
+  "recently-confirmed",
+] as const;
+
+const randomIndex = (length: number, random: () => number): number =>
+  Math.min(length - 1, Math.floor(Math.max(0, random()) * length));
+
+export const discoverRandomPlanet = async (
+  options: { fetcher?: Fetcher; random?: () => number; signal?: AbortSignal } = {},
+): Promise<RandomPlanetResult> => {
+  const random = options.random ?? Math.random;
+  const start = randomIndex(PLANET_SURPRISE_CATEGORIES.length, random);
+
+  for (let offset = 0; offset < PLANET_SURPRISE_CATEGORIES.length; offset += 1) {
+    const category =
+      PLANET_SURPRISE_CATEGORIES[(start + offset) % PLANET_SURPRISE_CATEGORIES.length];
+    if (!category) continue;
+    const result = await discoverPlanets(category, options);
+    const candidates = result.planets.filter((planet) => planet.kind !== "unknown");
+    if (candidates.length === 0) continue;
+    const planet = candidates[randomIndex(candidates.length, random)];
+    if (planet) return { cached: result.cached, planet };
+  }
+
+  throw new Error("No renderable surprise destination is currently available.");
+};
+
 const searchPlanetsRequest = async (
   path: string,
   options: { fetcher?: Fetcher; signal?: AbortSignal },
@@ -238,4 +280,30 @@ export const discoverStars = async (
   if (!isStarSearchResponse(payload))
     throw new Error("Star discovery returned an invalid response.");
   return { cached: payload.meta.cached, query: payload.meta.query, stars: payload.data };
+};
+
+const STAR_SURPRISE_CATEGORIES = [
+  "closest-neighbors",
+  "solar-analogs",
+  "brightest-stars",
+  "stellar-extremes",
+  "binary-systems",
+  "stellar-remnants",
+] as const;
+
+export const discoverRandomStar = async (
+  options: { fetcher?: Fetcher; random?: () => number; signal?: AbortSignal } = {},
+): Promise<RandomStarResult> => {
+  const random = options.random ?? Math.random;
+  const start = randomIndex(STAR_SURPRISE_CATEGORIES.length, random);
+
+  for (let offset = 0; offset < STAR_SURPRISE_CATEGORIES.length; offset += 1) {
+    const category = STAR_SURPRISE_CATEGORIES[(start + offset) % STAR_SURPRISE_CATEGORIES.length];
+    if (!category) continue;
+    const result = await discoverStars(category, options);
+    const star = result.stars[randomIndex(result.stars.length, random)];
+    if (star) return { cached: result.cached, star };
+  }
+
+  throw new Error("No surprise stellar destination is currently available.");
 };

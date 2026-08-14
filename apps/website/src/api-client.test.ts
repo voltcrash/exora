@@ -1,5 +1,7 @@
 import { expect, test } from "vite-plus/test";
 import {
+  discoverRandomPlanet,
+  discoverRandomStar,
   loadFeaturedPlanet,
   loadPlanetByName,
   loadStarByName,
@@ -61,6 +63,26 @@ test("returns normalized planet search results", async () => {
   expect(result).toMatchObject({ planets: [{ id: "hip-65426-b" }], query: "wasp" });
 });
 
+test("chooses a renderable surprise planet from a curated archive result", async () => {
+  const result = await discoverRandomPlanet({
+    random: () => 0,
+    fetcher: async (input) => {
+      expect(input).toContain("category=most-earth-like");
+      return Response.json({
+        data: [featuredPlanet],
+        meta: {
+          cached: true,
+          count: 1,
+          query: "most-earth-like",
+          source: "NASA Exoplanet Archive",
+        },
+      });
+    },
+  });
+
+  expect(result).toMatchObject({ cached: true, planet: { id: "hip-65426-b" } });
+});
+
 const starPayload = {
   data: {
     id: "alf-cma",
@@ -105,4 +127,19 @@ test("loads featured stars for an empty catalog query", async () => {
     },
   });
   expect(result).toMatchObject({ cached: true, stars: [{ name: "Sirius" }] });
+});
+
+test("chooses a surprise star from a curated SIMBAD result", async () => {
+  const result = await discoverRandomStar({
+    random: () => 0,
+    fetcher: async (input) => {
+      expect(input).toContain("category=closest-neighbors");
+      return Response.json({
+        data: [starPayload.data],
+        meta: { cached: false, count: 1, query: "closest-neighbors", source: "SIMBAD" },
+      });
+    },
+  });
+
+  expect(result).toMatchObject({ cached: false, star: { name: "Sirius" } });
 });

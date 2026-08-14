@@ -1,6 +1,6 @@
 import type { StarProfile } from "@exora/contracts";
 import { useEffect, useRef, useState } from "react";
-import { discoverStars, searchStars } from "../api-client.ts";
+import { discoverRandomStar, discoverStars, searchStars } from "../api-client.ts";
 import { formatNumber } from "../planet-utils.tsx";
 import { starKindLabel } from "../star-utils.ts";
 import { StarCatalogVisual } from "./CatalogVisual.tsx";
@@ -12,6 +12,7 @@ interface StarCatalogProps {
 }
 
 type SearchState = "idle" | "loading" | "ready" | "error";
+type SurpriseState = "idle" | "loading" | "error";
 
 const categories = [
   { id: "nearby-stars", icon: "⌖", label: "Nearby stars", note: "Within our stellar neighborhood" },
@@ -58,6 +59,7 @@ const collections = [
 export const StarCatalog = ({ onClose, onSelect, open }: StarCatalogProps) => {
   const dialogRef = useRef<HTMLDialogElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
+  const surpriseControllerRef = useRef<AbortController | null>(null);
   const [query, setQuery] = useState("");
   const [stars, setStars] = useState<StarProfile[]>([]);
   const [cached, setCached] = useState(false);
@@ -65,6 +67,7 @@ export const StarCatalog = ({ onClose, onSelect, open }: StarCatalogProps) => {
   const [activeCategory, setActiveCategory] = useState<string | null>(null);
   const [portalView, setPortalView] = useState<"collections" | "categories">("collections");
   const [resultView, setResultView] = useState<"gallery" | "list">("gallery");
+  const [surpriseState, setSurpriseState] = useState<SurpriseState>("idle");
 
   useEffect(() => {
     const dialog = dialogRef.current;
@@ -72,6 +75,8 @@ export const StarCatalog = ({ onClose, onSelect, open }: StarCatalogProps) => {
     if (open && !dialog.open) {
       dialog.showModal();
     } else if (!open && dialog.open) {
+      surpriseControllerRef.current?.abort();
+      setSurpriseState("idle");
       dialog.close();
     }
   }, [open]);
@@ -131,6 +136,23 @@ export const StarCatalog = ({ onClose, onSelect, open }: StarCatalogProps) => {
     (category) => category.id === activeCategory,
   )?.label;
 
+  const takeMeSomewhere = (): void => {
+    surpriseControllerRef.current?.abort();
+    const controller = new AbortController();
+    surpriseControllerRef.current = controller;
+    setSurpriseState("loading");
+    void discoverRandomStar({ signal: controller.signal })
+      .then((result) => {
+        if (controller.signal.aborted) return;
+        onSelect(result.star, result.cached);
+      })
+      .catch((error: unknown) => {
+        if (controller.signal.aborted) return;
+        console.error(error);
+        setSurpriseState("error");
+      });
+  };
+
   const status =
     searchState === "idle"
       ? "Choose a stellar family, or search SIMBAD by name."
@@ -167,6 +189,30 @@ export const StarCatalog = ({ onClose, onSelect, open }: StarCatalogProps) => {
           ×
         </button>
       </div>
+      <button
+        className="surprise-journey"
+        type="button"
+        disabled={surpriseState === "loading"}
+        onClick={takeMeSomewhere}
+      >
+        <span className="surprise-symbol" aria-hidden="true">
+          ✦
+        </span>
+        <span className="surprise-copy">
+          <small>TAKE ME SOMEWHERE</small>
+          <strong>
+            {surpriseState === "loading"
+              ? "Plotting a surprise course…"
+              : surpriseState === "error"
+                ? "Signal lost — try another jump"
+                : "Jump to a random stellar destination"}
+          </strong>
+        </span>
+        <span className="surprise-action">
+          {surpriseState === "loading" ? "SCANNING" : "SURPRISE ME"}{" "}
+          <span aria-hidden="true">↗</span>
+        </span>
+      </button>
       <div className="discovery-intro">
         <span>
           {portalView === "collections" ? "CURATED JOURNEYS" : "EXPLORE BY STELLAR FAMILY"}
