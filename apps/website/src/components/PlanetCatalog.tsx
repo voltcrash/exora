@@ -42,6 +42,37 @@ const categories = [
   },
 ] as const;
 
+const collections = [
+  {
+    id: "most-earth-like",
+    index: "01",
+    label: "Most Earth-like",
+    note: "Rocky worlds closest to Earth's scale and estimated temperature",
+    tag: "12 DESTINATIONS",
+  },
+  {
+    id: "nearest-rocky-worlds",
+    index: "02",
+    label: "Nearest rocky worlds",
+    note: "The closest small planets in our galactic neighborhood",
+    tag: "BY DISTANCE",
+  },
+  {
+    id: "recently-confirmed",
+    index: "03",
+    label: "Recently confirmed",
+    note: "The newest confirmed additions to the exoplanet archive",
+    tag: "LATEST FINDS",
+  },
+  {
+    id: "record-breakers",
+    index: "04",
+    label: "Record breakers",
+    note: "The hottest and most massive worlds in the known catalog",
+    tag: "EXTREME WORLDS",
+  },
+] as const;
+
 export const PlanetCatalog = ({ onClose, onSelect, open }: PlanetCatalogProps) => {
   const dialogRef = useRef<HTMLDialogElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
@@ -50,6 +81,7 @@ export const PlanetCatalog = ({ onClose, onSelect, open }: PlanetCatalogProps) =
   const [cached, setCached] = useState(false);
   const [searchState, setSearchState] = useState<SearchState>("idle");
   const [activeCategory, setActiveCategory] = useState<string | null>(null);
+  const [portalView, setPortalView] = useState<"collections" | "categories">("collections");
 
   useEffect(() => {
     const dialog = dialogRef.current;
@@ -123,13 +155,17 @@ export const PlanetCatalog = ({ onClose, onSelect, open }: PlanetCatalogProps) =
     };
   }, [activeCategory, query]);
 
-  const activeLabel = categories.find((category) => category.id === activeCategory)?.label;
+  const activeLabel = [...collections, ...categories].find(
+    (category) => category.id === activeCategory,
+  )?.label;
 
   const status =
     searchState === "idle"
       ? "Choose a discovery path, or search the archive by name."
       : searchState === "loading"
-        ? `Scanning NASA archive for “${query.trim()}”…`
+        ? query.trim()
+          ? `Scanning NASA archive for “${query.trim()}”…`
+          : `Opening ${activeLabel ?? "curated destinations"}…`
         : searchState === "error"
           ? "The archive signal is unavailable. Try again shortly."
           : `${planets.length} confirmed ${planets.length === 1 ? "world" : "worlds"} found${activeLabel ? ` in ${activeLabel}` : ""}${cached ? " · cached result" : ""}.`;
@@ -161,34 +197,79 @@ export const PlanetCatalog = ({ onClose, onSelect, open }: PlanetCatalogProps) =
         </button>
       </div>
       <div className="discovery-intro">
-        <span>EXPLORE BY PHENOMENON</span>
+        <span>{portalView === "collections" ? "CURATED JOURNEYS" : "EXPLORE BY PHENOMENON"}</span>
         <small>Large targets are designed for gaze, pointer, touch, or mouse</small>
       </div>
-      <div className="discovery-grid" aria-label="Planet discovery categories">
-        {categories.map((category) => (
-          <button
-            key={category.id}
-            className={`discovery-card${activeCategory === category.id ? " active" : ""}`}
-            type="button"
-            aria-pressed={activeCategory === category.id}
-            onClick={() => {
-              setQuery("");
-              setActiveCategory(category.id);
-            }}
-          >
-            <span className="discovery-icon" aria-hidden="true">
-              {category.icon}
-            </span>
-            <span>
-              <strong>{category.label}</strong>
-              <small>{category.note}</small>
-            </span>
-            <span className="discovery-arrow" aria-hidden="true">
-              ↗
-            </span>
-          </button>
-        ))}
+      <div className="discovery-tabs" role="tablist" aria-label="Planet discovery views">
+        <button
+          role="tab"
+          type="button"
+          aria-selected={portalView === "collections"}
+          onClick={() => setPortalView("collections")}
+        >
+          Curated collections
+        </button>
+        <button
+          role="tab"
+          type="button"
+          aria-selected={portalView === "categories"}
+          onClick={() => setPortalView("categories")}
+        >
+          World types
+        </button>
       </div>
+      {portalView === "collections" ? (
+        <div className="collection-grid" aria-label="Curated planet collections">
+          {collections.map((collection) => (
+            <button
+              key={collection.id}
+              className={`collection-card${activeCategory === collection.id ? " active" : ""}`}
+              type="button"
+              aria-pressed={activeCategory === collection.id}
+              onClick={() => {
+                setQuery("");
+                setActiveCategory(collection.id);
+              }}
+            >
+              <span className="collection-index">{collection.index}</span>
+              <span className="collection-copy">
+                <small>{collection.tag}</small>
+                <strong>{collection.label}</strong>
+                <span>{collection.note}</span>
+              </span>
+              <span className="collection-launch" aria-hidden="true">
+                EXPLORE ↗
+              </span>
+            </button>
+          ))}
+        </div>
+      ) : (
+        <div className="discovery-grid" aria-label="Planet discovery categories">
+          {categories.map((category) => (
+            <button
+              key={category.id}
+              className={`discovery-card${activeCategory === category.id ? " active" : ""}`}
+              type="button"
+              aria-pressed={activeCategory === category.id}
+              onClick={() => {
+                setQuery("");
+                setActiveCategory(category.id);
+              }}
+            >
+              <span className="discovery-icon" aria-hidden="true">
+                {category.icon}
+              </span>
+              <span>
+                <strong>{category.label}</strong>
+                <small>{category.note}</small>
+              </span>
+              <span className="discovery-arrow" aria-hidden="true">
+                ↗
+              </span>
+            </button>
+          ))}
+        </div>
+      )}
       <div className="discovery-divider">
         <span>OR SEARCH BY NAME</span>
       </div>

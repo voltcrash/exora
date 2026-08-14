@@ -136,6 +136,23 @@ export class PostgresPlanetRepository implements PlanetRepository {
         where: "discovery_year IS NOT NULL",
         order: "discovery_year DESC, name",
       },
+      "most-earth-like": {
+        where:
+          "radius_earth BETWEEN 0.75 AND 1.5 AND equilibrium_temperature_kelvin BETWEEN 210 AND 320",
+        order: "abs(radius_earth - 1), abs(equilibrium_temperature_kelvin - 255)",
+      },
+      "nearest-rocky-worlds": {
+        where: "radius_earth <= 2 AND distance_parsecs IS NOT NULL",
+        order: "distance_parsecs, radius_earth",
+      },
+      "recently-confirmed": {
+        where: "discovery_year IS NOT NULL",
+        order: "discovery_year DESC, name",
+      },
+      "record-breakers": {
+        where: "equilibrium_temperature_kelvin >= 1500 OR mass_jupiter >= 5",
+        order: "equilibrium_temperature_kelvin DESC NULLS LAST, mass_jupiter DESC NULLS LAST",
+      },
     };
     const filter = filters[category];
     const safeLimit = Math.max(1, Math.min(Math.trunc(limit), 24));

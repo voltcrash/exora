@@ -1319,15 +1319,26 @@ body[data-xr-status="unavailable"] .status-light {
 }
 
 .star-catalog .discovery-card:hover,
-.star-catalog .discovery-card.active {
+.star-catalog .discovery-card.active,
+.star-catalog .collection-card:hover,
+.star-catalog .collection-card.active {
   border-color: rgb(255 201 105 / 52%);
   background: rgb(255 190 80 / 7%);
   box-shadow: inset 0 0 28px rgb(255 178 52 / 4%);
 }
 
 .star-catalog .discovery-icon,
-.star-catalog .discovery-arrow {
+.star-catalog .discovery-arrow,
+.star-catalog .collection-index,
+.star-catalog .collection-copy small,
+.star-catalog .collection-launch {
   color: #ffc96f;
+}
+
+.star-catalog .discovery-tabs button[aria-selected="true"] {
+  border-color: rgb(255 201 105 / 42%);
+  color: #ffc96f;
+  background: rgb(255 190 80 / 8%);
 }
 
 .star-result-marker {
@@ -1409,6 +1420,131 @@ body[data-xr-status="unavailable"] .status-light {
   color: var(--faint);
   font-size: 7px;
   letter-spacing: 0.03em;
+}
+
+.discovery-tabs {
+  display: flex;
+  gap: 8px;
+  padding: 0 26px 12px;
+}
+
+.discovery-tabs button {
+  min-height: 38px;
+  padding: 0 16px;
+  border: 1px solid rgb(229 244 247 / 10%);
+  border-radius: 999px;
+  color: var(--faint);
+  background: rgb(255 255 255 / 2%);
+  cursor: pointer;
+  font-family: var(--mono);
+  font-size: 7px;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+}
+
+.discovery-tabs button[aria-selected="true"] {
+  border-color: rgb(139 230 234 / 42%);
+  color: var(--cyan);
+  background: rgb(139 230 234 / 8%);
+}
+
+.discovery-tabs button:focus-visible,
+.collection-card:focus-visible {
+  outline: 2px solid var(--cyan);
+  outline-offset: 3px;
+}
+
+.collection-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+  padding: 0 26px;
+}
+
+.collection-card {
+  min-height: 130px;
+  display: grid;
+  grid-template-columns: 45px 1fr auto;
+  align-items: stretch;
+  gap: 16px;
+  padding: 18px;
+  overflow: hidden;
+  position: relative;
+  border: 1px solid rgb(229 244 247 / 11%);
+  border-radius: 18px;
+  color: var(--ink);
+  background:
+    linear-gradient(125deg, rgb(139 230 234 / 8%), transparent 42%),
+    radial-gradient(circle at 90% 10%, rgb(139 230 234 / 8%), transparent 38%),
+    rgb(255 255 255 / 2%);
+  cursor: pointer;
+  text-align: left;
+  transition:
+    border-color 160ms ease,
+    background 160ms ease,
+    transform 160ms ease,
+    box-shadow 160ms ease;
+}
+
+.collection-card::after {
+  width: 90px;
+  height: 90px;
+  position: absolute;
+  right: -42px;
+  bottom: -50px;
+  border: 1px solid rgb(139 230 234 / 10%);
+  border-radius: 50%;
+  content: "";
+}
+
+.collection-card:hover,
+.collection-card.active {
+  border-color: rgb(139 230 234 / 52%);
+  background: rgb(139 230 234 / 7%);
+  box-shadow: inset 0 0 36px rgb(139 230 234 / 5%);
+  transform: translateY(-2px);
+}
+
+.collection-index {
+  color: var(--cyan);
+  font-family: var(--mono);
+  font-size: 10px;
+  opacity: 0.62;
+}
+
+.collection-copy {
+  display: grid;
+  align-content: center;
+  gap: 7px;
+}
+
+.collection-copy small {
+  color: var(--cyan);
+  font-family: var(--mono);
+  font-size: 7px;
+  letter-spacing: 0.08em;
+}
+
+.collection-copy strong {
+  font-size: clamp(15px, 1.8vw, 20px);
+  font-weight: 500;
+  letter-spacing: -0.025em;
+}
+
+.collection-copy > span {
+  max-width: 300px;
+  color: var(--faint);
+  font-family: var(--mono);
+  font-size: 7px;
+  line-height: 1.5;
+}
+
+.collection-launch {
+  align-self: end;
+  color: var(--cyan);
+  font-family: var(--mono);
+  font-size: 7px;
+  white-space: nowrap;
 }
 
 .discovery-grid {
@@ -2028,6 +2164,32 @@ body[data-xr-status="unavailable"] .status-light {
     padding: 17px 16px 11px;
   }
 
+  .discovery-tabs {
+    padding: 0 16px 10px;
+  }
+
+  .discovery-tabs button {
+    min-height: 42px;
+    flex: 1;
+  }
+
+  .collection-grid {
+    grid-template-columns: 1fr;
+    gap: 8px;
+    padding: 0 16px;
+  }
+
+  .collection-card {
+    min-height: 96px;
+    grid-template-columns: 28px 1fr auto;
+    gap: 10px;
+    padding: 14px;
+  }
+
+  .collection-copy > span {
+    display: none;
+  }
+
   .discovery-intro small {
     display: none;
   }
@@ -2107,6 +2269,7 @@ body[data-xr-status="unavailable"] .status-light {
   .star-trigger,
   .catalog-result,
   .discovery-card,
+  .collection-card,
   .enter-vr,
   .loading-screen,
   .approach-status,

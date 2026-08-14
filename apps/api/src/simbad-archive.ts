@@ -77,7 +77,11 @@ export type StarDiscoveryCategory =
   | "giants"
   | "binary-systems"
   | "variable-stars"
-  | "stellar-remnants";
+  | "stellar-remnants"
+  | "closest-neighbors"
+  | "solar-analogs"
+  | "brightest-stars"
+  | "stellar-extremes";
 
 export const STAR_DISCOVERY_CATEGORIES = new Set<StarDiscoveryCategory>([
   "nearby-stars",
@@ -88,31 +92,55 @@ export const STAR_DISCOVERY_CATEGORIES = new Set<StarDiscoveryCategory>([
   "binary-systems",
   "variable-stars",
   "stellar-remnants",
+  "closest-neighbors",
+  "solar-analogs",
+  "brightest-stars",
+  "stellar-extremes",
 ]);
 
 const STAR_DISCOVERY_FILTERS: Record<StarDiscoveryCategory, { order: string; where: string }> = {
-  "nearby-stars": { where: "b.plx_value >= 50", order: "b.plx_value desc" },
+  "nearby-stars": {
+    where: "b.plx_value >= 50 and b.sp_type is not null",
+    order: "plx_value desc",
+  },
   "sun-like": {
     where: "(b.sp_type like 'F%V%' or b.sp_type like 'G%V%')",
-    order: 'f."V"',
+    order: '"V"',
   },
-  "red-dwarfs": { where: "b.sp_type like 'M%V%'", order: "b.plx_value desc" },
+  "red-dwarfs": { where: "b.sp_type like 'M%V%'", order: "plx_value desc" },
   "blue-stars": {
     where: "(b.sp_type like 'O%' or b.sp_type like 'B%')",
-    order: 'f."V"',
+    order: '"V"',
   },
   giants: {
     where: "(b.sp_type like '%III%' or b.sp_type like '%II%' or b.sp_type like '%I%')",
-    order: 'f."V"',
+    order: '"V"',
   },
   "binary-systems": {
     where: "(b.otype like '%**%' or b.otype like 'SB%' or b.otype like 'EB%')",
-    order: "b.plx_value desc",
+    order: "plx_value desc",
   },
-  "variable-stars": { where: "b.otype like 'V*%'", order: 'f."V"' },
+  "variable-stars": { where: "b.otype like 'V*%'", order: '"V"' },
   "stellar-remnants": {
     where: "(b.otype like 'WD%' or b.otype like 'Psr%' or b.sp_type like 'D%')",
-    order: "b.plx_value desc",
+    order: "plx_value desc",
+  },
+  "closest-neighbors": {
+    where: "b.plx_value >= 50 and b.sp_type is not null",
+    order: "plx_value desc",
+  },
+  "solar-analogs": {
+    where:
+      "(b.sp_type like 'G1%V%' or b.sp_type like 'G2%V%' or b.sp_type like 'G3%V%') and b.plx_value > 0",
+    order: "plx_value desc",
+  },
+  "brightest-stars": {
+    where: 'f."V" is not null and b.sp_type is not null',
+    order: '"V"',
+  },
+  "stellar-extremes": {
+    where: "(b.sp_type like 'O%' or b.sp_type like 'B%I%')",
+    order: '"V"',
   },
 };
 

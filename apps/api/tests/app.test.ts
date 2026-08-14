@@ -93,6 +93,8 @@ test("returns category-driven planet and star discovery results", async () => {
   const app = createApp({ repository, starRepository });
   const planetResponse = await app.request("/api/planets?category=earth-like");
   const starResponse = await app.request("/api/stars?category=nearby-stars");
+  const planetCollectionResponse = await app.request("/api/planets?category=most-earth-like");
+  const starCollectionResponse = await app.request("/api/stars?category=solar-analogs");
 
   expect(planetResponse.status).toBe(200);
   expect(await planetResponse.json()).toMatchObject({
@@ -103,6 +105,14 @@ test("returns category-driven planet and star discovery results", async () => {
   expect(await starResponse.json()).toMatchObject({
     data: [{ id: "alf-cma" }],
     meta: { query: "nearby-stars" },
+  });
+  expect(planetCollectionResponse.status).toBe(200);
+  expect(await planetCollectionResponse.json()).toMatchObject({
+    meta: { query: "most-earth-like" },
+  });
+  expect(starCollectionResponse.status).toBe(200);
+  expect(await starCollectionResponse.json()).toMatchObject({
+    meta: { query: "solar-analogs" },
   });
 });
 

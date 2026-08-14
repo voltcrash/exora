@@ -70,7 +70,11 @@ export type PlanetDiscoveryCategory =
   | "frozen-worlds"
   | "extreme-weather"
   | "potentially-habitable"
-  | "recently-discovered";
+  | "recently-discovered"
+  | "most-earth-like"
+  | "nearest-rocky-worlds"
+  | "recently-confirmed"
+  | "record-breakers";
 
 export const PLANET_DISCOVERY_CATEGORIES = new Set<PlanetDiscoveryCategory>([
   "earth-like",
@@ -81,6 +85,10 @@ export const PLANET_DISCOVERY_CATEGORIES = new Set<PlanetDiscoveryCategory>([
   "extreme-weather",
   "potentially-habitable",
   "recently-discovered",
+  "most-earth-like",
+  "nearest-rocky-worlds",
+  "recently-confirmed",
+  "record-breakers",
 ]);
 
 const DISCOVERY_FILTERS: Record<PlanetDiscoveryCategory, { order: string; where: string }> = {
@@ -107,6 +115,22 @@ const DISCOVERY_FILTERS: Record<PlanetDiscoveryCategory, { order: string; where:
     order: "abs(pl_rade-1), abs(pl_eqt-255)",
   },
   "recently-discovered": { where: "disc_year is not null", order: "disc_year desc, pl_name" },
+  "most-earth-like": {
+    where: "pl_rade between 0.75 and 1.5 and pl_eqt between 210 and 320",
+    order: "abs(pl_rade-1), abs(pl_eqt-255)",
+  },
+  "nearest-rocky-worlds": {
+    where: "pl_rade <= 2 and sy_dist is not null",
+    order: "sy_dist, pl_rade",
+  },
+  "recently-confirmed": {
+    where: "disc_year is not null",
+    order: "disc_year desc, pl_name",
+  },
+  "record-breakers": {
+    where: "pl_eqt >= 1500 or pl_bmassj >= 5",
+    order: "pl_eqt desc, pl_bmassj desc",
+  },
 };
 
 export interface NasaPlanetRepositoryOptions {

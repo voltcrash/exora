@@ -23,6 +23,37 @@ const categories = [
   { id: "stellar-remnants", icon: "⊙", label: "Stellar remnants", note: "White dwarfs & pulsars" },
 ] as const;
 
+const collections = [
+  {
+    id: "closest-neighbors",
+    index: "01",
+    label: "Closest to home",
+    note: "Our nearest stellar neighbors, ordered by measured parallax",
+    tag: "LOCAL STARS",
+  },
+  {
+    id: "solar-analogs",
+    index: "02",
+    label: "The Sun's cousins",
+    note: "Nearby main-sequence stars with Sun-like spectra",
+    tag: "SOLAR ANALOGS",
+  },
+  {
+    id: "brightest-stars",
+    index: "03",
+    label: "Brightest in our sky",
+    note: "The most visually brilliant stellar destinations from Earth",
+    tag: "ICONIC LIGHTS",
+  },
+  {
+    id: "stellar-extremes",
+    index: "04",
+    label: "Stellar extremes",
+    note: "Rare, massive and extraordinarily hot blue stars",
+    tag: "COSMIC TITANS",
+  },
+] as const;
+
 export const StarCatalog = ({ onClose, onSelect, open }: StarCatalogProps) => {
   const dialogRef = useRef<HTMLDialogElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
@@ -31,6 +62,7 @@ export const StarCatalog = ({ onClose, onSelect, open }: StarCatalogProps) => {
   const [cached, setCached] = useState(false);
   const [searchState, setSearchState] = useState<SearchState>("idle");
   const [activeCategory, setActiveCategory] = useState<string | null>(null);
+  const [portalView, setPortalView] = useState<"collections" | "categories">("collections");
 
   useEffect(() => {
     const dialog = dialogRef.current;
@@ -93,7 +125,9 @@ export const StarCatalog = ({ onClose, onSelect, open }: StarCatalogProps) => {
     };
   }, [activeCategory, open, query]);
 
-  const activeLabel = categories.find((category) => category.id === activeCategory)?.label;
+  const activeLabel = [...collections, ...categories].find(
+    (category) => category.id === activeCategory,
+  )?.label;
 
   const status =
     searchState === "idle"
@@ -132,34 +166,81 @@ export const StarCatalog = ({ onClose, onSelect, open }: StarCatalogProps) => {
         </button>
       </div>
       <div className="discovery-intro">
-        <span>EXPLORE BY STELLAR FAMILY</span>
+        <span>
+          {portalView === "collections" ? "CURATED JOURNEYS" : "EXPLORE BY STELLAR FAMILY"}
+        </span>
         <small>Large targets are designed for gaze, pointer, touch, or mouse</small>
       </div>
-      <div className="discovery-grid" aria-label="Star discovery categories">
-        {categories.map((category) => (
-          <button
-            key={category.id}
-            className={`discovery-card${activeCategory === category.id ? " active" : ""}`}
-            type="button"
-            aria-pressed={activeCategory === category.id}
-            onClick={() => {
-              setQuery("");
-              setActiveCategory(category.id);
-            }}
-          >
-            <span className="discovery-icon" aria-hidden="true">
-              {category.icon}
-            </span>
-            <span>
-              <strong>{category.label}</strong>
-              <small>{category.note}</small>
-            </span>
-            <span className="discovery-arrow" aria-hidden="true">
-              ↗
-            </span>
-          </button>
-        ))}
+      <div className="discovery-tabs" role="tablist" aria-label="Star discovery views">
+        <button
+          role="tab"
+          type="button"
+          aria-selected={portalView === "collections"}
+          onClick={() => setPortalView("collections")}
+        >
+          Curated collections
+        </button>
+        <button
+          role="tab"
+          type="button"
+          aria-selected={portalView === "categories"}
+          onClick={() => setPortalView("categories")}
+        >
+          Star types
+        </button>
       </div>
+      {portalView === "collections" ? (
+        <div className="collection-grid" aria-label="Curated star collections">
+          {collections.map((collection) => (
+            <button
+              key={collection.id}
+              className={`collection-card${activeCategory === collection.id ? " active" : ""}`}
+              type="button"
+              aria-pressed={activeCategory === collection.id}
+              onClick={() => {
+                setQuery("");
+                setActiveCategory(collection.id);
+              }}
+            >
+              <span className="collection-index">{collection.index}</span>
+              <span className="collection-copy">
+                <small>{collection.tag}</small>
+                <strong>{collection.label}</strong>
+                <span>{collection.note}</span>
+              </span>
+              <span className="collection-launch" aria-hidden="true">
+                EXPLORE ↗
+              </span>
+            </button>
+          ))}
+        </div>
+      ) : (
+        <div className="discovery-grid" aria-label="Star discovery categories">
+          {categories.map((category) => (
+            <button
+              key={category.id}
+              className={`discovery-card${activeCategory === category.id ? " active" : ""}`}
+              type="button"
+              aria-pressed={activeCategory === category.id}
+              onClick={() => {
+                setQuery("");
+                setActiveCategory(category.id);
+              }}
+            >
+              <span className="discovery-icon" aria-hidden="true">
+                {category.icon}
+              </span>
+              <span>
+                <strong>{category.label}</strong>
+                <small>{category.note}</small>
+              </span>
+              <span className="discovery-arrow" aria-hidden="true">
+                ↗
+              </span>
+            </button>
+          ))}
+        </div>
+      )}
       <div className="discovery-divider">
         <span>OR SEARCH BY NAME</span>
       </div>
