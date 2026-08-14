@@ -172,6 +172,20 @@ export class PostgresPlanetRepository implements PlanetRepository {
     return { cached: true, value: rows[0] ? toPlanet(rows[0]) : null };
   }
 
+  async findByHost(hostStar: string, limit: number): Promise<RepositoryResult<ExoplanetProfile[]>> {
+    const safeLimit = Math.max(1, Math.min(Math.trunc(limit), 24));
+    const rows = await this.#database.query<PlanetRow>(
+      `SELECT ${PLANET_COLUMNS}
+       FROM exoplanets
+       WHERE lower(host_star) = lower($1)
+       ORDER BY name
+       LIMIT $2`,
+      [hostStar.trim().slice(0, 100), safeLimit],
+    );
+
+    return { cached: true, value: rows.map(toPlanet) };
+  }
+
   async search(query: string, limit: number): Promise<RepositoryResult<ExoplanetProfile[]>> {
     const normalizedQuery = query.trim().slice(0, 80);
     const safeLimit = Math.max(1, Math.min(Math.trunc(limit), 24));

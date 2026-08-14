@@ -52,6 +52,26 @@ export const createApp = ({
   app.get("/api/planets", async (context) => {
     const query = context.req.query("q")?.trim() ?? "";
     const category = context.req.query("category")?.trim() ?? "";
+    const hostStar = context.req.query("host")?.trim() ?? "";
+
+    if (hostStar) {
+      if (hostStar.length > 100) {
+        return context.json(apiError("INVALID_REQUEST", "Host star name is invalid."), 400);
+      }
+      const requestedLimit = Number.parseInt(context.req.query("limit") ?? "12", 10);
+      const limit = Number.isFinite(requestedLimit) ? requestedLimit : 12;
+      const result = await repository.findByHost(hostStar, limit);
+      context.header("Cache-Control", "public, max-age=900, stale-while-revalidate=21600");
+      return context.json<PlanetSearchResponse>({
+        data: result.value,
+        meta: {
+          cached: result.cached,
+          count: result.value.length,
+          query: hostStar,
+          source: "NASA Exoplanet Archive",
+        },
+      });
+    }
 
     if (category) {
       if (!PLANET_DISCOVERY_CATEGORIES.has(category as PlanetDiscoveryCategory)) {

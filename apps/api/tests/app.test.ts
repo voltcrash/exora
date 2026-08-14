@@ -36,6 +36,7 @@ const planet: ExoplanetProfile = {
 const repository: PlanetRepository = {
   discover: async () => ({ cached: true, value: [planet] }),
   findByName: async () => ({ cached: false, value: planet }),
+  findByHost: async () => ({ cached: true, value: [planet] }),
   search: async () => ({ cached: true, value: [planet] }),
 };
 
@@ -86,6 +87,18 @@ test("returns normalized planet search results", async () => {
   expect(payload).toMatchObject({
     data: [{ id: "hip-65426-b" }],
     meta: { cached: true, count: 1, query: "hip" },
+  });
+});
+
+test("returns confirmed planets for a host star", async () => {
+  const response = await createApp({ repository }).request(
+    "/api/planets?host=HIP%2065426&limit=12",
+  );
+
+  expect(response.status).toBe(200);
+  expect(await response.json()).toMatchObject({
+    data: [{ hostStar: "HIP 65426", id: "hip-65426-b" }],
+    meta: { cached: true, count: 1, query: "HIP 65426" },
   });
 });
 

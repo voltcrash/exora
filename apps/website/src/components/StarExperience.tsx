@@ -1,5 +1,6 @@
+import type { ExoplanetProfile } from "@exora/contracts";
 import { useEffect, useRef, useState } from "react";
-import type { StarLoadResult } from "../api-client.ts";
+import { loadPlanetsByHost, type StarLoadResult } from "../api-client.ts";
 import type { StarSceneExperience } from "../star-scene.ts";
 import { formatNumber } from "../planet-utils.tsx";
 import { deriveStarVisual, starKindLabel, starSummary } from "../star-utils.ts";
@@ -9,7 +10,9 @@ interface StarExperienceProps {
   onOpenBuilder: () => void;
   onOpenPlanets: () => void;
   onOpenStars: () => void;
+  onSelectPlanet: (planet: ExoplanetProfile, cached: boolean) => void;
   result: StarLoadResult;
+  systemHostName: string | null;
 }
 
 const xrCopy: Record<XrStatus, { button: string; label: string }> = {
@@ -24,7 +27,9 @@ export const StarExperience = ({
   onOpenBuilder,
   onOpenPlanets,
   onOpenStars,
+  onSelectPlanet,
   result,
+  systemHostName,
 }: StarExperienceProps) => {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const experienceRef = useRef<StarSceneExperience | null>(null);
@@ -32,10 +37,49 @@ export const StarExperience = ({
   const [qualityTier, setQualityTier] = useState("AUTO");
   const [sceneState, setSceneState] = useState<"loading" | "ready" | "error">("loading");
   const [xrStatus, setXrStatus] = useState<XrStatus>("checking");
+  const [systemPlanets, setSystemPlanets] = useState<ExoplanetProfile[]>([]);
+  const [systemCached, setSystemCached] = useState(false);
+  const [systemState, setSystemState] = useState<"idle" | "loading" | "ready" | "error">("idle");
   const star = result.star;
   const observation = star.observation;
   const visual = deriveStarVisual(star);
   const custom = result.mode === "custom";
+
+  useEffect(() => {
+    if (custom) {
+      setSystemPlanets([]);
+      setSystemState("idle");
+      return;
+    }
+    const controller = new AbortController();
+    const aliases = [systemHostName, star.name, star.catalogName.replace(/^\*\s*/, "")].filter(
+      (name, index, names): name is string => Boolean(name) && names.indexOf(name) === index,
+    );
+    setSystemState("loading");
+    void (async () => {
+      for (const alias of aliases) {
+        const response = await loadPlanetsByHost(alias, { signal: controller.signal });
+        if (response.planets.length > 0) return response;
+      }
+      return null;
+    })()
+      .then((response) => {
+        if (controller.signal.aborted) return;
+        setSystemPlanets(response?.planets ?? []);
+        setSystemCached(response?.cached ?? false);
+        setSystemState("ready");
+      })
+      .catch(() => {
+        if (!controller.signal.aborted) setSystemState("error");
+      });
+    return () => controller.abort();
+  }, [custom, star.catalogName, star.name, systemHostName]);
+
+  useEffect(() => {
+    experienceRef.current?.setPlanetTargets(systemPlanets, (planet) =>
+      onSelectPlanet(planet, systemCached),
+    );
+  }, [onSelectPlanet, sceneState, systemCached, systemPlanets]);
 
   useEffect(() => {
     document.body.dataset.xrStatus = xrStatus;
@@ -62,6 +106,9 @@ export const StarExperience = ({
       .then((experience) => {
         if (disposed) return experience.dispose();
         experienceRef.current = experience;
+        experience.setPlanetTargets(systemPlanets, (planet) =>
+          onSelectPlanet(planet, systemCached),
+        );
         setQualityTier(experience.qualityTier.toUpperCase());
         fpsTimer = window.setInterval(
           () => setFps(Math.round(experience.getFps()).toString()),
@@ -159,6 +206,40 @@ export const StarExperience = ({
               ? "USER-DESIGNED PROCEDURAL STAR"
               : "STELLAR APPEARANCE INFERRED FROM SPECTRAL CLASS"}
           </p>
+          {!custom ? (
+            <section className="known-worlds" aria-labelledby="known-worlds-title">
+              <div>
+                <p>CONNECTED SYSTEM</p>
+                <h2 id="known-worlds-title">Known worlds</h2>
+              </div>
+              {systemState === "loading" ? (
+                <small role="status">QUERYING NASA ARCHIVE…</small>
+              ) : null}
+              {systemState === "error" ? (
+                <small role="status">SYSTEM LINK UNAVAILABLE</small>
+              ) : null}
+              {systemState === "ready" && systemPlanets.length === 0 ? (
+                <small>NO CONFIRMED WORLDS LINKED</small>
+              ) : null}
+              {systemPlanets.length > 0 ? (
+                <div className="known-world-list">
+                  {systemPlanets.map((planet) => (
+                    <button
+                      key={planet.id}
+                      type="button"
+                      onClick={() => onSelectPlanet(planet, systemCached)}
+                    >
+                      <span className={`known-world-orb ${planet.kind}`} aria-hidden="true" />
+                      <span>
+                        <strong>{planet.name}</strong>
+                        <small>{planet.kind.replace("-", " ")} · VISIT ↗</small>
+                      </span>
+                    </button>
+                  ))}
+                </div>
+              ) : null}
+            </section>
+          ) : null}
         </section>
 
         <aside

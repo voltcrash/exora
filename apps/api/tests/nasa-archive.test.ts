@@ -59,6 +59,24 @@ test("caches identical TAP queries", async () => {
   expect(requests).toBe(1);
 });
 
+test("queries confirmed worlds by their exact host system", async () => {
+  let requestedUrl = "";
+  const repository = new NasaPlanetRepository({
+    fetcher: async (input) => {
+      requestedUrl =
+        typeof input === "string" ? input : input instanceof URL ? input.href : input.url;
+      return Response.json([nasaRow]);
+    },
+  });
+
+  const result = await repository.findByHost("HIP 65426", 50);
+  const query = new URL(requestedUrl).searchParams.get("query");
+
+  expect(result.value).toHaveLength(1);
+  expect(query).toContain("top 24");
+  expect(query).toContain("lower(hostname)=lower('HIP 65426')");
+});
+
 test("loads the complete normalized catalog for synchronization", async () => {
   let requestedUrl = "";
   const repository = new NasaPlanetRepository({

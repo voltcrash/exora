@@ -1,4 +1,6 @@
 import { ArcRotateCamera } from "@babylonjs/core/Cameras/arcRotateCamera.js";
+import { ActionManager } from "@babylonjs/core/Actions/actionManager.js";
+import { ExecuteCodeAction } from "@babylonjs/core/Actions/directActions.js";
 import "@babylonjs/core/Culling/ray.js";
 import { Engine } from "@babylonjs/core/Engines/engine.js";
 import { DirectionalLight } from "@babylonjs/core/Lights/directionalLight.js";
@@ -639,6 +641,7 @@ export interface PlanetExperience {
 interface PlanetExperienceOptions {
   canvas: HTMLCanvasElement;
   onFirstFrame: () => void;
+  onSelectHostStar?: () => void;
   onViewModeChange: (mode: ViewMode) => void;
   onXrStatusChange: (status: XrStatus) => void;
   recipe: WorldRecipe;
@@ -699,6 +702,7 @@ const createHostStar = (
   recipe: WorldRecipe,
   profile: RenderQualityProfile,
   parent: TransformNode,
+  onSelectHostStar?: () => void,
 ): AbstractMesh[] => {
   const starPosition = PLANET_POSITION.add(new Vector3(-18, 11, 32));
   const star = MeshBuilder.CreateSphere(
@@ -711,7 +715,7 @@ const createHostStar = (
   );
   star.parent = parent;
   star.position.copyFrom(starPosition);
-  star.isPickable = false;
+  star.isPickable = Boolean(onSelectHostStar);
 
   const starMaterial = new StandardMaterial("hostStarMaterial", scene);
   starMaterial.disableLighting = true;
@@ -730,7 +734,7 @@ const createHostStar = (
   );
   corona.parent = parent;
   corona.position.copyFrom(starPosition);
-  corona.isPickable = false;
+  corona.isPickable = Boolean(onSelectHostStar);
   corona.renderingGroupId = 1;
   const coronaMaterial = new StandardMaterial("hostStarCoronaMaterial", scene);
   coronaMaterial.disableLighting = true;
@@ -740,6 +744,15 @@ const createHostStar = (
   coronaMaterial.disableDepthWrite = true;
   coronaMaterial.freeze();
   corona.material = coronaMaterial;
+
+  if (onSelectHostStar) {
+    for (const target of [star, corona]) {
+      target.actionManager = new ActionManager(scene);
+      target.actionManager.registerAction(
+        new ExecuteCodeAction(ActionManager.OnPickTrigger, onSelectHostStar),
+      );
+    }
+  }
 
   return [star, corona];
 };
@@ -1363,6 +1376,7 @@ const createSurfaceEnvironment = (
   scene: Scene,
   recipe: WorldRecipe,
   profile: RenderQualityProfile,
+  onSelectHostStar?: () => void,
 ): { cloudLayers: Mesh[]; meshes: AbstractMesh[]; root: TransformNode; sky: ShaderMaterial } => {
   const root = new TransformNode("surfaceEnvironment", scene);
   const meshes: AbstractMesh[] = [];
@@ -1543,7 +1557,7 @@ const createSurfaceEnvironment = (
   );
   surfaceStar.parent = root;
   surfaceStar.position.set(-8, 3.8, 48);
-  surfaceStar.isPickable = false;
+  surfaceStar.isPickable = Boolean(onSelectHostStar);
   surfaceStar.applyFog = false;
   surfaceStar.renderingGroupId = 1;
   const surfaceStarMaterial = new StandardMaterial("surfaceHostStarMaterial", scene);
@@ -1564,7 +1578,7 @@ const createSurfaceEnvironment = (
   );
   surfaceStarHalo.parent = root;
   surfaceStarHalo.position.copyFrom(surfaceStar.position);
-  surfaceStarHalo.isPickable = false;
+  surfaceStarHalo.isPickable = Boolean(onSelectHostStar);
   surfaceStarHalo.applyFog = false;
   surfaceStarHalo.renderingGroupId = 1;
   const surfaceStarHaloMaterial = new StandardMaterial("surfaceHostStarHaloMaterial", scene);
@@ -1576,6 +1590,15 @@ const createSurfaceEnvironment = (
   surfaceStarHaloMaterial.freeze();
   surfaceStarHalo.material = surfaceStarHaloMaterial;
   meshes.push(surfaceStarHalo);
+
+  if (onSelectHostStar) {
+    for (const target of [surfaceStar, surfaceStarHalo]) {
+      target.actionManager = new ActionManager(scene);
+      target.actionManager.registerAction(
+        new ExecuteCodeAction(ActionManager.OnPickTrigger, onSelectHostStar),
+      );
+    }
+  }
 
   for (const mesh of meshes) {
     mesh.isVisible = false;
@@ -1600,6 +1623,7 @@ const setEnvironmentEnabled = (
 export const createPlanetExperience = ({
   canvas,
   onFirstFrame,
+  onSelectHostStar,
   onViewModeChange,
   onXrStatusChange,
   recipe,
@@ -1659,8 +1683,8 @@ export const createPlanetExperience = ({
     ringSystem,
     shader,
   } = createPlanet(scene, recipe, profile);
-  orbitalMeshes.push(...createHostStar(scene, recipe, profile, orbitalRoot));
-  const surfaceEnvironment = createSurfaceEnvironment(scene, recipe, profile);
+  orbitalMeshes.push(...createHostStar(scene, recipe, profile, orbitalRoot, onSelectHostStar));
+  const surfaceEnvironment = createSurfaceEnvironment(scene, recipe, profile, onSelectHostStar);
 
   let elapsedSeconds = 0;
   let qualitySampleSeconds = 0;

@@ -8,6 +8,7 @@ interface PlanetExperienceProps {
   onOpenCatalog: () => void;
   onOpenBuilder: () => void;
   onOpenStars: () => void;
+  onSelectHostStar: (hostStar: string) => Promise<boolean>;
   recipeOverride: WorldRecipe | null;
   result: PlanetLoadResult;
 }
@@ -24,6 +25,7 @@ export const PlanetExperience = ({
   onOpenBuilder,
   onOpenCatalog,
   onOpenStars,
+  onSelectHostStar,
   recipeOverride,
   result,
 }: PlanetExperienceProps) => {
@@ -34,12 +36,20 @@ export const PlanetExperience = ({
   const [sceneState, setSceneState] = useState<"loading" | "ready" | "error">("loading");
   const [viewMode, setViewMode] = useState<ViewMode>("orbit");
   const [xrStatus, setXrStatus] = useState<XrStatus>("checking");
+  const [hostJumpState, setHostJumpState] = useState<"idle" | "loading" | "error">("idle");
   const planet = result.planet;
   const observation = planet.observation;
   const recipe = useMemo(
     () => recipeOverride ?? deriveWorldRecipe(planet),
     [planet, recipeOverride],
   );
+
+  const openHostStar = async (): Promise<void> => {
+    if (result.mode === "custom" || hostJumpState === "loading") return;
+    setHostJumpState("loading");
+    const found = await onSelectHostStar(planet.hostStar);
+    if (!found) setHostJumpState("error");
+  };
 
   useEffect(() => {
     document.body.dataset.xrStatus = xrStatus;
@@ -63,6 +73,7 @@ export const PlanetExperience = ({
           recipe,
           onViewModeChange: setViewMode,
           onXrStatusChange: setXrStatus,
+          onSelectHostStar: result.mode === "custom" ? undefined : () => void openHostStar(),
           onFirstFrame: () => {
             if (!disposed) setSceneState("ready");
           },
@@ -91,7 +102,7 @@ export const PlanetExperience = ({
       experienceRef.current?.dispose();
       experienceRef.current = null;
     };
-  }, [planet.id, recipe]);
+  }, [planet.id, recipe, result.mode, onSelectHostStar]);
 
   const massUnit =
     observation.massJupiter !== null ? (
@@ -256,9 +267,22 @@ export const PlanetExperience = ({
               </dd>
             </div>
           </dl>
-          <div className="telemetry-detail">
+          <div className="telemetry-detail host-system-detail">
             <span>HOST SYSTEM</span>
-            <strong>{result.mode === "custom" ? "USER DEFINED" : planet.hostStar}</strong>
+            {result.mode === "custom" ? (
+              <strong>USER DEFINED</strong>
+            ) : (
+              <button
+                className="system-jump"
+                type="button"
+                disabled={hostJumpState === "loading"}
+                onClick={() => void openHostStar()}
+              >
+                <span aria-hidden="true">☀</span>
+                <strong>{planet.hostStar}</strong>
+                <small>{hostJumpState === "loading" ? "RESOLVING…" : "VISIT STAR ↗"}</small>
+              </button>
+            )}
             <small>
               {observation.hostSpectralType ?? "Spectrum unavailable"}
               {observation.hostTemperatureKelvin === null
@@ -268,6 +292,11 @@ export const PlanetExperience = ({
                 ? ""
                 : ` · ${formatNumber(observation.hostRadiusSolar, 2)} R☉`}
             </small>
+            {hostJumpState === "error" ? (
+              <small className="system-jump-error" role="status">
+                SIMBAD could not resolve this host name.
+              </small>
+            ) : null}
           </div>
           <div className="telemetry-detail">
             <span>ATMOSPHERE MODEL</span>

@@ -1,4 +1,6 @@
 import { ArcRotateCamera } from "@babylonjs/core/Cameras/arcRotateCamera.js";
+import { ActionManager } from "@babylonjs/core/Actions/actionManager.js";
+import { ExecuteCodeAction } from "@babylonjs/core/Actions/directActions.js";
 import { Engine } from "@babylonjs/core/Engines/engine.js";
 import { GlowLayer } from "@babylonjs/core/Layers/glowLayer.js";
 import { Color3, Color4 } from "@babylonjs/core/Maths/math.color.js";
@@ -9,12 +11,13 @@ import { StandardMaterial } from "@babylonjs/core/Materials/standardMaterial.js"
 import { Mesh } from "@babylonjs/core/Meshes/mesh.js";
 import { MeshBuilder } from "@babylonjs/core/Meshes/meshBuilder.js";
 import { VertexData } from "@babylonjs/core/Meshes/mesh.vertexData.js";
+import { TransformNode } from "@babylonjs/core/Meshes/transformNode.js";
 import { Scene, ScenePerformancePriority } from "@babylonjs/core/scene.js";
 import { WebXRDefaultExperience } from "@babylonjs/core/XR/webXRDefaultExperience.js";
 import "@babylonjs/core/XR/features/WebXRControllerPointerSelection.js";
 import "@babylonjs/core/XR/features/WebXRHandTracking.js";
 import { WebXRState } from "@babylonjs/core/XR/webXRTypes.js";
-import type { StarProfile } from "@exora/contracts";
+import type { ExoplanetProfile, StarProfile } from "@exora/contracts";
 import { deriveRenderQuality, type RenderQualityTier } from "./render-quality.ts";
 import { deriveStarVisual } from "./star-utils.ts";
 import type { XrStatus } from "./planet-scene.ts";
@@ -87,6 +90,10 @@ export interface StarSceneExperience {
   enterVr: () => Promise<void>;
   getFps: () => number;
   qualityTier: RenderQualityTier;
+  setPlanetTargets: (
+    planets: readonly ExoplanetProfile[],
+    onSelectPlanet: (planet: ExoplanetProfile) => void,
+  ) => void;
 }
 
 interface StarSceneOptions {
@@ -231,12 +238,92 @@ export const createStarScene = ({
   glow.intensity = 0.5 + activity * 0.42;
   glow.addIncludedOnlyMesh(starMesh);
 
+  let planetTargetRoots: TransformNode[] = [];
+  const setPlanetTargets = (
+    planets: readonly ExoplanetProfile[],
+    onSelectPlanet: (planet: ExoplanetProfile) => void,
+  ): void => {
+    for (const root of planetTargetRoots) root.dispose(false, true);
+    planetTargetRoots = planets.slice(0, 8).map((planet, index) => {
+      const root = new TransformNode(`system-world-orbit-${planet.id}`, scene);
+      root.position.copyFrom(starMesh.position);
+      root.rotation.x = -0.08 + (index % 3) * 0.07;
+      root.rotation.z = ((index % 2 === 0 ? -1 : 1) * Math.PI) / 34;
+
+      const orbitRadius = diameter * 0.68 + 1.1 + index * 0.48;
+      const orbit = MeshBuilder.CreateTorus(
+        `system-world-guide-${planet.id}`,
+        { diameter: orbitRadius * 2, thickness: 0.012, tessellation: 96 },
+        scene,
+      );
+      orbit.parent = root;
+      orbit.isPickable = false;
+      const orbitMaterial = new StandardMaterial(`system-world-guide-material-${planet.id}`, scene);
+      orbitMaterial.disableLighting = true;
+      orbitMaterial.emissiveColor = new Color3(0.24, 0.48, 0.52);
+      orbitMaterial.alpha = 0.22;
+      orbitMaterial.disableDepthWrite = true;
+      orbit.material = orbitMaterial;
+
+      const world = MeshBuilder.CreateSphere(
+        `system-world-${planet.id}`,
+        { diameter: planet.kind === "gas-giant" ? 0.72 : 0.5, segments: 24 },
+        scene,
+      );
+      world.parent = root;
+      world.position.x = orbitRadius;
+      world.isPickable = true;
+      const worldMaterial = new StandardMaterial(`system-world-material-${planet.id}`, scene);
+      worldMaterial.disableLighting = true;
+      const worldColor =
+        planet.kind === "gas-giant"
+          ? new Color3(0.9, 0.58, 0.3)
+          : planet.kind === "ice-giant"
+            ? new Color3(0.34, 0.72, 0.92)
+            : new Color3(0.36, 0.82, 0.7);
+      worldMaterial.diffuseColor = worldColor;
+      worldMaterial.emissiveColor = worldColor.scale(0.45);
+      world.material = worldMaterial;
+
+      const pointerTarget = MeshBuilder.CreateSphere(
+        `system-world-pointer-${planet.id}`,
+        { diameter: 1.05, segments: 16 },
+        scene,
+      );
+      pointerTarget.parent = root;
+      pointerTarget.position.copyFrom(world.position);
+      pointerTarget.isPickable = true;
+      const pointerMaterial = new StandardMaterial(
+        `system-world-pointer-material-${planet.id}`,
+        scene,
+      );
+      pointerMaterial.disableLighting = true;
+      pointerMaterial.emissiveColor = worldColor;
+      pointerMaterial.alpha = 0.055;
+      pointerMaterial.disableDepthWrite = true;
+      pointerTarget.material = pointerMaterial;
+
+      for (const target of [world, pointerTarget]) {
+        target.actionManager = new ActionManager(scene);
+        target.actionManager.registerAction(
+          new ExecuteCodeAction(ActionManager.OnPickTrigger, () => onSelectPlanet(planet)),
+        );
+      }
+      root.rotation.y = (index / Math.max(1, planets.length)) * Math.PI * 2;
+      return root;
+    });
+  };
+
   let elapsed = 0;
   let firstFrame = true;
   scene.onBeforeRenderObservable.add(() => {
     elapsed += Math.min(engine.getDeltaTime() / 1_000, 0.05);
     material.setFloat("time", elapsed);
     starMesh.rotation.y = elapsed * (0.008 + (star.customization?.rotation ?? 0.35) * 0.07);
+    for (let index = 0; index < planetTargetRoots.length; index += 1) {
+      const root = planetTargetRoots[index];
+      if (root) root.rotation.y += ((0.025 + index * 0.004) * engine.getDeltaTime()) / 1_000;
+    }
   });
   engine.runRenderLoop(() => {
     scene.render();
@@ -277,6 +364,7 @@ export const createStarScene = ({
 
   return {
     qualityTier: profile.tier,
+    setPlanetTargets,
     getFps: () => engine.getFps(),
     enterVr: async () => {
       if (!xr || !vrSupported) return;

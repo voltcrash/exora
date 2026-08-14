@@ -59,6 +59,7 @@ export interface PlanetRepository {
     limit: number,
   ): Promise<RepositoryResult<ExoplanetProfile[]>>;
   findByName(name: string): Promise<RepositoryResult<ExoplanetProfile | null>>;
+  findByHost(hostStar: string, limit: number): Promise<RepositoryResult<ExoplanetProfile[]>>;
   search(query: string, limit: number): Promise<RepositoryResult<ExoplanetProfile[]>>;
 }
 
@@ -259,6 +260,15 @@ export class NasaPlanetRepository implements PlanetRepository {
     const result = await this.#query(adql);
 
     return { cached: result.cached, value: result.value[0] ?? null };
+  }
+
+  findByHost(hostStar: string, limit: number): Promise<RepositoryResult<ExoplanetProfile[]>> {
+    const normalizedHost = hostStar.trim().slice(0, 100);
+    const escapedHost = escapeAdqlLiteral(normalizedHost);
+    const safeLimit = Math.max(1, Math.min(Math.trunc(limit), 24));
+    return this.#query(
+      `select top ${safeLimit} ${NASA_COLUMNS} from pscomppars where lower(hostname)=lower('${escapedHost}') order by pl_name`,
+    );
   }
 
   async search(query: string, limit: number): Promise<RepositoryResult<ExoplanetProfile[]>> {

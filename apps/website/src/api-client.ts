@@ -168,6 +168,12 @@ export const discoverPlanets = async (
 ): Promise<PlanetSearchResult> =>
   searchPlanetsRequest(`/api/planets?category=${encodeURIComponent(category)}&limit=12`, options);
 
+export const loadPlanetsByHost = async (
+  hostStar: string,
+  options: { fetcher?: Fetcher; signal?: AbortSignal } = {},
+): Promise<PlanetSearchResult> =>
+  searchPlanetsRequest(`/api/planets?host=${encodeURIComponent(hostStar)}&limit=12`, options);
+
 const PLANET_SURPRISE_CATEGORIES = [
   "most-earth-like",
   "nearest-rocky-worlds",

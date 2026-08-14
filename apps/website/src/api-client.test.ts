@@ -4,6 +4,7 @@ import {
   discoverRandomStar,
   loadFeaturedPlanet,
   loadPlanetByName,
+  loadPlanetsByHost,
   loadStarByName,
   searchPlanets,
   searchStars,
@@ -61,6 +62,25 @@ test("returns normalized planet search results", async () => {
   });
 
   expect(result).toMatchObject({ planets: [{ id: "hip-65426-b" }], query: "wasp" });
+});
+
+test("loads the confirmed planets connected to a star", async () => {
+  const result = await loadPlanetsByHost("HIP 65426", {
+    fetcher: async (input) => {
+      expect(input).toContain("host=HIP%2065426");
+      return Response.json({
+        data: [featuredPlanet],
+        meta: {
+          cached: true,
+          count: 1,
+          query: "HIP 65426",
+          source: "NASA Exoplanet Archive",
+        },
+      });
+    },
+  });
+
+  expect(result).toMatchObject({ cached: true, planets: [{ id: "hip-65426-b" }] });
 });
 
 test("chooses a renderable surprise planet from a curated archive result", async () => {

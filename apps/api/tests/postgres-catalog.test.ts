@@ -104,6 +104,17 @@ test("bounds database catalog searches", async () => {
   expect(database.queries[0]?.statement).toContain("name % $1");
 });
 
+test("loads a bounded set of planets for a host star", async () => {
+  const database = new FakeDatabase();
+  const repository = new PostgresPlanetRepository(database);
+
+  const result = await repository.findByHost("Kepler-62", 100);
+
+  expect(result.value).toEqual([planet]);
+  expect(database.queries[0]?.parameters).toEqual(["Kepler-62", 24]);
+  expect(database.queries[0]?.statement).toContain("lower(host_star) = lower($1)");
+});
+
 test("synchronizes planets and removes stale rows in one transaction", async () => {
   const database = new FakeDatabase();
   const result = await syncPlanetCatalog(database, [planet], {

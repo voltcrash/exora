@@ -43,9 +43,11 @@ export const App = () => {
   const [builderOpen, setBuilderOpen] = useState(false);
   const [activeObject, setActiveObject] = useState<ActiveObject | null>(null);
   const [customRecipe, setCustomRecipe] = useState<WorldRecipe | null>(null);
+  const [systemHostName, setSystemHostName] = useState<string | null>(null);
 
   const loadFromLocation = useCallback(() => {
     setCustomRecipe(null);
+    setSystemHostName(null);
     void loadRequestedObject().then(setActiveObject);
   }, []);
 
@@ -66,8 +68,19 @@ export const App = () => {
     window.history.pushState({}, "", `?star=${encodeURIComponent(star.name)}`);
     setStarCatalogOpen(false);
     setCustomRecipe(null);
+    setSystemHostName(null);
     setActiveObject({ result: { cached, mode: "live", star }, type: "star" });
   };
+
+  const selectHostStar = useCallback(async (hostStar: string): Promise<boolean> => {
+    const result = await loadStarByName(hostStar);
+    if (!result) return false;
+    window.history.pushState({}, "", `?star=${encodeURIComponent(result.star.name)}`);
+    setCustomRecipe(null);
+    setSystemHostName(hostStar);
+    setActiveObject({ result, type: "star" });
+    return true;
+  }, []);
 
   const generatePlanet = ({ planet, recipe }: CustomWorld): void => {
     window.history.pushState({}, "", `?custom=${encodeURIComponent(planet.name)}`);
@@ -110,12 +123,15 @@ export const App = () => {
           onOpenCatalog={() => setCatalogOpen(true)}
           onOpenBuilder={() => setBuilderOpen(true)}
           onOpenStars={() => setStarCatalogOpen(true)}
+          onSelectHostStar={selectHostStar}
           recipeOverride={customRecipe}
         />
       ) : (
         <StarExperience
           key={activeObject.result.star.id}
           result={activeObject.result}
+          systemHostName={systemHostName}
+          onSelectPlanet={selectPlanet}
           onOpenPlanets={() => setCatalogOpen(true)}
           onOpenStars={() => setStarCatalogOpen(true)}
           onOpenBuilder={() => setBuilderOpen(true)}
