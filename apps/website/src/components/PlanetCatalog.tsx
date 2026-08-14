@@ -1,8 +1,19 @@
 import type { ExoplanetProfile } from "@exora/contracts";
-import { useEffect, useRef, useState } from "react";
-import { discoverPlanets, discoverRandomPlanet, searchPlanets } from "../api-client.ts";
+import { useEffect, useMemo, useRef, useState } from "react";
+import {
+  discoverPlanets,
+  discoverRandomPlanet,
+  loadPlanetFilterPool,
+  searchPlanets,
+} from "../api-client.ts";
 import { formatNumber, hasRenderer, planetKindLabel } from "../planet-utils.tsx";
-import { planetNotableTrait, suggestPlanetName } from "../search-discovery.ts";
+import {
+  DEFAULT_PHYSICAL_PLANET_FILTERS,
+  filterPlanetsByPhysicalControls,
+  planetNotableTrait,
+  suggestPlanetName,
+  type PhysicalPlanetFilters,
+} from "../search-discovery.ts";
 import { PlanetCatalogVisual } from "./CatalogVisual.tsx";
 
 interface PlanetCatalogProps {
@@ -13,6 +24,23 @@ interface PlanetCatalogProps {
 
 type SearchState = "idle" | "loading" | "ready" | "error";
 type SurpriseState = "idle" | "loading" | "error";
+type PhysicalAxis = Exclude<keyof PhysicalPlanetFilters, "habitableZone" | "wellMeasured">;
+
+const physicalAxes: readonly {
+  high: string;
+  key: PhysicalAxis;
+  low: string;
+  name: string;
+}[] = [
+  { key: "composition", name: "Composition", low: "Rocky", high: "Gaseous" },
+  { key: "temperature", name: "Temperature", low: "Cold", high: "Hot" },
+  { key: "scale", name: "World scale", low: "Earth-size", high: "Giant" },
+  { key: "distance", name: "System range", low: "Nearby", high: "Distant" },
+  { key: "weather", name: "Atmosphere", low: "Calm", high: "Extreme" },
+] as const;
+
+const axisPositionLabel = (value: number, low: string, high: string): string =>
+  value < 34 ? low : value > 66 ? high : "Broad field";
 
 const categories = [
   { id: "earth-like", icon: "◉", label: "Earth-like candidates", note: "Familiar scale & climate" },
@@ -85,10 +113,15 @@ export const PlanetCatalog = ({ onClose, onSelect, open }: PlanetCatalogProps) =
   const [cached, setCached] = useState(false);
   const [searchState, setSearchState] = useState<SearchState>("idle");
   const [activeCategory, setActiveCategory] = useState<string | null>(null);
-  const [portalView, setPortalView] = useState<"collections" | "categories">("collections");
+  const [portalView, setPortalView] = useState<"collections" | "categories" | "filters">(
+    "collections",
+  );
   const [resultView, setResultView] = useState<"gallery" | "list">("gallery");
   const [surpriseState, setSurpriseState] = useState<SurpriseState>("idle");
   const [suggestion, setSuggestion] = useState<string | null>(null);
+  const [physicalFilters, setPhysicalFilters] = useState<PhysicalPlanetFilters>(
+    DEFAULT_PHYSICAL_PLANET_FILTERS,
+  );
 
   useEffect(() => {
     const dialog = dialogRef.current;
@@ -116,6 +149,25 @@ export const PlanetCatalog = ({ onClose, onSelect, open }: PlanetCatalogProps) =
 
   useEffect(() => {
     const normalizedQuery = query.trim();
+    if (portalView === "filters") {
+      setSuggestion(null);
+      const controller = new AbortController();
+      setSearchState("loading");
+      void loadPlanetFilterPool({ signal: controller.signal })
+        .then((result) => {
+          if (controller.signal.aborted) return;
+          setPlanets(result.planets);
+          setCached(result.cached);
+          setSearchState("ready");
+        })
+        .catch((error: unknown) => {
+          if (controller.signal.aborted) return;
+          console.error(error);
+          setPlanets([]);
+          setSearchState("error");
+        });
+      return () => controller.abort();
+    }
     if (activeCategory) {
       setSuggestion(null);
       const controller = new AbortController();
@@ -173,7 +225,15 @@ export const PlanetCatalog = ({ onClose, onSelect, open }: PlanetCatalogProps) =
       window.clearTimeout(delay);
       controller.abort();
     };
-  }, [activeCategory, query]);
+  }, [activeCategory, portalView, query]);
+
+  const visiblePlanets = useMemo(
+    () =>
+      portalView === "filters"
+        ? filterPlanetsByPhysicalControls(planets, physicalFilters)
+        : planets,
+    [physicalFilters, planets, portalView],
+  );
 
   const activeLabel = [...collections, ...categories].find(
     (category) => category.id === activeCategory,
@@ -200,12 +260,14 @@ export const PlanetCatalog = ({ onClose, onSelect, open }: PlanetCatalogProps) =
     searchState === "idle"
       ? "Choose a discovery path, or search the archive by name."
       : searchState === "loading"
-        ? query.trim()
-          ? `Scanning NASA archive for “${query.trim()}”…`
-          : `Opening ${activeLabel ?? "curated destinations"}…`
+        ? portalView === "filters"
+          ? "Calibrating the physical planet field…"
+          : query.trim()
+            ? `Scanning NASA archive for “${query.trim()}”…`
+            : `Opening ${activeLabel ?? "curated destinations"}…`
         : searchState === "error"
           ? "The archive signal is unavailable. Try again shortly."
-          : `${planets.length} confirmed ${planets.length === 1 ? "world" : "worlds"} found${suggestion ? ` for suggested signal ${suggestion}` : activeLabel ? ` in ${activeLabel}` : ""}${cached ? " · cached result" : ""}.`;
+          : `${visiblePlanets.length} confirmed ${visiblePlanets.length === 1 ? "world" : "worlds"} visible${portalView === "filters" ? ` from ${planets.length} sampled systems` : suggestion ? ` for suggested signal ${suggestion}` : activeLabel ? ` in ${activeLabel}` : ""}${cached ? " · cached result" : ""}.`;
 
   return (
     <dialog
@@ -258,7 +320,13 @@ export const PlanetCatalog = ({ onClose, onSelect, open }: PlanetCatalogProps) =
         </span>
       </button>
       <div className="discovery-intro">
-        <span>{portalView === "collections" ? "CURATED JOURNEYS" : "EXPLORE BY PHENOMENON"}</span>
+        <span>
+          {portalView === "collections"
+            ? "CURATED JOURNEYS"
+            : portalView === "categories"
+              ? "EXPLORE BY PHENOMENON"
+              : "HOLOGRAPHIC OBSERVATORY CONSOLE"}
+        </span>
         <small>Large targets are designed for gaze, pointer, touch, or mouse</small>
       </div>
       <div className="discovery-tabs" role="tablist" aria-label="Planet discovery views">
@@ -277,6 +345,18 @@ export const PlanetCatalog = ({ onClose, onSelect, open }: PlanetCatalogProps) =
           onClick={() => setPortalView("categories")}
         >
           World types
+        </button>
+        <button
+          role="tab"
+          type="button"
+          aria-selected={portalView === "filters"}
+          onClick={() => {
+            setActiveCategory(null);
+            setQuery("");
+            setPortalView("filters");
+          }}
+        >
+          Observatory controls
         </button>
       </div>
       {portalView === "collections" ? (
@@ -304,7 +384,7 @@ export const PlanetCatalog = ({ onClose, onSelect, open }: PlanetCatalogProps) =
             </button>
           ))}
         </div>
-      ) : (
+      ) : portalView === "categories" ? (
         <div className="discovery-grid" aria-label="Planet discovery categories">
           {categories.map((category) => (
             <button
@@ -330,29 +410,111 @@ export const PlanetCatalog = ({ onClose, onSelect, open }: PlanetCatalogProps) =
             </button>
           ))}
         </div>
+      ) : (
+        <section className="physical-console" aria-labelledby="physical-console-title">
+          <div className="physical-console-heading">
+            <span>
+              <small>LIVE PLANET FIELD</small>
+              <strong id="physical-console-title">Shape the observatory signal</strong>
+            </span>
+            <button
+              type="button"
+              onClick={() => setPhysicalFilters(DEFAULT_PHYSICAL_PLANET_FILTERS)}
+            >
+              RESET CONSOLE
+            </button>
+          </div>
+          <div className="physical-axis-grid">
+            {physicalAxes.map((axis) => {
+              const value = physicalFilters[axis.key];
+              return (
+                <label key={axis.key} className="physical-axis">
+                  <span>
+                    <strong>{axis.name}</strong>
+                    <small aria-live="polite">
+                      {axisPositionLabel(value, axis.low, axis.high)}
+                    </small>
+                  </span>
+                  <span className="physical-axis-labels" aria-hidden="true">
+                    <small>{axis.low}</small>
+                    <small>{axis.high}</small>
+                  </span>
+                  <input
+                    type="range"
+                    min="0"
+                    max="100"
+                    step="1"
+                    value={value}
+                    aria-label={`${axis.name}: ${axisPositionLabel(value, axis.low, axis.high)}`}
+                    onChange={(event) =>
+                      setPhysicalFilters((current) => ({
+                        ...current,
+                        [axis.key]: Number(event.target.value),
+                      }))
+                    }
+                  />
+                </label>
+              );
+            })}
+          </div>
+          <div className="physical-toggles">
+            <label>
+              <input
+                type="checkbox"
+                checked={physicalFilters.habitableZone}
+                onChange={(event) =>
+                  setPhysicalFilters((current) => ({
+                    ...current,
+                    habitableZone: event.target.checked,
+                  }))
+                }
+              />
+              <span aria-hidden="true" />
+              <strong>Habitable-zone candidates</strong>
+              <small>Rocky · 180–330 K</small>
+            </label>
+            <label>
+              <input
+                type="checkbox"
+                checked={physicalFilters.wellMeasured}
+                onChange={(event) =>
+                  setPhysicalFilters((current) => ({
+                    ...current,
+                    wellMeasured: event.target.checked,
+                  }))
+                }
+              />
+              <span aria-hidden="true" />
+              <strong>Confirmed data completeness</strong>
+              <small>6+ observed fields</small>
+            </label>
+          </div>
+        </section>
       )}
       <div className="discovery-divider">
-        <span>OR SEARCH BY NAME</span>
+        <span>{portalView === "filters" ? "VISIBLE PLANET FIELD" : "OR SEARCH BY NAME"}</span>
       </div>
-      <div className="catalog-search">
-        <span className="search-reticle" aria-hidden="true" />
-        <input
-          ref={inputRef}
-          type="search"
-          value={query}
-          onChange={(event) => {
-            setActiveCategory(null);
-            setQuery(event.target.value);
-          }}
-          placeholder="Type a name or catalog ID — misspellings are okay"
-          autoComplete="off"
-          minLength={1}
-          aria-autocomplete="list"
-          aria-controls="planet-search-results"
-          aria-describedby="catalog-status"
-        />
-        <span className="search-key">ESC</span>
-      </div>
+      {portalView !== "filters" ? (
+        <div className="catalog-search">
+          <span className="search-reticle" aria-hidden="true" />
+          <input
+            ref={inputRef}
+            type="search"
+            value={query}
+            onChange={(event) => {
+              setActiveCategory(null);
+              setQuery(event.target.value);
+            }}
+            placeholder="Type a name or catalog ID — misspellings are okay"
+            autoComplete="off"
+            minLength={1}
+            aria-autocomplete="list"
+            aria-controls="planet-search-results"
+            aria-describedby="catalog-status"
+          />
+          <span className="search-key">ESC</span>
+        </div>
+      ) : null}
       <div className="catalog-meta">
         <p id="catalog-status" role="status">
           {status}
@@ -400,13 +562,15 @@ export const PlanetCatalog = ({ onClose, onSelect, open }: PlanetCatalogProps) =
         {searchState === "error" && (
           <li className="catalog-empty">NASA search could not be completed.</li>
         )}
-        {searchState === "ready" && planets.length === 0 && (
+        {searchState === "ready" && visiblePlanets.length === 0 && (
           <li className="catalog-empty">
-            No confirmed planets matched this signal or its nearest aliases.
+            {portalView === "filters"
+              ? "No sampled worlds match this console configuration. Widen one or more controls."
+              : "No confirmed planets matched this signal or its nearest aliases."}
           </li>
         )}
         {searchState === "ready" &&
-          planets.map((planet) => {
+          visiblePlanets.map((planet) => {
             const supported = hasRenderer(planet);
             const temperature = planet.observation.equilibriumTemperatureKelvin;
             return (

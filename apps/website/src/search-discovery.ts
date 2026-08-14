@@ -111,6 +111,104 @@ export const planetNotableTrait = (planet: ExoplanetProfile): string => {
   return `${planet.observation.discoveryMethod} discovery`;
 };
 
+export interface PhysicalPlanetFilters {
+  composition: number;
+  distance: number;
+  habitableZone: boolean;
+  scale: number;
+  temperature: number;
+  weather: number;
+  wellMeasured: boolean;
+}
+
+export const DEFAULT_PHYSICAL_PLANET_FILTERS: PhysicalPlanetFilters = {
+  composition: 50,
+  distance: 50,
+  habitableZone: false,
+  scale: 50,
+  temperature: 50,
+  weather: 50,
+  wellMeasured: false,
+};
+
+const clampUnit = (value: number): number => Math.max(0, Math.min(1, value));
+
+const axisMatches = (control: number, observed: number | null): boolean => {
+  if (control >= 34 && control <= 66) return true;
+  if (observed === null) return false;
+  return control < 34 ? observed <= 0.42 : observed >= 0.58;
+};
+
+const measuredFieldCount = (planet: ExoplanetProfile): number => {
+  const observation = planet.observation;
+  return [
+    observation.radiusEarth ?? observation.radiusJupiter,
+    observation.massEarth ?? observation.massJupiter,
+    observation.equilibriumTemperatureKelvin,
+    observation.orbitalPeriodDays,
+    observation.semiMajorAxisAu,
+    observation.distanceParsecs,
+    observation.hostTemperatureKelvin,
+    observation.hostRadiusSolar,
+  ].filter((value) => value !== null).length;
+};
+
+export const filterPlanetsByPhysicalControls = (
+  planets: readonly ExoplanetProfile[],
+  filters: PhysicalPlanetFilters,
+  limit = 24,
+): ExoplanetProfile[] =>
+  planets
+    .map((planet, index) => {
+      const observation = planet.observation;
+      const composition =
+        planet.kind === "rocky"
+          ? 0
+          : planet.kind === "ice-giant"
+            ? 0.68
+            : planet.kind === "gas-giant"
+              ? 1
+              : null;
+      const temperature =
+        observation.equilibriumTemperatureKelvin === null
+          ? null
+          : clampUnit((observation.equilibriumTemperatureKelvin - 120) / 1_680);
+      const earthRadius =
+        observation.radiusEarth ??
+        (observation.radiusJupiter === null ? null : observation.radiusJupiter * 11.21);
+      const scale = earthRadius === null ? null : clampUnit((earthRadius - 0.5) / 13.5);
+      const distance =
+        observation.distanceParsecs === null ? null : clampUnit(observation.distanceParsecs / 300);
+      const weather =
+        temperature === null || composition === null
+          ? null
+          : clampUnit(temperature * 0.72 + composition * 0.28);
+      const habitable =
+        planet.kind === "rocky" &&
+        observation.equilibriumTemperatureKelvin !== null &&
+        observation.equilibriumTemperatureKelvin >= 180 &&
+        observation.equilibriumTemperatureKelvin <= 330;
+      const matches =
+        axisMatches(filters.composition, composition) &&
+        axisMatches(filters.temperature, temperature) &&
+        axisMatches(filters.scale, scale) &&
+        axisMatches(filters.distance, distance) &&
+        axisMatches(filters.weather, weather) &&
+        (!filters.habitableZone || habitable) &&
+        (!filters.wellMeasured || measuredFieldCount(planet) >= 6);
+      const score =
+        Math.abs(filters.composition / 100 - (composition ?? 0.5)) +
+        Math.abs(filters.temperature / 100 - (temperature ?? 0.5)) +
+        Math.abs(filters.scale / 100 - (scale ?? 0.5)) +
+        Math.abs(filters.distance / 100 - (distance ?? 0.5)) +
+        Math.abs(filters.weather / 100 - (weather ?? 0.5));
+      return { index, matches, planet, score };
+    })
+    .filter(({ matches }) => matches)
+    .sort((left, right) => left.score - right.score || left.index - right.index)
+    .slice(0, Math.max(1, limit))
+    .map(({ planet }) => planet);
+
 export const starNotableTrait = (star: StarProfile): string => {
   if ((star.observation.distanceParsecs ?? Number.POSITIVE_INFINITY) < 5) {
     return "Local stellar neighbor";

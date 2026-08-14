@@ -53,6 +53,23 @@ export const createApp = ({
     const query = context.req.query("q")?.trim() ?? "";
     const category = context.req.query("category")?.trim() ?? "";
     const hostStar = context.req.query("host")?.trim() ?? "";
+    const browse = context.req.query("browse")?.trim() ?? "";
+
+    if (browse === "physical-controls") {
+      const requestedLimit = Number.parseInt(context.req.query("limit") ?? "120", 10);
+      const limit = Number.isFinite(requestedLimit) ? requestedLimit : 120;
+      const result = await repository.browse(limit);
+      context.header("Cache-Control", "public, max-age=900, stale-while-revalidate=21600");
+      return context.json<PlanetSearchResponse>({
+        data: result.value,
+        meta: {
+          cached: result.cached,
+          count: result.value.length,
+          query: "physical-controls",
+          source: "NASA Exoplanet Archive",
+        },
+      });
+    }
 
     if (hostStar) {
       if (hostStar.length > 100) {

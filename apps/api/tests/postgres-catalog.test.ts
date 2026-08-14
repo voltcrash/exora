@@ -93,6 +93,17 @@ test("serves normalized planet profiles from PostgreSQL", async () => {
   expect(database.queries[0]?.parameters).toEqual(["Kepler-62 f"]);
 });
 
+test("loads a broad bounded planet field for physical controls", async () => {
+  const database = new FakeDatabase();
+  const repository = new PostgresPlanetRepository(database);
+
+  const result = await repository.browse(500);
+
+  expect(result.value).toEqual([planet]);
+  expect(database.queries[0]?.parameters).toEqual([120]);
+  expect(database.queries[0]?.statement).toContain("equilibrium_temperature_kelvin IS NOT NULL");
+});
+
 test("bounds database catalog searches", async () => {
   const database = new FakeDatabase();
   const repository = new PostgresPlanetRepository(database);

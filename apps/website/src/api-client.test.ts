@@ -3,6 +3,7 @@ import {
   discoverRandomPlanet,
   discoverRandomStar,
   loadFeaturedPlanet,
+  loadPlanetFilterPool,
   loadPlanetByName,
   loadPlanetsByHost,
   loadStarByName,
@@ -81,6 +82,25 @@ test("loads the confirmed planets connected to a star", async () => {
   });
 
   expect(result).toMatchObject({ cached: true, planets: [{ id: "hip-65426-b" }] });
+});
+
+test("loads a broad field for local physical filtering", async () => {
+  const result = await loadPlanetFilterPool({
+    fetcher: async (input) => {
+      expect(input).toBe("/api/planets?browse=physical-controls&limit=120");
+      return Response.json({
+        data: [featuredPlanet],
+        meta: {
+          cached: true,
+          count: 1,
+          query: "physical-controls",
+          source: "NASA Exoplanet Archive",
+        },
+      });
+    },
+  });
+
+  expect(result).toMatchObject({ planets: [{ id: "hip-65426-b" }] });
 });
 
 test("chooses a renderable surprise planet from a curated archive result", async () => {

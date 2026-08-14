@@ -174,6 +174,11 @@ export const loadPlanetsByHost = async (
 ): Promise<PlanetSearchResult> =>
   searchPlanetsRequest(`/api/planets?host=${encodeURIComponent(hostStar)}&limit=12`, options);
 
+export const loadPlanetFilterPool = async (
+  options: { fetcher?: Fetcher; signal?: AbortSignal } = {},
+): Promise<PlanetSearchResult> =>
+  searchPlanetsRequest("/api/planets?browse=physical-controls&limit=120", options);
+
 const PLANET_SURPRISE_CATEGORIES = [
   "most-earth-like",
   "nearest-rocky-worlds",

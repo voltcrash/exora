@@ -54,6 +54,7 @@ export interface RepositoryResult<T> {
 }
 
 export interface PlanetRepository {
+  browse(limit: number): Promise<RepositoryResult<ExoplanetProfile[]>>;
   discover(
     category: PlanetDiscoveryCategory,
     limit: number,
@@ -240,6 +241,13 @@ export class NasaPlanetRepository implements PlanetRepository {
     this.#fetcher = options.fetcher ?? fetch;
     this.#now = options.now ?? Date.now;
     this.#timeoutMs = options.timeoutMs ?? 10_000;
+  }
+
+  browse(limit: number): Promise<RepositoryResult<ExoplanetProfile[]>> {
+    const safeLimit = Math.max(24, Math.min(Math.trunc(limit), 120));
+    return this.#query(
+      `select top ${safeLimit} ${NASA_COLUMNS} from pscomppars where sy_dist is not null and pl_eqt is not null and (pl_rade is not null or pl_radj is not null) order by pl_name`,
+    );
   }
 
   discover(

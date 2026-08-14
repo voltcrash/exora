@@ -77,6 +77,24 @@ test("queries confirmed worlds by their exact host system", async () => {
   expect(query).toContain("lower(hostname)=lower('HIP 65426')");
 });
 
+test("bounds the physical-control browsing field", async () => {
+  let requestedUrl = "";
+  const repository = new NasaPlanetRepository({
+    fetcher: async (input) => {
+      requestedUrl =
+        typeof input === "string" ? input : input instanceof URL ? input.href : input.url;
+      return Response.json([nasaRow]);
+    },
+  });
+
+  const result = await repository.browse(500);
+  const query = new URL(requestedUrl).searchParams.get("query");
+
+  expect(result.value).toHaveLength(1);
+  expect(query).toContain("top 120");
+  expect(query).toContain("sy_dist is not null");
+});
+
 test("loads the complete normalized catalog for synchronization", async () => {
   let requestedUrl = "";
   const repository = new NasaPlanetRepository({

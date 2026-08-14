@@ -34,6 +34,7 @@ const planet: ExoplanetProfile = {
 };
 
 const repository: PlanetRepository = {
+  browse: async () => ({ cached: true, value: [planet] }),
   discover: async () => ({ cached: true, value: [planet] }),
   findByName: async () => ({ cached: false, value: planet }),
   findByHost: async () => ({ cached: true, value: [planet] }),
@@ -99,6 +100,18 @@ test("returns confirmed planets for a host star", async () => {
   expect(await response.json()).toMatchObject({
     data: [{ hostStar: "HIP 65426", id: "hip-65426-b" }],
     meta: { cached: true, count: 1, query: "HIP 65426" },
+  });
+});
+
+test("returns a broad planet field for physical controls", async () => {
+  const response = await createApp({ repository }).request(
+    "/api/planets?browse=physical-controls&limit=120",
+  );
+
+  expect(response.status).toBe(200);
+  expect(await response.json()).toMatchObject({
+    data: [{ id: "hip-65426-b" }],
+    meta: { count: 1, query: "physical-controls" },
   });
 });
 

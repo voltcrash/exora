@@ -95,6 +95,21 @@ export class PostgresPlanetRepository implements PlanetRepository {
     this.#database = database;
   }
 
+  async browse(limit: number): Promise<RepositoryResult<ExoplanetProfile[]>> {
+    const safeLimit = Math.max(24, Math.min(Math.trunc(limit), 120));
+    const rows = await this.#database.query<PlanetRow>(
+      `SELECT ${PLANET_COLUMNS}
+       FROM exoplanets
+       WHERE distance_parsecs IS NOT NULL
+         AND equilibrium_temperature_kelvin IS NOT NULL
+         AND (radius_earth IS NOT NULL OR radius_jupiter IS NOT NULL)
+       ORDER BY name
+       LIMIT $1`,
+      [safeLimit],
+    );
+    return { cached: true, value: rows.map(toPlanet) };
+  }
+
   async discover(
     category: PlanetDiscoveryCategory,
     limit: number,
