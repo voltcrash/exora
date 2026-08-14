@@ -2,6 +2,7 @@ import type { ExoplanetProfile } from "@exora/contracts";
 import { useEffect, useRef, useState } from "react";
 import { discoverPlanets, discoverRandomPlanet, searchPlanets } from "../api-client.ts";
 import { formatNumber, hasRenderer, planetKindLabel } from "../planet-utils.tsx";
+import { planetNotableTrait, suggestPlanetName } from "../search-discovery.ts";
 import { PlanetCatalogVisual } from "./CatalogVisual.tsx";
 
 interface PlanetCatalogProps {
@@ -87,6 +88,7 @@ export const PlanetCatalog = ({ onClose, onSelect, open }: PlanetCatalogProps) =
   const [portalView, setPortalView] = useState<"collections" | "categories">("collections");
   const [resultView, setResultView] = useState<"gallery" | "list">("gallery");
   const [surpriseState, setSurpriseState] = useState<SurpriseState>("idle");
+  const [suggestion, setSuggestion] = useState<string | null>(null);
 
   useEffect(() => {
     const dialog = dialogRef.current;
@@ -115,6 +117,7 @@ export const PlanetCatalog = ({ onClose, onSelect, open }: PlanetCatalogProps) =
   useEffect(() => {
     const normalizedQuery = query.trim();
     if (activeCategory) {
+      setSuggestion(null);
       const controller = new AbortController();
       setSearchState("loading");
       void discoverPlanets(activeCategory, { signal: controller.signal })
@@ -132,29 +135,39 @@ export const PlanetCatalog = ({ onClose, onSelect, open }: PlanetCatalogProps) =
         });
       return () => controller.abort();
     }
-    if (normalizedQuery.length < 2) {
+    if (normalizedQuery.length < 1) {
       setPlanets([]);
+      setSuggestion(null);
       setSearchState("idle");
       return;
     }
 
     const controller = new AbortController();
     setSearchState("loading");
-    const delay = window.setTimeout(() => {
-      void searchPlanets(normalizedQuery, { signal: controller.signal })
-        .then((result) => {
+    const delay = window.setTimeout(
+      () => {
+        void (async () => {
+          const initialResult = await searchPlanets(normalizedQuery, { signal: controller.signal });
+          const correction = suggestPlanetName(normalizedQuery);
+          const result =
+            correction && initialResult.planets.length === 0
+              ? await searchPlanets(correction, { signal: controller.signal })
+              : initialResult;
           if (controller.signal.aborted) return;
+          setSuggestion(correction && result.planets.length > 0 ? correction : null);
           setPlanets(result.planets);
           setCached(result.cached);
           setSearchState("ready");
-        })
-        .catch((error: unknown) => {
+        })().catch((error: unknown) => {
           if (controller.signal.aborted) return;
           console.error(error);
           setPlanets([]);
+          setSuggestion(null);
           setSearchState("error");
         });
-    }, 320);
+      },
+      normalizedQuery.length === 1 ? 180 : 280,
+    );
 
     return () => {
       window.clearTimeout(delay);
@@ -192,7 +205,7 @@ export const PlanetCatalog = ({ onClose, onSelect, open }: PlanetCatalogProps) =
           : `Opening ${activeLabel ?? "curated destinations"}…`
         : searchState === "error"
           ? "The archive signal is unavailable. Try again shortly."
-          : `${planets.length} confirmed ${planets.length === 1 ? "world" : "worlds"} found${activeLabel ? ` in ${activeLabel}` : ""}${cached ? " · cached result" : ""}.`;
+          : `${planets.length} confirmed ${planets.length === 1 ? "world" : "worlds"} found${suggestion ? ` for suggested signal ${suggestion}` : activeLabel ? ` in ${activeLabel}` : ""}${cached ? " · cached result" : ""}.`;
 
   return (
     <dialog
@@ -331,9 +344,11 @@ export const PlanetCatalog = ({ onClose, onSelect, open }: PlanetCatalogProps) =
             setActiveCategory(null);
             setQuery(event.target.value);
           }}
-          placeholder="Search Kepler, WASP, TRAPPIST or any known planet"
+          placeholder="Type a name or catalog ID — misspellings are okay"
           autoComplete="off"
-          minLength={2}
+          minLength={1}
+          aria-autocomplete="list"
+          aria-controls="planet-search-results"
           aria-describedby="catalog-status"
         />
         <span className="search-key">ESC</span>
@@ -359,7 +374,22 @@ export const PlanetCatalog = ({ onClose, onSelect, open }: PlanetCatalogProps) =
           </button>
         </div>
       </div>
+      {suggestion && (
+        <button
+          className="did-you-mean"
+          type="button"
+          onClick={() => {
+            setSuggestion(null);
+            setQuery(suggestion);
+          }}
+        >
+          <span>DID YOU MEAN</span>
+          <strong>{suggestion}</strong>
+          <span aria-hidden="true">↗</span>
+        </button>
+      )}
       <ol
+        id="planet-search-results"
         className={`catalog-results ${resultView}-view${searchState === "idle" ? " is-idle" : ""}`}
       >
         {searchState === "loading" && (
@@ -371,7 +401,9 @@ export const PlanetCatalog = ({ onClose, onSelect, open }: PlanetCatalogProps) =
           <li className="catalog-empty">NASA search could not be completed.</li>
         )}
         {searchState === "ready" && planets.length === 0 && (
-          <li className="catalog-empty">No confirmed planets matched this signal.</li>
+          <li className="catalog-empty">
+            No confirmed planets matched this signal or its nearest aliases.
+          </li>
         )}
         {searchState === "ready" &&
           planets.map((planet) => {
@@ -394,10 +426,12 @@ export const PlanetCatalog = ({ onClose, onSelect, open }: PlanetCatalogProps) =
                     <small>
                       {planet.hostStar} · {planet.observation.discoveryMethod}
                     </small>
+                    <span className="result-trait">{planetNotableTrait(planet)}</span>
                   </span>
                   <span className="result-metrics">
                     <small>{planetKindLabel(planet)}</small>
                     <strong>
+                      {formatNumber(planet.observation.distanceParsecs, 1)} PC ·{" "}
                       {temperature === null ? "TEMP UNKNOWN" : `${formatNumber(temperature, 0)} K`}
                     </strong>
                   </span>

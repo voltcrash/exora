@@ -3,6 +3,7 @@ import { useEffect, useRef, useState } from "react";
 import { discoverRandomStar, discoverStars, searchStars } from "../api-client.ts";
 import { formatNumber } from "../planet-utils.tsx";
 import { starKindLabel } from "../star-utils.ts";
+import { starNotableTrait, suggestStarName } from "../search-discovery.ts";
 import { StarCatalogVisual } from "./CatalogVisual.tsx";
 
 interface StarCatalogProps {
@@ -68,6 +69,7 @@ export const StarCatalog = ({ onClose, onSelect, open }: StarCatalogProps) => {
   const [portalView, setPortalView] = useState<"collections" | "categories">("collections");
   const [resultView, setResultView] = useState<"gallery" | "list">("gallery");
   const [surpriseState, setSurpriseState] = useState<SurpriseState>("idle");
+  const [suggestion, setSuggestion] = useState<string | null>(null);
 
   useEffect(() => {
     const dialog = dialogRef.current;
@@ -84,6 +86,7 @@ export const StarCatalog = ({ onClose, onSelect, open }: StarCatalogProps) => {
   useEffect(() => {
     if (!open) return;
     if (activeCategory) {
+      setSuggestion(null);
       const controller = new AbortController();
       setSearchState("loading");
       void discoverStars(activeCategory, { signal: controller.signal })
@@ -101,30 +104,38 @@ export const StarCatalog = ({ onClose, onSelect, open }: StarCatalogProps) => {
         });
       return () => controller.abort();
     }
-    if (query.trim().length < 2) {
+    if (query.trim().length < 1) {
       setStars([]);
+      setSuggestion(null);
       setSearchState("idle");
       return;
     }
     const controller = new AbortController();
     setSearchState("loading");
+    const normalizedQuery = query.trim();
     const delay = window.setTimeout(
       () => {
-        void searchStars(query, { signal: controller.signal })
-          .then((result) => {
-            if (controller.signal.aborted) return;
-            setStars(result.stars);
-            setCached(result.cached);
-            setSearchState("ready");
-          })
-          .catch((error: unknown) => {
-            if (controller.signal.aborted) return;
-            console.error(error);
-            setStars([]);
-            setSearchState("error");
-          });
+        void (async () => {
+          const initialResult = await searchStars(normalizedQuery, { signal: controller.signal });
+          const correction = suggestStarName(normalizedQuery);
+          const result =
+            correction && initialResult.stars.length === 0
+              ? await searchStars(correction, { signal: controller.signal })
+              : initialResult;
+          if (controller.signal.aborted) return;
+          setSuggestion(correction && result.stars.length > 0 ? correction : null);
+          setStars(result.stars);
+          setCached(result.cached);
+          setSearchState("ready");
+        })().catch((error: unknown) => {
+          if (controller.signal.aborted) return;
+          console.error(error);
+          setStars([]);
+          setSuggestion(null);
+          setSearchState("error");
+        });
       },
-      query.trim().length >= 2 ? 320 : 0,
+      normalizedQuery.length === 1 ? 180 : 280,
     );
     return () => {
       window.clearTimeout(delay);
@@ -157,12 +168,12 @@ export const StarCatalog = ({ onClose, onSelect, open }: StarCatalogProps) => {
     searchState === "idle"
       ? "Choose a stellar family, or search SIMBAD by name."
       : searchState === "loading"
-        ? query.trim().length >= 2
+        ? query.trim().length >= 1
           ? `Resolving “${query.trim()}” in SIMBAD…`
           : `Scanning SIMBAD for ${activeLabel ?? "stellar objects"}…`
         : searchState === "error"
           ? "The SIMBAD signal is unavailable. Try again shortly."
-          : `${stars.length} stellar ${stars.length === 1 ? "destination" : "destinations"}${activeLabel ? ` in ${activeLabel}` : ""}${cached ? " · cached result" : ""}.`;
+          : `${stars.length} stellar ${stars.length === 1 ? "destination" : "destinations"}${suggestion ? ` for suggested signal ${suggestion}` : activeLabel ? ` in ${activeLabel}` : ""}${cached ? " · cached result" : ""}.`;
 
   return (
     <dialog
@@ -304,8 +315,11 @@ export const StarCatalog = ({ onClose, onSelect, open }: StarCatalogProps) => {
             setActiveCategory(null);
             setQuery(event.target.value);
           }}
-          placeholder="Search Sirius, Betelgeuse, Vega or a catalog ID"
+          placeholder="Type a common name or catalog ID — misspellings are okay"
           autoComplete="off"
+          minLength={1}
+          aria-autocomplete="list"
+          aria-controls="star-search-results"
           aria-describedby="star-catalog-status"
         />
         <span className="search-key">ESC</span>
@@ -331,7 +345,22 @@ export const StarCatalog = ({ onClose, onSelect, open }: StarCatalogProps) => {
           </button>
         </div>
       </div>
+      {suggestion && (
+        <button
+          className="did-you-mean"
+          type="button"
+          onClick={() => {
+            setSuggestion(null);
+            setQuery(suggestion);
+          }}
+        >
+          <span>DID YOU MEAN</span>
+          <strong>{suggestion}</strong>
+          <span aria-hidden="true">↗</span>
+        </button>
+      )}
       <ol
+        id="star-search-results"
         className={`catalog-results ${resultView}-view${searchState === "idle" ? " is-idle" : ""}`}
       >
         {searchState === "loading" && (
@@ -343,7 +372,9 @@ export const StarCatalog = ({ onClose, onSelect, open }: StarCatalogProps) => {
           <li className="catalog-empty">SIMBAD search could not be completed.</li>
         )}
         {searchState === "ready" && stars.length === 0 && (
-          <li className="catalog-empty">No exact stellar object matched that name.</li>
+          <li className="catalog-empty">
+            No stellar object matched that name or its nearest aliases.
+          </li>
         )}
         {searchState === "ready" &&
           stars.map((star) => (
@@ -362,6 +393,7 @@ export const StarCatalog = ({ onClose, onSelect, open }: StarCatalogProps) => {
                   <small>
                     {star.catalogName} · {star.objectType}
                   </small>
+                  <span className="result-trait">{starNotableTrait(star)}</span>
                 </span>
                 <span className="result-metrics">
                   <small>{starKindLabel(star)}</small>

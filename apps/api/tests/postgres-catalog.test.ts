@@ -100,7 +100,8 @@ test("bounds database catalog searches", async () => {
   const result = await repository.search("kepler", 100);
 
   expect(result.value).toEqual([planet]);
-  expect(database.queries[0]?.parameters).toEqual(["kepler", 24]);
+  expect(database.queries[0]?.parameters).toEqual(["kepler", "kepler", 24]);
+  expect(database.queries[0]?.statement).toContain("name % $1");
 });
 
 test("synchronizes planets and removes stale rows in one transaction", async () => {

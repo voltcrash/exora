@@ -1815,6 +1815,49 @@ body[data-xr-status="unavailable"] .status-light {
   text-transform: uppercase;
 }
 
+.did-you-mean {
+  min-height: 42px;
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  margin: -4px 26px 13px;
+  padding: 8px 13px;
+  border: 1px solid rgb(139 230 234 / 22%);
+  border-radius: 11px;
+  color: var(--faint);
+  background: rgb(139 230 234 / 5%);
+  cursor: pointer;
+  font-family: var(--mono);
+  font-size: 7px;
+  text-align: left;
+}
+
+.did-you-mean strong {
+  color: var(--cyan);
+  font-size: 9px;
+  font-weight: 500;
+  text-transform: none;
+}
+
+.did-you-mean > span:last-child {
+  margin-left: auto;
+  color: var(--cyan);
+}
+
+.did-you-mean:hover {
+  border-color: rgb(139 230 234 / 48%);
+}
+
+.star-catalog .did-you-mean {
+  border-color: rgb(255 201 105 / 22%);
+  background: rgb(255 190 80 / 5%);
+}
+
+.star-catalog .did-you-mean strong,
+.star-catalog .did-you-mean > span:last-child {
+  color: #ffc96f;
+}
+
 .catalog-view-toggle {
   display: flex;
   gap: 5px;
@@ -2114,11 +2157,23 @@ body[data-xr-status="unavailable"] .status-light {
 
 .result-identity small,
 .result-metrics small,
-.result-state {
+.result-state,
+.result-trait {
   color: var(--faint);
   font-family: var(--mono);
   font-size: 7px;
   text-transform: uppercase;
+}
+
+.result-trait {
+  overflow: hidden;
+  color: #8fc7c8;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.star-catalog .result-trait {
+  color: #d3aa6d;
 }
 
 .result-metrics strong {
@@ -2131,6 +2186,48 @@ body[data-xr-status="unavailable"] .status-light {
 .result-state {
   justify-self: end;
   color: var(--cyan);
+}
+
+.list-view .catalog-result {
+  grid-template-columns: 56px 8px minmax(150px, 1fr) minmax(150px, 0.55fr) 96px;
+}
+
+.list-view .result-preview {
+  display: block;
+}
+
+.list-view .catalog-visual {
+  width: 52px;
+  height: 52px;
+  border-radius: 50%;
+}
+
+.list-view .catalog-planet-sphere,
+.list-view .catalog-star-core {
+  width: 34px;
+  height: 34px;
+}
+
+.list-view .catalog-orbit,
+.list-view .catalog-star-rays {
+  width: 44px;
+  height: 44px;
+}
+
+.list-view .catalog-orbit {
+  height: 15px;
+}
+
+.list-view .catalog-visual-glint {
+  width: 7px;
+  height: 7px;
+  top: 11px;
+  left: 16px;
+  filter: blur(3px);
+}
+
+.list-view .star-catalog-visual .catalog-visual-glint {
+  top: 12px;
 }
 
 .catalog-empty,
@@ -2569,6 +2666,10 @@ body[data-xr-status="unavailable"] .status-light {
     padding: 11px 17px 13px;
   }
 
+  .did-you-mean {
+    margin: -3px 16px 12px;
+  }
+
   .catalog-view-toggle button {
     min-height: 34px;
     padding: 0 10px;
@@ -2631,6 +2732,31 @@ body[data-xr-status="unavailable"] .status-light {
   .catalog-result {
     grid-template-columns: 9px minmax(120px, 1fr) 72px;
     gap: 10px;
+  }
+
+  .list-view .catalog-result {
+    grid-template-columns: 44px minmax(110px, 1fr) 64px;
+  }
+
+  .list-view .result-marker {
+    display: none;
+  }
+
+  .list-view .catalog-visual {
+    width: 40px;
+    height: 40px;
+  }
+
+  .list-view .catalog-planet-sphere,
+  .list-view .catalog-star-core {
+    width: 27px;
+    height: 27px;
+  }
+
+  .list-view .catalog-orbit,
+  .list-view .catalog-star-rays {
+    width: 34px;
+    height: 34px;
   }
 }
 

@@ -136,7 +136,7 @@ export const searchPlanets = async (
   options: { fetcher?: Fetcher; signal?: AbortSignal } = {},
 ): Promise<PlanetSearchResult> => {
   const normalizedQuery = query.trim();
-  if (normalizedQuery.length < 2) {
+  if (normalizedQuery.length < 1) {
     return { cached: false, planets: [], query: normalizedQuery };
   }
 
@@ -247,7 +247,7 @@ export const searchStars = async (
 ): Promise<StarSearchResult> => {
   const normalizedQuery = query.trim();
   const path =
-    normalizedQuery.length >= 2
+    normalizedQuery.length >= 1
       ? `/api/stars?q=${encodeURIComponent(normalizedQuery)}&limit=12`
       : "/api/stars/featured";
   const response = await (options.fetcher ?? fetch)(path, {

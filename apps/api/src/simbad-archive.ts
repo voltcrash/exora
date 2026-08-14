@@ -280,15 +280,25 @@ export class SimbadStarRepository implements StarRepository {
     return { cached: result.cached, value: result.value[0] ?? null };
   }
 
-  search(query: string, limit: number): Promise<RepositoryResult<StarProfile[]>> {
+  async search(query: string, limit: number): Promise<RepositoryResult<StarProfile[]>> {
     const candidates = nameCandidates(query);
-    const conditions = candidates
+    const exactConditions = candidates
       .map((candidate) => `i.id='${escapeAdqlLiteral(candidate)}'`)
       .join(" or ");
     const safeLimit = Math.max(1, Math.min(Math.trunc(limit), 12));
-    return this.#query(
-      `select distinct top ${safeLimit} ${STAR_COLUMNS} ${STAR_FROM} where ${conditions}`,
+    const result = await this.#query(
+      `select distinct top ${safeLimit} ${STAR_COLUMNS} ${STAR_FROM} where ${exactConditions}`,
     );
+    return {
+      cached: result.cached,
+      value: [
+        ...new Map(
+          result.value
+            .filter((star) => !/planet/i.test(star.objectType))
+            .map((star) => [star.id, star]),
+        ).values(),
+      ].slice(0, safeLimit),
+    };
   }
 
   async #query(adql: string): Promise<RepositoryResult<StarProfile[]>> {

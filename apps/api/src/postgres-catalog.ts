@@ -179,9 +179,14 @@ export class PostgresPlanetRepository implements PlanetRepository {
       `SELECT ${PLANET_COLUMNS}
        FROM exoplanets
        WHERE name ILIKE '%' || $1 || '%'
-       ORDER BY similarity(name, $1) DESC, name
-       LIMIT $2`,
-      [normalizedQuery, safeLimit],
+          OR name % $1
+          OR ($2 <> '' AND regexp_replace(lower(name), '[^a-z0-9]', '', 'g') LIKE '%' || $2 || '%')
+       ORDER BY
+         CASE WHEN lower(name) LIKE lower($1) || '%' THEN 0 ELSE 1 END,
+         similarity(name, $1) DESC,
+         name
+       LIMIT $3`,
+      [normalizedQuery, normalizedQuery.toLowerCase().replaceAll(/[^a-z0-9]/g, ""), safeLimit],
     );
 
     return { cached: true, value: rows.map(toPlanet) };

@@ -116,9 +116,11 @@ test("returns category-driven planet and star discovery results", async () => {
   });
 });
 
-test("rejects undersized search queries", async () => {
-  const response = await createApp({ repository }).request("/api/planets?q=h");
+test("accepts one-character autocomplete and rejects empty search queries", async () => {
+  const autocompleteResponse = await createApp({ repository }).request("/api/planets?q=h");
+  const response = await createApp({ repository }).request("/api/planets");
 
+  expect(autocompleteResponse.status).toBe(200);
   expect(response.status).toBe(400);
   expect(await response.json()).toMatchObject({ error: { code: "INVALID_REQUEST" } });
 });

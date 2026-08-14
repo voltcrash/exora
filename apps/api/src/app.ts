@@ -75,9 +75,9 @@ export const createApp = ({
       });
     }
 
-    if (query.length < 2) {
+    if (query.length < 1) {
       return context.json(
-        apiError("INVALID_REQUEST", "Search query must contain at least two characters."),
+        apiError("INVALID_REQUEST", "Search query must contain at least one character."),
         400,
       );
     }
@@ -176,11 +176,34 @@ export const createApp = ({
         },
       });
     }
-    if (query.length < 2) {
+    if (query.length < 1) {
       return context.json(
-        apiError("INVALID_REQUEST", "Star name must contain at least two characters."),
+        apiError("INVALID_REQUEST", "Star name must contain at least one character."),
         400,
       );
+    }
+
+    const featuredResult = await starRepository.featured();
+    const normalizedQuery = query.toLowerCase();
+    const predictiveStars = featuredResult.value.filter(
+      (star) =>
+        star.name.toLowerCase().startsWith(normalizedQuery) ||
+        star.catalogName
+          .toLowerCase()
+          .replace(/^\*\s*/, "")
+          .startsWith(normalizedQuery),
+    );
+    if (predictiveStars.length > 0 || query.length <= 2) {
+      context.header("Cache-Control", "public, max-age=3600, stale-while-revalidate=43200");
+      return context.json<StarSearchResponse>({
+        data: predictiveStars,
+        meta: {
+          cached: featuredResult.cached,
+          count: predictiveStars.length,
+          query,
+          source: "SIMBAD",
+        },
+      });
     }
 
     const requestedLimit = Number.parseInt(context.req.query("limit") ?? "12", 10);
