@@ -25,3 +25,11 @@ release. Add a tool name to select part of the graph. For example, run
 - [ ] If setup, runtime, or package-manager behavior looks wrong, run `vp env doctor` and include its output when asking for help.
 
 <!--VITE PLUS END-->
+
+# Rules
+
+- don't use any other package manager other than pnpm - it will also be only accessed through Vite+
+- don't use npx, only pnpm dlx
+- never rollback to outdated versions just because some errors were encountered
+- without permission you must never use old versions
+- always use the latest version of everything
