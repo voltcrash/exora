@@ -54,9 +54,60 @@ export interface RepositoryResult<T> {
 }
 
 export interface PlanetRepository {
+  discover(
+    category: PlanetDiscoveryCategory,
+    limit: number,
+  ): Promise<RepositoryResult<ExoplanetProfile[]>>;
   findByName(name: string): Promise<RepositoryResult<ExoplanetProfile | null>>;
   search(query: string, limit: number): Promise<RepositoryResult<ExoplanetProfile[]>>;
 }
+
+export type PlanetDiscoveryCategory =
+  | "earth-like"
+  | "lava-worlds"
+  | "gas-giants"
+  | "ocean-candidates"
+  | "frozen-worlds"
+  | "extreme-weather"
+  | "potentially-habitable"
+  | "recently-discovered";
+
+export const PLANET_DISCOVERY_CATEGORIES = new Set<PlanetDiscoveryCategory>([
+  "earth-like",
+  "lava-worlds",
+  "gas-giants",
+  "ocean-candidates",
+  "frozen-worlds",
+  "extreme-weather",
+  "potentially-habitable",
+  "recently-discovered",
+]);
+
+const DISCOVERY_FILTERS: Record<PlanetDiscoveryCategory, { order: string; where: string }> = {
+  "earth-like": {
+    where: "pl_rade between 0.8 and 1.6 and pl_eqt between 220 and 320",
+    order: "abs(pl_rade-1), abs(pl_eqt-255)",
+  },
+  "lava-worlds": { where: "pl_eqt >= 1000 and pl_rade < 3", order: "pl_eqt desc" },
+  "gas-giants": {
+    where: "(pl_radj >= 0.45 or pl_bmassj >= 0.08)",
+    order: "pl_radj desc",
+  },
+  "ocean-candidates": {
+    where: "pl_rade between 1.3 and 2.6 and pl_eqt between 200 and 350",
+    order: "abs(pl_eqt-275), pl_rade",
+  },
+  "frozen-worlds": { where: "pl_eqt < 180", order: "pl_eqt" },
+  "extreme-weather": {
+    where: "pl_eqt >= 1200 and (pl_radj >= 0.45 or pl_bmassj >= 0.08)",
+    order: "pl_eqt desc",
+  },
+  "potentially-habitable": {
+    where: "pl_rade between 0.5 and 1.8 and pl_eqt between 180 and 330",
+    order: "abs(pl_rade-1), abs(pl_eqt-255)",
+  },
+  "recently-discovered": { where: "disc_year is not null", order: "disc_year desc, pl_name" },
+};
 
 export interface NasaPlanetRepositoryOptions {
   cacheTtlMs?: number;
@@ -164,6 +215,17 @@ export class NasaPlanetRepository implements PlanetRepository {
     this.#fetcher = options.fetcher ?? fetch;
     this.#now = options.now ?? Date.now;
     this.#timeoutMs = options.timeoutMs ?? 10_000;
+  }
+
+  discover(
+    category: PlanetDiscoveryCategory,
+    limit: number,
+  ): Promise<RepositoryResult<ExoplanetProfile[]>> {
+    const filter = DISCOVERY_FILTERS[category];
+    const safeLimit = Math.max(1, Math.min(Math.trunc(limit), 24));
+    return this.#query(
+      `select top ${safeLimit} ${NASA_COLUMNS} from pscomppars where ${filter.where} order by ${filter.order}`,
+    );
   }
 
   async findByName(name: string): Promise<RepositoryResult<ExoplanetProfile | null>> {

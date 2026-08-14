@@ -1,6 +1,10 @@
 import type { ExoplanetProfile } from "@exora/contracts";
 import type { DatabaseClient } from "./database.ts";
-import type { PlanetRepository, RepositoryResult } from "./nasa-archive.ts";
+import type {
+  PlanetDiscoveryCategory,
+  PlanetRepository,
+  RepositoryResult,
+} from "./nasa-archive.ts";
 
 interface PlanetRow extends Record<string, unknown> {
   discovery_method: string;
@@ -89,6 +93,57 @@ export class PostgresPlanetRepository implements PlanetRepository {
 
   constructor(database: DatabaseClient) {
     this.#database = database;
+  }
+
+  async discover(
+    category: PlanetDiscoveryCategory,
+    limit: number,
+  ): Promise<RepositoryResult<ExoplanetProfile[]>> {
+    const filters: Record<PlanetDiscoveryCategory, { order: string; where: string }> = {
+      "earth-like": {
+        where:
+          "radius_earth BETWEEN 0.8 AND 1.6 AND equilibrium_temperature_kelvin BETWEEN 220 AND 320",
+        order: "abs(radius_earth - 1), abs(equilibrium_temperature_kelvin - 255)",
+      },
+      "lava-worlds": {
+        where: "equilibrium_temperature_kelvin >= 1000 AND radius_earth < 3",
+        order: "equilibrium_temperature_kelvin DESC",
+      },
+      "gas-giants": {
+        where: "(radius_jupiter >= 0.45 OR mass_jupiter >= 0.08)",
+        order: "radius_jupiter DESC NULLS LAST",
+      },
+      "ocean-candidates": {
+        where:
+          "radius_earth BETWEEN 1.3 AND 2.6 AND equilibrium_temperature_kelvin BETWEEN 200 AND 350",
+        order: "abs(equilibrium_temperature_kelvin - 275), radius_earth",
+      },
+      "frozen-worlds": {
+        where: "equilibrium_temperature_kelvin < 180",
+        order: "equilibrium_temperature_kelvin",
+      },
+      "extreme-weather": {
+        where:
+          "equilibrium_temperature_kelvin >= 1200 AND (radius_jupiter >= 0.45 OR mass_jupiter >= 0.08)",
+        order: "equilibrium_temperature_kelvin DESC",
+      },
+      "potentially-habitable": {
+        where:
+          "radius_earth BETWEEN 0.5 AND 1.8 AND equilibrium_temperature_kelvin BETWEEN 180 AND 330",
+        order: "abs(radius_earth - 1), abs(equilibrium_temperature_kelvin - 255)",
+      },
+      "recently-discovered": {
+        where: "discovery_year IS NOT NULL",
+        order: "discovery_year DESC, name",
+      },
+    };
+    const filter = filters[category];
+    const safeLimit = Math.max(1, Math.min(Math.trunc(limit), 24));
+    const rows = await this.#database.query<PlanetRow>(
+      `SELECT ${PLANET_COLUMNS} FROM exoplanets WHERE ${filter.where} ORDER BY ${filter.order} LIMIT $1`,
+      [safeLimit],
+    );
+    return { cached: true, value: rows.map(toPlanet) };
   }
 
   async findByName(name: string): Promise<RepositoryResult<ExoplanetProfile | null>> {

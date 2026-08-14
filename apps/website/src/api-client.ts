@@ -152,6 +152,27 @@ export const searchPlanets = async (
   };
 };
 
+export const discoverPlanets = async (
+  category: string,
+  options: { fetcher?: Fetcher; signal?: AbortSignal } = {},
+): Promise<PlanetSearchResult> =>
+  searchPlanetsRequest(`/api/planets?category=${encodeURIComponent(category)}&limit=12`, options);
+
+const searchPlanetsRequest = async (
+  path: string,
+  options: { fetcher?: Fetcher; signal?: AbortSignal },
+): Promise<PlanetSearchResult> => {
+  const response = await (options.fetcher ?? fetch)(path, {
+    headers: { accept: "application/json" },
+    signal: options.signal ?? AbortSignal.timeout(8_000),
+  });
+  if (!response.ok) throw new Error(`Planet discovery failed with status ${response.status}.`);
+  const payload: unknown = await response.json();
+  if (!isPlanetSearchResponse(payload))
+    throw new Error("Planet discovery returned an invalid response.");
+  return { cached: payload.meta.cached, planets: payload.data, query: payload.meta.query };
+};
+
 const requestStar = async (
   path: string,
   fetcher: Fetcher,
@@ -199,4 +220,22 @@ export const searchStars = async (
     query: payload.meta.query,
     stars: payload.data,
   };
+};
+
+export const discoverStars = async (
+  category: string,
+  options: { fetcher?: Fetcher; signal?: AbortSignal } = {},
+): Promise<StarSearchResult> => {
+  const response = await (options.fetcher ?? fetch)(
+    `/api/stars?category=${encodeURIComponent(category)}&limit=12`,
+    {
+      headers: { accept: "application/json" },
+      signal: options.signal ?? AbortSignal.timeout(10_000),
+    },
+  );
+  if (!response.ok) throw new Error(`Star discovery failed with status ${response.status}.`);
+  const payload: unknown = await response.json();
+  if (!isStarSearchResponse(payload))
+    throw new Error("Star discovery returned an invalid response.");
+  return { cached: payload.meta.cached, query: payload.meta.query, stars: payload.data };
 };

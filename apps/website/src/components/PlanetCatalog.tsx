@@ -1,6 +1,6 @@
 import type { ExoplanetProfile } from "@exora/contracts";
 import { useEffect, useRef, useState } from "react";
-import { searchPlanets } from "../api-client.ts";
+import { discoverPlanets, searchPlanets } from "../api-client.ts";
 import { formatNumber, hasRenderer, planetKindLabel } from "../planet-utils.tsx";
 
 interface PlanetCatalogProps {
@@ -11,6 +11,37 @@ interface PlanetCatalogProps {
 
 type SearchState = "idle" | "loading" | "ready" | "error";
 
+const categories = [
+  { id: "earth-like", icon: "◉", label: "Earth-like candidates", note: "Familiar scale & climate" },
+  { id: "lava-worlds", icon: "△", label: "Lava worlds", note: "Molten, ultra-hot terrain" },
+  { id: "gas-giants", icon: "◒", label: "Gas giants", note: "Colossal cloud layers" },
+  {
+    id: "ocean-candidates",
+    icon: "≈",
+    label: "Ocean-world candidates",
+    note: "Possible global seas",
+  },
+  { id: "frozen-worlds", icon: "✣", label: "Frozen worlds", note: "Cold, distant frontiers" },
+  {
+    id: "extreme-weather",
+    icon: "ϟ",
+    label: "Extreme weather",
+    note: "Violent atmospheric systems",
+  },
+  {
+    id: "potentially-habitable",
+    icon: "⌾",
+    label: "Potentially habitable",
+    note: "Temperate rocky candidates",
+  },
+  {
+    id: "recently-discovered",
+    icon: "+",
+    label: "Recently discovered",
+    note: "The archive's newest worlds",
+  },
+] as const;
+
 export const PlanetCatalog = ({ onClose, onSelect, open }: PlanetCatalogProps) => {
   const dialogRef = useRef<HTMLDialogElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
@@ -18,6 +49,7 @@ export const PlanetCatalog = ({ onClose, onSelect, open }: PlanetCatalogProps) =
   const [planets, setPlanets] = useState<ExoplanetProfile[]>([]);
   const [cached, setCached] = useState(false);
   const [searchState, setSearchState] = useState<SearchState>("idle");
+  const [activeCategory, setActiveCategory] = useState<string | null>(null);
 
   useEffect(() => {
     const dialog = dialogRef.current;
@@ -25,7 +57,6 @@ export const PlanetCatalog = ({ onClose, onSelect, open }: PlanetCatalogProps) =
 
     if (open && !dialog.open) {
       dialog.showModal();
-      window.setTimeout(() => inputRef.current?.focus(), 0);
     } else if (!open && dialog.open) {
       dialog.close();
     }
@@ -44,6 +75,24 @@ export const PlanetCatalog = ({ onClose, onSelect, open }: PlanetCatalogProps) =
 
   useEffect(() => {
     const normalizedQuery = query.trim();
+    if (activeCategory) {
+      const controller = new AbortController();
+      setSearchState("loading");
+      void discoverPlanets(activeCategory, { signal: controller.signal })
+        .then((result) => {
+          if (controller.signal.aborted) return;
+          setPlanets(result.planets);
+          setCached(result.cached);
+          setSearchState("ready");
+        })
+        .catch((error: unknown) => {
+          if (controller.signal.aborted) return;
+          console.error(error);
+          setPlanets([]);
+          setSearchState("error");
+        });
+      return () => controller.abort();
+    }
     if (normalizedQuery.length < 2) {
       setPlanets([]);
       setSearchState("idle");
@@ -72,16 +121,18 @@ export const PlanetCatalog = ({ onClose, onSelect, open }: PlanetCatalogProps) =
       window.clearTimeout(delay);
       controller.abort();
     };
-  }, [query]);
+  }, [activeCategory, query]);
+
+  const activeLabel = categories.find((category) => category.id === activeCategory)?.label;
 
   const status =
     searchState === "idle"
-      ? "Enter at least two characters to scan the archive."
+      ? "Choose a discovery path, or search the archive by name."
       : searchState === "loading"
         ? `Scanning NASA archive for “${query.trim()}”…`
         : searchState === "error"
           ? "The archive signal is unavailable. Try again shortly."
-          : `${planets.length} confirmed ${planets.length === 1 ? "world" : "worlds"} found${cached ? " · cached result" : ""}.`;
+          : `${planets.length} confirmed ${planets.length === 1 ? "world" : "worlds"} found${activeLabel ? ` in ${activeLabel}` : ""}${cached ? " · cached result" : ""}.`;
 
   return (
     <dialog
@@ -97,8 +148,8 @@ export const PlanetCatalog = ({ onClose, onSelect, open }: PlanetCatalogProps) =
     >
       <div className="catalog-header">
         <div>
-          <p>NASA EXOPLANET ARCHIVE · THOUSANDS OF CONFIRMED WORLDS</p>
-          <h2 id="catalog-title">Where should we go next?</h2>
+          <p>DISCOVERY PORTAL · NASA EXOPLANET ARCHIVE</p>
+          <h2 id="catalog-title">Choose a world to discover</h2>
         </div>
         <button
           className="catalog-close"
@@ -109,13 +160,48 @@ export const PlanetCatalog = ({ onClose, onSelect, open }: PlanetCatalogProps) =
           ×
         </button>
       </div>
+      <div className="discovery-intro">
+        <span>EXPLORE BY PHENOMENON</span>
+        <small>Large targets are designed for gaze, pointer, touch, or mouse</small>
+      </div>
+      <div className="discovery-grid" aria-label="Planet discovery categories">
+        {categories.map((category) => (
+          <button
+            key={category.id}
+            className={`discovery-card${activeCategory === category.id ? " active" : ""}`}
+            type="button"
+            aria-pressed={activeCategory === category.id}
+            onClick={() => {
+              setQuery("");
+              setActiveCategory(category.id);
+            }}
+          >
+            <span className="discovery-icon" aria-hidden="true">
+              {category.icon}
+            </span>
+            <span>
+              <strong>{category.label}</strong>
+              <small>{category.note}</small>
+            </span>
+            <span className="discovery-arrow" aria-hidden="true">
+              ↗
+            </span>
+          </button>
+        ))}
+      </div>
+      <div className="discovery-divider">
+        <span>OR SEARCH BY NAME</span>
+      </div>
       <div className="catalog-search">
         <span className="search-reticle" aria-hidden="true" />
         <input
           ref={inputRef}
           type="search"
           value={query}
-          onChange={(event) => setQuery(event.target.value)}
+          onChange={(event) => {
+            setActiveCategory(null);
+            setQuery(event.target.value);
+          }}
           placeholder="Search Kepler, WASP, TRAPPIST or any known planet"
           autoComplete="off"
           minLength={2}
@@ -129,7 +215,7 @@ export const PlanetCatalog = ({ onClose, onSelect, open }: PlanetCatalogProps) =
         </p>
         <span>Gas · ice · rocky worlds</span>
       </div>
-      <ol className="catalog-results">
+      <ol className={`catalog-results${searchState === "idle" ? " is-idle" : ""}`}>
         {searchState === "loading" && (
           <li className="catalog-loading">
             <span /> Resolving confirmed worlds

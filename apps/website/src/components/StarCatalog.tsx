@@ -1,6 +1,6 @@
 import type { StarProfile } from "@exora/contracts";
 import { useEffect, useRef, useState } from "react";
-import { searchStars } from "../api-client.ts";
+import { discoverStars, searchStars } from "../api-client.ts";
 import { formatNumber } from "../planet-utils.tsx";
 import { starKindLabel } from "../star-utils.ts";
 
@@ -10,7 +10,18 @@ interface StarCatalogProps {
   open: boolean;
 }
 
-type SearchState = "loading" | "ready" | "error";
+type SearchState = "idle" | "loading" | "ready" | "error";
+
+const categories = [
+  { id: "nearby-stars", icon: "⌖", label: "Nearby stars", note: "Within our stellar neighborhood" },
+  { id: "sun-like", icon: "☼", label: "Sun-like stars", note: "F & G main-sequence stars" },
+  { id: "red-dwarfs", icon: "•", label: "Red dwarfs", note: "Small, cool & long-lived" },
+  { id: "blue-stars", icon: "✦", label: "Blue stars", note: "Hot, luminous stellar giants" },
+  { id: "giants", icon: "◉", label: "Giants & supergiants", note: "Stars in evolved stages" },
+  { id: "binary-systems", icon: "∞", label: "Binary systems", note: "Two stars in orbital dance" },
+  { id: "variable-stars", icon: "∿", label: "Variable stars", note: "Brightness that changes" },
+  { id: "stellar-remnants", icon: "⊙", label: "Stellar remnants", note: "White dwarfs & pulsars" },
+] as const;
 
 export const StarCatalog = ({ onClose, onSelect, open }: StarCatalogProps) => {
   const dialogRef = useRef<HTMLDialogElement>(null);
@@ -18,14 +29,14 @@ export const StarCatalog = ({ onClose, onSelect, open }: StarCatalogProps) => {
   const [query, setQuery] = useState("");
   const [stars, setStars] = useState<StarProfile[]>([]);
   const [cached, setCached] = useState(false);
-  const [searchState, setSearchState] = useState<SearchState>("loading");
+  const [searchState, setSearchState] = useState<SearchState>("idle");
+  const [activeCategory, setActiveCategory] = useState<string | null>(null);
 
   useEffect(() => {
     const dialog = dialogRef.current;
     if (!dialog) return;
     if (open && !dialog.open) {
       dialog.showModal();
-      window.setTimeout(() => inputRef.current?.focus(), 0);
     } else if (!open && dialog.open) {
       dialog.close();
     }
@@ -33,6 +44,29 @@ export const StarCatalog = ({ onClose, onSelect, open }: StarCatalogProps) => {
 
   useEffect(() => {
     if (!open) return;
+    if (activeCategory) {
+      const controller = new AbortController();
+      setSearchState("loading");
+      void discoverStars(activeCategory, { signal: controller.signal })
+        .then((result) => {
+          if (controller.signal.aborted) return;
+          setStars(result.stars);
+          setCached(result.cached);
+          setSearchState("ready");
+        })
+        .catch((error: unknown) => {
+          if (controller.signal.aborted) return;
+          console.error(error);
+          setStars([]);
+          setSearchState("error");
+        });
+      return () => controller.abort();
+    }
+    if (query.trim().length < 2) {
+      setStars([]);
+      setSearchState("idle");
+      return;
+    }
     const controller = new AbortController();
     setSearchState("loading");
     const delay = window.setTimeout(
@@ -57,18 +91,20 @@ export const StarCatalog = ({ onClose, onSelect, open }: StarCatalogProps) => {
       window.clearTimeout(delay);
       controller.abort();
     };
-  }, [open, query]);
+  }, [activeCategory, open, query]);
+
+  const activeLabel = categories.find((category) => category.id === activeCategory)?.label;
 
   const status =
-    searchState === "loading"
-      ? query.trim().length >= 2
-        ? `Resolving “${query.trim()}” in SIMBAD…`
-        : "Loading a guided set of nearby and notable stars…"
-      : searchState === "error"
-        ? "The SIMBAD signal is unavailable. Try again shortly."
-        : query.trim().length < 2
-          ? `${stars.length} destinations selected from the SIMBAD archive.`
-          : `${stars.length} exact ${stars.length === 1 ? "match" : "matches"}${cached ? " · cached result" : ""}.`;
+    searchState === "idle"
+      ? "Choose a stellar family, or search SIMBAD by name."
+      : searchState === "loading"
+        ? query.trim().length >= 2
+          ? `Resolving “${query.trim()}” in SIMBAD…`
+          : `Scanning SIMBAD for ${activeLabel ?? "stellar objects"}…`
+        : searchState === "error"
+          ? "The SIMBAD signal is unavailable. Try again shortly."
+          : `${stars.length} stellar ${stars.length === 1 ? "destination" : "destinations"}${activeLabel ? ` in ${activeLabel}` : ""}${cached ? " · cached result" : ""}.`;
 
   return (
     <dialog
@@ -83,8 +119,8 @@ export const StarCatalog = ({ onClose, onSelect, open }: StarCatalogProps) => {
     >
       <div className="catalog-header">
         <div>
-          <p>SIMBAD · CDS STRASBOURG · STELLAR OBJECTS</p>
-          <h2 id="star-catalog-title">Choose a star to observe</h2>
+          <p>DISCOVERY PORTAL · SIMBAD STELLAR ARCHIVE</p>
+          <h2 id="star-catalog-title">Choose a star to discover</h2>
         </div>
         <button
           className="catalog-close"
@@ -95,6 +131,38 @@ export const StarCatalog = ({ onClose, onSelect, open }: StarCatalogProps) => {
           ×
         </button>
       </div>
+      <div className="discovery-intro">
+        <span>EXPLORE BY STELLAR FAMILY</span>
+        <small>Large targets are designed for gaze, pointer, touch, or mouse</small>
+      </div>
+      <div className="discovery-grid" aria-label="Star discovery categories">
+        {categories.map((category) => (
+          <button
+            key={category.id}
+            className={`discovery-card${activeCategory === category.id ? " active" : ""}`}
+            type="button"
+            aria-pressed={activeCategory === category.id}
+            onClick={() => {
+              setQuery("");
+              setActiveCategory(category.id);
+            }}
+          >
+            <span className="discovery-icon" aria-hidden="true">
+              {category.icon}
+            </span>
+            <span>
+              <strong>{category.label}</strong>
+              <small>{category.note}</small>
+            </span>
+            <span className="discovery-arrow" aria-hidden="true">
+              ↗
+            </span>
+          </button>
+        ))}
+      </div>
+      <div className="discovery-divider">
+        <span>OR SEARCH BY NAME</span>
+      </div>
       <div className="catalog-search">
         <span className="star-search-mark" aria-hidden="true">
           ✦
@@ -103,8 +171,11 @@ export const StarCatalog = ({ onClose, onSelect, open }: StarCatalogProps) => {
           ref={inputRef}
           type="search"
           value={query}
-          onChange={(event) => setQuery(event.target.value)}
-          placeholder="Enter an exact name: Sirius, Betelgeuse, Vega…"
+          onChange={(event) => {
+            setActiveCategory(null);
+            setQuery(event.target.value);
+          }}
+          placeholder="Search Sirius, Betelgeuse, Vega or a catalog ID"
           autoComplete="off"
           aria-describedby="star-catalog-status"
         />
@@ -116,7 +187,7 @@ export const StarCatalog = ({ onClose, onSelect, open }: StarCatalogProps) => {
         </p>
         <span>Names · spectrum · astrometry</span>
       </div>
-      <ol className="catalog-results">
+      <ol className={`catalog-results${searchState === "idle" ? " is-idle" : ""}`}>
         {searchState === "loading" && (
           <li className="catalog-loading">
             <span /> Resolving stellar data

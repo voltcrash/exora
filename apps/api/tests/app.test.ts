@@ -34,6 +34,7 @@ const planet: ExoplanetProfile = {
 };
 
 const repository: PlanetRepository = {
+  discover: async () => ({ cached: true, value: [planet] }),
   findByName: async () => ({ cached: false, value: planet }),
   search: async () => ({ cached: true, value: [planet] }),
 };
@@ -64,6 +65,7 @@ const star: StarProfile = {
 };
 
 const starRepository: StarRepository = {
+  discover: async () => ({ cached: true, value: [star] }),
   featured: async () => ({ cached: true, value: [star] }),
   findByName: async () => ({ cached: false, value: star }),
   search: async () => ({ cached: false, value: [star] }),
@@ -84,6 +86,23 @@ test("returns normalized planet search results", async () => {
   expect(payload).toMatchObject({
     data: [{ id: "hip-65426-b" }],
     meta: { cached: true, count: 1, query: "hip" },
+  });
+});
+
+test("returns category-driven planet and star discovery results", async () => {
+  const app = createApp({ repository, starRepository });
+  const planetResponse = await app.request("/api/planets?category=earth-like");
+  const starResponse = await app.request("/api/stars?category=nearby-stars");
+
+  expect(planetResponse.status).toBe(200);
+  expect(await planetResponse.json()).toMatchObject({
+    data: [{ id: "hip-65426-b" }],
+    meta: { query: "earth-like" },
+  });
+  expect(starResponse.status).toBe(200);
+  expect(await starResponse.json()).toMatchObject({
+    data: [{ id: "alf-cma" }],
+    meta: { query: "nearby-stars" },
   });
 });
 

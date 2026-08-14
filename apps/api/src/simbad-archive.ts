@@ -60,10 +60,61 @@ interface CacheEntry<T> {
 }
 
 export interface StarRepository {
+  discover(
+    category: StarDiscoveryCategory,
+    limit: number,
+  ): Promise<RepositoryResult<StarProfile[]>>;
   featured(): Promise<RepositoryResult<StarProfile[]>>;
   findByName(name: string): Promise<RepositoryResult<StarProfile | null>>;
   search(query: string, limit: number): Promise<RepositoryResult<StarProfile[]>>;
 }
+
+export type StarDiscoveryCategory =
+  | "nearby-stars"
+  | "sun-like"
+  | "red-dwarfs"
+  | "blue-stars"
+  | "giants"
+  | "binary-systems"
+  | "variable-stars"
+  | "stellar-remnants";
+
+export const STAR_DISCOVERY_CATEGORIES = new Set<StarDiscoveryCategory>([
+  "nearby-stars",
+  "sun-like",
+  "red-dwarfs",
+  "blue-stars",
+  "giants",
+  "binary-systems",
+  "variable-stars",
+  "stellar-remnants",
+]);
+
+const STAR_DISCOVERY_FILTERS: Record<StarDiscoveryCategory, { order: string; where: string }> = {
+  "nearby-stars": { where: "b.plx_value >= 50", order: "b.plx_value desc" },
+  "sun-like": {
+    where: "(b.sp_type like 'F%V%' or b.sp_type like 'G%V%')",
+    order: 'f."V"',
+  },
+  "red-dwarfs": { where: "b.sp_type like 'M%V%'", order: "b.plx_value desc" },
+  "blue-stars": {
+    where: "(b.sp_type like 'O%' or b.sp_type like 'B%')",
+    order: 'f."V"',
+  },
+  giants: {
+    where: "(b.sp_type like '%III%' or b.sp_type like '%II%' or b.sp_type like '%I%')",
+    order: 'f."V"',
+  },
+  "binary-systems": {
+    where: "(b.otype like '%**%' or b.otype like 'SB%' or b.otype like 'EB%')",
+    order: "b.plx_value desc",
+  },
+  "variable-stars": { where: "b.otype like 'V*%'", order: 'f."V"' },
+  "stellar-remnants": {
+    where: "(b.otype like 'WD%' or b.otype like 'Psr%' or b.sp_type like 'D%')",
+    order: "b.plx_value desc",
+  },
+};
 
 export interface SimbadStarRepositoryOptions {
   cacheTtlMs?: number;
@@ -175,6 +226,18 @@ export class SimbadStarRepository implements StarRepository {
     this.#fetcher = options.fetcher ?? fetch;
     this.#now = options.now ?? Date.now;
     this.#timeoutMs = options.timeoutMs ?? 10_000;
+  }
+
+  discover(
+    category: StarDiscoveryCategory,
+    limit: number,
+  ): Promise<RepositoryResult<StarProfile[]>> {
+    const filter = STAR_DISCOVERY_FILTERS[category];
+    const safeLimit = Math.max(1, Math.min(Math.trunc(limit), 12));
+    const columns = STAR_COLUMNS.replace("i.id as matched_id", "b.main_id as matched_id");
+    return this.#query(
+      `select distinct top ${safeLimit} ${columns} from basic as b left outer join allfluxes as f on b.oid=f.oidref where ${filter.where} order by ${filter.order}`,
+    );
   }
 
   featured(): Promise<RepositoryResult<StarProfile[]>> {

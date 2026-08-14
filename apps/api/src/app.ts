@@ -7,8 +7,20 @@ import type {
 } from "@exora/contracts";
 import { Hono } from "hono";
 import { cors } from "hono/cors";
-import { NasaArchiveError, NasaPlanetRepository, type PlanetRepository } from "./nasa-archive.ts";
-import { SimbadArchiveError, SimbadStarRepository, type StarRepository } from "./simbad-archive.ts";
+import {
+  NasaArchiveError,
+  NasaPlanetRepository,
+  PLANET_DISCOVERY_CATEGORIES,
+  type PlanetDiscoveryCategory,
+  type PlanetRepository,
+} from "./nasa-archive.ts";
+import {
+  SimbadArchiveError,
+  SimbadStarRepository,
+  STAR_DISCOVERY_CATEGORIES,
+  type StarDiscoveryCategory,
+  type StarRepository,
+} from "./simbad-archive.ts";
 
 interface CreateAppOptions {
   repository?: PlanetRepository;
@@ -39,6 +51,29 @@ export const createApp = ({
 
   app.get("/api/planets", async (context) => {
     const query = context.req.query("q")?.trim() ?? "";
+    const category = context.req.query("category")?.trim() ?? "";
+
+    if (category) {
+      if (!PLANET_DISCOVERY_CATEGORIES.has(category as PlanetDiscoveryCategory)) {
+        return context.json(
+          apiError("INVALID_REQUEST", "Planet discovery category is invalid."),
+          400,
+        );
+      }
+      const requestedLimit = Number.parseInt(context.req.query("limit") ?? "12", 10);
+      const limit = Number.isFinite(requestedLimit) ? requestedLimit : 12;
+      const result = await repository.discover(category as PlanetDiscoveryCategory, limit);
+      context.header("Cache-Control", "public, max-age=900, stale-while-revalidate=21600");
+      return context.json<PlanetSearchResponse>({
+        data: result.value,
+        meta: {
+          cached: result.cached,
+          count: result.value.length,
+          query: category,
+          source: "NASA Exoplanet Archive",
+        },
+      });
+    }
 
     if (query.length < 2) {
       return context.json(
@@ -119,6 +154,28 @@ export const createApp = ({
 
   app.get("/api/stars", async (context) => {
     const query = context.req.query("q")?.trim() ?? "";
+    const category = context.req.query("category")?.trim() ?? "";
+    if (category) {
+      if (!STAR_DISCOVERY_CATEGORIES.has(category as StarDiscoveryCategory)) {
+        return context.json(
+          apiError("INVALID_REQUEST", "Star discovery category is invalid."),
+          400,
+        );
+      }
+      const requestedLimit = Number.parseInt(context.req.query("limit") ?? "12", 10);
+      const limit = Number.isFinite(requestedLimit) ? requestedLimit : 12;
+      const result = await starRepository.discover(category as StarDiscoveryCategory, limit);
+      context.header("Cache-Control", "public, max-age=1800, stale-while-revalidate=43200");
+      return context.json<StarSearchResponse>({
+        data: result.value,
+        meta: {
+          cached: result.cached,
+          count: result.value.length,
+          query: category,
+          source: "SIMBAD",
+        },
+      });
+    }
     if (query.length < 2) {
       return context.json(
         apiError("INVALID_REQUEST", "Star name must contain at least two characters."),
