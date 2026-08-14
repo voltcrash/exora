@@ -52,6 +52,29 @@ test("normalizes SIMBAD measurements and derives distance", () => {
   });
 });
 
+test("uses a proper-name alias for catalog-style discovery identifiers", () => {
+  const star = normalizeSimbadStar({
+    ...Object.fromEntries(metadata.map(({ name }, index) => [name, siriusRow[index]])),
+    aliases: "* alf CMa|NAME Sirius|HD 48915",
+    matched_id: "* alf CMa",
+  });
+
+  expect(star?.name).toBe("Sirius");
+  expect(star?.catalogName).toBe("* alf CMa");
+});
+
+test("formats Bayer designations when SIMBAD has no proper-name alias", () => {
+  const star = normalizeSimbadStar({
+    ...Object.fromEntries(metadata.map(({ name }, index) => [name, siriusRow[index]])),
+    aliases: "FK5 538|WDS J14396-6050AB",
+    main_id: "* alf Cen",
+    matched_id: "* alf Cen",
+  });
+
+  expect(star?.name).toBe("Alpha Centauri");
+  expect(star?.catalogName).toBe("* alf Cen");
+});
+
 test("uses exact alias matching and caches repeated searches", async () => {
   let requests = 0;
   let requestedUrl = "";

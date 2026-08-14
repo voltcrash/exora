@@ -26,16 +26,19 @@ const STAR_COLUMNS = [
   "b.sp_type",
   'f."V"',
   'f."G"',
+  "a.ids as aliases",
 ].join(",");
 const STAR_FROM =
   "from ident as i join basic as b on i.oidref=b.oid " +
-  "left outer join allfluxes as f on b.oid=f.oidref";
+  "left outer join allfluxes as f on b.oid=f.oidref " +
+  "left outer join ids as a on b.oid=a.oidref";
 
 type Fetcher = (input: string | URL | Request, init?: RequestInit) => Promise<Response>;
 
 interface SimbadStarRow {
   G: number | null;
   V: number | null;
+  aliases: string | null;
   dec: number | null;
   main_id: string | null;
   matched_id: string | null;
@@ -172,6 +175,49 @@ const titleCase = (value: string): string =>
     (word) => `${word[0]?.toUpperCase() ?? ""}${word.slice(1).toLowerCase()}`,
   );
 
+const GREEK_LETTER_NAMES: Readonly<Record<string, string>> = {
+  alf: "Alpha",
+  bet: "Beta",
+  gam: "Gamma",
+  del: "Delta",
+  eps: "Epsilon",
+  zet: "Zeta",
+  eta: "Eta",
+  tet: "Theta",
+  iot: "Iota",
+  kap: "Kappa",
+  lam: "Lambda",
+  mu: "Mu",
+  nu: "Nu",
+  ksi: "Xi",
+  omi: "Omicron",
+  pi: "Pi",
+  rho: "Rho",
+  sig: "Sigma",
+  tau: "Tau",
+  ups: "Upsilon",
+  phi: "Phi",
+  khi: "Chi",
+  psi: "Psi",
+  ome: "Omega",
+};
+
+const CONSTELLATION_NAMES: Readonly<Record<string, string>> = {
+  Aql: "Aquilae",
+  Cen: "Centauri",
+  Cet: "Ceti",
+  CMa: "Canis Majoris",
+  Cru: "Crucis",
+  Eri: "Eridani",
+  Leo: "Leonis",
+  Lup: "Lupi",
+  Lyr: "Lyrae",
+  Ori: "Orionis",
+  Sco: "Scorpii",
+  UMa: "Ursae Majoris",
+  UMi: "Ursae Minoris",
+};
+
 const nameCandidates = (name: string): string[] => {
   const clean = name.trim().replaceAll(/\s+/g, " ").slice(0, 100);
   const titled = titleCase(clean);
@@ -195,9 +241,25 @@ const classifyStar = (otype: string, spectralType: string | null): StarKind => {
   return "star";
 };
 
-const displayName = (matchedId: string, mainId: string): string => {
+const formatBayerDesignation = (identifier: string): string | null => {
+  const match = identifier.match(/^\*\s+([a-z]{2,3})(\d*)\s+([A-Z][A-Za-z]{2})(.*)$/);
+  if (!match) return null;
+  const greekName = GREEK_LETTER_NAMES[match[1] ?? ""];
+  if (!greekName) return null;
+  const constellation = CONSTELLATION_NAMES[match[3] ?? ""] ?? match[3];
+  return `${greekName}${match[2] ?? ""} ${constellation}${match[4] ?? ""}`.trim();
+};
+
+const displayName = (matchedId: string, mainId: string, aliases: string | null): string => {
   const matched = matchedId.replace(/^NAME\s+/i, "").trim();
-  return matched && !/^(\*|V\*|Cl\*)\s/.test(matched) ? matched : mainId;
+  if (matched && !/^(\*|V\*|Cl\*)\s/.test(matched)) return matched;
+
+  const properName = aliases
+    ?.split("|")
+    .find((alias) => /^NAME\s+/i.test(alias))
+    ?.replace(/^NAME\s+/i, "")
+    .trim();
+  return properName || formatBayerDesignation(mainId) || mainId;
 };
 
 export const normalizeSimbadStar = (
@@ -211,7 +273,7 @@ export const normalizeSimbadStar = (
   const dec = numberOrNull(row.dec);
   if (!mainId || !matchedId || ra === null || dec === null) return null;
 
-  const name = displayName(matchedId, mainId);
+  const name = displayName(matchedId, mainId, stringOrNull(row.aliases));
   const parallax = numberOrNull(row.plx_value);
   const spectralType = stringOrNull(row.sp_type);
   const otype = stringOrNull(row.otype) ?? "*";
@@ -264,7 +326,7 @@ export class SimbadStarRepository implements StarRepository {
     const safeLimit = Math.max(1, Math.min(Math.trunc(limit), 12));
     const columns = STAR_COLUMNS.replace("i.id as matched_id", "b.main_id as matched_id");
     return this.#query(
-      `select distinct top ${safeLimit} ${columns} from basic as b left outer join allfluxes as f on b.oid=f.oidref where ${filter.where} order by ${filter.order}`,
+      `select distinct top ${safeLimit} ${columns} from basic as b left outer join allfluxes as f on b.oid=f.oidref left outer join ids as a on b.oid=a.oidref where ${filter.where} order by ${filter.order}`,
     );
   }
 
