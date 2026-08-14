@@ -19,7 +19,7 @@ catalog:
   react: ^19.2.8
   react-dom: ^19.2.8
   typescript: ^7.0.2
-  vercel: ^58.9.5
+  vercel: ^58.10.0
   vite: npm:@voidzero-dev/vite-plus-core@0.2.9
   vite-plus: 0.2.9
 overrides:
