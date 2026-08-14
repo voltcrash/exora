@@ -2,6 +2,7 @@ import type { ExoplanetProfile } from "@exora/contracts";
 import { useEffect, useRef, useState } from "react";
 import { discoverPlanets, searchPlanets } from "../api-client.ts";
 import { formatNumber, hasRenderer, planetKindLabel } from "../planet-utils.tsx";
+import { PlanetCatalogVisual } from "./CatalogVisual.tsx";
 
 interface PlanetCatalogProps {
   onClose: () => void;
@@ -82,6 +83,7 @@ export const PlanetCatalog = ({ onClose, onSelect, open }: PlanetCatalogProps) =
   const [searchState, setSearchState] = useState<SearchState>("idle");
   const [activeCategory, setActiveCategory] = useState<string | null>(null);
   const [portalView, setPortalView] = useState<"collections" | "categories">("collections");
+  const [resultView, setResultView] = useState<"gallery" | "list">("gallery");
 
   useEffect(() => {
     const dialog = dialogRef.current;
@@ -294,9 +296,26 @@ export const PlanetCatalog = ({ onClose, onSelect, open }: PlanetCatalogProps) =
         <p id="catalog-status" role="status">
           {status}
         </p>
-        <span>Gas · ice · rocky worlds</span>
+        <div className="catalog-view-toggle" role="group" aria-label="Planet result layout">
+          <button
+            type="button"
+            aria-pressed={resultView === "gallery"}
+            onClick={() => setResultView("gallery")}
+          >
+            ▦ Gallery
+          </button>
+          <button
+            type="button"
+            aria-pressed={resultView === "list"}
+            onClick={() => setResultView("list")}
+          >
+            ☰ List
+          </button>
+        </div>
       </div>
-      <ol className={`catalog-results${searchState === "idle" ? " is-idle" : ""}`}>
+      <ol
+        className={`catalog-results ${resultView}-view${searchState === "idle" ? " is-idle" : ""}`}
+      >
         {searchState === "loading" && (
           <li className="catalog-loading">
             <span /> Resolving confirmed worlds
@@ -320,6 +339,9 @@ export const PlanetCatalog = ({ onClose, onSelect, open }: PlanetCatalogProps) =
                   disabled={!supported}
                   onClick={() => onSelect(planet, cached)}
                 >
+                  <span className="result-preview">
+                    <PlanetCatalogVisual planet={planet} />
+                  </span>
                   <span className="result-marker" aria-hidden="true" />
                   <span className="result-identity">
                     <strong>{planet.name}</strong>

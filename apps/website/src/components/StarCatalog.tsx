@@ -3,6 +3,7 @@ import { useEffect, useRef, useState } from "react";
 import { discoverStars, searchStars } from "../api-client.ts";
 import { formatNumber } from "../planet-utils.tsx";
 import { starKindLabel } from "../star-utils.ts";
+import { StarCatalogVisual } from "./CatalogVisual.tsx";
 
 interface StarCatalogProps {
   onClose: () => void;
@@ -63,6 +64,7 @@ export const StarCatalog = ({ onClose, onSelect, open }: StarCatalogProps) => {
   const [searchState, setSearchState] = useState<SearchState>("idle");
   const [activeCategory, setActiveCategory] = useState<string | null>(null);
   const [portalView, setPortalView] = useState<"collections" | "categories">("collections");
+  const [resultView, setResultView] = useState<"gallery" | "list">("gallery");
 
   useEffect(() => {
     const dialog = dialogRef.current;
@@ -266,9 +268,26 @@ export const StarCatalog = ({ onClose, onSelect, open }: StarCatalogProps) => {
         <p id="star-catalog-status" role="status">
           {status}
         </p>
-        <span>Names · spectrum · astrometry</span>
+        <div className="catalog-view-toggle" role="group" aria-label="Star result layout">
+          <button
+            type="button"
+            aria-pressed={resultView === "gallery"}
+            onClick={() => setResultView("gallery")}
+          >
+            ▦ Gallery
+          </button>
+          <button
+            type="button"
+            aria-pressed={resultView === "list"}
+            onClick={() => setResultView("list")}
+          >
+            ☰ List
+          </button>
+        </div>
       </div>
-      <ol className={`catalog-results${searchState === "idle" ? " is-idle" : ""}`}>
+      <ol
+        className={`catalog-results ${resultView}-view${searchState === "idle" ? " is-idle" : ""}`}
+      >
         {searchState === "loading" && (
           <li className="catalog-loading">
             <span /> Resolving stellar data
@@ -288,6 +307,9 @@ export const StarCatalog = ({ onClose, onSelect, open }: StarCatalogProps) => {
                 type="button"
                 onClick={() => onSelect(star, cached)}
               >
+                <span className="result-preview">
+                  <StarCatalogVisual star={star} />
+                </span>
                 <span className="result-marker star-result-marker" aria-hidden="true" />
                 <span className="result-identity">
                   <strong>{star.name}</strong>

@@ -1723,6 +1723,43 @@ body[data-xr-status="unavailable"] .status-light {
   text-transform: uppercase;
 }
 
+.catalog-view-toggle {
+  display: flex;
+  gap: 5px;
+  padding: 3px;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background: rgb(0 0 0 / 20%);
+}
+
+.catalog-view-toggle button {
+  min-height: 28px;
+  padding: 0 11px;
+  border: 0;
+  border-radius: 999px;
+  color: var(--faint);
+  background: transparent;
+  cursor: pointer;
+  font-family: var(--mono);
+  font-size: 7px;
+  text-transform: uppercase;
+}
+
+.catalog-view-toggle button[aria-pressed="true"] {
+  color: #061012;
+  background: var(--cyan);
+}
+
+.star-catalog .catalog-view-toggle button[aria-pressed="true"] {
+  color: #171006;
+  background: #ffc96f;
+}
+
+.catalog-view-toggle button:focus-visible {
+  outline: 2px solid var(--cyan);
+  outline-offset: 2px;
+}
+
 .catalog-results {
   max-height: 310px;
   margin: 0;
@@ -1739,6 +1776,10 @@ body[data-xr-status="unavailable"] .status-light {
 
 .catalog-results li + li {
   margin-top: 8px;
+}
+
+.result-preview {
+  display: none;
 }
 
 .catalog-result {
@@ -1765,6 +1806,189 @@ body[data-xr-status="unavailable"] .status-light {
   border-color: rgb(139 230 234 / 36%);
   background: rgb(139 230 234 / 5%);
   transform: translateX(3px);
+}
+
+.catalog-results.gallery-view {
+  max-height: 500px;
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.catalog-results.gallery-view li + li {
+  margin-top: 0;
+}
+
+.gallery-view .catalog-result {
+  min-height: 296px;
+  height: 100%;
+  grid-template-areas:
+    "preview preview"
+    "identity identity"
+    "metrics state";
+  grid-template-columns: minmax(0, 1fr) auto;
+  grid-template-rows: 174px auto auto;
+  align-content: start;
+  align-items: end;
+  gap: 12px 8px;
+  padding: 11px;
+  overflow: hidden;
+  position: relative;
+  border-radius: 17px;
+}
+
+.gallery-view .catalog-result:not(:disabled):hover {
+  transform: translateY(-3px);
+}
+
+.gallery-view .result-preview {
+  min-width: 0;
+  display: block;
+  grid-area: preview;
+}
+
+.gallery-view .result-marker {
+  display: none;
+}
+
+.gallery-view .result-identity {
+  grid-area: identity;
+  padding: 0 5px;
+}
+
+.gallery-view .result-identity strong {
+  font-size: 13px;
+}
+
+.gallery-view .result-metrics {
+  grid-area: metrics;
+  padding: 0 5px 3px;
+}
+
+.gallery-view .result-state {
+  grid-area: state;
+  padding: 0 5px 3px;
+}
+
+.catalog-visual {
+  height: 174px;
+  display: grid;
+  place-items: center;
+  overflow: hidden;
+  position: relative;
+  border: 1px solid rgb(229 244 247 / 8%);
+  border-radius: 12px;
+  background:
+    radial-gradient(circle at 16% 20%, rgb(255 255 255 / 17%) 0 1px, transparent 2px),
+    radial-gradient(circle at 72% 18%, rgb(255 255 255 / 12%) 0 1px, transparent 2px),
+    radial-gradient(circle at 88% 70%, rgb(255 255 255 / 15%) 0 1px, transparent 2px),
+    radial-gradient(circle at 30% 80%, rgb(255 255 255 / 10%) 0 1px, transparent 2px),
+    radial-gradient(circle at 50% 46%, rgb(22 45 49 / 38%), transparent 66%), #05090b;
+}
+
+.catalog-orbit {
+  width: 142px;
+  height: 48px;
+  position: absolute;
+  border: 1px solid rgb(139 230 234 / 12%);
+  border-radius: 50%;
+  transform: rotate(var(--visual-tilt));
+}
+
+.catalog-planet-sphere {
+  width: 116px;
+  height: 116px;
+  z-index: 1;
+  position: relative;
+  border-radius: 50%;
+  background:
+    radial-gradient(circle at 33% 28%, hsl(var(--visual-accent) 72% 78% / 72%), transparent 18%),
+    radial-gradient(circle at 68% 66%, hsl(var(--visual-shadow) 62% 11% / 85%), transparent 52%),
+    repeating-linear-gradient(
+      calc(84deg + var(--visual-tilt)),
+      hsl(var(--visual-hue) 48% 46%) 0 9px,
+      hsl(var(--visual-accent) 38% 31%) 10px 17px,
+      hsl(var(--visual-shadow) 44% 20%) 18px 23px
+    );
+  box-shadow:
+    inset -20px -13px 28px rgb(0 0 0 / 68%),
+    inset 12px 8px 20px rgb(255 255 255 / 8%),
+    0 0 32px hsl(var(--visual-hue) 55% 55% / 17%);
+  transform: rotate(var(--visual-tilt));
+}
+
+.planet-catalog-visual.rocky .catalog-planet-sphere {
+  background:
+    radial-gradient(circle at 32% 25%, hsl(var(--visual-accent) 58% 72% / 65%), transparent 15%),
+    radial-gradient(circle at 64% 38%, hsl(var(--visual-shadow) 40% 20%) 0 5%, transparent 7%),
+    radial-gradient(circle at 42% 68%, hsl(var(--visual-shadow) 32% 23%) 0 8%, transparent 10%),
+    radial-gradient(circle at 70% 72%, hsl(var(--visual-accent) 38% 34%) 0 12%, transparent 14%),
+    linear-gradient(135deg, hsl(var(--visual-hue) 48% 48%), hsl(var(--visual-shadow) 42% 22%));
+}
+
+.planet-catalog-visual.ice-giant .catalog-planet-sphere {
+  filter: saturate(0.78) brightness(1.12);
+}
+
+.catalog-visual-glint {
+  width: 18px;
+  height: 18px;
+  z-index: 2;
+  position: absolute;
+  top: 29px;
+  left: calc(50% - 37px);
+  border-radius: 50%;
+  background: rgb(255 255 255 / 25%);
+  filter: blur(7px);
+}
+
+.star-catalog-visual {
+  background:
+    radial-gradient(circle at 15% 22%, rgb(255 255 255 / 22%) 0 1px, transparent 2px),
+    radial-gradient(circle at 75% 18%, rgb(255 255 255 / 17%) 0 1px, transparent 2px),
+    radial-gradient(circle at 85% 75%, rgb(255 255 255 / 20%) 0 1px, transparent 2px),
+    radial-gradient(circle at 28% 78%, rgb(255 255 255 / 13%) 0 1px, transparent 2px),
+    radial-gradient(circle, hsl(var(--star-hue) 90% 62% / 10%), transparent 68%), #05080c;
+}
+
+.catalog-star-rays {
+  width: 142px;
+  height: 142px;
+  position: absolute;
+  background: conic-gradient(
+    from var(--star-ray),
+    transparent 0 10%,
+    hsl(var(--star-hue) 90% 76% / 14%) 12%,
+    transparent 14% 48%,
+    hsl(var(--star-hue) 90% 76% / 10%) 50%,
+    transparent 52% 100%
+  );
+  filter: blur(4px);
+}
+
+.catalog-star-core {
+  width: 108px;
+  height: 108px;
+  z-index: 1;
+  border-radius: 50%;
+  background:
+    radial-gradient(circle at 35% 29%, rgb(255 255 255 / 94%), transparent 9%),
+    radial-gradient(
+      circle at 45% 42%,
+      #fff 0 12%,
+      hsl(var(--star-hue) 96% 82%) 32%,
+      hsl(var(--star-hue) 89% var(--star-bloom)) 66%,
+      hsl(var(--star-hue) 82% 38%) 100%
+    );
+  box-shadow:
+    0 0 18px hsl(var(--star-hue) 94% 74% / 70%),
+    0 0 50px hsl(var(--star-hue) 90% 60% / 28%),
+    inset -9px -6px 17px rgb(70 32 0 / 28%);
+}
+
+.star-catalog-visual .catalog-visual-glint {
+  top: 34px;
+  background: #fff;
 }
 
 .catalog-result:disabled {
@@ -2235,6 +2459,11 @@ body[data-xr-status="unavailable"] .status-light {
     padding: 11px 17px 13px;
   }
 
+  .catalog-view-toggle button {
+    min-height: 34px;
+    padding: 0 10px;
+  }
+
   .catalog-meta span,
   .result-metrics {
     display: none;
@@ -2242,6 +2471,51 @@ body[data-xr-status="unavailable"] .status-light {
 
   .catalog-results {
     padding: 0 16px 16px;
+  }
+
+  .catalog-results.gallery-view {
+    max-height: 430px;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 8px;
+  }
+
+  .gallery-view .catalog-result {
+    min-height: 238px;
+    grid-template-rows: 128px auto auto;
+    padding: 8px;
+  }
+
+  .gallery-view .result-identity strong {
+    font-size: 10px;
+  }
+
+  .catalog-visual {
+    height: 128px;
+  }
+
+  .catalog-planet-sphere,
+  .catalog-star-core {
+    width: 84px;
+    height: 84px;
+  }
+
+  .catalog-orbit,
+  .catalog-star-rays {
+    width: 108px;
+    height: 108px;
+  }
+
+  .catalog-orbit {
+    height: 36px;
+  }
+
+  .catalog-visual-glint {
+    top: 23px;
+    left: calc(50% - 27px);
+  }
+
+  .star-catalog-visual .catalog-visual-glint {
+    top: 27px;
   }
 
   .catalog-result {
