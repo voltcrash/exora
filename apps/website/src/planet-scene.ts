@@ -16,6 +16,7 @@ import "@babylonjs/core/Meshes/instancedMesh.js";
 import { VertexData } from "@babylonjs/core/Meshes/mesh.vertexData.js";
 import { Scene, ScenePerformancePriority } from "@babylonjs/core/scene.js";
 import { TransformNode } from "@babylonjs/core/Meshes/transformNode.js";
+import type { WebXRCamera } from "@babylonjs/core/XR/webXRCamera.js";
 import { WebXRDefaultExperience } from "@babylonjs/core/XR/webXRDefaultExperience.js";
 import "@babylonjs/core/XR/features/WebXRControllerMovement.js";
 import "@babylonjs/core/XR/features/WebXRControllerPointerSelection.js";
@@ -30,12 +31,24 @@ import {
   type RenderQualityProfile,
   type RenderQualityTier,
 } from "./render-quality.ts";
+import { createXrMenu, type XrMenu, type XrMenuItem } from "./xr-menu.ts";
+import { requestVrHandoff } from "./xr-session.ts";
 
 const PLANET_POSITION = new Vector3(0, 1.35, 9.5);
 const VIEWING_DECK_POSITION = new Vector3(0, 0, -7.4);
 const LIGHT_DIRECTION = new Vector3(-0.82, 0.3, -0.38).normalize();
 const DESKTOP_MOVE_SPEED = 5.2;
 const XR_MOVE_SPEED = 2.2;
+const SURFACE_GROUND_ORIGIN_Z = 18;
+const SURFACE_GROUND_BASE_Y = -1.6;
+/** Where the wearer stands when the immersive session drops onto the terrain. */
+const XR_SURFACE_STAND = new Vector3(0, 0, 12);
+const XR_SURFACE_BOUNDS = { maxX: 30, maxZ: 50, minX: -30, minZ: -14 };
+/** Radius of the orbital platform, so a thumbstick cannot walk the wearer into empty space. */
+const XR_DECK_RADIUS = 2.4;
+
+const clamp = (value: number, minimum: number, maximum: number): number =>
+  Math.min(maximum, Math.max(minimum, value));
 
 const SKY_VERTEX_SHADER = `
 precision highp float;
@@ -1278,6 +1291,10 @@ const surfaceTerrainHeight = (x: number, z: number, recipe: WorldRecipe): number
   return (base * (1 - terraceAmount) + terraced * terraceAmount) * relief + crater + horizonLift;
 };
 
+/** Terrain height in world space, matching how the surface ground mesh is placed. */
+const surfaceGroundHeight = (x: number, z: number, recipe: WorldRecipe): number =>
+  SURFACE_GROUND_BASE_Y + surfaceTerrainHeight(x, z - SURFACE_GROUND_ORIGIN_Z, recipe);
+
 const mixRgb = (from: Rgb, to: Rgb, amount: number): Color4 =>
   new Color4(
     from[0] + (to[0] - from[0]) * amount,
@@ -1401,7 +1418,7 @@ const createSurfaceEnvironment = (
     scene,
   );
   ground.parent = root;
-  ground.position.set(0, -1.6, 18);
+  ground.position.set(0, SURFACE_GROUND_BASE_Y, SURFACE_GROUND_ORIGIN_Z);
   ground.isPickable = false;
   meshes.push(ground);
   const surfaceSky = createSurfaceSky(scene, root, recipe, profile);
@@ -1644,6 +1661,8 @@ export const createPlanetExperience = ({
   );
   engine.setHardwareScalingLevel(profile.hardwareScalingLevel);
 
+  let isInXr = false;
+
   const scene = new Scene(engine);
   scene.clearColor = new Color4(0.0015, 0.003, 0.008, 1);
   scene.performancePriority = ScenePerformancePriority.Intermediate;
@@ -1671,6 +1690,15 @@ export const createPlanetExperience = ({
   keyLight.diffuse = toColor3(recipe.star.color);
   keyLight.intensity = 2.2 * recipe.star.intensity;
 
+  // Picking the host star tears this scene down, so an immersive session has to be handed over
+  // to the star scene instead of silently dropping the wearer back into the flat page.
+  const travelToHostStar = onSelectHostStar
+    ? (): void => {
+        if (isInXr) requestVrHandoff();
+        onSelectHostStar();
+      }
+    : undefined;
+
   createStarfield(scene, recipe.seed, profile.starCount);
   const viewingDeck = createViewingDeck(scene, profile);
   const {
@@ -1684,12 +1712,11 @@ export const createPlanetExperience = ({
     ringSystem,
     shader,
   } = createPlanet(scene, recipe, profile);
-  orbitalMeshes.push(...createHostStar(scene, recipe, profile, orbitalRoot, onSelectHostStar));
-  const surfaceEnvironment = createSurfaceEnvironment(scene, recipe, profile, onSelectHostStar);
+  orbitalMeshes.push(...createHostStar(scene, recipe, profile, orbitalRoot, travelToHostStar));
+  const surfaceEnvironment = createSurfaceEnvironment(scene, recipe, profile, travelToHostStar);
 
   let elapsedSeconds = 0;
   let qualitySampleSeconds = 0;
-  let isInXr = false;
   let viewState: "entering" | "leaving" | "orbit" | "surface" = "orbit";
   let viewTransitionSeconds = 0;
   const pressedMovementKeys = new Set<string>();
@@ -1847,6 +1874,30 @@ export const createPlanetExperience = ({
     atmosphere.setVector3("cameraPosition", activePosition);
     cloudLayer?.setVector3("cameraPosition", activePosition);
 
+    const rig = isInXr ? xrCamera() : null;
+    if (rig) {
+      // Thumbstick movement slides the rig across a flat plane, so the wearer has to be kept on
+      // the terrain (or on the deck) instead of hovering above it or walking off the world.
+      const eyeHeight = rig.realWorldHeight;
+      if (viewState === "surface") {
+        rig.position.x = clamp(rig.position.x, XR_SURFACE_BOUNDS.minX, XR_SURFACE_BOUNDS.maxX);
+        rig.position.z = clamp(rig.position.z, XR_SURFACE_BOUNDS.minZ, XR_SURFACE_BOUNDS.maxZ);
+        const groundY = surfaceGroundHeight(rig.position.x, rig.position.z, recipe);
+        rig.position.y += groundY - (rig.position.y - eyeHeight);
+      } else {
+        const offsetX = rig.position.x - VIEWING_DECK_POSITION.x;
+        const offsetZ = rig.position.z - VIEWING_DECK_POSITION.z;
+        const distance = Math.hypot(offsetX, offsetZ);
+        if (distance > XR_DECK_RADIUS) {
+          const scale = XR_DECK_RADIUS / distance;
+          rig.position.x = VIEWING_DECK_POSITION.x + offsetX * scale;
+          rig.position.z = VIEWING_DECK_POSITION.z + offsetZ * scale;
+        }
+        rig.position.y += VIEWING_DECK_POSITION.y - (rig.position.y - eyeHeight);
+      }
+      xrMenu?.update(rig, deltaSeconds);
+    }
+
     if (qualitySampleSeconds >= 3) {
       qualitySampleSeconds = 0;
       const currentLevel = engine.getHardwareScalingLevel();
@@ -1866,14 +1917,111 @@ export const createPlanetExperience = ({
 
   onXrStatusChange("checking");
   let xr: WebXRDefaultExperience | null = null;
+  let xrMenu: XrMenu | null = null;
   let isVrSupported = false;
   let disposed = false;
+
+  const xrCamera = (): WebXRCamera | null => xr?.baseExperience.camera ?? null;
+
+  /**
+   * Moves the rig to the spot that makes sense for a view.
+   *
+   * On the very first pose Babylon has yet to add the wearer's real height to the rig, so the
+   * position it expects is the floor. Every later move happens mid-session, where the camera
+   * already sits at head height and the offset has to be added back by hand.
+   */
+  const placeXrCamera = (surface: boolean, initial: boolean): void => {
+    const rig = xrCamera();
+    if (!rig) return;
+    const headOffset = initial ? 0 : rig.realWorldHeight;
+    if (surface) {
+      const groundY = surfaceGroundHeight(XR_SURFACE_STAND.x, XR_SURFACE_STAND.z, recipe);
+      rig.position.set(XR_SURFACE_STAND.x, groundY + headOffset, XR_SURFACE_STAND.z);
+      rig.setTarget(new Vector3(XR_SURFACE_STAND.x, groundY + 1.4, XR_SURFACE_STAND.z + 18));
+    } else {
+      rig.position.set(
+        VIEWING_DECK_POSITION.x,
+        VIEWING_DECK_POSITION.y + headOffset,
+        VIEWING_DECK_POSITION.z,
+      );
+      rig.setTarget(PLANET_POSITION);
+    }
+  };
+
+  /** Restores the desktop camera so leaving the headset lands on the view the wearer left in. */
+  const syncDesktopCamera = (surface: boolean): void => {
+    camera.lowerRadiusLimit = surface ? 7.5 : 10.5;
+    camera.upperRadiusLimit = surface ? 18.4 : 25;
+    camera.lowerBetaLimit = surface ? 1.02 : 0.58;
+    camera.upperBetaLimit = surface ? 1.48 : Math.PI - 0.58;
+    camera.target.copyFrom(surface ? surfaceTarget : orbitTarget);
+    camera.radius = surface ? 12.8 : 17.2;
+    camera.beta = surface ? 1.23 : Math.PI / 2.13;
+    camera.alpha = -Math.PI / 2;
+    camera.attachControl(canvas, true);
+  };
+
+  const buildXrMenuItems = (): XrMenuItem[] => {
+    const surface = viewState === "surface";
+    const items: XrMenuItem[] = [
+      surface
+        ? {
+            id: "orbit",
+            label: "Return to orbit",
+            detail: "See the whole world again",
+            onSelect: () => applyXrView(false, false),
+          }
+        : {
+            id: "surface",
+            label: "Descend to the surface",
+            detail: "Walk the terrain",
+            onSelect: () => applyXrView(true, false),
+          },
+      {
+        id: "recentre",
+        label: "Recentre me",
+        detail: surface ? "Face the horizon" : "Face the planet",
+        onSelect: () => placeXrCamera(viewState === "surface", false),
+      },
+    ];
+
+    if (travelToHostStar) {
+      items.push({
+        id: "host-star",
+        label: "Travel to the host star",
+        detail: "Rebuilds the immersive session",
+        onSelect: travelToHostStar,
+      });
+    }
+
+    items.push({
+      id: "exit",
+      label: "Exit immersive VR",
+      detail: "Back to the browser view",
+      onSelect: () => void xr?.baseExperience.exitXRAsync(),
+    });
+    return items;
+  };
+
+  /** Switches view from inside the headset, where the orbit camera transition cannot be used. */
+  const applyXrView = (surface: boolean, initial: boolean): void => {
+    viewState = surface ? "surface" : "orbit";
+    viewTransitionSeconds = 0;
+    applyViewEnvironment(surface);
+    setViewingDeckVisible(viewingDeck, !surface);
+    placeXrCamera(surface, initial);
+    xrMenu?.setTitle(surface ? "Surface excursion" : "Orbital deck");
+    xrMenu?.setItems(buildXrMenuItems());
+    onViewModeChange(surface ? "surface" : "orbit");
+  };
 
   void WebXRDefaultExperience.CreateAsync(scene, {
     disableDefaultUI: true,
     disableNearInteraction: true,
     disableTeleportation: true,
     floorMeshes: [viewingDeck.floor],
+    // The rigged hand mesh is a remote glTF and no loader is bundled, so joint spheres are used.
+    handSupportOptions: { handMeshes: { disableDefaultMeshes: true } },
     inputOptions: { doNotLoadControllerMeshes: true },
     optionalFeatures: ["hand-tracking"],
     outputCanvasOptions: {
@@ -1903,14 +2051,19 @@ export const createPlanetExperience = ({
         rotationThreshold: 0.18,
         xrInput: createdXr.input,
       });
-      createdXr.baseExperience.onInitialXRPoseSetObservable.add((xrCamera) => {
-        xrCamera.position.copyFrom(VIEWING_DECK_POSITION);
+      xrMenu = createXrMenu(scene, viewState === "surface" ? "Surface excursion" : "Orbital deck");
+      xrMenu.setItems(buildXrMenuItems());
+
+      // The rig lands wherever the headset happens to face, so the view has to be aimed at the
+      // subject; otherwise the session opens on empty starfield and looks broken.
+      createdXr.baseExperience.onInitialXRPoseSetObservable.add(() => {
+        applyXrView(viewState === "surface", true);
       });
 
       createdXr.baseExperience.onStateChangedObservable.add((state) => {
         if (disposed) return;
         if (state === WebXRState.ENTERING_XR) {
-          setViewingDeckVisible(viewingDeck, true);
+          setViewingDeckVisible(viewingDeck, viewState !== "surface");
           onXrStatusChange("entering");
         }
         if (state === WebXRState.IN_XR) {
@@ -1918,11 +2071,15 @@ export const createPlanetExperience = ({
           if (createdXr.baseExperience.sessionManager.isFixedFoveationSupported) {
             createdXr.baseExperience.sessionManager.fixedFoveation = profile.xrFixedFoveation;
           }
+          xrMenu?.setItems(buildXrMenuItems());
+          xrMenu?.setVisible(true);
           onXrStatusChange("in-xr");
         }
         if (state === WebXRState.NOT_IN_XR) {
           isInXr = false;
+          xrMenu?.setVisible(false);
           setViewingDeckVisible(viewingDeck, false);
+          syncDesktopCamera(viewState === "surface");
           onXrStatusChange(isVrSupported ? "ready" : "unavailable");
         }
       });
@@ -1959,6 +2116,8 @@ export const createPlanetExperience = ({
       window.removeEventListener("keydown", onMovementKeyDown);
       window.removeEventListener("keyup", onMovementKeyUp);
       window.removeEventListener("blur", clearMovementKeys);
+      xrMenu?.dispose();
+      xrMenu = null;
       xr?.dispose();
       engine.stopRenderLoop();
       scene.dispose();

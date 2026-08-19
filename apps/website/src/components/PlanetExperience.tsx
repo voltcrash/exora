@@ -4,6 +4,7 @@ import type { PlanetLoadResult } from "../api-client.ts";
 import type { PlanetExperience as BabylonExperience, ViewMode, XrStatus } from "../planet-scene.ts";
 import { formatNumber, formatPlanetName } from "../planet-utils.tsx";
 import { isXrEmulated } from "../xr-emulator.ts";
+import { clearVrHandoff, consumeVrHandoff } from "../xr-session.ts";
 
 interface PlanetExperienceProps {
   onOpenCatalog: () => void;
@@ -54,6 +55,13 @@ export const PlanetExperience = ({
 
   useEffect(() => {
     document.body.dataset.xrStatus = xrStatus;
+  }, [xrStatus]);
+
+  // Travelling between celestial objects rebuilds the renderer and therefore ends the running
+  // session; re-entering as soon as the new scene is ready keeps the headset on.
+  useEffect(() => {
+    if (xrStatus !== "ready" || !consumeVrHandoff()) return;
+    void experienceRef.current?.enterVr().catch(() => clearVrHandoff());
   }, [xrStatus]);
 
   useEffect(() => {
