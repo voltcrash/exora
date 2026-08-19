@@ -19,6 +19,7 @@ The current slice renders HIP 65426 b using a normalized response from the NASA 
 - an interactive Babylon.js scene with desktop orbit controls;
 - a responsive observation HUD; and
 - a WebXR entry flow with a teleportable viewing deck;
+- an opt-in emulated WebXR runtime for debugging immersive mode in a desktop browser;
 - adaptive Quest rendering with reduced geometry, dynamic desktop resolution, and fixed foveation;
 - a local data fallback when NASA or the API is unavailable.
 
@@ -65,6 +66,8 @@ vp run db:sync
 When `DATABASE_URL` is present, the API serves lookups and searches from PostgreSQL. Without it, local development continues to query NASA directly. Catalog synchronization runs as an explicit job so production can schedule it independently from API startup.
 
 WebXR requires a secure context. Localhost works for desktop development; testing from a Quest on the local network will require serving the app over HTTPS or deploying it to an HTTPS host.
+
+To exercise the immersive flow without a headset, open <http://localhost:5173/?xr=emulate>. The dev server then installs an emulated Quest runtime over `navigator.xr` and shows an on-screen headset and controller rig. See the [desktop WebXR emulation guide](docs/webxr-emulation.md).
 
 Use the [Meta Quest smoke-test checklist](docs/quest-testing.md) for headset validation and performance targets.
 

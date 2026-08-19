@@ -19,9 +19,11 @@
     "react-dom": "catalog:"
   },
   "devDependencies": {
+    "@iwer/devui": "catalog:",
     "@types/react": "catalog:",
     "@types/react-dom": "catalog:",
     "@vitejs/plugin-react": "catalog:",
+    "iwer": "catalog:",
     "typescript": "^7.0.2",
     "vite": "catalog:",
     "vite-plus": "catalog:"

@@ -3,6 +3,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import type { PlanetLoadResult } from "../api-client.ts";
 import type { PlanetExperience as BabylonExperience, ViewMode, XrStatus } from "../planet-scene.ts";
 import { archiveStateLabel, formatNumber, formatPlanetName } from "../planet-utils.tsx";
+import { isXrEmulated } from "../xr-emulator.ts";
 
 interface PlanetExperienceProps {
   onOpenCatalog: () => void;
@@ -315,7 +316,9 @@ export const PlanetExperience = ({
           <span>
             <small>SESSION STATUS</small>
             <strong>
-              {sceneState === "error" ? "RENDERER UNAVAILABLE" : xrCopy[xrStatus].label}
+              {sceneState === "error"
+                ? "RENDERER UNAVAILABLE"
+                : `${xrCopy[xrStatus].label}${isXrEmulated() ? " · EMULATED" : ""}`}
             </strong>
           </span>
         </div>
