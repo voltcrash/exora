@@ -1,11 +1,12 @@
 # Rules
 
-- don't use any other package manager other than pnpm - it will also be only accessed through Vite+
+- don't use any other package manager except pnpm - it will also be only accessed through Vite+
 - don't use npx, only pnpm dlx
 - never use pnpm directly - every thing uses Vite+, read the Vite+ instructions below
 - never rollback to outdated versions just because some errors were encountered
 - without permission you must never use old versions
 - always use the latest version of everything
+- node.js will use latest LTS version only
 
 <!--VITE PLUS START-->
 
