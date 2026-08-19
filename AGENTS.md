@@ -8,6 +8,7 @@
 - always use the latest version of everything
 - node.js will use latest LTS version only
 - after each change - commit and push using the conventional commits format
+- don't put yourself as the co-contributor at all
 
 <!--VITE PLUS START-->
 
