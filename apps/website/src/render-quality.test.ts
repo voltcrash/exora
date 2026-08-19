@@ -32,6 +32,7 @@ test("keeps the high-detail profile on capable desktops", () => {
   expect(profile.tier).toBe("desktop");
   expect(profile.starCount).toBe(1_100);
   expect(profile.planetSegments).toBe(64);
+  expect(profile.surfaceMicrodetail).toBe(true);
 });
 
 test("reduces desktop resolution after sustained low frame rate", () => {
@@ -85,5 +86,15 @@ test("raises foveation only while the session misses the refresh rate", () => {
 test("bakes the octave budget into the shader defines", () => {
   const profile = deriveRenderQuality({ userAgent: "Quest 2", pixelRatio: 1 });
 
+  expect(profile.surfaceMicrodetail).toBe(false);
   expect(shaderDefines(profile)).toEqual(["#define FBM_OCTAVES 3"]);
+});
+
+test("only enables triplanar surface microdetail on the desktop tier", () => {
+  const profile = deriveRenderQuality({
+    userAgent: "Mozilla/5.0 (Macintosh; Intel Mac OS X)",
+    pixelRatio: 2,
+  });
+
+  expect(shaderDefines(profile)).toEqual(["#define FBM_OCTAVES 5", "#define SURFACE_MICRODETAIL"]);
 });
