@@ -8,6 +8,9 @@ export interface RenderQualityProfile {
   /** Ceiling for foveation once a struggling immersive session starts trading edge detail. */
   maxXrFixedFoveation: number;
   moonSegments: number;
+  /** Icosphere subdivision level for rocky planets (vertex count ~= 10 * n^2 + 2), chosen to
+   * roughly match planetSegments' vertex density on a UV sphere at the same tier. */
+  planetIcoSubdivisions: number;
   planetSegments: number;
   ringTessellation: number;
   starCount: number;
@@ -48,6 +51,7 @@ export const deriveRenderQuality = ({
       tier: "quest",
       starCount: 460,
       planetSegments: 40,
+      planetIcoSubdivisions: 8,
       moonSegments: 14,
       ringTessellation: 56,
       fbmOctaves: 3,
@@ -64,6 +68,7 @@ export const deriveRenderQuality = ({
       tier: "quest",
       starCount: 620,
       planetSegments: 48,
+      planetIcoSubdivisions: 10,
       moonSegments: 16,
       ringTessellation: 72,
       fbmOctaves: 4,
@@ -80,6 +85,7 @@ export const deriveRenderQuality = ({
       tier: "mobile",
       starCount: 760,
       planetSegments: 52,
+      planetIcoSubdivisions: 12,
       moonSegments: 18,
       ringTessellation: 80,
       fbmOctaves: 4,
@@ -95,6 +101,7 @@ export const deriveRenderQuality = ({
     tier: "desktop",
     starCount: 1_100,
     planetSegments: 64,
+    planetIcoSubdivisions: 14,
     moonSegments: 24,
     ringTessellation: 128,
     fbmOctaves: 5,
