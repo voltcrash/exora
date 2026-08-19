@@ -2,7 +2,7 @@ import { deriveWorldRecipe, type WorldRecipe } from "@exora/worldgen";
 import { useEffect, useMemo, useRef, useState } from "react";
 import type { PlanetLoadResult } from "../api-client.ts";
 import type { PlanetExperience as BabylonExperience, ViewMode, XrStatus } from "../planet-scene.ts";
-import { archiveStateLabel, formatNumber, formatPlanetName } from "../planet-utils.tsx";
+import { formatNumber, formatPlanetName } from "../planet-utils.tsx";
 import { isXrEmulated } from "../xr-emulator.ts";
 
 interface PlanetExperienceProps {
@@ -197,10 +197,6 @@ export const PlanetExperience = ({
               <strong>CREATE OBJECT</strong>
             </span>
           </button>
-        </div>
-        <div className="archive-state">
-          <span className="pulse-dot" aria-hidden="true" />
-          {archiveStateLabel(result)}
         </div>
       </header>
 
