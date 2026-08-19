@@ -23,13 +23,13 @@ import "@babylonjs/core/XR/features/WebXRHandTracking.js";
 import { WebXRFeatureName } from "@babylonjs/core/XR/webXRFeaturesManager.js";
 import { WebXRState } from "@babylonjs/core/XR/webXRTypes.js";
 import type { ExoplanetProfile, StarProfile } from "@exora/contracts";
+import { deriveStarRecipe } from "@exora/worldgen";
 import {
   adaptFixedFoveation,
   deriveRenderQuality,
   type RenderQualityTier,
   shaderDefines,
 } from "./render-quality.ts";
-import { deriveStarVisual } from "./star-utils.ts";
 import type { XrStatus } from "./planet-scene.ts";
 import { createXrMenu, type XrMenu, type XrMenuItem } from "./xr-menu.ts";
 import { requestVrHandoff } from "./xr-session.ts";
@@ -121,12 +121,6 @@ interface StarSceneOptions {
   star: StarProfile;
 }
 
-const hashName = (name: string): number => {
-  let hash = 2166136261;
-  for (const character of name) hash = Math.imul(hash ^ character.charCodeAt(0), 16777619);
-  return hash >>> 0;
-};
-
 const createStarfield = (scene: Scene, seed: number, count: number): Mesh => {
   const mesh = new Mesh("stellar-background", scene);
   const positions: number[] = [];
@@ -211,10 +205,10 @@ export const createStarScene = ({
   camera.inertia = 0.82;
   camera.attachControl(canvas, true);
 
-  const seed = hashName(star.catalogName);
-  const visual = deriveStarVisual(star);
-  const activity = star.customization?.activity ?? 0.55;
-  const diameter = 5.6 + (star.customization?.radius ?? 0.5) * 3.2;
+  const recipe = deriveStarRecipe(star);
+  const seed = recipe.seed;
+  const activity = recipe.activity;
+  const diameter = recipe.radiusSceneUnits;
   createStarfield(scene, seed, profile.starCount);
   Effect.ShadersStore.exoraStarVertexShader = STAR_VERTEX_SHADER;
   Effect.ShadersStore.exoraStarFragmentShader = STAR_FRAGMENT_SHADER;
@@ -244,7 +238,7 @@ export const createStarScene = ({
       ],
     },
   );
-  const [red, green, blue] = visual.color;
+  const [red, green, blue] = recipe.color;
   const baseColor = new Color3(red, green, blue);
   material.setColor3("baseColor", baseColor);
   material.setColor3("hotColor", Color3.Lerp(baseColor, Color3.White(), 0.68));
