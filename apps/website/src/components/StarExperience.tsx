@@ -4,6 +4,7 @@ import { loadPlanetsByHost, type StarLoadResult } from "../api-client.ts";
 import type { StarSceneExperience } from "../star-scene.ts";
 import { formatNumber } from "../planet-utils.tsx";
 import { deriveStarVisual, starKindLabel, starSummary } from "../star-utils.ts";
+import { isXrEmulated } from "../xr-emulator.ts";
 import type { XrStatus } from "../planet-scene.ts";
 
 interface StarExperienceProps {
@@ -349,7 +350,9 @@ export const StarExperience = ({
           <span>
             <small>SESSION STATUS</small>
             <strong>
-              {sceneState === "error" ? "RENDERER UNAVAILABLE" : xrCopy[xrStatus].label}
+              {sceneState === "error"
+                ? "RENDERER UNAVAILABLE"
+                : `${xrCopy[xrStatus].label}${isXrEmulated() ? " · EMULATED" : ""}`}
             </strong>
           </span>
         </div>
