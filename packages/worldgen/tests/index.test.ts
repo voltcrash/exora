@@ -1,10 +1,15 @@
 import { expect, test } from "vite-plus/test";
-import type { ExoplanetProfile } from "@exora/contracts";
+import type { ExoplanetProfile, StarProfile } from "@exora/contracts";
 import {
   deriveHostStar,
+  derivePlanetDerivedProperties,
+  derivePlanetInferredProperties,
+  derivePlanetMeasuredProperties,
+  deriveStarRecipe,
   deriveWorldRecipe,
   generateCustomStar,
   generateCustomWorld,
+  hashObjectId,
 } from "../src/index.ts";
 
 const featuredPlanet: ExoplanetProfile = {
@@ -255,4 +260,442 @@ test("custom star parameters create a local renderer profile", () => {
   });
   expect(star.observation.rightAscensionDegrees).toBeNull();
   expect(star.observation.visualMagnitude).toBeNull();
+});
+
+const catalogStar: StarProfile = {
+  id: "hd-172167",
+  name: "Vega",
+  catalogName: "HD 172167",
+  kind: "main-sequence",
+  objectType: "Star",
+  observation: {
+    rightAscensionDegrees: 279.234,
+    declinationDegrees: 38.784,
+    parallaxMas: 130.23,
+    distanceParsecs: 7.68,
+    properMotionRaMasPerYear: 200.94,
+    properMotionDecMasPerYear: 286.23,
+    radialVelocityKmPerSecond: -20.6,
+    spectralType: "A0Va",
+    visualMagnitude: 0.03,
+    gaiaMagnitude: 0.15,
+  },
+  source: { archive: "SIMBAD", tables: ["basic", "ident", "allfluxes"], retrievedOn: "2026-08-13" },
+};
+
+test("hashObjectId is a pure function of the identifier and worldgen version", () => {
+  expect(hashObjectId("hip-65426-b")).toBe(hashObjectId("hip-65426-b"));
+  expect(hashObjectId("hip-65426-b")).not.toBe(hashObjectId("kepler-62-f"));
+});
+
+test("planet recipes are deterministic given the same seed and differ across object ids", () => {
+  const first = deriveWorldRecipe(featuredPlanet);
+  const second = deriveWorldRecipe({ ...featuredPlanet });
+  const renamed = deriveWorldRecipe({ ...featuredPlanet, id: "a-different-planet-id" });
+
+  expect(second).toEqual(first);
+  expect(second.seed).toBe(first.seed);
+  expect(renamed.seed).not.toBe(first.seed);
+  expect(renamed).not.toEqual(first);
+});
+
+test("star recipes are deterministic for the same star and differ across object ids", () => {
+  const first = deriveStarRecipe(catalogStar);
+  const second = deriveStarRecipe({ ...catalogStar });
+  const renamed = deriveStarRecipe({ ...catalogStar, id: "a-different-star-id" });
+
+  expect(second).toEqual(first);
+  expect(second.seed).toBe(first.seed);
+  expect(renamed.seed).not.toBe(first.seed);
+});
+
+test("missing NASA host-star fields never produce NaN or non-finite values", () => {
+  const sparse = deriveHostStar({
+    ...featuredPlanet,
+    observation: {
+      ...featuredPlanet.observation,
+      hostTemperatureKelvin: null,
+      hostRadiusSolar: null,
+      hostMassSolar: null,
+      hostLuminosityLogSolar: null,
+      semiMajorAxisAu: null,
+    },
+  });
+
+  for (const value of [
+    sparse.intensity,
+    sparse.radiusSceneUnits,
+    sparse.apparentRadiusRadians,
+    ...sparse.color,
+  ]) {
+    expect(Number.isFinite(value)).toBe(true);
+    expect(Number.isNaN(value)).toBe(false);
+  }
+});
+
+test("missing SIMBAD spectral type never produces NaN and falls back to a sane default", () => {
+  const sparse = deriveStarRecipe({
+    ...catalogStar,
+    observation: { ...catalogStar.observation, spectralType: null },
+  });
+
+  expect(Number.isFinite(sparse.temperatureKelvin)).toBe(true);
+  expect(sparse.color.every((channel) => Number.isFinite(channel))).toBe(true);
+  expect(sparse.label).toBe("Yellow star");
+});
+
+test("extreme host-star values are clamped into physically sane ranges instead of overflowing", () => {
+  const extreme = deriveHostStar({
+    ...featuredPlanet,
+    observation: {
+      ...featuredPlanet.observation,
+      hostTemperatureKelvin: null,
+      hostRadiusSolar: null,
+      hostMassSolar: 1e12,
+      hostLuminosityLogSolar: 1e6,
+      semiMajorAxisAu: 1e-9,
+    },
+  });
+
+  expect(Number.isFinite(extreme.intensity)).toBe(true);
+  expect(Number.isFinite(extreme.radiusSceneUnits)).toBe(true);
+  expect(Number.isFinite(extreme.apparentRadiusRadians)).toBe(true);
+  expect(extreme.intensity).toBeLessThanOrEqual(3.2);
+  expect(extreme.radiusSceneUnits).toBeLessThanOrEqual(5.5);
+  expect(extreme.apparentRadiusRadians).toBeLessThanOrEqual(0.09);
+  for (const channel of extreme.color) {
+    expect(channel).toBeGreaterThanOrEqual(0);
+    expect(channel).toBeLessThanOrEqual(1);
+  }
+});
+
+test("extreme custom star inputs stay within the recipe's expected ranges", () => {
+  const { star } = generateCustomStar({
+    activity: 50,
+    kind: "main-sequence",
+    name: "Overdriven",
+    radius: -8,
+    rotation: 2,
+    seed: -100,
+    temperatureKelvin: 9_000_000,
+  });
+  const recipe = deriveStarRecipe(star);
+
+  expect(recipe.seed).toBeGreaterThanOrEqual(0);
+  expect(recipe.temperatureKelvin).toBeLessThanOrEqual(40_000);
+  expect(recipe.activity).toBeGreaterThanOrEqual(0);
+  expect(recipe.activity).toBeLessThanOrEqual(1);
+  expect(recipe.radiusSceneUnits).toBeGreaterThanOrEqual(5.6);
+  expect(recipe.radiusSceneUnits).toBeLessThanOrEqual(5.6 + 3.2);
+  for (const channel of recipe.color) {
+    expect(Number.isFinite(channel)).toBe(true);
+    expect(channel).toBeGreaterThanOrEqual(0);
+    expect(channel).toBeLessThanOrEqual(1);
+  }
+});
+
+const earthSizeRockyPlanet: ExoplanetProfile = {
+  ...temperateRockyPlanet,
+  id: "earth-analog",
+  name: "Earth Analog",
+  observation: {
+    ...temperateRockyPlanet.observation,
+    radiusEarth: 1.0,
+    massEarth: 1.0,
+    equilibriumTemperatureKelvin: 255,
+  },
+};
+
+const massiveSuperEarthPlanet: ExoplanetProfile = {
+  ...temperateRockyPlanet,
+  id: "massive-super-earth",
+  name: "Massive Super-Earth",
+  observation: {
+    ...temperateRockyPlanet.observation,
+    radiusEarth: 1.8,
+    massEarth: 9,
+    equilibriumTemperatureKelvin: 260,
+  },
+};
+
+const smallHotRockyPlanet: ExoplanetProfile = {
+  ...temperateRockyPlanet,
+  id: "small-hot-rocky",
+  name: "Small Hot Rocky World",
+  observation: {
+    ...temperateRockyPlanet.observation,
+    radiusEarth: 0.8,
+    massEarth: 0.6,
+    equilibriumTemperatureKelvin: 2_100,
+    semiMajorAxisAu: 0.01,
+  },
+};
+
+const coldRockyPlanet: ExoplanetProfile = {
+  ...temperateRockyPlanet,
+  id: "cold-rocky",
+  name: "Cold Rocky World",
+  observation: {
+    ...temperateRockyPlanet.observation,
+    radiusEarth: 1.1,
+    massEarth: 1.3,
+    equilibriumTemperatureKelvin: 90,
+  },
+};
+
+const jupiterSizeGiantPlanet: ExoplanetProfile = {
+  ...featuredPlanet,
+  id: "jupiter-analog",
+  name: "Jupiter Analog",
+  kind: "gas-giant",
+  observation: {
+    ...featuredPlanet.observation,
+    radiusJupiter: 1.0,
+    massJupiter: 1.0,
+    equilibriumTemperatureKelvin: 150,
+  },
+};
+
+const lowDensityGiantPlanet: ExoplanetProfile = {
+  ...featuredPlanet,
+  id: "low-density-giant",
+  name: "Puffy Giant",
+  kind: "gas-giant",
+  observation: {
+    ...featuredPlanet.observation,
+    radiusJupiter: 1.8,
+    massJupiter: 0.3,
+    equilibriumTemperatureKelvin: 900,
+  },
+};
+
+const neptuneSizeWorld: ExoplanetProfile = {
+  ...iceGiantPlanet,
+  id: "neptune-analog",
+  name: "Neptune Analog",
+  observation: {
+    ...iceGiantPlanet.observation,
+    radiusEarth: 3.88,
+    massEarth: 17.1,
+    equilibriumTemperatureKelvin: 72,
+  },
+};
+
+const hotJupiterPlanet: ExoplanetProfile = {
+  ...featuredPlanet,
+  id: "hot-jupiter",
+  name: "Hot Jupiter",
+  kind: "gas-giant",
+  observation: {
+    ...featuredPlanet.observation,
+    radiusJupiter: 1.3,
+    massJupiter: 0.8,
+    equilibriumTemperatureKelvin: 1_650,
+    semiMajorAxisAu: 0.03,
+  },
+};
+
+const unknownIncompletePlanet: ExoplanetProfile = {
+  ...temperateRockyPlanet,
+  id: "unknown-incomplete",
+  name: "Unknown Incomplete Object",
+  kind: "unknown",
+  observation: {
+    distanceParsecs: null,
+    discoveryMethod: "Unknown",
+    discoveryYear: null,
+    equilibriumTemperatureKelvin: null,
+    hostLuminosityLogSolar: null,
+    hostMassSolar: null,
+    hostRadiusSolar: null,
+    hostSpectralType: null,
+    hostTemperatureKelvin: null,
+    massEarth: null,
+    massJupiter: null,
+    orbitalPeriodDays: null,
+    radiusEarth: null,
+    radiusJupiter: null,
+    semiMajorAxisAu: null,
+  },
+};
+
+const mDwarfStar: StarProfile = {
+  ...catalogStar,
+  id: "gj-1002",
+  name: "GJ 1002",
+  observation: { ...catalogStar.observation, spectralType: "M5.5V" },
+};
+
+const gStar: StarProfile = {
+  ...catalogStar,
+  id: "sun-analog",
+  name: "Sun Analog",
+  observation: { ...catalogStar.observation, spectralType: "G2V" },
+};
+
+const hotABStar: StarProfile = {
+  ...catalogStar,
+  id: "regulus",
+  name: "Regulus",
+  observation: { ...catalogStar.observation, spectralType: "B8IVn" },
+};
+
+test("Earth-size rocky planets resolve to a rocky or ocean-candidate visual class with populated terrain", () => {
+  const recipe = deriveWorldRecipe(earthSizeRockyPlanet);
+
+  if (recipe.renderer !== "rocky") throw new Error("Expected a rocky recipe.");
+  expect(["rocky", "ocean_candidate"]).toContain(recipe.inferred.visualClass);
+  expect(recipe.derived.bulkDensityGCm3).not.toBeNull();
+  expect(recipe.terrain.oceanCoverage).toBe(recipe.surface.waterLevel);
+  expect(recipe.terrain.cloudCoverage).toBe(recipe.surface.cloudCover);
+});
+
+test("massive super-Earths derive a bulk density from measured mass and radius", () => {
+  const recipe = deriveWorldRecipe(massiveSuperEarthPlanet);
+
+  if (recipe.renderer !== "rocky") throw new Error("Expected a rocky recipe.");
+  expect(recipe.derived.bulkDensityGCm3).not.toBeNull();
+  expect(recipe.derived.bulkDensityGCm3 ?? 0).toBeGreaterThan(0);
+  expect(recipe.derived.radiusEarthEffective).toBeCloseTo(1.8);
+});
+
+test("small hot rocky worlds under extreme irradiation infer a lava visual class", () => {
+  const recipe = deriveWorldRecipe(smallHotRockyPlanet);
+
+  if (recipe.renderer !== "rocky") throw new Error("Expected a rocky recipe.");
+  expect(recipe.inferred.visualClass).toBe("lava");
+  expect(recipe.inferred.volcanicLikelihood).toBeGreaterThan(0.5);
+  expect(recipe.terrain.lavaCoverage).toBeGreaterThan(0);
+  expect(recipe.terrain.oceanCoverage).toBe(0);
+});
+
+test("cold rocky worlds infer an ice visual class with high ice likelihood", () => {
+  const recipe = deriveWorldRecipe(coldRockyPlanet);
+
+  if (recipe.renderer !== "rocky") throw new Error("Expected a rocky recipe.");
+  expect(recipe.inferred.visualClass).toBe("ice");
+  expect(recipe.inferred.iceLikelihood).toBeGreaterThan(0.6);
+  expect(recipe.inferred.paletteFamily).toBe("ice-blue");
+  expect(recipe.terrain.iceCoverage).toBeGreaterThan(0);
+});
+
+test("Jupiter-size giants resolve to the gas_giant visual class", () => {
+  const recipe = deriveWorldRecipe(jupiterSizeGiantPlanet);
+
+  if (recipe.renderer !== "gas-giant") throw new Error("Expected a gas-giant recipe.");
+  expect(recipe.inferred.visualClass).toBe("gas_giant");
+  expect(recipe.bandDetail.bandCount).toBeGreaterThan(0);
+  expect(recipe.bandDetail.stormCount).toBeGreaterThanOrEqual(1);
+});
+
+test("low-density giants still resolve to a giant visual class from their catalog kind", () => {
+  const recipe = deriveWorldRecipe(lowDensityGiantPlanet);
+
+  if (recipe.renderer !== "gas-giant") throw new Error("Expected a gas-giant recipe.");
+  expect(["gas_giant", "hot_gas_giant"]).toContain(recipe.inferred.visualClass);
+  expect(recipe.bandDetail.atmosphereDepth).toBeGreaterThan(0);
+});
+
+test("Neptune-size worlds resolve to the ice_giant visual class", () => {
+  const recipe = deriveWorldRecipe(neptuneSizeWorld);
+
+  if (recipe.renderer !== "ice-giant") throw new Error("Expected an ice-giant recipe.");
+  expect(recipe.inferred.visualClass).toBe("ice_giant");
+  expect(recipe.bandDetail.paletteFamily).toMatch(/methane-blue|cyan-ice/);
+});
+
+test("hot Jupiters infer the hot_gas_giant visual class with reduced ice likelihood", () => {
+  const recipe = deriveWorldRecipe(hotJupiterPlanet);
+
+  if (recipe.renderer !== "gas-giant") throw new Error("Expected a gas-giant recipe.");
+  expect(recipe.inferred.visualClass).toBe("hot_gas_giant");
+  expect(recipe.inferred.paletteFamily).toBe("hot-dark-red");
+  expect(recipe.inferred.iceLikelihood).toBeLessThan(0.3);
+});
+
+test("unknown/incomplete objects fall back to conservative low-confidence defaults, never NaN", () => {
+  const recipe = deriveWorldRecipe(unknownIncompletePlanet);
+
+  expect(recipe.confidence).toBe("low");
+  expect(recipe.inferred.confidence).toBe("low");
+  if (recipe.renderer === "rocky") {
+    expect(recipe.inferred.visualClass).toBe("unknown");
+  }
+  for (const value of [
+    recipe.derived.radiusEarthEffective,
+    recipe.derived.massEarthEffective,
+    recipe.radiusSceneUnits,
+    recipe.star.intensity,
+  ]) {
+    expect(Number.isFinite(value)).toBe(true);
+  }
+  expect(recipe.derived.bulkDensityGCm3).toBeNull();
+  expect(recipe.derived.insolationEarthRelative).toBeNull();
+});
+
+test("M dwarf stars resolve to a red, cooler star recipe with a small apparent size", () => {
+  const recipe = deriveStarRecipe(mDwarfStar);
+
+  expect(recipe.spectralClassification.startsWith("M")).toBe(true);
+  expect(recipe.temperatureKelvin).toBeLessThan(4_000);
+  expect(recipe.label).toBe("Red star");
+});
+
+test("G stars resolve to a sun-like yellow star recipe", () => {
+  const recipe = deriveStarRecipe(gStar);
+
+  expect(recipe.spectralClassification.startsWith("G")).toBe(true);
+  expect(recipe.temperatureKelvin).toBeGreaterThan(5_000);
+  expect(recipe.temperatureKelvin).toBeLessThan(6_500);
+  expect(recipe.label).toBe("Yellow star");
+});
+
+test("A/B hot stars resolve to a blue-white star recipe with weaker granulation than an M dwarf", () => {
+  const hotRecipe = deriveStarRecipe(hotABStar);
+  const coolRecipe = deriveStarRecipe(mDwarfStar);
+
+  expect(hotRecipe.spectralClassification.startsWith("B")).toBe(true);
+  expect(hotRecipe.temperatureKelvin).toBeGreaterThan(10_000);
+  expect(hotRecipe.granulationStrength).toBeLessThan(coolRecipe.granulationStrength);
+});
+
+test("star recipe GENERATED fields stay within their documented [0, 1] or positive ranges", () => {
+  for (const star of [mDwarfStar, gStar, hotABStar, catalogStar]) {
+    const recipe = deriveStarRecipe(star);
+
+    expect(recipe.spotCoverage).toBeGreaterThanOrEqual(0);
+    expect(recipe.spotCoverage).toBeLessThanOrEqual(1);
+    expect(recipe.granulationStrength).toBeGreaterThanOrEqual(0);
+    expect(recipe.granulationStrength).toBeLessThanOrEqual(1);
+    expect(recipe.coronalIntensity).toBeGreaterThanOrEqual(0);
+    expect(recipe.coronalIntensity).toBeLessThanOrEqual(1);
+    expect(recipe.granulationScale).toBeGreaterThan(0);
+    expect(recipe.rotationFactor).toBeGreaterThanOrEqual(0);
+    expect(recipe.rotationFactor).toBeLessThanOrEqual(1);
+  }
+});
+
+test("derivePlanetDerivedProperties only reports a density when both mass and radius are measured", () => {
+  const measuredBoth = derivePlanetMeasuredProperties(earthSizeRockyPlanet);
+  const measuredRadiusOnly = derivePlanetMeasuredProperties({
+    ...earthSizeRockyPlanet,
+    observation: { ...earthSizeRockyPlanet.observation, massEarth: null },
+  });
+
+  expect(derivePlanetDerivedProperties(measuredBoth).bulkDensityGCm3).toBeCloseTo(5.51, 1);
+  expect(derivePlanetDerivedProperties(measuredRadiusOnly).bulkDensityGCm3).toBeNull();
+});
+
+test("derivePlanetInferredProperties never claims high confidence with no measured inputs", () => {
+  const measured = derivePlanetMeasuredProperties(unknownIncompletePlanet);
+  const derived = derivePlanetDerivedProperties(measured);
+  const inferred = derivePlanetInferredProperties(
+    unknownIncompletePlanet,
+    measured,
+    derived,
+    () => 0.5,
+  );
+
+  expect(inferred.confidence).toBe("low");
+  expect(inferred.visualClass).toBe("unknown");
 });
