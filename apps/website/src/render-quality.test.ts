@@ -1,5 +1,10 @@
 import { expect, test } from "vite-plus/test";
-import { adaptHardwareScaling, deriveRenderQuality } from "./render-quality.ts";
+import {
+  adaptFixedFoveation,
+  adaptHardwareScaling,
+  deriveRenderQuality,
+  shaderDefines,
+} from "./render-quality.ts";
 
 test("selects a Quest-focused rendering budget", () => {
   const profile = deriveRenderQuality({
@@ -41,4 +46,44 @@ test("does not resize the canvas during an immersive session", () => {
   const profile = deriveRenderQuality({ userAgent: "Quest 3", pixelRatio: 2 });
 
   expect(adaptHardwareScaling(1.5, 30, profile, true)).toBe(1.5);
+});
+
+test("gives Quest 2 a lighter budget than a Quest 3", () => {
+  const questTwo = deriveRenderQuality({
+    userAgent: "Mozilla/5.0 (X11; Linux x86_64; Quest 2) OculusBrowser/33.0",
+    pixelRatio: 1,
+  });
+  const questThree = deriveRenderQuality({
+    userAgent: "Mozilla/5.0 (X11; Linux x86_64; Quest 3) OculusBrowser/35.0",
+    pixelRatio: 1,
+  });
+
+  expect(questTwo.tier).toBe("quest");
+  expect(questTwo.fbmOctaves).toBeLessThan(questThree.fbmOctaves);
+  expect(questTwo.planetSegments).toBeLessThan(questThree.planetSegments);
+  expect(questTwo.xrFramebufferScaleFactor).toBeLessThan(questThree.xrFramebufferScaleFactor);
+  expect(questTwo.xrFixedFoveation).toBeGreaterThan(questThree.xrFixedFoveation);
+});
+
+test("treats an unrecognised headset as the weaker one", () => {
+  const profile = deriveRenderQuality({ userAgent: "OculusBrowser/33.0", pixelRatio: 1 });
+
+  expect(profile.tier).toBe("quest");
+  expect(profile.fbmOctaves).toBe(3);
+});
+
+test("raises foveation only while the session misses the refresh rate", () => {
+  const profile = deriveRenderQuality({ userAgent: "Quest 2", pixelRatio: 1 });
+
+  expect(adaptFixedFoveation(profile.xrFixedFoveation, 50, profile)).toBe(0.9);
+  expect(adaptFixedFoveation(1, 50, profile)).toBe(1);
+  expect(adaptFixedFoveation(0.9, 72, profile)).toBe(0.85);
+  expect(adaptFixedFoveation(profile.xrFixedFoveation, 72, profile)).toBe(0.8);
+  expect(adaptFixedFoveation(0.9, 66, profile)).toBe(0.9);
+});
+
+test("bakes the octave budget into the shader defines", () => {
+  const profile = deriveRenderQuality({ userAgent: "Quest 2", pixelRatio: 1 });
+
+  expect(shaderDefines(profile)).toEqual(["#define FBM_OCTAVES 3"]);
 });

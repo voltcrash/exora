@@ -23,7 +23,12 @@ import "@babylonjs/core/XR/features/WebXRHandTracking.js";
 import { WebXRFeatureName } from "@babylonjs/core/XR/webXRFeaturesManager.js";
 import { WebXRState } from "@babylonjs/core/XR/webXRTypes.js";
 import type { ExoplanetProfile, StarProfile } from "@exora/contracts";
-import { deriveRenderQuality, type RenderQualityTier } from "./render-quality.ts";
+import {
+  adaptFixedFoveation,
+  deriveRenderQuality,
+  type RenderQualityTier,
+  shaderDefines,
+} from "./render-quality.ts";
 import { deriveStarVisual } from "./star-utils.ts";
 import type { XrStatus } from "./planet-scene.ts";
 import { createXrMenu, type XrMenu, type XrMenuItem } from "./xr-menu.ts";
@@ -70,7 +75,7 @@ float noise(vec3 p) {
 float fbm(vec3 p) {
   float value = 0.0;
   float amplitude = 0.56;
-  for (int i = 0; i < 5; i++) {
+  for (int i = 0; i < FBM_OCTAVES; i++) {
     value += noise(p) * amplitude;
     p = p.yzx * 2.07 + vec3(7.1, 13.7, 19.3);
     amplitude *= 0.48;
@@ -184,6 +189,9 @@ export const createStarScene = ({
   const scene = new Scene(engine);
   scene.clearColor = new Color4(0.001, 0.002, 0.006, 1);
   scene.performancePriority = ScenePerformancePriority.Intermediate;
+  // The intermediate priority also turns off the colour clear, which leaves each eye smearing
+  // the previous frame in an immersive session. Nothing here paints every pixel, so clear.
+  scene.autoClear = true;
   scene.skipPointerMovePicking = true;
 
   const camera = new ArcRotateCamera(
@@ -224,6 +232,7 @@ export const createStarScene = ({
     { vertex: "exoraStar", fragment: "exoraStar" },
     {
       attributes: ["position", "normal"],
+      defines: shaderDefines(profile),
       uniforms: [
         "world",
         "worldViewProjection",
@@ -376,9 +385,12 @@ export const createStarScene = ({
   };
 
   let elapsed = 0;
+  let qualitySampleSeconds = 0;
   let firstFrame = true;
   scene.onBeforeRenderObservable.add(() => {
-    elapsed += Math.min(engine.getDeltaTime() / 1_000, 0.05);
+    const deltaSeconds = Math.min(engine.getDeltaTime() / 1_000, 0.05);
+    elapsed += deltaSeconds;
+    qualitySampleSeconds += deltaSeconds;
     material.setFloat("time", elapsed);
     starMesh.rotation.y = elapsed * (0.008 + (star.customization?.rotation ?? 0.35) * 0.07);
     for (let index = 0; index < planetTargetRoots.length; index += 1) {
@@ -398,7 +410,12 @@ export const createStarScene = ({
         rig.position.z = STAR_DECK_POSITION.z + offsetZ * scale;
       }
       rig.position.y += STAR_DECK_POSITION.y - (rig.position.y - rig.realWorldHeight);
-      xrMenu?.update(rig, Math.min(engine.getDeltaTime() / 1_000, 0.05));
+      xrMenu?.update(rig, deltaSeconds);
+    }
+
+    if (qualitySampleSeconds >= 3) {
+      qualitySampleSeconds = 0;
+      if (isInXr) adaptSessionFoveation(engine.getFps());
     }
   });
   engine.runRenderLoop(() => {
@@ -418,6 +435,21 @@ export const createStarScene = ({
   let disposed = false;
 
   const xrCamera = (): WebXRCamera | null => xr?.baseExperience.camera ?? null;
+
+  let sessionFoveation = profile.xrFixedFoveation;
+
+  /**
+   * Trades peripheral sharpness for frame rate while the headset is on, since canvas
+   * resolution is fixed for the lifetime of an immersive session.
+   */
+  const adaptSessionFoveation = (fps: number): void => {
+    const sessionManager = xr?.baseExperience.sessionManager;
+    if (!sessionManager?.isFixedFoveationSupported) return;
+    const next = adaptFixedFoveation(sessionFoveation, fps, profile);
+    if (next === sessionFoveation) return;
+    sessionFoveation = next;
+    sessionManager.fixedFoveation = next;
+  };
 
   /**
    * Puts the wearer on the observation deck facing the star.
@@ -478,6 +510,9 @@ export const createStarScene = ({
     optionalFeatures: ["hand-tracking"],
     outputCanvasOptions: {
       canvasOptions: {
+        // An opaque immersive layer saves the headset compositor a per-pixel blend it would
+        // otherwise do against nothing, and no view here ever wants to see through the world.
+        alpha: false,
         antialias: false,
         depth: true,
         stencil: false,
@@ -512,8 +547,9 @@ export const createStarScene = ({
         }
         if (state === WebXRState.IN_XR) {
           isInXr = true;
+          sessionFoveation = profile.xrFixedFoveation;
           if (createdXr.baseExperience.sessionManager.isFixedFoveationSupported) {
-            createdXr.baseExperience.sessionManager.fixedFoveation = profile.xrFixedFoveation;
+            createdXr.baseExperience.sessionManager.fixedFoveation = sessionFoveation;
           }
           refreshXrMenu();
           xrMenu?.setVisible(true);

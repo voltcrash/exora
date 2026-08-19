@@ -26,10 +26,12 @@ import { WebXRFeatureName } from "@babylonjs/core/XR/webXRFeaturesManager.js";
 import { WebXRState } from "@babylonjs/core/XR/webXRTypes.js";
 import type { Rgb, WorldRecipe } from "@exora/worldgen";
 import {
+  adaptFixedFoveation,
   adaptHardwareScaling,
   deriveRenderQuality,
   type RenderQualityProfile,
   type RenderQualityTier,
+  shaderDefines,
 } from "./render-quality.ts";
 import { createXrMenu, type XrMenu, type XrMenuItem } from "./xr-menu.ts";
 import { requestVrHandoff } from "./xr-session.ts";
@@ -97,7 +99,7 @@ float noise(vec2 point) {
 float fbm(vec2 point) {
   float value = 0.0;
   float amplitude = 0.52;
-  for (int octave = 0; octave < 5; octave++) {
+  for (int octave = 0; octave < FBM_OCTAVES; octave++) {
     value += noise(point) * amplitude;
     point = point * 2.03 + vec2(13.1, 7.7);
     amplitude *= 0.48;
@@ -197,7 +199,7 @@ float noise(vec3 point) {
 float fbm(vec3 point) {
   float value = 0.0;
   float amplitude = 0.52;
-  for (int octave = 0; octave < 6; octave++) {
+  for (int octave = 0; octave < FBM_OCTAVES + 1; octave++) {
     value += amplitude * noise(point);
     point = point.yzx * 2.03 + vec3(11.7, 7.9, 15.3);
     amplitude *= 0.48;
@@ -307,7 +309,7 @@ float noise(vec3 point) {
 float fbm(vec3 point) {
   float value = 0.0;
   float amplitude = 0.52;
-  for (int octave = 0; octave < 5; octave++) {
+  for (int octave = 0; octave < FBM_OCTAVES; octave++) {
     value += amplitude * noise(point);
     point = point.yzx * 2.07 + vec3(9.3, 14.8, 5.6);
     amplitude *= 0.48;
@@ -464,7 +466,7 @@ float noise(vec3 point) {
 float fbm(vec3 point) {
   float value = 0.0;
   float amplitude = 0.52;
-  for (int octave = 0; octave < 5; octave++) {
+  for (int octave = 0; octave < FBM_OCTAVES; octave++) {
     value += amplitude * noise(point);
     point = point.yzx * 2.04 + vec3(8.7, 13.1, 5.9);
     amplitude *= 0.48;
@@ -475,7 +477,7 @@ float fbm(vec3 point) {
 float ridgedFbm(vec3 point) {
   float value = 0.0;
   float amplitude = 0.54;
-  for (int octave = 0; octave < 4; octave++) {
+  for (int octave = 0; octave < FBM_OCTAVES - 1; octave++) {
     float ridge = 1.0 - abs(noise(point) * 2.0 - 1.0);
     value += ridge * ridge * amplitude;
     point = point.zxy * 2.12 + vec3(4.3, 17.2, 9.1);
@@ -579,7 +581,7 @@ float noise(vec3 point) {
 float fbm(vec3 point) {
   float value = 0.0;
   float amplitude = 0.54;
-  for (int octave = 0; octave < 4; octave++) {
+  for (int octave = 0; octave < FBM_OCTAVES - 1; octave++) {
     value += amplitude * noise(point);
     point = point * 2.06 + vec3(8.1, 13.4, 4.7);
     amplitude *= 0.48;
@@ -912,6 +914,7 @@ const createPlanet = (
       { vertex: "exoraRocky", fragment: "exoraRocky" },
       {
         attributes: ["position", "normal"],
+        defines: shaderDefines(profile),
         uniforms: [
           "world",
           "worldViewProjection",
@@ -942,6 +945,7 @@ const createPlanet = (
       { vertex: "exoraPlanet", fragment: "exoraIceGiant" },
       {
         attributes: ["position", "normal"],
+        defines: shaderDefines(profile),
         uniforms: [
           "world",
           "worldViewProjection",
@@ -968,6 +972,7 @@ const createPlanet = (
       { vertex: "exoraPlanet", fragment: "exoraPlanet" },
       {
         attributes: ["position", "normal"],
+        defines: shaderDefines(profile),
         uniforms: [
           "world",
           "worldViewProjection",
@@ -1068,6 +1073,7 @@ const createPlanet = (
       { vertex: "exoraAtmosphere", fragment: "exoraCloud" },
       {
         attributes: ["position", "normal"],
+        defines: shaderDefines(profile),
         uniforms: [
           "world",
           "worldViewProjection",
@@ -1363,6 +1369,7 @@ const createSurfaceSky = (
     { vertex: "exoraSky", fragment: "exoraSky" },
     {
       attributes: ["position"],
+      defines: shaderDefines(profile),
       uniforms: [
         "worldViewProjection",
         "time",
@@ -1900,11 +1907,15 @@ export const createPlanetExperience = ({
 
     if (qualitySampleSeconds >= 3) {
       qualitySampleSeconds = 0;
-      const currentLevel = engine.getHardwareScalingLevel();
-      const nextLevel = adaptHardwareScaling(currentLevel, engine.getFps(), profile, isInXr);
-      if (nextLevel !== currentLevel) {
-        engine.setHardwareScalingLevel(nextLevel);
-        engine.resize();
+      if (isInXr) {
+        adaptSessionFoveation(engine.getFps());
+      } else {
+        const currentLevel = engine.getHardwareScalingLevel();
+        const nextLevel = adaptHardwareScaling(currentLevel, engine.getFps(), profile, false);
+        if (nextLevel !== currentLevel) {
+          engine.setHardwareScalingLevel(nextLevel);
+          engine.resize();
+        }
       }
     }
   });
@@ -1922,6 +1933,23 @@ export const createPlanetExperience = ({
   let disposed = false;
 
   const xrCamera = (): WebXRCamera | null => xr?.baseExperience.camera ?? null;
+
+  let sessionFoveation = profile.xrFixedFoveation;
+
+  /**
+   * Trades peripheral sharpness for frame rate while the headset is on.
+   *
+   * Canvas resolution is fixed for the lifetime of a session, so foveation is the only lever
+   * left; a Quest 2 that starts missing 72 Hz recovers by blurring further from the eye.
+   */
+  const adaptSessionFoveation = (fps: number): void => {
+    const sessionManager = xr?.baseExperience.sessionManager;
+    if (!sessionManager?.isFixedFoveationSupported) return;
+    const next = adaptFixedFoveation(sessionFoveation, fps, profile);
+    if (next === sessionFoveation) return;
+    sessionFoveation = next;
+    sessionManager.fixedFoveation = next;
+  };
 
   /**
    * Moves the rig to the spot that makes sense for a view.
@@ -2026,6 +2054,9 @@ export const createPlanetExperience = ({
     optionalFeatures: ["hand-tracking"],
     outputCanvasOptions: {
       canvasOptions: {
+        // An opaque immersive layer saves the headset compositor a per-pixel blend it would
+        // otherwise do against nothing, and no view here ever wants to see through the world.
+        alpha: false,
         antialias: false,
         depth: true,
         stencil: false,
@@ -2068,8 +2099,9 @@ export const createPlanetExperience = ({
         }
         if (state === WebXRState.IN_XR) {
           isInXr = true;
+          sessionFoveation = profile.xrFixedFoveation;
           if (createdXr.baseExperience.sessionManager.isFixedFoveationSupported) {
-            createdXr.baseExperience.sessionManager.fixedFoveation = profile.xrFixedFoveation;
+            createdXr.baseExperience.sessionManager.fixedFoveation = sessionFoveation;
           }
           xrMenu?.setItems(buildXrMenuItems());
           xrMenu?.setVisible(true);
@@ -2105,9 +2137,9 @@ export const createPlanetExperience = ({
     getFps: () => engine.getFps(),
     enterVr: async () => {
       if (!xr || !isVrSupported) return;
-      await xr.baseExperience.enterXRAsync("immersive-vr", "local-floor", xr.renderTarget, {
-        optionalFeatures: ["local-floor", "bounded-floor", "hand-tracking"],
-      });
+      // Babylon appends the reference space and every enabled optional feature (including
+      // hand tracking) to the session request, so nothing has to be listed by hand here.
+      await xr.baseExperience.enterXRAsync("immersive-vr", "local-floor", xr.renderTarget);
     },
     dispose: () => {
       if (disposed) return;
