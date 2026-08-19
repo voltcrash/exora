@@ -179,10 +179,6 @@ export const StarExperience = ({
             </span>
           </button>
         </div>
-        <div className="archive-state">
-          <span className="pulse-dot" aria-hidden="true" />
-          {custom ? "CUSTOM STAR · LOCAL" : `SIMBAD · ${result.cached ? "CACHED" : "LIVE"}`}
-        </div>
       </header>
 
       <main className="hud">
