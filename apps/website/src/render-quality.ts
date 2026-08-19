@@ -14,6 +14,9 @@ export interface RenderQualityProfile {
   planetSegments: number;
   ringTessellation: number;
   starCount: number;
+  /** Whether rocky planets sample the triplanar PBR microdetail textures (normal + roughness).
+   * Off on fill-rate-constrained tiers so they keep the cheaper pure-procedural surface. */
+  surfaceMicrodetail: boolean;
   tier: RenderQualityTier;
   xrFixedFoveation: number;
   xrFramebufferScaleFactor: number;
@@ -55,6 +58,7 @@ export const deriveRenderQuality = ({
       moonSegments: 14,
       ringTessellation: 56,
       fbmOctaves: 3,
+      surfaceMicrodetail: false,
       hardwareScalingLevel: roundScale(Math.max(1.3, pixelRatio / 1.2)),
       maxHardwareScalingLevel: 2,
       xrFramebufferScaleFactor: 0.72,
@@ -72,6 +76,7 @@ export const deriveRenderQuality = ({
       moonSegments: 16,
       ringTessellation: 72,
       fbmOctaves: 4,
+      surfaceMicrodetail: false,
       hardwareScalingLevel: roundScale(Math.max(1.2, pixelRatio / 1.35)),
       maxHardwareScalingLevel: 1.9,
       xrFramebufferScaleFactor: 0.82,
@@ -89,6 +94,7 @@ export const deriveRenderQuality = ({
       moonSegments: 18,
       ringTessellation: 80,
       fbmOctaves: 4,
+      surfaceMicrodetail: false,
       hardwareScalingLevel: roundScale(Math.max(1.1, pixelRatio / 1.5)),
       maxHardwareScalingLevel: 1.8,
       xrFramebufferScaleFactor: 0.88,
@@ -105,6 +111,7 @@ export const deriveRenderQuality = ({
     moonSegments: 24,
     ringTessellation: 128,
     fbmOctaves: 5,
+    surfaceMicrodetail: true,
     hardwareScalingLevel: roundScale(Math.max(1, pixelRatio / 1.65)),
     maxHardwareScalingLevel: 1.65,
     xrFramebufferScaleFactor: 1,
@@ -163,4 +170,5 @@ export const adaptFixedFoveation = (
  */
 export const shaderDefines = (profile: RenderQualityProfile): string[] => [
   `#define FBM_OCTAVES ${profile.fbmOctaves}`,
+  ...(profile.surfaceMicrodetail ? ["#define SURFACE_MICRODETAIL"] : []),
 ];
