@@ -12,6 +12,7 @@ import { Mesh } from "@babylonjs/core/Meshes/mesh.js";
 import { MeshBuilder } from "@babylonjs/core/Meshes/meshBuilder.js";
 import { VertexData } from "@babylonjs/core/Meshes/mesh.vertexData.js";
 import { TransformNode } from "@babylonjs/core/Meshes/transformNode.js";
+import "@babylonjs/core/Meshes/instancedMesh.js";
 import { Scene, ScenePerformancePriority } from "@babylonjs/core/scene.js";
 import { WebXRDefaultExperience } from "@babylonjs/core/XR/webXRDefaultExperience.js";
 import "@babylonjs/core/XR/features/WebXRControllerPointerSelection.js";
