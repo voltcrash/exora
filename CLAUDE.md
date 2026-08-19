@@ -7,6 +7,7 @@
 - without permission you must never use old versions
 - always use the latest version of everything
 - node.js will use latest LTS version only
+- after each change - commit and push using the conventional commits format
 
 <!--VITE PLUS START-->
 
