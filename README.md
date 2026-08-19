@@ -20,7 +20,7 @@ The current slice renders HIP 65426 b using a normalized response from the NASA 
 - a responsive observation HUD; and
 - a WebXR entry flow with a teleportable viewing deck;
 - an opt-in emulated WebXR runtime for debugging immersive mode in a desktop browser;
-- adaptive Quest rendering with reduced geometry, dynamic desktop resolution, and fixed foveation;
+- adaptive Quest rendering with a separate Quest 2 budget, reduced geometry and shader detail, dynamic desktop resolution, and foveation that adapts to the headset frame rate;
 - a local data fallback when NASA or the API is unavailable.
 
 The visualization distinguishes archive observations from Exora's inferred and generated details. It is not observed imagery.
