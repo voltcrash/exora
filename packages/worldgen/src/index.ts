@@ -1188,17 +1188,18 @@ export interface StarVisualRecipe {
   temperatureKelvin: number;
 }
 
-const spectralStarPalette: Record<
-  string,
-  { color: Rgb; label: string; temperatureKelvin: number }
-> = {
-  O: { color: [0.55, 0.7, 1], temperatureKelvin: 35_000, label: "Blue star" },
-  B: { color: [0.62, 0.75, 1], temperatureKelvin: 18_000, label: "Blue-white star" },
-  A: { color: [0.78, 0.84, 1], temperatureKelvin: 8_500, label: "White star" },
-  F: { color: [1, 0.94, 0.78], temperatureKelvin: 6_700, label: "Yellow-white star" },
-  G: { color: [1, 0.78, 0.38], temperatureKelvin: 5_700, label: "Yellow star" },
-  K: { color: [1, 0.52, 0.2], temperatureKelvin: 4_500, label: "Orange star" },
-  M: { color: [1, 0.25, 0.1], temperatureKelvin: 3_200, label: "Red star" },
+/** Fallback temperatures/labels by spectral letter when no measured temperature is available.
+ * Color is never stored here — it's always derived from temperatureToRgb so a star's displayed
+ * hue is a single physically-motivated blackbody curve rather than hand-picked cartoon spectral
+ * colors (a G star should read as warm white, not saturated banana yellow). */
+const spectralStarPalette: Record<string, { label: string; temperatureKelvin: number }> = {
+  O: { temperatureKelvin: 35_000, label: "Blue star" },
+  B: { temperatureKelvin: 18_000, label: "Blue-white star" },
+  A: { temperatureKelvin: 8_500, label: "White star" },
+  F: { temperatureKelvin: 6_700, label: "White star" },
+  G: { temperatureKelvin: 5_700, label: "Yellow star" },
+  K: { temperatureKelvin: 4_500, label: "Orange star" },
+  M: { temperatureKelvin: 3_200, label: "Red star" },
 };
 
 /** Extracts the physical facts a star's visual recipe is derived from, kept separate so the
@@ -1223,10 +1224,9 @@ export const deriveStarRecipe = (star: StarProfile): StarVisualRecipe => {
     physical.effectiveTemperatureKelvin === null
       ? palette.temperatureKelvin
       : clamp(physical.effectiveTemperatureKelvin, 1_000, 40_000);
-  const color =
-    physical.effectiveTemperatureKelvin === null
-      ? palette.color
-      : temperatureToRgb(temperatureKelvin);
+  // Always the same blackbody curve, whether the temperature came from a measurement or a
+  // spectral-class fallback, so color and temperatureKelvin never disagree with each other.
+  const color = temperatureToRgb(temperatureKelvin);
   const activity = clampUnit(star.customization?.activity ?? 0.55);
   // Cooler stars carry deeper convective envelopes and tend toward more, larger granules;
   // hotter stars run more radiative and show comparatively little granulation. This is a
