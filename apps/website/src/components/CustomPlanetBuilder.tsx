@@ -315,19 +315,18 @@ export const WorldForge = ({
                   }
                   onChange={(value) => update("water", value)}
                 />
-              ) : (
-                <label className="toggle-control">
-                  <span>
-                    Ring system
-                    <small>{parameters.rings ? "ENABLED" : "DISABLED"}</small>
-                  </span>
-                  <input
-                    type="checkbox"
-                    checked={parameters.rings}
-                    onChange={(event) => update("rings", event.currentTarget.checked)}
-                  />
-                </label>
-              )}
+              ) : null}
+              <label className="toggle-control">
+                <span>
+                  Ring system
+                  <small>{parameters.rings ? "ENABLED" : "DISABLED"}</small>
+                </span>
+                <input
+                  type="checkbox"
+                  checked={parameters.rings}
+                  onChange={(event) => update("rings", event.currentTarget.checked)}
+                />
+              </label>
               <RangeControl
                 label="Rotation rate"
                 value={parameters.rotation}

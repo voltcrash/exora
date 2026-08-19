@@ -97,11 +97,33 @@ export interface PlanetInferredProperties {
   volcanicLikelihood: number;
 }
 
+/**
+ * A single ring system shape shared by every renderer that can show one. `bands` and `gapiness`
+ * drive the procedural radial density pattern (see `createRingSystem` in planet-scene.ts) so a
+ * ring never renders as one flat, uniformly transparent disc.
+ */
+export interface RingRecipe {
+  /** Roughly how many density bands the radial noise pattern produces. */
+  bands: number;
+  color: Rgb;
+  /** How pronounced the gaps between bands are, in [0, 1]. */
+  gapiness: number;
+  innerRadius: number;
+  opacity: number;
+  outerRadius: number;
+}
+
 interface BaseWorldRecipe {
   axialTilt: number;
   atmosphere: {
     color: Rgb;
+    /** Overall optical thickness of the atmosphere shell, in [0, 1]. */
+    density: number;
+    /** Forward-scattered (Mie-like) haze strength around the light direction, in [0, 1]. */
+    haze: number;
     label: string;
+    /** Rayleigh-like scattering strength driving the limb/rim color shift, in [0, 1]. */
+    scatterStrength: number;
   };
   classification: string;
   confidence: "low" | "medium" | "high";
@@ -166,11 +188,7 @@ export interface GasGiantWorldRecipe extends BaseWorldRecipe {
     turbulence: number;
   };
   renderer: "gas-giant";
-  rings: {
-    color: Rgb;
-    opacity: number;
-    outerRadius: number;
-  } | null;
+  rings: RingRecipe | null;
 }
 
 export interface IceGiantWorldRecipe extends BaseWorldRecipe {
@@ -186,11 +204,7 @@ export interface IceGiantWorldRecipe extends BaseWorldRecipe {
   };
   bandDetail: GiantBandDetail;
   renderer: "ice-giant";
-  rings: {
-    color: Rgb;
-    opacity: number;
-    outerRadius: number;
-  };
+  rings: RingRecipe;
 }
 
 /**
@@ -222,9 +236,14 @@ export interface RockyTerrainDetail {
 
 export interface RockyWorldRecipe extends BaseWorldRecipe {
   renderer: "rocky";
+  /** Sparse debris/ice ring, distinct from the near-universal giant ring — most rocky worlds
+   * have none. */
+  rings: RingRecipe | null;
   surface: {
     cloudColor: Rgb;
     cloudCover: number;
+    /** Radial noise scale for the cloud shell; higher reads as smaller, more numerous cells. */
+    cloudScale: number;
     cloudSpeed: number;
     craterDensity: number;
     elevation: number;
@@ -236,7 +255,11 @@ export interface RockyWorldRecipe extends BaseWorldRecipe {
     midColor: Rgb;
     roughness: number;
     waterColor: Rgb;
+    /** Lighter, more scattered tint used near coastlines to distinguish shallow from deep water. */
+    waterColorShallow: Rgb;
     waterLevel: number;
+    /** Prevailing cloud-drift direction in radians, independent of the planet's own rotation. */
+    windDirection: number;
   };
   terrain: RockyTerrainDetail;
 }
@@ -647,7 +670,10 @@ const deriveGasGiantRecipe = (
     },
     atmosphere: {
       color: palette.atmosphere,
+      density: 0.7 + random() * 0.25,
+      haze: clampUnit(0.15 + inferred.iceLikelihood * 0.35),
       label: "Hydrogen / helium · inferred",
+      scatterStrength: 0.5 + random() * 0.3,
     },
     moon: {
       radius: scaledRadius * (0.075 + random() * 0.025),
@@ -658,7 +684,10 @@ const deriveGasGiantRecipe = (
     },
     rings: hasProminentRings
       ? {
+          bands: 4 + Math.floor(random() * 6),
           color: isHot ? [0.66, 0.35, 0.19] : [0.42, 0.52, 0.62],
+          gapiness: 0.3 + random() * 0.5,
+          innerRadius: scaledRadius * (1.22 + random() * 0.12),
           opacity: 0.12 + random() * 0.12,
           outerRadius: scaledRadius * (1.42 + random() * 0.24),
         }
@@ -683,7 +712,28 @@ const deriveRockyRecipe = (
   const isScorched = temperature !== null && temperature > 500;
   const isTemperate = temperature !== null && temperature >= 180 && temperature <= 330;
   const isFrozen = temperature !== null && temperature < 180;
+  // Deep-frozen worlds (below roughly the CO2 frost line) glaciate edge to edge rather than
+  // just at the poles.
+  const isGlobalIce = temperature !== null && temperature < 120;
   const isOceanCandidate = inferred.visualClass === "ocean_candidate";
+  // An ocean-candidate world that is also frozen reads as an ice-locked ocean (Europa-like)
+  // rather than a dry, waterless world.
+  const isFrozenOcean = isFrozen && isOceanCandidate;
+  const paletteFamily = inferred.paletteFamily as RockyPaletteFamily;
+
+  // Liquid chemistry is not always Earth-blue water: tint the ocean by inferred surface
+  // chemistry (a sulfuric world reads as a murky, reactive sea; an oxidized world as a rusty
+  // brine; an iron-rich world as a dark, metallic melt) rather than assuming one universal color.
+  const temperateWaterColor: Rgb =
+    paletteFamily === "sulfuric-yellow"
+      ? [0.14, 0.16, 0.03]
+      : paletteFamily === "oxidized-red"
+        ? [0.1, 0.05, 0.02]
+        : paletteFamily === "iron-rich"
+          ? [0.01, 0.05, 0.05]
+          : paletteFamily === "carbon-dark"
+            ? [0.012, 0.02, 0.03]
+            : [0.015, 0.13, 0.24];
 
   const palette = isScorched
     ? {
@@ -698,7 +748,9 @@ const deriveRockyRecipe = (
           lowColor: [0.055, 0.095, 0.13] as const,
           midColor: [0.36, 0.5, 0.57] as const,
           highColor: [0.83, 0.92, 0.94] as const,
-          waterColor: [0.025, 0.09, 0.15] as const,
+          waterColor: isFrozenOcean
+            ? mixColor(temperateWaterColor, [0.83, 0.92, 0.94], 0.5)
+            : ([0.025, 0.09, 0.15] as Rgb),
           atmosphere: [0.35, 0.7, 1] as const,
         }
       : isTemperate
@@ -706,7 +758,7 @@ const deriveRockyRecipe = (
             lowColor: [0.08, 0.16, 0.07] as const,
             midColor: [0.38, 0.3, 0.16] as const,
             highColor: [0.72, 0.67, 0.54] as const,
-            waterColor: [0.015, 0.13, 0.24] as const,
+            waterColor: temperateWaterColor,
             atmosphere: [0.22, 0.62, 1] as const,
           }
         : {
@@ -719,21 +771,36 @@ const deriveRockyRecipe = (
 
   const classification = isScorched
     ? "Scorched rocky world"
-    : isFrozen
-      ? "Frozen rocky world"
-      : isOceanCandidate
-        ? "Ocean-candidate world"
-        : isTemperate
-          ? "Temperate rocky world"
-          : "Rocky world";
+    : isFrozenOcean
+      ? "Ice-locked ocean world"
+      : isGlobalIce
+        ? "Glaciated rocky world"
+        : isFrozen
+          ? "Frozen rocky world"
+          : isOceanCandidate
+            ? "Ocean-candidate world"
+            : isTemperate
+              ? "Temperate rocky world"
+              : "Rocky world";
 
   const elevation = 0.13 + random() * 0.12;
   const roughness = 2.1 + random() * 1.4;
   const craterDensity = 0.38 + random() * 0.34;
-  const waterLevel = isTemperate ? 0.4 + random() * 0.08 : 0;
+  const waterLevel = isTemperate
+    ? 0.4 + random() * 0.08
+    : isFrozenOcean
+      ? 0.36 + random() * 0.1
+      : 0;
   const lavaStrength = isScorched ? 0.5 + random() * 0.42 : 0;
-  const iceCapStrength = isFrozen ? 0.86 : isTemperate ? 0.28 + random() * 0.2 : 0;
+  const iceCapStrength = isGlobalIce
+    ? 0.94 + random() * 0.05
+    : isFrozen
+      ? 0.78 + random() * 0.18
+      : isTemperate
+        ? 0.28 + random() * 0.2
+        : 0;
   const cloudCover = isTemperate ? 0.3 + random() * 0.34 : isFrozen ? 0.12 + random() * 0.16 : 0;
+  const hasDebrisRing = random() > 0.86;
 
   return {
     seed,
@@ -749,24 +816,44 @@ const deriveRockyRecipe = (
     axialTilt: -0.34 + random() * 0.68,
     atmosphere: {
       color: palette.atmosphere,
+      density: isTemperate
+        ? 0.5 + random() * 0.4
+        : isScorched
+          ? 0.15 + random() * 0.25
+          : 0.2 + random() * 0.3,
+      haze: clampUnit(0.12 + cloudCover * 0.4),
       label: isScorched
         ? "Mineral vapor · inferred"
         : isTemperate
           ? "Secondary atmosphere · inferred"
           : "Thin volatiles · inferred",
+      scatterStrength: isTemperate ? 0.55 + random() * 0.3 : 0.3 + random() * 0.3,
     },
+    rings: hasDebrisRing
+      ? {
+          bands: 3 + Math.floor(random() * 4),
+          color: isFrozen ? [0.75, 0.82, 0.88] : [0.55, 0.5, 0.46],
+          gapiness: 0.3 + random() * 0.4,
+          innerRadius: scaledRadius * (1.3 + random() * 0.1),
+          opacity: 0.05 + random() * 0.08,
+          outerRadius: scaledRadius * (1.7 + random() * 0.5),
+        }
+      : null,
     surface: {
       ...palette,
       elevation,
       roughness,
       craterDensity,
       waterLevel,
+      waterColorShallow: mixColor(palette.waterColor, palette.highColor, 0.4),
       lavaStrength,
       emissiveColor: isScorched ? [1, 0.16, 0.015] : [0, 0, 0],
       iceCapStrength,
       cloudCover,
+      cloudScale: 2.2 + random() * 2.4,
       cloudSpeed: 0.016 + random() * 0.016,
       cloudColor: isFrozen ? [0.58, 0.75, 0.86] : [0.84, 0.9, 0.94],
+      windDirection: random() * Math.PI * 2,
     },
     terrain: {
       paletteFamily: inferred.paletteFamily as RockyPaletteFamily,
@@ -780,7 +867,13 @@ const deriveRockyRecipe = (
       craterDensity,
       craterScale: 0.5 + random() * 1.5,
       iceCoverage: iceCapStrength,
-      polarIceBias: isFrozen ? 0.55 + random() * 0.4 : isTemperate ? 0.15 + random() * 0.2 : 0,
+      polarIceBias: isGlobalIce
+        ? 0.85 + random() * 0.15
+        : isFrozen
+          ? 0.55 + random() * 0.4
+          : isTemperate
+            ? 0.15 + random() * 0.2
+            : 0,
       volcanicActivity: lavaStrength,
       lavaCoverage: isScorched ? 0.2 + random() * 0.5 : 0,
       cloudCoverage: cloudCover,
@@ -852,7 +945,10 @@ const deriveIceGiantRecipe = (
     axialTilt: -0.46 + random() * 0.92,
     atmosphere: {
       color: palette.atmosphere,
+      density: 0.6 + random() * 0.3,
+      haze: clampUnit(0.35 + inferred.iceLikelihood * 0.3),
       label: "Hydrogen / helium / methane · inferred",
+      scatterStrength: 0.45 + random() * 0.3,
     },
     bandDetail: {
       paletteFamily: inferred.paletteFamily as GiantPaletteFamily,
@@ -875,7 +971,10 @@ const deriveIceGiantRecipe = (
       polarGlow,
     },
     rings: {
+      bands: 3 + Math.floor(random() * 5),
       color: isWarm ? [0.28, 0.55, 0.58] : [0.3, 0.45, 0.72],
+      gapiness: 0.25 + random() * 0.45,
+      innerRadius: scaledRadius * (1.16 + random() * 0.1),
       opacity: 0.1 + random() * 0.12,
       outerRadius: scaledRadius * (1.35 + random() * 0.12),
     },
@@ -1138,27 +1237,42 @@ export const generateCustomWorld = (parameters: CustomPlanetParameters): CustomW
     const lavaStrength = isHot ? 0.2 + activity * 0.8 : 0;
     const iceCapStrength = isCold ? 0.45 + water * 0.55 : Math.max(0, water * 0.25 - 0.05);
     const craterDensity = 0.12 + activity * 0.82;
+    const waterColor = mixColor([0.005, 0.06, 0.16], parameters.baseColor, 0.12);
+    const highColor = mixColor(parameters.baseColor, [0.95, 0.92, 0.84], 0.52);
     return {
       planet,
       recipe: {
         ...shared,
         renderer: "rocky",
         classification: "Custom rocky world",
+        rings: parameters.rings
+          ? {
+              bands: 3 + Math.floor(activity * 5),
+              color: mixColor(parameters.baseColor, [0.85, 0.86, 0.88], 0.5),
+              gapiness: 0.3 + activity * 0.4,
+              innerRadius: shared.radiusSceneUnits * 1.32,
+              opacity: 0.06 + atmosphere * 0.1,
+              outerRadius: shared.radiusSceneUnits * (1.65 + radius * 0.4),
+            }
+          : null,
         surface: {
           ...generated.surface,
           lowColor: scaleColor(parameters.baseColor, 0.2),
           midColor: scaleColor(parameters.baseColor, 0.72),
-          highColor: mixColor(parameters.baseColor, [0.95, 0.92, 0.84], 0.52),
+          highColor,
           elevation: 0.045 + activity * 0.3,
           roughness: 1.5 + activity * 3.6,
           craterDensity,
           waterLevel,
-          waterColor: mixColor([0.005, 0.06, 0.16], parameters.baseColor, 0.12),
+          waterColor,
+          waterColorShallow: mixColor(waterColor, highColor, 0.4),
           cloudCover,
+          cloudScale: 2 + atmosphere * 3,
           cloudSpeed: 0.008 + activity * 0.04,
           lavaStrength,
           emissiveColor: isHot ? [1, 0.11, 0.008] : [0, 0, 0],
           iceCapStrength,
+          windDirection: (seed % 628) / 100,
         },
         terrain: {
           ...generated.terrain,
@@ -1250,7 +1364,10 @@ export const generateCustomWorld = (parameters: CustomPlanetParameters): CustomW
       },
       rings: parameters.rings
         ? {
+            bands: 4 + Math.floor(activity * 6),
             color: mixColor(parameters.baseColor, [0.92, 0.78, 0.58], 0.5),
+            gapiness: 0.3 + activity * 0.4,
+            innerRadius: shared.radiusSceneUnits * 1.24,
             opacity: 0.1 + atmosphere * 0.22,
             outerRadius: shared.radiusSceneUnits * (1.42 + radius * 0.25),
           }

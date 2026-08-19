@@ -13,6 +13,9 @@ export interface RenderQualityProfile {
   planetIcoSubdivisions: number;
   planetSegments: number;
   ringTessellation: number;
+  /** Whether the cloud shell samples a second, higher-frequency noise octave group for
+   * finer multi-scale structure. Off on fill-rate-constrained tiers. */
+  secondaryCloudDetail: boolean;
   starCount: number;
   /** Whether rocky planets sample the triplanar PBR microdetail textures (normal + roughness).
    * Off on fill-rate-constrained tiers so they keep the cheaper pure-procedural surface. */
@@ -59,6 +62,7 @@ export const deriveRenderQuality = ({
       ringTessellation: 56,
       fbmOctaves: 3,
       surfaceMicrodetail: false,
+      secondaryCloudDetail: false,
       hardwareScalingLevel: roundScale(Math.max(1.3, pixelRatio / 1.2)),
       maxHardwareScalingLevel: 2,
       xrFramebufferScaleFactor: 0.72,
@@ -77,6 +81,7 @@ export const deriveRenderQuality = ({
       ringTessellation: 72,
       fbmOctaves: 4,
       surfaceMicrodetail: false,
+      secondaryCloudDetail: false,
       hardwareScalingLevel: roundScale(Math.max(1.2, pixelRatio / 1.35)),
       maxHardwareScalingLevel: 1.9,
       xrFramebufferScaleFactor: 0.82,
@@ -95,6 +100,7 @@ export const deriveRenderQuality = ({
       ringTessellation: 80,
       fbmOctaves: 4,
       surfaceMicrodetail: false,
+      secondaryCloudDetail: true,
       hardwareScalingLevel: roundScale(Math.max(1.1, pixelRatio / 1.5)),
       maxHardwareScalingLevel: 1.8,
       xrFramebufferScaleFactor: 0.88,
@@ -112,6 +118,7 @@ export const deriveRenderQuality = ({
     ringTessellation: 128,
     fbmOctaves: 5,
     surfaceMicrodetail: true,
+    secondaryCloudDetail: true,
     hardwareScalingLevel: roundScale(Math.max(1, pixelRatio / 1.65)),
     maxHardwareScalingLevel: 1.65,
     xrFramebufferScaleFactor: 1,
@@ -171,4 +178,5 @@ export const adaptFixedFoveation = (
 export const shaderDefines = (profile: RenderQualityProfile): string[] => [
   `#define FBM_OCTAVES ${profile.fbmOctaves}`,
   ...(profile.surfaceMicrodetail ? ["#define SURFACE_MICRODETAIL"] : []),
+  ...(profile.secondaryCloudDetail ? ["#define CLOUD_DETAIL"] : []),
 ];

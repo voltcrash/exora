@@ -5,7 +5,7 @@ import "@babylonjs/core/Culling/ray.js";
 import { Engine } from "@babylonjs/core/Engines/engine.js";
 import { DirectionalLight } from "@babylonjs/core/Lights/directionalLight.js";
 import { Color3, Color4 } from "@babylonjs/core/Maths/math.color.js";
-import { Vector3 } from "@babylonjs/core/Maths/math.vector.js";
+import { Vector2, Vector3 } from "@babylonjs/core/Maths/math.vector.js";
 import { Effect } from "@babylonjs/core/Materials/effect.js";
 import { ShaderMaterial } from "@babylonjs/core/Materials/shaderMaterial.js";
 import { StandardMaterial } from "@babylonjs/core/Materials/standardMaterial.js";
@@ -25,7 +25,7 @@ import "@babylonjs/core/XR/features/WebXRControllerTeleportation.js";
 import "@babylonjs/core/XR/features/WebXRHandTracking.js";
 import { WebXRFeatureName } from "@babylonjs/core/XR/webXRFeaturesManager.js";
 import { WebXRState } from "@babylonjs/core/XR/webXRTypes.js";
-import type { Rgb, RockyWorldRecipe, WorldRecipe } from "@exora/worldgen";
+import type { Rgb, RingRecipe, RockyWorldRecipe, WorldRecipe } from "@exora/worldgen";
 import {
   adaptFixedFoveation,
   adaptHardwareScaling,
@@ -454,6 +454,7 @@ uniform vec3 lowColor;
 uniform vec3 midColor;
 uniform vec3 highColor;
 uniform vec3 waterColor;
+uniform vec3 waterColorShallow;
 uniform vec3 emissiveColor;
 
 #ifdef SURFACE_MICRODETAIL
@@ -565,15 +566,25 @@ void main(void) {
   float craterThreshold = mix(0.91, 0.76, craterDensity);
   float crater = smoothstep(craterThreshold, craterThreshold + 0.09, craterNoise);
   float craterRim = smoothstep(craterThreshold - 0.035, craterThreshold, craterNoise) - crater;
+  // Fracture channels (thin, ridge-following cracks) and separate rounded hotspots (isolated
+  // upwelling cells), both bounded by lavaStrength so activity never reads as a whole-planet glow.
   float fractureField = abs(
     ridgedFbm(surface * 7.8 + vec3(2.4, 18.1, 9.7)) -
     ridgedFbm(surface * 7.8 + vec3(9.6, 3.2, 21.4))
   );
   float fractures = (1.0 - smoothstep(0.012, 0.085, fractureField)) * lavaStrength;
+  float hotspotNoise = fbm(surface * 3.4 + vec3(51.3, 22.4, 7.1));
+  float hotspots = smoothstep(0.8, 0.93, hotspotNoise) * lavaStrength;
+  float lavaGlow = clamp(fractures * 0.85 + hotspots * 0.6, 0.0, max(lavaStrength * 0.92, 0.0));
   float surfaceHeight = macroDetail * 0.32 + erosion * 0.1 + mineralDetail * 0.025 - crater * 0.04 + craterRim * 0.025;
   vec3 normal = perturbNormal(vWorldPosition, baseNormal, surfaceHeight);
+  // Ice coverage grows from the poles inward as iceCapStrength rises: near 1.0 it eats through
+  // the lower-latitude threshold entirely, giving a globally glaciated world instead of just
+  // wider polar caps.
   float polarBoundary = abs(surface.y) + (macroDetail - 0.5) * 0.16 + (mineralDetail - 0.5) * 0.04;
-  float polarMask = smoothstep(0.58, 0.88, polarBoundary) * iceCapStrength;
+  float polarThreshold = mix(0.58, 0.04, smoothstep(0.74, 1.0, iceCapStrength));
+  float polarMask = smoothstep(polarThreshold, polarThreshold + 0.3, polarBoundary) * iceCapStrength;
+  vec3 iceColor = mix(vec3(0.63, 0.78, 0.85), vec3(0.93, 0.97, 0.99), smoothstep(0.35, 0.85, mineralDetail));
 
   float detailRoughness = 0.55;
 #ifdef SURFACE_MICRODETAIL
@@ -647,26 +658,54 @@ void main(void) {
   rockColor *= 0.94 + (microDetail - 0.5) * 0.06;
   rockColor = mix(rockColor, highColor * 1.08, craterRim * 0.36);
   rockColor = mix(rockColor, lowColor * 0.38, crater * 0.68);
+  // Dark volcanic crust: the ground around active fracture/hotspot networks reads as cooled,
+  // ash-dark basalt rather than plain rock, independent of the emissive glow itself.
+  rockColor = mix(rockColor, vec3(0.018, 0.012, 0.011), clamp(lavaStrength * 0.55, 0.0, 1.0) * (1.0 - lavaGlow));
 
   float coastline = vHeight + (macroDetail - 0.5) * 0.025;
-  float waterMask = waterLevel > 0.0 ? 1.0 - smoothstep(waterLevel - 0.012, waterLevel + 0.016, coastline) : 0.0;
-  normal = normalize(mix(normal, baseNormal, waterMask * 0.94));
-  vec3 surfaceColor = mix(rockColor, waterColor, waterMask * 0.92);
-  surfaceColor = mix(surfaceColor, vec3(0.72, 0.84, 0.88), polarMask * (0.62 + microDetail * 0.16));
+  float shoreline = waterLevel > 0.0 ? smoothstep(waterLevel + 0.016, waterLevel - 0.012, coastline) : 0.0;
+  float waterMask = shoreline;
+  // Ice-locked oceans (high iceCapStrength on a water world) keep the basin shape but stop
+  // acting like liquid: no ripple, no glint, tinted toward ice instead of the liquid color.
+  float frozenWater = waterMask * smoothstep(0.55, 0.82, iceCapStrength);
+  float liquidWater = waterMask * (1.0 - frozenWater);
+
+  // Subtle animated ripple, liquid areas only, so the surface is not perfectly still.
+  vec3 rippleSample = surface * 42.0 + vec3(time * 0.6, time * -0.44, time * 0.31);
+  float ripple = (noise(rippleSample) - 0.5) * 0.05 * liquidWater;
+  vec3 waterNormal = normalize(baseNormal + vec3(ripple, ripple * 0.6, -ripple));
+  normal = normalize(mix(normal, mix(baseNormal, waterNormal, liquidWater > 0.0 ? 1.0 : 0.0), waterMask * 0.94));
+
+  // Shallow (near the shore) vs. deep (basin interior) tint, using distance past the shoreline
+  // threshold as a cheap depth proxy — no separate depth buffer needed.
+  float depthProxy = waterLevel > 0.0 ? clamp((waterLevel - coastline) / max(waterLevel, 0.05), 0.0, 1.0) : 0.0;
+  vec3 liquidColor = mix(waterColorShallow, waterColor, depthProxy);
+  vec3 waterSurfaceColor = mix(liquidColor, iceColor, frozenWater / max(waterMask, 0.0001));
+  vec3 surfaceColor = mix(rockColor, waterSurfaceColor, waterMask * 0.92);
+  surfaceColor = mix(surfaceColor, iceColor, polarMask * (0.62 + microDetail * 0.16));
+
   float diffuse = max(dot(normal, lightDirection), 0.0);
   float wrappedLight = 0.16 + diffuse * 0.98;
   vec3 viewDirection = normalize(cameraPosition - vWorldPosition);
   vec3 halfDirection = normalize(lightDirection + viewDirection);
-  float waterSpecular = pow(max(dot(normal, halfDirection), 0.0), 46.0) * waterMask;
+  // Fresnel reflectance: water (and ice) throw more of the sky/star back at grazing angles,
+  // rock stays mostly matte.
+  float fresnel = pow(1.0 - max(dot(normal, viewDirection), 0.0), 5.0);
+  float waterFresnel = fresnel * (liquidWater * 0.85 + frozenWater * 0.22);
+  // A tight, bright star glint on liquid water; a softer, dimmer one on ice.
+  float waterSpecular = pow(max(dot(normal, halfDirection), 0.0), 130.0) * liquidWater;
+  float iceSpecular = pow(max(dot(normal, halfDirection), 0.0), 34.0) * frozenWater * 0.4;
   // Smoother materials (ice) throw a tighter, brighter highlight; rougher ones (dust, rock) a
   // dim, broad one — giving the surface meaningful, material-driven roughness variation.
   float rockSpecular = pow(max(dot(normal, halfDirection), 0.0), mix(6.0, 70.0, 1.0 - detailRoughness)) * (1.0 - waterMask) * (1.0 - detailRoughness) * 0.1;
   float rim = pow(1.0 - max(dot(normal, viewDirection), 0.0), 3.0);
 
-  vec3 finalColor = surfaceColor * wrappedLight * mix(vec3(1.0), stellarColor, diffuse * 0.38) * stellarIntensity + vec3(0.34, 0.58, 0.72) * waterSpecular * 0.45;
+  vec3 finalColor = surfaceColor * wrappedLight * mix(vec3(1.0), stellarColor, diffuse * 0.38) * stellarIntensity;
+  finalColor += mix(vec3(0.34, 0.58, 0.72), stellarColor, 0.55) * (waterSpecular + iceSpecular) * stellarIntensity;
+  finalColor += stellarColor * waterFresnel * stellarIntensity * 0.5;
   finalColor += stellarColor * rockSpecular * stellarIntensity;
   finalColor += highColor * rim * 0.08;
-  finalColor += emissiveColor * fractures * (0.72 + 0.28 * sin(time * 0.7 + microDetail * 8.0));
+  finalColor += emissiveColor * lavaGlow * (0.72 + 0.2 * sin(time * 0.7 + microDetail * 8.0) + 0.12 * sin(time * 1.7 + hotspotNoise * 11.0));
   float dither = (hash(vec3(gl_FragCoord.xy, seed)) - 0.5) / 255.0;
   gl_FragColor = vec4(finalColor + dither, 1.0);
 }
@@ -681,6 +720,8 @@ varying vec3 vWorldNormal;
 uniform float time;
 uniform float seed;
 uniform float cloudCover;
+uniform float cloudScale;
+uniform vec2 windDirection;
 uniform vec3 cloudColor;
 uniform vec3 cameraPosition;
 uniform vec3 lightDirection;
@@ -718,8 +759,21 @@ float fbm(vec3 point) {
 
 void main(void) {
   vec3 normal = normalize(vWorldNormal);
-  vec3 samplePosition = normal * 3.2 + vec3(time * 0.028, 0.0, time * -0.014);
+  // Wind drift is a translation along the (seed-chosen) prevailing direction, independent of
+  // the planet's own rotation, which the cloud mesh already inherits from its parent transform.
+  vec3 drift = vec3(windDirection.x, 0.0, windDirection.y) * time * 0.03;
+  vec3 samplePosition = normal * (2.6 * cloudScale * 0.5 + 1.3) + drift;
   float cloudNoise = fbm(samplePosition);
+
+#ifdef CLOUD_DETAIL
+  // A second, higher-frequency octave group sampled at a different scale/speed than the base
+  // layer, so the cloud field reads as multi-scale structure (large systems + fine wisps)
+  // instead of one blob of noise. Skipped on fill-rate-constrained tiers.
+  vec3 fineSamplePosition = normal * (7.5 * cloudScale * 0.5 + 2.0) - drift * 1.7;
+  float fineNoise = fbm(fineSamplePosition + cloudNoise * 0.6);
+  cloudNoise = mix(cloudNoise, cloudNoise * 0.6 + fineNoise * 0.4, 0.55);
+#endif
+
   float threshold = mix(0.74, 0.43, cloudCover);
   float cloud = smoothstep(threshold, threshold + 0.16, cloudNoise);
   vec3 viewDirection = normalize(cameraPosition - vWorldPosition);
@@ -757,16 +811,127 @@ varying vec3 vWorldNormal;
 
 uniform vec3 atmosphereColor;
 uniform vec3 cameraPosition;
+uniform vec3 lightDirection;
+uniform vec3 stellarColor;
+uniform float stellarIntensity;
 uniform float time;
 uniform float activity;
+uniform float density;
+uniform float haze;
+uniform float scatterStrength;
 
 void main(void) {
   vec3 normal = normalize(vWorldNormal);
   vec3 viewDirection = normalize(cameraPosition - vWorldPosition);
   float rim = pow(1.0 - max(dot(normal, viewDirection), 0.0), 2.25);
   float pulse = 0.92 + sin(time * 0.42) * 0.08 * activity;
-  float alpha = smoothstep(0.03, 1.0, rim) * (0.42 + activity * 0.16) * pulse;
-  gl_FragColor = vec4(atmosphereColor * (0.75 + rim * (1.35 + activity * 0.5)), alpha);
+
+  // Cheap Rayleigh-like approximation: thin/edge-on air scatters shorter wavelengths harder, so
+  // push the limb color toward blue as it thins away from the (thicker-looking) disc center.
+  vec3 rayleighTint = mix(atmosphereColor, vec3(0.55, 0.72, 1.0), scatterStrength * 0.5);
+  vec3 rimColor = mix(atmosphereColor, rayleighTint, smoothstep(0.15, 0.85, rim));
+
+  // Terminator behavior: the day-side limb reads bright and scattered, the night-side limb goes
+  // dim and desaturated instead of glowing uniformly all the way around.
+  float sunFacing = dot(normal, lightDirection);
+  float dayNight = smoothstep(-0.55, 0.35, sunFacing);
+  vec3 nightTint = mix(atmosphereColor * 0.22, vec3(0.05, 0.04, 0.09), 0.5);
+  vec3 litColor = mix(nightTint, rimColor, dayNight);
+
+  // Mie-like forward glow concentrated toward the star direction as seen from the camera.
+  float mie = pow(max(dot(viewDirection, lightDirection), 0.0), 10.0) * haze * dayNight;
+
+  float alpha = smoothstep(0.03, 1.0, rim) * density * (0.42 + activity * 0.16) * pulse;
+  alpha *= mix(0.45, 1.0, dayNight);
+  vec3 finalColor = litColor * (0.75 + rim * (1.35 + activity * 0.5)) * mix(vec3(1.0), stellarColor, 0.4 * dayNight) * (0.6 + stellarIntensity * 0.25);
+  finalColor += stellarColor * mie * stellarIntensity * 0.6;
+  gl_FragColor = vec4(finalColor, clamp(alpha + mie * 0.3, 0.0, 1.0));
+}
+`;
+
+const RING_VERTEX_SHADER = `
+precision highp float;
+
+attribute vec3 position;
+attribute vec2 uv;
+
+uniform mat4 world;
+uniform mat4 worldViewProjection;
+
+varying vec2 vUv;
+varying vec3 vWorldPosition;
+varying vec3 vWorldNormal;
+
+void main(void) {
+  vUv = uv;
+  vec4 worldPosition = world * vec4(position, 1.0);
+  vWorldPosition = worldPosition.xyz;
+  vWorldNormal = normalize(mat3(world) * vec3(0.0, 1.0, 0.0));
+  gl_Position = worldViewProjection * vec4(position, 1.0);
+}
+`;
+
+/**
+ * Deterministic, procedural radial density so a ring never renders as one flat, uniformly
+ * transparent disc: `vUv.x` sweeps 0 (inner edge) to 1 (outer edge) and layered value-noise
+ * over that single axis produces bands, gaps, and per-band shading/color variation.
+ */
+const RING_FRAGMENT_SHADER = `
+precision highp float;
+
+varying vec2 vUv;
+varying vec3 vWorldPosition;
+varying vec3 vWorldNormal;
+
+uniform float seed;
+uniform float bands;
+uniform float gapiness;
+uniform float opacity;
+uniform vec3 ringColor;
+uniform vec3 cameraPosition;
+uniform vec3 lightDirection;
+uniform vec3 stellarColor;
+uniform float stellarIntensity;
+
+float hash1(float n) {
+  return fract(sin(n * 127.1 + seed * 0.0173) * 43758.5453123);
+}
+
+float bandNoise(float r) {
+  float value = 0.0;
+  float freq = bands;
+  float amplitude = 0.55;
+  for (int octave = 0; octave < RING_OCTAVES; octave++) {
+    float cell = floor(r * freq);
+    float local = fract(r * freq);
+    float a = hash1(cell + float(octave) * 19.3);
+    float b = hash1(cell + 1.0 + float(octave) * 19.3);
+    value += mix(a, b, smoothstep(0.0, 1.0, local)) * amplitude;
+    freq *= 1.93;
+    amplitude *= 0.52;
+  }
+  return value / 1.4;
+}
+
+void main(void) {
+  float r = clamp(vUv.x, 0.0, 1.0);
+  float density = bandNoise(r);
+  float gapMask = smoothstep(gapiness * 0.32, gapiness * 0.32 + 0.14, density);
+  float edgeFade = smoothstep(0.0, 0.05, r) * smoothstep(1.0, 0.92, r);
+  float shade = mix(0.55, 1.35, hash1(floor(r * bands * 2.3) + 4.1));
+  vec3 tint = ringColor * shade;
+
+  vec3 normal = normalize(vWorldNormal);
+  vec3 viewDirection = normalize(cameraPosition - vWorldPosition);
+  // Rings are unshadowed thin discs, lit from both faces; abs() keeps the underside from
+  // reading as pitch black while still tracking the host-star direction for day/night balance.
+  float lit = 0.35 + abs(dot(normal, lightDirection)) * 0.85;
+  float grazing = pow(1.0 - abs(dot(normal, viewDirection)), 1.4);
+
+  vec3 finalColor = tint * lit * mix(vec3(1.0), stellarColor, 0.4) * stellarIntensity;
+  finalColor += tint * grazing * 0.12;
+  float alpha = opacity * gapMask * edgeFade * (0.55 + density * 0.5);
+  gl_FragColor = vec4(finalColor, clamp(alpha, 0.0, 1.0));
 }
 `;
 
@@ -948,50 +1113,114 @@ const setViewingDeckVisible = (viewingDeck: ViewingDeck, visible: boolean): void
   viewingDeck.ring.isVisible = visible;
 };
 
+/**
+ * Builds a single flat annulus (inner radius -> outer radius) in the XZ plane: `uv.x` sweeps
+ * radially (0 at the inner edge, 1 at the outer edge) so a shader can drive procedural radial
+ * density from it, `uv.y` sweeps angularly. A handful of radial subdivisions (rather than one
+ * quad strip) let the per-fragment band noise read as more than a flat gradient across the
+ * width. One draw call, unlike the previous stacked-torus approach.
+ */
+const buildRingMesh = (
+  scene: Scene,
+  innerRadius: number,
+  outerRadius: number,
+  angularSegments: number,
+): Mesh => {
+  const mesh = new Mesh("planetRings", scene);
+  const radialSteps = 6;
+  const positions: number[] = [];
+  const uvs: number[] = [];
+  const indices: number[] = [];
+
+  for (let ring = 0; ring <= radialSteps; ring += 1) {
+    const radialFraction = ring / radialSteps;
+    const ringRadius = innerRadius + (outerRadius - innerRadius) * radialFraction;
+    for (let segment = 0; segment <= angularSegments; segment += 1) {
+      const angle = (segment / angularSegments) * Math.PI * 2;
+      positions.push(Math.cos(angle) * ringRadius, 0, Math.sin(angle) * ringRadius);
+      uvs.push(radialFraction, segment / angularSegments);
+    }
+  }
+
+  const rowLength = angularSegments + 1;
+  for (let ring = 0; ring < radialSteps; ring += 1) {
+    for (let segment = 0; segment < angularSegments; segment += 1) {
+      const a = ring * rowLength + segment;
+      const b = a + 1;
+      const c = a + rowLength;
+      const d = c + 1;
+      indices.push(a, c, b, b, c, d);
+    }
+  }
+
+  const normals = Array.from<number>({ length: positions.length }).fill(0);
+  for (let index = 1; index < normals.length; index += 3) normals[index] = 1;
+
+  const vertexData = new VertexData();
+  vertexData.positions = positions;
+  vertexData.indices = indices;
+  vertexData.uvs = uvs;
+  vertexData.normals = normals;
+  vertexData.applyToMesh(mesh);
+  return mesh;
+};
+
 const createRingSystem = (
   scene: Scene,
   profile: RenderQualityProfile,
-  radius: number,
-  outerRadius: number,
-  color: Rgb,
-  opacity: number,
+  planetRadius: number,
+  ring: RingRecipe,
+  star: WorldRecipe["star"],
   tilt: number,
-): TransformNode => {
+): { material: ShaderMaterial; system: TransformNode } => {
   const ringSystem = new TransformNode("ringSystem", scene);
   ringSystem.position.copyFrom(PLANET_POSITION);
   ringSystem.rotation.x = 0.88 + tilt * 0.36;
   ringSystem.rotation.z = tilt;
-  const ringCount = profile.tier === "desktop" ? 9 : 6;
-  const span = outerRadius - radius * 1.08;
 
-  for (let index = 0; index < ringCount; index += 1) {
-    const progress = (index + 0.35) / ringCount;
-    const ringRadius = radius * 1.08 + span * progress;
-    const ring = MeshBuilder.CreateTorus(
-      `planetRing-${index}`,
-      {
-        diameter: ringRadius * 2,
-        thickness: Math.max(0.016, span * (0.035 + (index % 3) * 0.012)),
-        tessellation: profile.ringTessellation,
-      },
-      scene,
-    );
-    ring.parent = ringSystem;
-    ring.isPickable = false;
+  const innerRadius = Math.max(planetRadius * 1.05, ring.innerRadius);
+  const outerRadius = Math.max(innerRadius * 1.05, ring.outerRadius);
+  const mesh = buildRingMesh(scene, innerRadius, outerRadius, profile.ringTessellation);
+  mesh.parent = ringSystem;
+  mesh.isPickable = false;
+  mesh.renderingGroupId = 1;
 
-    const material = new StandardMaterial(`planetRingMaterial-${index}`, scene);
-    const ringColor = toColor3(color).scale(0.72 + (index % 4) * 0.09);
-    material.disableLighting = true;
-    material.diffuseColor = ringColor;
-    material.emissiveColor = ringColor.scale(0.32);
-    material.alpha = opacity * (0.48 + ((index * 7) % 5) * 0.13);
-    material.backFaceCulling = false;
-    material.disableDepthWrite = true;
-    material.freeze();
-    ring.material = material;
-  }
+  const material = new ShaderMaterial(
+    "planetRingMaterial",
+    scene,
+    { vertex: "exoraRing", fragment: "exoraRing" },
+    {
+      attributes: ["position", "uv"],
+      defines: [`#define RING_OCTAVES ${profile.tier === "desktop" ? 4 : 3}`],
+      uniforms: [
+        "world",
+        "worldViewProjection",
+        "cameraPosition",
+        "seed",
+        "bands",
+        "gapiness",
+        "opacity",
+        "ringColor",
+        "lightDirection",
+        "stellarColor",
+        "stellarIntensity",
+      ],
+      needAlphaBlending: true,
+    },
+  );
+  material.setFloat("seed", ring.outerRadius * 1_000 + ring.bands);
+  material.setFloat("bands", Math.max(3, ring.bands));
+  material.setFloat("gapiness", Math.min(1, Math.max(0, ring.gapiness)));
+  material.setFloat("opacity", ring.opacity);
+  material.setColor3("ringColor", toColor3(ring.color));
+  material.setVector3("lightDirection", LIGHT_DIRECTION);
+  material.setColor3("stellarColor", toColor3(star.color));
+  material.setFloat("stellarIntensity", star.intensity);
+  material.backFaceCulling = false;
+  material.disableDepthWrite = true;
+  mesh.material = material;
 
-  return ringSystem;
+  return { material, system: ringSystem };
 };
 
 /**
@@ -1056,6 +1285,7 @@ const createPlanet = (
   orbitalMeshes: AbstractMesh[];
   orbitalRoot: TransformNode;
   planet: Mesh;
+  ringMaterial: ShaderMaterial | null;
   ringSystem: TransformNode | null;
   shader: ShaderMaterial;
 } => {
@@ -1067,6 +1297,8 @@ const createPlanet = (
   Effect.ShadersStore.exoraCloudFragmentShader = CLOUD_FRAGMENT_SHADER;
   Effect.ShadersStore.exoraAtmosphereVertexShader = ATMOSPHERE_VERTEX_SHADER;
   Effect.ShadersStore.exoraAtmosphereFragmentShader = ATMOSPHERE_FRAGMENT_SHADER;
+  Effect.ShadersStore.exoraRingVertexShader = RING_VERTEX_SHADER;
+  Effect.ShadersStore.exoraRingFragmentShader = RING_FRAGMENT_SHADER;
 
   const orbitalRoot = new TransformNode("orbitalWorld", scene);
   const orbitalMeshes: AbstractMesh[] = [];
@@ -1130,6 +1362,7 @@ const createPlanet = (
           "midColor",
           "highColor",
           "waterColor",
+          "waterColorShallow",
           "emissiveColor",
           ...(profile.surfaceMicrodetail ? ["detailFadeStart", "detailFadeEnd"] : []),
         ],
@@ -1224,6 +1457,7 @@ const createPlanet = (
     shader.setColor3("midColor", toColor3(recipe.surface.midColor));
     shader.setColor3("highColor", toColor3(recipe.surface.highColor));
     shader.setColor3("waterColor", toColor3(recipe.surface.waterColor));
+    shader.setColor3("waterColorShallow", toColor3(recipe.surface.waterColorShallow));
     shader.setColor3("emissiveColor", toColor3(recipe.surface.emissiveColor));
 
     if (profile.surfaceMicrodetail) {
@@ -1265,18 +1499,19 @@ const createPlanet = (
   }
   planet.material = shader;
 
-  const ringRecipe = recipe.renderer === "rocky" ? null : recipe.rings;
-  const ringSystem = ringRecipe
+  const ringRecipe = recipe.rings;
+  const ringBuild = ringRecipe
     ? createRingSystem(
         scene,
         profile,
         recipe.radiusSceneUnits,
-        ringRecipe.outerRadius,
-        ringRecipe.color,
-        ringRecipe.opacity,
+        ringRecipe,
+        recipe.star,
         recipe.axialTilt,
       )
     : null;
+  const ringSystem = ringBuild?.system ?? null;
+  const ringMaterial = ringBuild?.material ?? null;
   if (ringSystem) {
     ringSystem.parent = orbitalRoot;
     orbitalMeshes.push(...ringSystem.getChildMeshes(false));
@@ -1310,6 +1545,8 @@ const createPlanet = (
           "time",
           "seed",
           "cloudCover",
+          "cloudScale",
+          "windDirection",
           "cloudColor",
           "lightDirection",
           "stellarColor",
@@ -1319,6 +1556,11 @@ const createPlanet = (
     );
     cloudLayer.setFloat("seed", recipe.seed);
     cloudLayer.setFloat("cloudCover", recipe.surface.cloudCover);
+    cloudLayer.setFloat("cloudScale", recipe.surface.cloudScale);
+    cloudLayer.setVector2(
+      "windDirection",
+      new Vector2(Math.cos(recipe.surface.windDirection), Math.sin(recipe.surface.windDirection)),
+    );
     cloudLayer.setColor3("cloudColor", toColor3(recipe.surface.cloudColor));
     cloudLayer.setVector3("lightDirection", LIGHT_DIRECTION);
     cloudLayer.setColor3("stellarColor", toColor3(recipe.star.color));
@@ -1348,14 +1590,26 @@ const createPlanet = (
         "world",
         "worldViewProjection",
         "cameraPosition",
+        "lightDirection",
+        "stellarColor",
+        "stellarIntensity",
         "atmosphereColor",
         "time",
         "activity",
+        "density",
+        "haze",
+        "scatterStrength",
       ],
       needAlphaBlending: true,
     },
   );
   atmosphere.setColor3("atmosphereColor", toColor3(recipe.atmosphere.color));
+  atmosphere.setVector3("lightDirection", LIGHT_DIRECTION);
+  atmosphere.setColor3("stellarColor", toColor3(recipe.star.color));
+  atmosphere.setFloat("stellarIntensity", recipe.star.intensity);
+  atmosphere.setFloat("density", recipe.atmosphere.density);
+  atmosphere.setFloat("haze", recipe.atmosphere.haze);
+  atmosphere.setFloat("scatterStrength", recipe.atmosphere.scatterStrength);
   atmosphere.setFloat(
     "activity",
     recipe.renderer === "gas-giant"
@@ -1423,6 +1677,7 @@ const createPlanet = (
     orbitalMeshes,
     orbitalRoot,
     planet,
+    ringMaterial,
     ringSystem,
     shader,
   };
@@ -1945,6 +2200,7 @@ export const createPlanetExperience = ({
     orbitalMeshes,
     orbitalRoot,
     planet,
+    ringMaterial,
     ringSystem,
     shader,
   } = createPlanet(scene, recipe, profile);
@@ -2109,6 +2365,7 @@ export const createPlanetExperience = ({
     shader.setVector3("cameraPosition", activePosition);
     atmosphere.setVector3("cameraPosition", activePosition);
     cloudLayer?.setVector3("cameraPosition", activePosition);
+    ringMaterial?.setVector3("cameraPosition", activePosition);
 
     const rig = isInXr ? xrCamera() : null;
     if (rig) {

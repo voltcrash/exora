@@ -96,5 +96,9 @@ test("only enables triplanar surface microdetail on the desktop tier", () => {
     pixelRatio: 2,
   });
 
-  expect(shaderDefines(profile)).toEqual(["#define FBM_OCTAVES 5", "#define SURFACE_MICRODETAIL"]);
+  expect(shaderDefines(profile)).toEqual([
+    "#define FBM_OCTAVES 5",
+    "#define SURFACE_MICRODETAIL",
+    "#define CLOUD_DETAIL",
+  ]);
 });
