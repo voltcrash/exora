@@ -5,6 +5,7 @@ import type { StarSceneExperience } from "../star-scene.ts";
 import { formatNumber } from "../planet-utils.tsx";
 import { deriveStarVisual, starKindLabel, starSummary } from "../star-utils.ts";
 import { isXrEmulated } from "../xr-emulator.ts";
+import { clearVrHandoff, consumeVrHandoff } from "../xr-session.ts";
 import type { XrStatus } from "../planet-scene.ts";
 
 interface StarExperienceProps {
@@ -84,6 +85,13 @@ export const StarExperience = ({
 
   useEffect(() => {
     document.body.dataset.xrStatus = xrStatus;
+  }, [xrStatus]);
+
+  // Travelling between celestial objects rebuilds the renderer and therefore ends the running
+  // session; re-entering as soon as the new scene is ready keeps the headset on.
+  useEffect(() => {
+    if (xrStatus !== "ready" || !consumeVrHandoff()) return;
+    void experienceRef.current?.enterVr().catch(() => clearVrHandoff());
   }, [xrStatus]);
 
   useEffect(() => {
