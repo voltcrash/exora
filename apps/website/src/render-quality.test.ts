@@ -87,7 +87,7 @@ test("bakes the octave budget into the shader defines", () => {
   const profile = deriveRenderQuality({ userAgent: "Quest 2", pixelRatio: 1 });
 
   expect(profile.surfaceMicrodetail).toBe(false);
-  expect(shaderDefines(profile)).toEqual(["#define FBM_OCTAVES 3"]);
+  expect(shaderDefines(profile)).toEqual(["#define FBM_OCTAVES 3", "#define MAX_GIANT_STORMS 1"]);
 });
 
 test("only enables triplanar surface microdetail on the desktop tier", () => {
@@ -98,6 +98,7 @@ test("only enables triplanar surface microdetail on the desktop tier", () => {
 
   expect(shaderDefines(profile)).toEqual([
     "#define FBM_OCTAVES 5",
+    "#define MAX_GIANT_STORMS 3",
     "#define SURFACE_MICRODETAIL",
     "#define CLOUD_DETAIL",
   ]);

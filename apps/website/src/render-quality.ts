@@ -7,6 +7,9 @@ export interface RenderQualityProfile {
   maxHardwareScalingLevel: number;
   /** Ceiling for foveation once a struggling immersive session starts trading edge detail. */
   maxXrFixedFoveation: number;
+  /** How many storms a gas/ice giant's fragment shader evaluates per pixel, the dominant cost
+   * of the multi-storm loop. A recipe's own `bandDetail.stormCount` is clamped to this. */
+  maxGiantStorms: number;
   moonSegments: number;
   /** Icosphere subdivision level for rocky planets (vertex count ~= 10 * n^2 + 2), chosen to
    * roughly match planetSegments' vertex density on a UV sphere at the same tier. */
@@ -61,6 +64,7 @@ export const deriveRenderQuality = ({
       moonSegments: 14,
       ringTessellation: 56,
       fbmOctaves: 3,
+      maxGiantStorms: 1,
       surfaceMicrodetail: false,
       secondaryCloudDetail: false,
       hardwareScalingLevel: roundScale(Math.max(1.3, pixelRatio / 1.2)),
@@ -80,6 +84,7 @@ export const deriveRenderQuality = ({
       moonSegments: 16,
       ringTessellation: 72,
       fbmOctaves: 4,
+      maxGiantStorms: 2,
       surfaceMicrodetail: false,
       secondaryCloudDetail: false,
       hardwareScalingLevel: roundScale(Math.max(1.2, pixelRatio / 1.35)),
@@ -99,6 +104,7 @@ export const deriveRenderQuality = ({
       moonSegments: 18,
       ringTessellation: 80,
       fbmOctaves: 4,
+      maxGiantStorms: 3,
       surfaceMicrodetail: false,
       secondaryCloudDetail: true,
       hardwareScalingLevel: roundScale(Math.max(1.1, pixelRatio / 1.5)),
@@ -117,6 +123,7 @@ export const deriveRenderQuality = ({
     moonSegments: 24,
     ringTessellation: 128,
     fbmOctaves: 5,
+    maxGiantStorms: 3,
     surfaceMicrodetail: true,
     secondaryCloudDetail: true,
     hardwareScalingLevel: roundScale(Math.max(1, pixelRatio / 1.65)),
@@ -177,6 +184,7 @@ export const adaptFixedFoveation = (
  */
 export const shaderDefines = (profile: RenderQualityProfile): string[] => [
   `#define FBM_OCTAVES ${profile.fbmOctaves}`,
+  `#define MAX_GIANT_STORMS ${profile.maxGiantStorms}`,
   ...(profile.surfaceMicrodetail ? ["#define SURFACE_MICRODETAIL"] : []),
   ...(profile.secondaryCloudDetail ? ["#define CLOUD_DETAIL"] : []),
 ];
