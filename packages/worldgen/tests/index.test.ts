@@ -613,6 +613,113 @@ test("hot Jupiters infer the hot_gas_giant visual class with reduced ice likelih
   expect(recipe.inferred.iceLikelihood).toBeLessThan(0.3);
 });
 
+const ultraHotJupiterPlanet: ExoplanetProfile = {
+  ...featuredPlanet,
+  id: "ultra-hot-jupiter",
+  name: "Ultra-hot Jupiter",
+  kind: "gas-giant",
+  observation: {
+    ...featuredPlanet.observation,
+    radiusJupiter: 1.7,
+    massJupiter: 1.2,
+    equilibriumTemperatureKelvin: 2_400,
+    semiMajorAxisAu: 0.02,
+  },
+};
+
+const temperateGasGiantPlanet: ExoplanetProfile = {
+  ...featuredPlanet,
+  id: "temperate-gas-giant",
+  name: "Temperate Gas Giant",
+  kind: "gas-giant",
+  observation: {
+    ...featuredPlanet.observation,
+    radiusJupiter: 1.0,
+    massJupiter: 0.9,
+    equilibriumTemperatureKelvin: 500,
+  },
+};
+
+test("ultra-hot Jupiters infer the ultrahot-red-brown palette family, distinct from a hot Jupiter's", () => {
+  const ultraHotRecipe = deriveWorldRecipe(ultraHotJupiterPlanet);
+  const hotRecipe = deriveWorldRecipe(hotJupiterPlanet);
+  if (ultraHotRecipe.renderer !== "gas-giant" || hotRecipe.renderer !== "gas-giant") {
+    throw new Error("Expected gas-giant recipes.");
+  }
+
+  expect(ultraHotRecipe.classification).toBe("Ultra-hot Jupiter");
+  expect(ultraHotRecipe.inferred.paletteFamily).toBe("ultrahot-red-brown");
+  expect(ultraHotRecipe.cloudBands.deepColor).not.toEqual(hotRecipe.cloudBands.deepColor);
+});
+
+test("gas-giant bandDetail exposes the full recipe-control surface the shader consumes", () => {
+  for (const planet of [jupiterSizeGiantPlanet, hotJupiterPlanet, ultraHotJupiterPlanet]) {
+    const recipe = deriveWorldRecipe(planet);
+    if (recipe.renderer !== "gas-giant") throw new Error("Expected a gas-giant recipe.");
+
+    expect(recipe.bandDetail.stormCount).toBeGreaterThanOrEqual(1);
+    expect(recipe.bandDetail.stormCount).toBeLessThanOrEqual(3);
+    for (const value of [
+      recipe.bandDetail.bandSharpness,
+      recipe.bandDetail.bandWarp,
+      recipe.bandDetail.zonalVariation,
+      recipe.bandDetail.stormColorShift,
+    ]) {
+      expect(Number.isFinite(value)).toBe(true);
+      expect(value).toBeGreaterThanOrEqual(0);
+    }
+    expect(recipe.bandDetail.stormColorShift).toBeLessThanOrEqual(1);
+  }
+});
+
+test("ice-giant bandDetail exposes the full recipe-control surface the shader consumes", () => {
+  for (const planet of [iceGiantPlanet, neptuneSizeWorld]) {
+    const recipe = deriveWorldRecipe(planet);
+    if (recipe.renderer !== "ice-giant") throw new Error("Expected an ice-giant recipe.");
+
+    expect(recipe.bandDetail.stormCount).toBeGreaterThanOrEqual(1);
+    expect(recipe.bandDetail.stormCount).toBeLessThanOrEqual(2);
+    for (const value of [
+      recipe.bandDetail.bandSharpness,
+      recipe.bandDetail.bandWarp,
+      recipe.bandDetail.zonalVariation,
+      recipe.bandDetail.stormColorShift,
+    ]) {
+      expect(Number.isFinite(value)).toBe(true);
+      expect(value).toBeGreaterThanOrEqual(0);
+    }
+  }
+});
+
+test("a gallery of seeded giants is deterministic and visually distinct across families", () => {
+  const gallery = [
+    jupiterSizeGiantPlanet, // cold gas giant
+    temperateGasGiantPlanet, // temperate gas giant
+    hotJupiterPlanet, // hot gas giant
+    ultraHotJupiterPlanet, // ultra-hot gas giant
+    iceGiantPlanet, // warm-leaning ice giant
+    neptuneSizeWorld, // cold ice giant
+  ];
+
+  const recipes = gallery.map((planet) => deriveWorldRecipe(planet));
+
+  // Stable: deriving the same fixed-seed planet twice reproduces an identical recipe.
+  for (const [index, planet] of gallery.entries()) {
+    expect(deriveWorldRecipe(planet)).toEqual(recipes[index]);
+  }
+
+  // Distinct: no two giants in the gallery render with the same deep/light color pair, so the
+  // gallery does not silently collapse onto one shared look.
+  const colorSignatures = recipes.map((recipe) =>
+    recipe.renderer === "gas-giant"
+      ? JSON.stringify([recipe.cloudBands.deepColor, recipe.cloudBands.lightColor])
+      : recipe.renderer === "ice-giant"
+        ? JSON.stringify([recipe.atmosphereBands.deepColor, recipe.atmosphereBands.lightColor])
+        : JSON.stringify(recipe.surface.lowColor),
+  );
+  expect(new Set(colorSignatures).size).toBe(colorSignatures.length);
+});
+
 test("unknown/incomplete objects fall back to conservative low-confidence defaults, never NaN", () => {
   const recipe = deriveWorldRecipe(unknownIncompletePlanet);
 

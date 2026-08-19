@@ -168,9 +168,17 @@ uniform float seed;
 uniform float turbulence;
 uniform float contrast;
 uniform float jetCount;
+uniform float bandSharpness;
+uniform float bandWarp;
+uniform float zonalVariation;
 uniform float stormLatitude;
 uniform float stormScale;
 uniform float stormStrength;
+uniform float stormCount;
+uniform float stormColorShift;
+uniform float haze;
+uniform float atmosphereDepth;
+uniform float polarVariation;
 uniform vec3 cameraPosition;
 uniform vec3 lightDirection;
 uniform vec3 stellarColor;
@@ -229,31 +237,72 @@ void main(void) {
   float filamentNoise = fbm(
     vec3(flowingSurface.x * 7.0, flowingSurface.y * (16.0 + turbulence * 3.0), flowingSurface.z * 7.0) + vec3(17.1, flow * 0.45, 3.7)
   );
-  float bandPhase = latitude * jetCount * 1.42 + (broadNoise - 0.5) * 5.4 + (warpNoise - 0.5) * 2.2;
-  float bandWave = 0.5 + sin(bandPhase) * 0.34 + sin(bandPhase * 0.51 + 1.8) * 0.12;
-  float bandMix = smoothstep(0.12, 0.88, bandWave);
-  bandMix = mix(0.5, bandMix, contrast);
 
-  float stormLongitude = sin(seed * 0.00013) * 2.4;
-  vec3 stormCenter = vec3(
-    cos(stormLatitude) * cos(stormLongitude),
-    sin(stormLatitude),
-    cos(stormLatitude) * sin(stormLongitude)
-  );
-  vec3 stormEast = normalize(cross(vec3(0.0, 1.0, 0.0), stormCenter));
-  vec3 stormNorth = normalize(cross(stormCenter, stormEast));
-  vec2 stormUv = vec2(dot(surface, stormEast), dot(surface, stormNorth));
-  float stormDistance = length(stormUv * vec2(stormScale * 0.7, stormScale * 1.65));
-  float stormCore = (1.0 - smoothstep(0.38, 1.0, stormDistance)) * smoothstep(-0.2, 0.72, dot(surface, stormCenter));
-  float stormAngle = atan(stormUv.y, stormUv.x);
-  float stormSpiral = sin(stormAngle * 5.0 - stormDistance * 19.0 + flow * 2.0 + warpNoise * 2.0);
-  float storms = stormCore * (0.7 + stormSpiral * 0.18 + filamentNoise * 0.12) * stormStrength;
+  // Each storm gets a deterministic latitude/longitude/scale/phase derived from its own index
+  // and the planet seed, so a multi-storm giant never reads as identical circles pasted around
+  // the sphere. MAX_GIANT_STORMS is a quality-tier compile constant; activeStorms (from the
+  // recipe's stormCount) clamps how many of those slots actually render.
+  float stormMask = 0.0;
+  vec3 stormTint = vec3(0.0);
+  int activeStorms = int(min(stormCount, float(MAX_GIANT_STORMS)));
+  for (int i = 0; i < MAX_GIANT_STORMS; i++) {
+    if (i >= activeStorms) continue;
+    float fi = float(i);
+    float indexHashA = hash(vec3(seed * 0.0002 + fi * 7.13, fi * 3.71, fi * 11.9));
+    float indexHashB = hash(vec3(fi * 5.31, seed * 0.00031 + fi * 2.17, fi * 9.4));
+    float sizeFalloff = 1.0 - fi * 0.32;
+    float latSpread = 0.1 + fi * 0.22;
+    float thisLatitude = clamp(stormLatitude + (indexHashA - 0.5) * latSpread, -1.3, 1.3);
+    float thisLongitude = sin(seed * 0.00013 + fi * 2.71) * 3.4 + indexHashB * 6.28;
+    vec3 stormCenter = vec3(
+      cos(thisLatitude) * cos(thisLongitude),
+      sin(thisLatitude),
+      cos(thisLatitude) * sin(thisLongitude)
+    );
+    vec3 stormEast = normalize(cross(vec3(0.0, 1.0, 0.0), stormCenter));
+    vec3 stormNorth = normalize(cross(stormCenter, stormEast));
+    vec2 stormUv = vec2(dot(surface, stormEast), dot(surface, stormNorth));
+    float thisScale = max(stormScale * sizeFalloff, 0.6);
+    float stormDistance = length(stormUv * vec2(thisScale * 0.7, thisScale * 1.65));
+    float stormCore = (1.0 - smoothstep(0.38, 1.0, stormDistance)) * smoothstep(-0.2, 0.72, dot(surface, stormCenter));
+    float stormAngle = atan(stormUv.y, stormUv.x);
+    float spiralDir = mod(fi, 2.0) < 0.5 ? 1.0 : -1.0;
+    float stormSpiral = sin(stormAngle * (4.0 + fi) - stormDistance * 19.0 + flow * (2.0 + fi * 0.6) * spiralDir + warpNoise * 2.0);
+    float thisStorm = stormCore * (0.7 + stormSpiral * 0.18 + filamentNoise * 0.12) * stormStrength * sizeFalloff;
+    float thisShift = fract(stormColorShift + indexHashB * 0.5 + fi * 0.17);
+    stormTint += mix(stormColor, lightColor, thisShift * 0.55) * thisStorm;
+    stormMask += thisStorm;
+  }
+  vec3 blendedStormColor = stormMask > 0.0001 ? stormTint / stormMask : stormColor;
+  stormMask = clamp(stormMask, 0.0, 1.0);
+
+  // Zonal warp keeps jet bands from reading as mathematically perfect horizontal stripes: it
+  // nudges the effective latitude before banding, and storms visibly disturb the flow around
+  // them via the same bandPhase term.
+  float zonalNoise = fbm(vec3(latitude * 3.1 + 5.4, flow * 0.22, 8.8));
+  float latitudeWarp = latitude + (zonalNoise - 0.5) * zonalVariation * 0.7;
+  float bandPhase = latitudeWarp * jetCount * 1.42
+    + (broadNoise - 0.5) * (3.6 + bandWarp * 3.2)
+    + (warpNoise - 0.5) * (1.4 + bandWarp * 1.6)
+    + stormMask * 2.4;
+  float bandWave = 0.5 + sin(bandPhase) * 0.34 + sin(bandPhase * 0.51 + 1.8) * 0.12;
+  float halfWidth = mix(0.44, 0.08, clamp(bandSharpness, 0.0, 1.0));
+  float bandMix = smoothstep(0.5 - halfWidth, 0.5 + halfWidth, bandWave);
+  bandMix = mix(0.5, bandMix, contrast);
   float cells = smoothstep(0.66, 0.9, filamentNoise) * (0.35 + 0.65 * abs(cos(bandPhase)));
 
-  vec3 cloudColor = mix(deepColor, midColor, clamp(0.22 + broadNoise * 0.62 + warpNoise * 0.12, 0.0, 1.0));
+  float depthMix = clamp(0.22 + broadNoise * 0.62 + warpNoise * 0.12, 0.0, 1.0);
+  depthMix = pow(depthMix, mix(1.5, 0.65, clamp(atmosphereDepth, 0.0, 1.0)));
+  vec3 cloudColor = mix(deepColor, midColor, depthMix);
   cloudColor = mix(cloudColor, lightColor, clamp(bandMix * 0.82 + filamentNoise * 0.12 + cells * 0.16, 0.0, 1.0));
   cloudColor *= 0.92 + (filamentNoise - 0.5) * 0.12;
-  cloudColor = mix(cloudColor, stormColor, clamp(storms, 0.0, 0.9));
+  cloudColor = mix(cloudColor, mix(deepColor, lightColor, 0.5), clamp(haze, 0.0, 1.0) * 0.18);
+  cloudColor = mix(cloudColor, blendedStormColor, clamp(stormMask, 0.0, 0.9));
+
+  // Polar structure: giants darken and haze toward the poles instead of holding the same band
+  // pattern edge to edge.
+  float poleMask = pow(smoothstep(0.5, 1.3, abs(latitude)), 2.0);
+  cloudColor = mix(cloudColor, mix(deepColor, midColor, 0.4), poleMask * clamp(polarVariation, 0.0, 1.0) * 0.7);
 
   float diffuse = max(dot(normal, lightDirection), 0.0);
   float wrappedLight = 0.18 + diffuse * 0.94;
@@ -279,8 +328,17 @@ varying vec3 vSurfacePosition;
 uniform float time;
 uniform float seed;
 uniform float bandScale;
+uniform float bandContrast;
+uniform float bandSharpness;
+uniform float bandTurbulence;
+uniform float bandWarp;
+uniform float zonalVariation;
 uniform float stormStrength;
 uniform float stormLatitude;
+uniform float stormCount;
+uniform float stormColorShift;
+uniform float haze;
+uniform float atmosphereDepth;
 uniform float polarGlow;
 uniform vec3 cameraPosition;
 uniform vec3 lightDirection;
@@ -332,27 +390,58 @@ void main(void) {
   float latitude = asin(clamp(surface.y, -1.0, 1.0));
   float flow = time * 0.018;
   vec3 flowingSurface = rotateY(surface, flow);
-  float haze = fbm(flowingSurface * 2.6 + vec3(3.7, 11.9, 6.2));
+  float hazeNoise = fbm(flowingSurface * 2.6 + vec3(3.7, 11.9, 6.2));
   float detail = fbm(
-    vec3(flowingSurface.x * 6.0, flowingSurface.y * 15.0, flowingSurface.z * 6.0) + vec3(haze * 2.0)
+    vec3(flowingSurface.x * (5.0 + bandTurbulence * 3.0), flowingSurface.y * (13.0 + bandTurbulence * 4.0), flowingSurface.z * (5.0 + bandTurbulence * 3.0)) + vec3(hazeNoise * 2.0)
   );
-  float bandPhase = latitude * bandScale * 1.65 + (haze - 0.5) * 3.5 + (detail - 0.5) * 0.9;
-  float bands = 0.5 + sin(bandPhase) * 0.25 + sin(bandPhase * 0.47 + 2.2) * 0.08;
-  bands = smoothstep(0.12, 0.88, bands);
-  float stormNoise = fbm(rotateY(surface, -flow * 1.8) * 6.5 + vec3(12.4, 4.2, 8.7));
-  float latitudeMask = 1.0 - smoothstep(0.08, 0.48, abs(latitude - stormLatitude));
-  float storms = smoothstep(0.64, 0.9, stormNoise) * stormStrength * latitudeMask;
-  float pole = pow(smoothstep(0.55, 1.3, abs(latitude)), 2.0) * polarGlow;
 
-  vec3 atmosphereColor = mix(deepColor, hazeColor, clamp(0.3 + haze * 0.5 + detail * 0.08, 0.0, 1.0));
-  atmosphereColor = mix(atmosphereColor, lightColor, bands * 0.2 + storms + detail * 0.05);
+  // Subdued, wider-spread band warp than the gas giant shader -- ice giants read as more
+  // uniform and hazier, not just a re-tinted gas giant.
+  float zonalNoise = fbm(vec3(latitude * 2.6 + 9.1, flow * 0.15, 4.4));
+  float latitudeWarp = latitude + (zonalNoise - 0.5) * zonalVariation * 0.8;
+  float bandPhase = latitudeWarp * bandScale * 1.65
+    + (hazeNoise - 0.5) * (2.2 + bandWarp * 2.2)
+    + (detail - 0.5) * (0.5 + bandWarp * 0.7);
+  float bandWave = 0.5 + sin(bandPhase) * 0.25 + sin(bandPhase * 0.47 + 2.2) * 0.08;
+  float halfWidth = mix(0.44, 0.1, clamp(bandSharpness, 0.0, 1.0));
+  float bands = smoothstep(0.5 - halfWidth, 0.5 + halfWidth, bandWave);
+  bands = mix(0.5, bands, clamp(bandContrast, 0.0, 1.0));
+
+  // Fewer, subtler storms than a gas giant, each with its own deterministic latitude/phase/tint.
+  float stormMask = 0.0;
+  int activeStorms = int(min(stormCount, float(MAX_GIANT_STORMS)));
+  for (int i = 0; i < MAX_GIANT_STORMS; i++) {
+    if (i >= activeStorms) continue;
+    float fi = float(i);
+    float indexHash = hash(vec3(seed * 0.00023 + fi * 6.7, fi * 4.1, fi * 8.3));
+    float thisLatitude = clamp(stormLatitude + (indexHash - 0.5) * (0.15 + fi * 0.3), -1.2, 1.2);
+    float stormNoise = fbm(rotateY(surface, -flow * (1.6 + fi * 0.4)) * (5.5 + fi * 1.2) + vec3(12.4 + fi * 3.1, 4.2, 8.7 + fi * 2.0));
+    float latitudeMask = 1.0 - smoothstep(0.06, 0.42, abs(latitude - thisLatitude));
+    float thisStrength = stormStrength * (1.0 - fi * 0.28);
+    float thisShift = fract(stormColorShift + indexHash * 0.6 + fi * 0.21);
+    stormMask += smoothstep(0.62, 0.9, stormNoise) * thisStrength * latitudeMask * (0.7 + thisShift * 0.3);
+  }
+  stormMask = clamp(stormMask, 0.0, 1.0);
+
+  float pole = pow(smoothstep(0.55, 1.3, abs(latitude)), 2.0);
+
+  float depthMix = clamp(0.3 + hazeNoise * 0.5 + detail * 0.08, 0.0, 1.0);
+  depthMix = pow(depthMix, mix(1.4, 0.7, clamp(atmosphereDepth, 0.0, 1.0)));
+  vec3 atmosphereColor = mix(deepColor, hazeColor, depthMix);
+  atmosphereColor = mix(atmosphereColor, lightColor, bands * 0.2 + stormMask + detail * 0.05);
+  // Strong haze flattens contrast further -- the defining difference from a gas giant's crisper
+  // cloud definition.
+  atmosphereColor = mix(atmosphereColor, hazeColor, clamp(haze, 0.0, 1.0) * 0.32);
+  // Polar treatment differs from the gas giant: a desaturating haze cap rather than a bright
+  // sheen hotspot.
+  atmosphereColor = mix(atmosphereColor, hazeColor, pole * polarGlow * 0.55);
 
   float diffuse = max(dot(normal, lightDirection), 0.0);
   float wrappedLight = 0.22 + diffuse * 0.9;
   vec3 viewDirection = normalize(cameraPosition - vWorldPosition);
   float rim = pow(1.0 - max(dot(normal, viewDirection), 0.0), 2.5);
   vec3 finalColor = atmosphereColor * wrappedLight * mix(vec3(1.0), stellarColor, diffuse * 0.32) * stellarIntensity + hazeColor * rim * 0.46;
-  finalColor += lightColor * pole * (0.14 + detail * 0.11);
+  finalColor += lightColor * pole * polarGlow * (0.05 + detail * 0.04);
   float dither = (hash(vec3(gl_FragCoord.xy, seed)) - 0.5) / 255.0;
   gl_FragColor = vec4(finalColor + dither, 1.0);
 }
@@ -1397,8 +1486,17 @@ const createPlanet = (
           "time",
           "seed",
           "bandScale",
+          "bandContrast",
+          "bandSharpness",
+          "bandTurbulence",
+          "bandWarp",
+          "zonalVariation",
           "stormStrength",
           "stormLatitude",
+          "stormCount",
+          "stormColorShift",
+          "haze",
+          "atmosphereDepth",
           "polarGlow",
           "lightDirection",
           "stellarColor",
@@ -1426,9 +1524,17 @@ const createPlanet = (
           "turbulence",
           "contrast",
           "jetCount",
+          "bandSharpness",
+          "bandWarp",
+          "zonalVariation",
           "stormLatitude",
           "stormScale",
           "stormStrength",
+          "stormCount",
+          "stormColorShift",
+          "haze",
+          "atmosphereDepth",
+          "polarVariation",
           "lightDirection",
           "stellarColor",
           "stellarIntensity",
@@ -1479,8 +1585,17 @@ const createPlanet = (
     }
   } else if (recipe.renderer === "ice-giant") {
     shader.setFloat("bandScale", recipe.atmosphereBands.bandScale);
+    shader.setFloat("bandContrast", recipe.bandDetail.bandContrast);
+    shader.setFloat("bandSharpness", recipe.bandDetail.bandSharpness);
+    shader.setFloat("bandTurbulence", recipe.bandDetail.bandTurbulence);
+    shader.setFloat("bandWarp", recipe.bandDetail.bandWarp);
+    shader.setFloat("zonalVariation", recipe.bandDetail.zonalVariation);
     shader.setFloat("stormStrength", recipe.atmosphereBands.stormStrength);
     shader.setFloat("stormLatitude", recipe.atmosphereBands.stormLatitude);
+    shader.setFloat("stormCount", recipe.bandDetail.stormCount);
+    shader.setFloat("stormColorShift", recipe.bandDetail.stormColorShift);
+    shader.setFloat("haze", recipe.bandDetail.haze);
+    shader.setFloat("atmosphereDepth", recipe.bandDetail.atmosphereDepth);
     shader.setFloat("polarGlow", recipe.atmosphereBands.polarGlow);
     shader.setColor3("deepColor", toColor3(recipe.atmosphereBands.deepColor));
     shader.setColor3("hazeColor", toColor3(recipe.atmosphereBands.hazeColor));
@@ -1489,9 +1604,17 @@ const createPlanet = (
     shader.setFloat("turbulence", recipe.cloudBands.turbulence);
     shader.setFloat("contrast", recipe.cloudBands.contrast);
     shader.setFloat("jetCount", recipe.cloudBands.jetCount);
+    shader.setFloat("bandSharpness", recipe.bandDetail.bandSharpness);
+    shader.setFloat("bandWarp", recipe.bandDetail.bandWarp);
+    shader.setFloat("zonalVariation", recipe.bandDetail.zonalVariation);
     shader.setFloat("stormLatitude", recipe.cloudBands.stormLatitude);
     shader.setFloat("stormScale", recipe.cloudBands.stormScale);
     shader.setFloat("stormStrength", recipe.cloudBands.stormStrength);
+    shader.setFloat("stormCount", recipe.bandDetail.stormCount);
+    shader.setFloat("stormColorShift", recipe.bandDetail.stormColorShift);
+    shader.setFloat("haze", recipe.bandDetail.haze);
+    shader.setFloat("atmosphereDepth", recipe.bandDetail.atmosphereDepth);
+    shader.setFloat("polarVariation", recipe.bandDetail.polarVariation);
     shader.setColor3("deepColor", toColor3(recipe.cloudBands.deepColor));
     shader.setColor3("midColor", toColor3(recipe.cloudBands.midColor));
     shader.setColor3("lightColor", toColor3(recipe.cloudBands.lightColor));
