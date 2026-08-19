@@ -13,6 +13,7 @@ import type { AbstractMesh } from "@babylonjs/core/Meshes/abstractMesh.js";
 import { Mesh } from "@babylonjs/core/Meshes/mesh.js";
 import { MeshBuilder } from "@babylonjs/core/Meshes/meshBuilder.js";
 import "@babylonjs/core/Meshes/instancedMesh.js";
+import { VertexBuffer } from "@babylonjs/core/Buffers/buffer.js";
 import { VertexData } from "@babylonjs/core/Meshes/mesh.vertexData.js";
 import { Scene, ScenePerformancePriority } from "@babylonjs/core/scene.js";
 import { TransformNode } from "@babylonjs/core/Meshes/transformNode.js";
@@ -24,7 +25,7 @@ import "@babylonjs/core/XR/features/WebXRControllerTeleportation.js";
 import "@babylonjs/core/XR/features/WebXRHandTracking.js";
 import { WebXRFeatureName } from "@babylonjs/core/XR/webXRFeaturesManager.js";
 import { WebXRState } from "@babylonjs/core/XR/webXRTypes.js";
-import type { Rgb, WorldRecipe } from "@exora/worldgen";
+import type { Rgb, RockyWorldRecipe, WorldRecipe } from "@exora/worldgen";
 import {
   adaptFixedFoveation,
   adaptHardwareScaling,
@@ -33,6 +34,7 @@ import {
   type RenderQualityTier,
   shaderDefines,
 } from "./render-quality.ts";
+import { buildCraterField, sampleTerrainHeight } from "./planet-terrain.ts";
 import { createXrMenu, type XrMenu, type XrMenuItem } from "./xr-menu.ts";
 import { requestVrHandoff } from "./xr-session.ts";
 
@@ -404,18 +406,20 @@ float fbm(vec3 point) {
 }
 
 void main(void) {
+  // Geometry is displaced once, CPU-side, in object space (see displaceRockyPlanet in
+  // planet-scene.ts) so lighting normals stay correct under directional light; this shader only
+  // recomputes a cosmetic height value from the same surface direction for color banding.
   vec3 direction = normalize(position);
   float continents = fbm(direction * roughness);
   float ridges = abs(fbm(direction * roughness * 2.15 + vec3(17.0)) * 2.0 - 1.0);
   float terrain = clamp(continents * 0.78 + (1.0 - ridges) * 0.22, 0.0, 1.0);
-  vec3 displacedPosition = position + normal * ((terrain - 0.44) * elevation);
-  vec4 worldPosition = world * vec4(displacedPosition, 1.0);
+  vec4 worldPosition = world * vec4(position, 1.0);
 
   vHeight = terrain;
   vSurfacePosition = direction;
   vWorldPosition = worldPosition.xyz;
   vWorldNormal = normalize(mat3(world) * normal);
-  gl_Position = worldViewProjection * vec4(displacedPosition, 1.0);
+  gl_Position = worldViewProjection * vec4(position, 1.0);
 }
 `;
 
@@ -867,6 +871,56 @@ const createRingSystem = (
   return ringSystem;
 };
 
+/**
+ * How much CPU-side terrain displacement (in scene units) a fully-elevated world gets, kept
+ * separate from `recipe.radiusSceneUnits` (display radius) and any physical radius derived from
+ * catalog data — this is a purely artistic knob so mountains read as visible relief without
+ * implying kilometer-accurate heights.
+ */
+const TERRAIN_DISPLAY_EXAGGERATION = 0.5;
+
+/**
+ * Displaces a rocky planet's icosphere vertices with multi-scale procedural terrain (continents,
+ * mountains, ridges, roughness, craters — see planet-terrain.ts) and recomputes normals from the
+ * displaced geometry so directional lighting responds to the actual shape instead of the
+ * original sphere's normals. Runs once at mesh-build time, in object space, so it is unaffected
+ * by the mesh's later rotation/position/orbit transforms.
+ */
+const displaceRockyPlanet = (planet: Mesh, recipe: RockyWorldRecipe): void => {
+  const positions = planet.getVerticesData(VertexBuffer.PositionKind);
+  const indices = planet.getIndices();
+  if (!positions || !indices) return;
+
+  const craters = buildCraterField(
+    recipe.seed,
+    recipe.terrain.craterDensity,
+    recipe.terrain.craterScale,
+  );
+  const radius = recipe.radiusSceneUnits;
+
+  for (let vertex = 0; vertex < positions.length; vertex += 3) {
+    const x = positions[vertex]!;
+    const y = positions[vertex + 1]!;
+    const z = positions[vertex + 2]!;
+    const length = Math.hypot(x, y, z) || 1;
+    const direction = { x: x / length, y: y / length, z: z / length };
+    const { height } = sampleTerrainHeight(direction, recipe.terrain, recipe.seed, craters);
+    const rawOffset = height * recipe.surface.elevation * TERRAIN_DISPLAY_EXAGGERATION;
+    // Clamp relative to radius so extreme parameter combinations (max mountains + max craters)
+    // cannot fold the mesh in on itself.
+    const offset = Math.min(radius * 0.4, Math.max(-radius * 0.4, rawOffset));
+    const displaced = radius + offset;
+    positions[vertex] = direction.x * displaced;
+    positions[vertex + 1] = direction.y * displaced;
+    positions[vertex + 2] = direction.z * displaced;
+  }
+
+  const normals = new Float32Array(positions.length);
+  VertexData.ComputeNormals(positions, indices, normals);
+  planet.updateVerticesData(VertexBuffer.PositionKind, positions);
+  planet.setVerticesData(VertexBuffer.NormalKind, normals);
+};
+
 const createPlanet = (
   scene: Scene,
   recipe: WorldRecipe,
@@ -894,16 +948,35 @@ const createPlanet = (
   const orbitalRoot = new TransformNode("orbitalWorld", scene);
   const orbitalMeshes: AbstractMesh[] = [];
 
-  const planet = MeshBuilder.CreateSphere(
-    "planet",
-    { diameter: recipe.radiusSceneUnits * 2, segments: profile.planetSegments },
-    scene,
-  );
+  // Rocky worlds get an icosphere: its near-uniform vertex distribution avoids the pinched
+  // triangles a UV sphere has at the poles, which otherwise show up as displacement/crater
+  // artifacts once terrain pushes vertices in and out along their normals. Gas/ice giants have
+  // no vertex displacement, so they keep the cheaper UV sphere.
+  const planet =
+    recipe.renderer === "rocky"
+      ? MeshBuilder.CreateIcoSphere(
+          "planet",
+          {
+            radius: recipe.radiusSceneUnits,
+            subdivisions: profile.planetIcoSubdivisions,
+            flat: false,
+          },
+          scene,
+        )
+      : MeshBuilder.CreateSphere(
+          "planet",
+          { diameter: recipe.radiusSceneUnits * 2, segments: profile.planetSegments },
+          scene,
+        );
   planet.position.copyFrom(PLANET_POSITION);
   planet.parent = orbitalRoot;
   planet.rotation.z = recipe.axialTilt;
   planet.isPickable = false;
   orbitalMeshes.push(planet);
+
+  if (recipe.renderer === "rocky") {
+    displaceRockyPlanet(planet, recipe);
+  }
 
   let shader: ShaderMaterial;
 
