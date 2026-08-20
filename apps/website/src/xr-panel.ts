@@ -46,15 +46,15 @@ import {
 /** Physical size of the panel, chosen so a full page reads without eye movement at arm's length. */
 const PANEL_SIZE = { height: 1.15, width: 0.92 };
 /** How far from the wearer a summoned panel lands. */
-const SUMMON_DISTANCE = 1.45;
+const SUMMON_DISTANCE = 1.55;
 /** How far below eye level it lands, which keeps it comfortably inside a controller ray. */
 const SUMMON_DROP = 0.52;
 /**
- * The console opens over the wearer's left shoulder instead of on the optical axis. It remains
- * world-locked after that one placement, so the planet or star stays completely unobstructed and
- * looking towards the console feels like turning to a physical instrument station.
+ * The console opens to the wearer's left instead of on the optical axis. It remains world-locked
+ * after that one placement, so the planet or star stays unobstructed without putting the panel
+ * outside the headset's forward field of view.
  */
-const SUMMON_YAW = -Math.PI * 0.29;
+const SUMMON_YAW = -Math.PI * 0.16;
 /** Past this the panel has been walked away from and is dismissed rather than left floating. */
 const ABANDON_DISTANCE = 5;
 const OPEN_SECONDS = 0.16;
@@ -66,7 +66,10 @@ const DIM = "rgba(154, 206, 232, 0.82)";
 const FAINT = "rgba(126, 176, 204, 0.55)";
 const ACCENT = "#6fe3ff";
 
-const FACE_BUTTONS = new Set(["a-button", "b-button", "x-button", "y-button"]);
+/** A/X and a stick click are unambiguous "bring it here" inputs, even if it is already open. */
+const SUMMON_BUTTONS = new Set(["a-button", "x-button", "xr-standard-thumbstick"]);
+/** B/Y dismiss the panel, so opening it never depends on remembering its previous state. */
+const HIDE_BUTTONS = new Set(["b-button", "y-button"]);
 
 const toneAccent = (cell: XrCell): string => {
   if (cell.disabled) return "rgba(120, 150, 170, 0.35)";
@@ -765,9 +768,11 @@ export const createXrPanel = (scene: Scene, anisotropy = 4): XrPanel => {
       createWristPad(controller);
       for (const id of motionController.getComponentIds()) {
         const component = motionController.getComponent(id);
-        if (FACE_BUTTONS.has(id)) {
+        if (SUMMON_BUTTONS.has(id) || HIDE_BUTTONS.has(id)) {
           component.onButtonStateChangedObservable.add(() => {
-            if (component.changes.pressed?.current === true) toggle();
+            if (component.changes.pressed?.current !== true) return;
+            if (SUMMON_BUTTONS.has(id)) summon();
+            else hide();
           });
         }
         if (id === "xr-standard-trigger") {
