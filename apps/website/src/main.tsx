@@ -2,6 +2,7 @@ import { Analytics } from "@vercel/analytics/react";
 import { SpeedInsights } from "@vercel/speed-insights/react";
 import { createRoot } from "react-dom/client";
 import { App } from "./App.tsx";
+import { ApplicationErrorBoundary } from "./components/ApplicationErrorBoundary.tsx";
 import { installXrEmulator, isXrEmulatorRequested } from "./xr-emulator.ts";
 import "./style.css";
 
@@ -10,11 +11,13 @@ if (!root) throw new Error("Exora could not find its application root.");
 
 const render = (): void => {
   createRoot(root).render(
-    <>
-      <App />
-      <Analytics />
-      <SpeedInsights />
-    </>,
+    <ApplicationErrorBoundary>
+      <>
+        <App />
+        <Analytics />
+        <SpeedInsights />
+      </>
+    </ApplicationErrorBoundary>,
   );
 };
 

@@ -8,6 +8,7 @@ import {
   type StarLoadResult,
 } from "./api-client.ts";
 import { PlanetExperience } from "./components/PlanetExperience.tsx";
+import { RecoveryScreen } from "./components/RecoveryScreen.tsx";
 import { featuredPlanet } from "./planet-profile.ts";
 import { hasRenderer } from "./planet-utils.tsx";
 import { useSceneHost } from "./use-scene-host.ts";
@@ -56,7 +57,11 @@ export const App = () => {
   // from a world to its host star swaps which view is mounted, and a WebXR session cannot
   // survive its WebGL context being torn down and rebuilt underneath it.
   const [canvas, setCanvas] = useState<HTMLCanvasElement | null>(null);
-  const sceneHost = useSceneHost(canvas);
+  const {
+    host: sceneHost,
+    restart: restartSceneHost,
+    status: sceneHostStatus,
+  } = useSceneHost(canvas);
   const [catalogOpen, setCatalogOpen] = useState(false);
   const [starCatalogOpen, setStarCatalogOpen] = useState(false);
   const [builderOpen, setBuilderOpen] = useState(false);
@@ -142,6 +147,27 @@ export const App = () => {
         }
         tabIndex={0}
       />
+      {sceneHostStatus === "context-lost" || sceneHostStatus === "recovering" ? (
+        <RecoveryScreen
+          action="RESTART NOW"
+          detail={
+            sceneHostStatus === "context-lost"
+              ? "The browser paused graphics access. Exora will resume when the GPU context returns."
+              : "Graphics access returned. Exora is rebuilding the current destination."
+          }
+          heading={sceneHostStatus === "context-lost" ? "RECONNECTING TO GPU" : "RESTORING SCENE"}
+          onRetry={restartSceneHost}
+          pending
+        />
+      ) : null}
+      {sceneHostStatus === "failed" ? (
+        <RecoveryScreen
+          action="RESTART RENDERER"
+          detail="The graphics session could not be restored. Restarting keeps the current destination selected."
+          heading="RENDERER OFFLINE"
+          onRetry={restartSceneHost}
+        />
+      ) : null}
       {!activeObject ? (
         <div className="loading-screen initial-loading" role="status">
           <div className="loading-orbit" aria-hidden="true">

@@ -40,6 +40,11 @@ import {
   type RenderQualityProfile,
   type RenderQualityTier,
 } from "./render-quality.ts";
+import {
+  transitionRendererStatus,
+  type RendererEvent,
+  type RendererStatus,
+} from "./renderer-recovery.ts";
 import { createXrConsole, type XrConsole, type XrConsoleHost } from "./xr-console.ts";
 import { openWorldScope, type WorldScope } from "./world-scope.ts";
 
@@ -93,6 +98,8 @@ export interface SceneHost {
   refreshConsole: () => void;
   /** Subscribes to immersive status, called immediately with the current one. */
   onXrStatus: (listener: (status: XrStatus) => void) => () => void;
+  /** Subscribes to WebGL availability and recovery, called immediately with the current state. */
+  onRendererStatus: (listener: (status: RendererStatus) => void) => () => void;
   xrCamera: () => WebXRCamera | null;
 }
 
@@ -108,7 +115,12 @@ const createSceneHost = (canvas: HTMLCanvasElement): SceneHost => {
   const engine = new Engine(
     canvas,
     profile.tier === "desktop",
-    { antialias: profile.tier === "desktop", preserveDrawingBuffer: false, stencil: false },
+    {
+      antialias: profile.tier === "desktop",
+      doNotHandleContextLost: false,
+      preserveDrawingBuffer: false,
+      stencil: false,
+    },
     false,
   );
   engine.setHardwareScalingLevel(profile.hardwareScalingLevel);
@@ -215,6 +227,27 @@ const createSceneHost = (canvas: HTMLCanvasElement): SceneHost => {
     for (const listener of statusListeners) listener(next);
   };
 
+  let rendererStatus: RendererStatus = "ready";
+  const rendererStatusListeners = new Set<(status: RendererStatus) => void>();
+  const dispatchRendererEvent = (event: RendererEvent): void => {
+    const next = transitionRendererStatus(rendererStatus, event);
+    if (next === rendererStatus) return;
+    rendererStatus = next;
+    for (const listener of rendererStatusListeners) listener(next);
+  };
+
+  // Babylon owns the low-level resource rebuild because context-loss handling is enabled on the
+  // engine. Exora owns the user-visible lifecycle: pause behind a recovery screen, then only
+  // declare success after the restored context has rendered a complete frame.
+  engine.onContextLostObservable.add(() => {
+    if (!disposed) dispatchRendererEvent("context-lost");
+  });
+  engine.onContextRestoredObservable.add(() => {
+    if (disposed) return;
+    dispatchRendererEvent("context-restored");
+    engine.resize();
+  });
+
   /**
    * Trades peripheral sharpness for frame rate while the headset is on.
    *
@@ -274,7 +307,16 @@ const createSceneHost = (canvas: HTMLCanvasElement): SceneHost => {
     }
   });
 
-  engine.runRenderLoop(() => scene.render());
+  engine.runRenderLoop(() => {
+    try {
+      scene.render();
+      dispatchRendererEvent("frame-rendered");
+    } catch (error) {
+      console.error("[renderer] frame failed", error);
+      dispatchRendererEvent("render-failed");
+      engine.stopRenderLoop();
+    }
+  });
 
   const resize = (): void => engine.resize();
   window.addEventListener("resize", resize);
@@ -333,6 +375,7 @@ const createSceneHost = (canvas: HTMLCanvasElement): SceneHost => {
       scope.dispose();
       xrConsole?.refresh();
       void fadeVeil(0);
+      dispatchRendererEvent("render-failed");
       throw error;
     }
     scope.seal();
@@ -454,6 +497,11 @@ const createSceneHost = (canvas: HTMLCanvasElement): SceneHost => {
       listener(xrStatus);
       return () => statusListeners.delete(listener);
     },
+    onRendererStatus: (listener) => {
+      rendererStatusListeners.add(listener);
+      listener(rendererStatus);
+      return () => rendererStatusListeners.delete(listener);
+    },
     enterVr: async () => {
       if (!xr || !isVrSupported) return;
       // Babylon appends the reference space and every enabled optional feature (including
@@ -463,6 +511,7 @@ const createSceneHost = (canvas: HTMLCanvasElement): SceneHost => {
     dispose: () => {
       if (disposed) return;
       disposed = true;
+      rendererStatusListeners.clear();
       window.removeEventListener("resize", resize);
       currentWorld?.dispose();
       currentScope?.dispose();
@@ -490,6 +539,13 @@ let host: SceneHost | null = null;
  */
 export const acquireSceneHost = (canvas: HTMLCanvasElement): SceneHost => {
   if (host && host.canvas === canvas) return host;
+  host?.dispose();
+  host = createSceneHost(canvas);
+  return host;
+};
+
+/** Replaces a failed renderer while retaining the page-owned canvas and React destination. */
+export const recreateSceneHost = (canvas: HTMLCanvasElement): SceneHost => {
   host?.dispose();
   host = createSceneHost(canvas);
   return host;
