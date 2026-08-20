@@ -1289,7 +1289,6 @@ const createPlanet = (
   atmosphere: ShaderMaterial;
   cloudLayer: ShaderMaterial | null;
   cloudMesh: Mesh | null;
-  moonOrbit: TransformNode;
   orbitalMeshes: AbstractMesh[];
   orbitalRoot: TransformNode;
   planet: Mesh;
@@ -1666,56 +1665,10 @@ const createPlanet = (
   atmosphereMesh.material = atmosphere;
   atmosphereMesh.freezeWorldMatrix();
 
-  const orbitGuide = MeshBuilder.CreateTorus(
-    "moonOrbitGuide",
-    {
-      diameter: recipe.moon.orbitRadius * 2,
-      thickness: 0.012,
-      tessellation: profile.ringTessellation,
-    },
-    scene,
-  );
-  orbitGuide.position.copyFrom(PLANET_POSITION);
-  orbitGuide.parent = orbitalRoot;
-  orbitGuide.rotation.z = recipe.moon.inclination;
-  orbitGuide.isPickable = false;
-  orbitalMeshes.push(orbitGuide);
-
-  const orbitMaterial = new StandardMaterial("orbitGuideMaterial", scene);
-  orbitMaterial.disableLighting = true;
-  orbitMaterial.emissiveColor = new Color3(0.18, 0.58, 0.72);
-  orbitMaterial.alpha = 0.12;
-  orbitMaterial.freeze();
-  orbitGuide.material = orbitMaterial;
-  orbitGuide.freezeWorldMatrix();
-
-  const moonOrbit = new TransformNode("moonOrbit", scene);
-  moonOrbit.position.copyFrom(PLANET_POSITION);
-  moonOrbit.parent = orbitalRoot;
-  moonOrbit.rotation.z = recipe.moon.inclination;
-
-  const moon = MeshBuilder.CreateSphere(
-    "generatedMoon",
-    { diameter: recipe.moon.radius * 2, segments: profile.moonSegments },
-    scene,
-  );
-  moon.parent = moonOrbit;
-  moon.position.set(recipe.moon.orbitRadius, 0, 0);
-  moon.isPickable = false;
-  orbitalMeshes.push(moon);
-
-  const moonMaterial = new StandardMaterial("moonMaterial", scene);
-  moonMaterial.diffuseColor = toColor3(recipe.moon.color);
-  moonMaterial.emissiveColor = new Color3(0.01, 0.014, 0.018);
-  moonMaterial.specularColor = new Color3(0.06, 0.07, 0.08);
-  moonMaterial.freeze();
-  moon.material = moonMaterial;
-
   return {
     atmosphere,
     cloudLayer,
     cloudMesh,
-    moonOrbit,
     orbitalMeshes,
     orbitalRoot,
     planet,
@@ -2239,7 +2192,6 @@ export const createPlanetExperience = ({
     atmosphere,
     cloudLayer,
     cloudMesh,
-    moonOrbit,
     orbitalMeshes,
     orbitalRoot,
     planet,
@@ -2391,7 +2343,6 @@ export const createPlanetExperience = ({
     }
 
     planet.rotation.y += deltaSeconds * recipe.rotationSpeed;
-    moonOrbit.rotation.y += deltaSeconds * recipe.moon.speed;
     if (ringSystem) ringSystem.rotation.y += deltaSeconds * recipe.rotationSpeed * 0.045;
     if (cloudMesh && recipe.renderer === "rocky")
       cloudMesh.rotation.y += deltaSeconds * (recipe.rotationSpeed + recipe.surface.cloudSpeed);

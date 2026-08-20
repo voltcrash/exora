@@ -135,13 +135,6 @@ interface BaseWorldRecipe {
   /** MEASURED catalog properties this recipe was built from, kept alongside the recipe so a
    * renderer or UI can show "why" a world looks the way it does without re-deriving it. */
   measured: PlanetMeasuredProperties;
-  moon: {
-    color: Rgb;
-    inclination: number;
-    orbitRadius: number;
-    radius: number;
-    speed: number;
-  };
   radiusSceneUnits: number;
   rotationSpeed: number;
   seed: number;
@@ -836,13 +829,6 @@ const deriveGasGiantRecipe = (
       label: "Hydrogen / helium · inferred",
       scatterStrength: 0.5 + random() * 0.3,
     },
-    moon: {
-      radius: scaledRadius * (0.075 + random() * 0.025),
-      orbitRadius: scaledRadius * (1.7 + random() * 0.2),
-      speed: 0.055 + random() * 0.02,
-      inclination: -0.22 + random() * 0.44,
-      color: isHot ? [0.29, 0.19, 0.14] : [0.22, 0.25, 0.29],
-    },
     rings: hasProminentRings
       ? {
           bands: 4 + Math.floor(random() * 6),
@@ -1044,13 +1030,6 @@ const deriveRockyRecipe = (
           ? 0.15 + random() * 0.25
           : 0.2 + random() * 0.3,
     },
-    moon: {
-      radius: scaledRadius * (0.055 + random() * 0.025),
-      orbitRadius: scaledRadius * (1.72 + random() * 0.22),
-      speed: 0.045 + random() * 0.024,
-      inclination: -0.34 + random() * 0.68,
-      color: isFrozen ? [0.32, 0.38, 0.42] : [0.24, 0.22, 0.2],
-    },
     summary: isScorched
       ? "An intensely heated mineral world with glowing fracture networks, dark impact basins, and a thin vapor haze generated from its measured thermal regime."
       : isOceanCandidate
@@ -1138,13 +1117,6 @@ const deriveIceGiantRecipe = (
       innerRadius: scaledRadius * (1.16 + random() * 0.1),
       opacity: 0.1 + random() * 0.12,
       outerRadius: scaledRadius * (1.35 + random() * 0.12),
-    },
-    moon: {
-      radius: scaledRadius * (0.045 + random() * 0.025),
-      orbitRadius: scaledRadius * (1.7 + random() * 0.24),
-      speed: 0.04 + random() * 0.025,
-      inclination: -0.42 + random() * 0.84,
-      color: isWarm ? [0.2, 0.29, 0.3] : [0.2, 0.24, 0.32],
     },
     summary:
       "A deep volatile-rich atmosphere rendered with methane-tinted haze, subdued cloud bands, and a faint debris ring inferred from its measured scale and temperature.",

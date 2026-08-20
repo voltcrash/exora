@@ -8,8 +8,8 @@ from a plain LAN HTTP address.
 1. Open Exora and confirm the HUD reports `QUEST` beside the FPS counter.
 2. Enter immersive VR and verify the viewing deck starts at floor height.
 3. Orbit around one gas giant, one rocky world, and one ice giant.
-4. Confirm the planet, atmosphere, moon, and ice-giant rings render in both eyes, with no
-   smearing of the previous frame at the edges of either eye.
+4. Confirm the planet, atmosphere, and ice-giant rings render in both eyes, with no smearing of
+   the previous frame at the edges of either eye.
 5. Verify a controller ray can point at the in-headset panel and that every entry on it
    responds: change view, recentre, travel, and exit.
 6. Walk the surface excursion with the thumbstick and confirm the wearer stays on the terrain.

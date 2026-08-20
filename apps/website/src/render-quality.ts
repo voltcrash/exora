@@ -21,7 +21,6 @@ export interface RenderQualityProfile {
   /** How many storms a gas/ice giant's fragment shader evaluates per pixel, the dominant cost
    * of the multi-storm loop. A recipe's own `bandDetail.stormCount` is clamped to this. */
   maxGiantStorms: number;
-  moonSegments: number;
   /** Icosphere subdivision level for rocky planets (vertex count ~= 10 * n^2 + 2), chosen to
    * roughly match planetSegments' vertex density on a UV sphere at the same tier. */
   planetIcoSubdivisions: number;
@@ -97,7 +96,6 @@ export const deriveRenderQuality = ({
       starCount: 420,
       planetSegments: 40,
       planetIcoSubdivisions: 8,
-      moonSegments: 14,
       ringTessellation: 56,
       fbmOctaves: 3,
       maxGiantStorms: 1,
@@ -121,7 +119,6 @@ export const deriveRenderQuality = ({
       starCount: 620,
       planetSegments: 48,
       planetIcoSubdivisions: 10,
-      moonSegments: 16,
       ringTessellation: 72,
       fbmOctaves: 4,
       maxGiantStorms: 2,
@@ -143,7 +140,6 @@ export const deriveRenderQuality = ({
       starCount: 1_000,
       planetSegments: 52,
       planetIcoSubdivisions: 12,
-      moonSegments: 18,
       ringTessellation: 80,
       fbmOctaves: 4,
       maxGiantStorms: 3,
@@ -166,7 +162,6 @@ export const deriveRenderQuality = ({
     starCount: 2_400,
     planetSegments: 64,
     planetIcoSubdivisions: 14,
-    moonSegments: 24,
     ringTessellation: 128,
     fbmOctaves: 5,
     maxGiantStorms: 3,
