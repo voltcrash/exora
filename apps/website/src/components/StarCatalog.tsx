@@ -4,6 +4,7 @@ import { discoverRandomStar, discoverStars, searchStars } from "../api-client.ts
 import { formatNumber } from "../planet-utils.tsx";
 import { starKindLabel } from "../star-utils.ts";
 import { starNotableTrait, suggestStarName } from "../search-discovery.ts";
+import { useTabList } from "../use-tab-list.ts";
 import { StarCatalogVisual } from "./CatalogVisual.tsx";
 
 interface StarCatalogProps {
@@ -14,6 +15,10 @@ interface StarCatalogProps {
 
 type SearchState = "idle" | "loading" | "ready" | "error";
 type SurpriseState = "idle" | "loading" | "error";
+type PortalView = "collections" | "categories";
+
+/** Tab order for the discovery views. Module scope so the tab list keeps a stable identity. */
+const PORTAL_VIEWS: readonly PortalView[] = ["collections", "categories"];
 
 const categories = [
   { id: "nearby-stars", icon: "⌖", label: "Nearby stars", note: "Within our stellar neighborhood" },
@@ -66,7 +71,7 @@ export const StarCatalog = ({ onClose, onSelect, open }: StarCatalogProps) => {
   const [cached, setCached] = useState(false);
   const [searchState, setSearchState] = useState<SearchState>("idle");
   const [activeCategory, setActiveCategory] = useState<string | null>(null);
-  const [portalView, setPortalView] = useState<"collections" | "categories">("collections");
+  const [portalView, setPortalView] = useState<PortalView>("collections");
   const [resultView, setResultView] = useState<"gallery" | "list">("gallery");
   const [surpriseState, setSurpriseState] = useState<SurpriseState>("idle");
   const [suggestion, setSuggestion] = useState<string | null>(null);
@@ -146,6 +151,14 @@ export const StarCatalog = ({ onClose, onSelect, open }: StarCatalogProps) => {
   const activeLabel = [...collections, ...categories].find(
     (category) => category.id === activeCategory,
   )?.label;
+
+  const tabs = useTabList({
+    label: "Star discovery views",
+    list: "star-discovery",
+    onSelect: setPortalView,
+    value: portalView,
+    values: PORTAL_VIEWS,
+  });
 
   const takeMeSomewhere = (): void => {
     surpriseControllerRef.current?.abort();
@@ -230,26 +243,16 @@ export const StarCatalog = ({ onClose, onSelect, open }: StarCatalogProps) => {
         </span>
         <small>Large targets are designed for gaze, pointer, touch, or mouse</small>
       </div>
-      <div className="discovery-tabs" role="tablist" aria-label="Star discovery views">
-        <button
-          role="tab"
-          type="button"
-          aria-selected={portalView === "collections"}
-          onClick={() => setPortalView("collections")}
-        >
+      <div className="discovery-tabs" {...tabs.tabListProps}>
+        <button {...tabs.tabProps("collections")} onClick={() => setPortalView("collections")}>
           Curated collections
         </button>
-        <button
-          role="tab"
-          type="button"
-          aria-selected={portalView === "categories"}
-          onClick={() => setPortalView("categories")}
-        >
+        <button {...tabs.tabProps("categories")} onClick={() => setPortalView("categories")}>
           Star types
         </button>
       </div>
       {portalView === "collections" ? (
-        <div className="collection-grid" aria-label="Curated star collections">
+        <div className="collection-grid" {...tabs.panelProps("collections")}>
           {collections.map((collection) => (
             <button
               key={collection.id}
@@ -274,7 +277,7 @@ export const StarCatalog = ({ onClose, onSelect, open }: StarCatalogProps) => {
           ))}
         </div>
       ) : (
-        <div className="discovery-grid" aria-label="Star discovery categories">
+        <div className="discovery-grid" {...tabs.panelProps("categories")}>
           {categories.map((category) => (
             <button
               key={category.id}

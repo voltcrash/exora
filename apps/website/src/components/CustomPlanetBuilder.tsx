@@ -8,9 +8,15 @@ import {
   type Rgb,
 } from "@exora/worldgen";
 import { useEffect, useRef, useState } from "react";
+import { useTabList } from "../use-tab-list.ts";
+
+type ForgeMode = "planet" | "star";
+
+/** Tab order for the forge modes. Module scope so the tab list keeps a stable identity. */
+const FORGE_MODES: readonly ForgeMode[] = ["planet", "star"];
 
 interface WorldForgeProps {
-  initialMode: "planet" | "star";
+  initialMode: ForgeMode;
   onClose: () => void;
   onGeneratePlanet: (world: CustomWorld) => void;
   onGenerateStar: (star: CustomStar) => void;
@@ -123,7 +129,7 @@ export const WorldForge = ({
 }: WorldForgeProps) => {
   const dialogRef = useRef<HTMLDialogElement>(null);
   const nameRef = useRef<HTMLInputElement>(null);
-  const [mode, setMode] = useState<"planet" | "star">("planet");
+  const [mode, setMode] = useState<ForgeMode>("planet");
   const [parameters, setParameters] = useState(initialParameters);
   const [starParameters, setStarParameters] = useState(initialStarParameters);
 
@@ -149,6 +155,14 @@ export const WorldForge = ({
     key: Key,
     value: CustomStarParameters[Key],
   ): void => setStarParameters((current) => ({ ...current, [key]: value }));
+
+  const tabs = useTabList({
+    label: "Object type",
+    list: "forge-mode",
+    onSelect: setMode,
+    value: mode,
+    values: FORGE_MODES,
+  });
 
   const radiusLabel =
     parameters.kind === "rocky"
@@ -190,11 +204,9 @@ export const WorldForge = ({
           </button>
         </div>
 
-        <div className="forge-tabs" role="tablist" aria-label="Object type">
+        <div className="forge-tabs" {...tabs.tabListProps}>
           <button
-            type="button"
-            role="tab"
-            aria-selected={mode === "planet"}
+            {...tabs.tabProps("planet")}
             className={mode === "planet" ? "active" : ""}
             onClick={() => setMode("planet")}
           >
@@ -205,9 +217,7 @@ export const WorldForge = ({
             </span>
           </button>
           <button
-            type="button"
-            role="tab"
-            aria-selected={mode === "star"}
+            {...tabs.tabProps("star")}
             className={mode === "star" ? "active" : ""}
             onClick={() => setMode("star")}
           >
@@ -222,7 +232,7 @@ export const WorldForge = ({
         </div>
 
         {mode === "planet" ? (
-          <div className="builder-body" role="tabpanel">
+          <div className="builder-body" {...tabs.panelProps("planet")}>
             <section className="builder-identity" aria-label="World identity">
               <label>
                 <span>WORLD NAME</span>
@@ -342,7 +352,7 @@ export const WorldForge = ({
             </section>
           </div>
         ) : (
-          <div className="builder-body star-builder-body" role="tabpanel">
+          <div className="builder-body star-builder-body" {...tabs.panelProps("star")}>
             <section className="builder-identity" aria-label="Star identity">
               <label>
                 <span>STAR NAME</span>
