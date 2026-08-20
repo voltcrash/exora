@@ -47,6 +47,8 @@ import {
 
 /** Physical size of the panel, chosen so a full page reads without eye movement at arm's length. */
 const PANEL_SIZE = { height: 1.15, width: 0.92 };
+/** Supersampling keeps text and fine rules crisp once the panel is angled in the headset. */
+const PANEL_TEXTURE_SCALE = 2;
 /** How far from the wearer a summoned panel lands. */
 const SUMMON_DISTANCE = 1.55;
 /** How far below eye level it lands, which keeps it comfortably inside a controller ray. */
@@ -386,9 +388,9 @@ const paintChrome = (context: CanvasRenderingContext2D, view: XrPanelView): void
 
   const body = { height: height - 8, width: width - 8, x: 4, y: 4 };
   const backdrop = context.createLinearGradient(0, 0, 0, height);
-  backdrop.addColorStop(0, "rgba(9, 26, 41, 0.95)");
-  backdrop.addColorStop(0.55, "rgba(5, 16, 27, 0.93)");
-  backdrop.addColorStop(1, "rgba(4, 11, 19, 0.95)");
+  backdrop.addColorStop(0, "rgb(9, 26, 41)");
+  backdrop.addColorStop(0.55, "rgb(5, 16, 27)");
+  backdrop.addColorStop(1, "rgb(4, 11, 19)");
   roundedRectPath(context, body, 30);
   context.fillStyle = backdrop;
   context.fill();
@@ -491,7 +493,10 @@ export const createXrPanel = (scene: Scene, anisotropy = 4): XrPanel => {
 
   const texture = new DynamicTexture(
     "xrPanelTexture",
-    { height: PANEL_METRICS.height, width: PANEL_METRICS.width },
+    {
+      height: PANEL_METRICS.height * PANEL_TEXTURE_SCALE,
+      width: PANEL_METRICS.width * PANEL_TEXTURE_SCALE,
+    },
     scene,
     true,
     Texture.TRILINEAR_SAMPLINGMODE,
@@ -539,6 +544,7 @@ export const createXrPanel = (scene: Scene, anisotropy = 4): XrPanel => {
   highlight.setEnabled(false);
 
   const context = texture.getContext() as unknown as CanvasRenderingContext2D;
+  context.setTransform(PANEL_TEXTURE_SCALE, 0, 0, PANEL_TEXTURE_SCALE, 0, 0);
   let placements: XrPlacement[] = [];
   let currentView: XrPanelView | null = null;
   let hovered: XrCell | null = null;
@@ -685,18 +691,20 @@ export const createXrPanel = (scene: Scene, anisotropy = 4): XrPanel => {
     visible = true;
     // Put the panel somewhere useful immediately. In a real headset the first stable eye pose
     // arrives over the next couple of frames, but waiting for that pose while the material is
-    // fully transparent made the console disappear forever whenever a browser briefly withheld
-    // its XR rig camera (notably Quest Browser and IWER). The delayed anchors below still refine
-    // the world-locked placement once tracking has settled.
+    // transparent made the console disappear forever whenever a browser briefly withheld its XR
+    // rig camera (notably Quest Browser and IWER). Keep the material fully opaque throughout the
+    // scale-in animation; the delayed anchors below still refine the world-locked placement once
+    // tracking has settled.
     anchor();
     openProgress = 0.35;
     pendingFrames = 2;
     hovered = null;
     highlight.setEnabled(false);
-    material.alpha = 0.35;
-    highlightMaterial.alpha = 0.35 * 0.26;
+    material.alpha = 1;
+    highlightMaterial.alpha = 0.26;
     root.setEnabled(true);
     root.scaling.setAll(0.92);
+    for (const pad of wristPads) pad.setEnabled(false);
     pulse(0.25, 20);
   };
 
@@ -710,6 +718,7 @@ export const createXrPanel = (scene: Scene, anisotropy = 4): XrPanel => {
     hovered = null;
     highlight.setEnabled(false);
     root.setEnabled(false);
+    for (const pad of wristPads) pad.setEnabled(true);
   };
 
   const toggle = (): void => (visible ? hide() : summon());
@@ -768,6 +777,7 @@ export const createXrPanel = (scene: Scene, anisotropy = 4): XrPanel => {
     pad.isPickable = true;
     pad.applyFog = false;
     pad.renderingGroupId = PANEL_RENDERING_GROUP;
+    pad.setEnabled(!visible);
     // ActionManager uses Babylon's XR pointer-selection path directly. This is more reliable on
     // Quest and in IWER than waiting for a browser-style POINTERPICK notification on the scene.
     pad.actionManager = new ActionManager(scene);
@@ -827,8 +837,6 @@ export const createXrPanel = (scene: Scene, anisotropy = 4): XrPanel => {
       openProgress = Math.min(1, openProgress + deltaSeconds / OPEN_SECONDS);
       const eased = openProgress * openProgress * (3 - 2 * openProgress);
       root.scaling.setAll(0.88 + eased * 0.12);
-      material.alpha = eased;
-      highlightMaterial.alpha = eased * 0.26;
     }
     if (!readEye()) return;
 
