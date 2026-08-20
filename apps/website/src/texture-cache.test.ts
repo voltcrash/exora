@@ -1,5 +1,5 @@
 import { expect, test, vi } from "vite-plus/test";
-import { createKeyedCache } from "./texture-cache.ts";
+import { createKeyedCache, surfaceDetailSelectionForPalette } from "./texture-cache.ts";
 
 test("reuses the same value for repeated requests instead of recreating it", () => {
   const factory = vi.fn((path: string) => ({ path }));
@@ -41,4 +41,19 @@ test("falls back once a factory fails, without retrying the bad load", () => {
   expect(factory).toHaveBeenCalledTimes(1);
   expect(fallback).toHaveBeenCalledTimes(2);
   expect(cache.size()).toBe(0);
+});
+
+test("selects chemistry and physical materials from the inferred rocky palette", () => {
+  expect(surfaceDetailSelectionForPalette("sulfuric-yellow")).toMatchObject({
+    chemistry: "sulfuric",
+    primary: "cracked",
+    secondary: "regolith",
+  });
+  expect(surfaceDetailSelectionForPalette("ice-blue")).toMatchObject({
+    chemistry: "ice",
+    primary: "ice",
+  });
+  expect(surfaceDetailSelectionForPalette("carbon-dark").chemistryStrength).toBeGreaterThan(
+    surfaceDetailSelectionForPalette("silicate-neutral").chemistryStrength,
+  );
 });

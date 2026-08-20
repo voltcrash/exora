@@ -45,7 +45,7 @@ import {
 import { buildCraterField, sampleTerrainHeight } from "./planet-terrain.ts";
 import { createStellarSurface, type StellarSurface } from "./star-surface.ts";
 import { createStarfield } from "./star-visuals.ts";
-import { getSurfaceDetailTextures } from "./texture-cache.ts";
+import { getSurfaceDetailTextures, surfaceDetailSelectionForPalette } from "./texture-cache.ts";
 import { createXrConsole, type XrConsole, type XrConsoleHost } from "./xr-console.ts";
 import { planetFacts } from "./xr-console-model.ts";
 import type { XrCell } from "./xr-panel-layout.ts";
@@ -454,10 +454,15 @@ void main(void) {
   float depthMix = clamp(0.3 + hazeNoise * 0.5 + detail * 0.08, 0.0, 1.0);
   depthMix = pow(depthMix, mix(1.4, 0.7, clamp(atmosphereDepth, 0.0, 1.0)));
   vec3 atmosphereColor = mix(deepColor, hazeColor, depthMix);
-  atmosphereColor = mix(atmosphereColor, lightColor, bands * 0.2 + stormMask + detail * 0.05);
+  float filament = smoothstep(0.58, 0.86, detail) * (0.35 + bands * 0.65);
+  atmosphereColor = mix(
+    atmosphereColor,
+    lightColor,
+    clamp(bands * 0.32 + stormMask * 0.82 + filament * 0.13, 0.0, 1.0)
+  );
   // Strong haze flattens contrast further -- the defining difference from a gas giant's crisper
   // cloud definition.
-  atmosphereColor = mix(atmosphereColor, hazeColor, clamp(haze, 0.0, 1.0) * 0.32);
+  atmosphereColor = mix(atmosphereColor, hazeColor, clamp(haze, 0.0, 1.0) * 0.22);
   // Polar treatment differs from the gas giant: a desaturating haze cap rather than a bright
   // sheen hotspot.
   atmosphereColor = mix(atmosphereColor, hazeColor, pole * polarGlow * 0.55);
@@ -481,9 +486,8 @@ attribute vec3 normal;
 
 uniform mat4 world;
 uniform mat4 worldViewProjection;
-uniform float seed;
 uniform float elevation;
-uniform float roughness;
+uniform float planetRadius;
 
 varying vec3 vWorldPosition;
 varying vec3 vWorldNormal;
@@ -491,48 +495,15 @@ varying vec3 vSurfacePosition;
 varying vec3 vObjectPosition;
 varying float vHeight;
 
-float hash(vec3 point) {
-  point = fract(point * 0.1031 + seed * 0.000013);
-  point += dot(point, point.yzx + 33.33);
-  return fract((point.x + point.y) * point.z);
-}
-
-float noise(vec3 point) {
-  vec3 index = floor(point);
-  vec3 fraction = fract(point);
-  fraction = fraction * fraction * (3.0 - 2.0 * fraction);
-
-  return mix(
-    mix(mix(hash(index), hash(index + vec3(1.0, 0.0, 0.0)), fraction.x),
-        mix(hash(index + vec3(0.0, 1.0, 0.0)), hash(index + vec3(1.0, 1.0, 0.0)), fraction.x), fraction.y),
-    mix(mix(hash(index + vec3(0.0, 0.0, 1.0)), hash(index + vec3(1.0, 0.0, 1.0)), fraction.x),
-        mix(hash(index + vec3(0.0, 1.0, 1.0)), hash(index + vec3(1.0, 1.0, 1.0)), fraction.x), fraction.y),
-    fraction.z
-  );
-}
-
-float fbm(vec3 point) {
-  float value = 0.0;
-  float amplitude = 0.54;
-  for (int octave = 0; octave < 5; octave++) {
-    value += amplitude * noise(point);
-    point = point * 2.03 + vec3(7.1, 13.7, 19.3);
-    amplitude *= 0.48;
-  }
-  return value;
-}
-
 void main(void) {
-  // Geometry is displaced once, CPU-side, in object space (see displaceRockyPlanet in
-  // planet-scene.ts) so lighting normals stay correct under directional light; this shader only
-  // recomputes a cosmetic height value from the same surface direction for color banding.
+  // Geometry is displaced once, CPU-side. Recover the actual displaced height here so coastlines,
+  // snow lines, and material transitions follow the visible terrain instead of an unrelated
+  // cosmetic noise field.
   vec3 direction = normalize(position);
-  float continents = fbm(direction * roughness);
-  float ridges = abs(fbm(direction * roughness * 2.15 + vec3(17.0)) * 2.0 - 1.0);
-  float terrain = clamp(continents * 0.78 + (1.0 - ridges) * 0.22, 0.0, 1.0);
+  float terrainHeight = (length(position) - planetRadius) / max(elevation * 0.5, 0.0001);
   vec4 worldPosition = world * vec4(position, 1.0);
 
-  vHeight = terrain;
+  vHeight = clamp(0.5 + terrainHeight * 0.25, 0.0, 1.0);
   vSurfacePosition = direction;
   // Object-space (pre-world-transform) position, used by the fragment shader for triplanar
   // microdetail sampling so the detail texture stays glued to the surface instead of swimming
@@ -572,17 +543,21 @@ uniform vec3 waterColor;
 uniform vec3 waterColorShallow;
 uniform vec3 emissiveColor;
 
+#ifdef SURFACE_COLOR_DETAIL
+uniform sampler2D chemistryColorMap;
+uniform float chemistryScale;
+uniform float chemistryStrength;
+uniform float colorDetailFadeStart;
+uniform float colorDetailFadeEnd;
+#endif
+
 #ifdef SURFACE_MICRODETAIL
-uniform sampler2D graniteNormalMap;
-uniform sampler2D graniteRoughnessMap;
-uniform sampler2D basaltNormalMap;
-uniform sampler2D basaltRoughnessMap;
-uniform sampler2D crackedNormalMap;
-uniform sampler2D crackedRoughnessMap;
-uniform sampler2D regolithNormalMap;
-uniform sampler2D regolithRoughnessMap;
-uniform sampler2D iceNormalMap;
-uniform sampler2D iceRoughnessMap;
+uniform sampler2D primaryNormalMap;
+uniform sampler2D primaryRoughnessMap;
+uniform sampler2D secondaryNormalMap;
+uniform sampler2D secondaryRoughnessMap;
+uniform float primaryDetailScale;
+uniform float secondaryDetailScale;
 uniform float detailFadeStart;
 uniform float detailFadeEnd;
 #endif
@@ -639,14 +614,16 @@ vec3 perturbNormal(vec3 position, vec3 normal, float height) {
   return normalize(abs(determinant) * normal - gradient * 0.07);
 }
 
-#ifdef SURFACE_MICRODETAIL
+#if defined(SURFACE_COLOR_DETAIL) || defined(SURFACE_MICRODETAIL)
 /** Sharpened per-axis blend weights for object-space triplanar sampling (Babylon translates
  * texture2D/attribute/varying to their WebGL2 equivalents automatically). */
 vec3 triplanarBlend(vec3 objectNormal) {
   vec3 blend = pow(abs(objectNormal), vec3(4.0));
   return blend / max(blend.x + blend.y + blend.z, 0.0001);
 }
+#endif
 
+#ifdef SURFACE_MICRODETAIL
 // Whiteout-blended triplanar normal map: samples the three axis-aligned projections of the
 // given normal map and combines them relative to the base object-space normal so seams between
 // projections stay hidden.
@@ -666,6 +643,15 @@ float sampleTriplanarScalar(sampler2D tex, vec3 p, vec3 blend) {
   float sx = texture2D(tex, p.yz).r;
   float sy = texture2D(tex, p.zx).r;
   float sz = texture2D(tex, p.xy).r;
+  return sx * blend.x + sy * blend.y + sz * blend.z;
+}
+#endif
+
+#ifdef SURFACE_COLOR_DETAIL
+vec3 sampleTriplanarColor(sampler2D tex, vec3 p, vec3 blend) {
+  vec3 sx = texture2D(tex, p.yz).rgb;
+  vec3 sy = texture2D(tex, p.zx).rgb;
+  vec3 sz = texture2D(tex, p.xy).rgb;
   return sx * blend.x + sy * blend.y + sz * blend.z;
 }
 #endif
@@ -702,19 +688,7 @@ void main(void) {
   vec3 iceColor = mix(vec3(0.63, 0.78, 0.85), vec3(0.93, 0.97, 0.99), smoothstep(0.35, 0.85, mineralDetail));
 
   float detailRoughness = 0.55;
-#ifdef SURFACE_MICRODETAIL
-  // Blend weights for the five reusable material families, all driven by recipe/terrain
-  // quantities (slope, elevation, craters, lava, ice cap) rather than any Earth-specific biome
-  // rule, so e.g. a sulfuric world still only ever picks among rock/dust/ice detail.
-  float slope = 1.0 - clamp(dot(baseNormal, surface), 0.0, 1.0);
-  float iceWeight = polarMask;
-  float basaltWeight = clamp(fractures * 1.6 + (1.0 - smoothstep(0.0, 0.22, vHeight)) * 0.28, 0.0, 1.0) * (1.0 - iceWeight);
-  float crackedWeight = clamp(craterRim * 2.2 + crater * 0.55 + erosion * 0.12, 0.0, 1.0) * (1.0 - iceWeight);
-  float graniteWeight = clamp(smoothstep(0.42, 0.82, slope) + smoothstep(0.7, 0.95, vHeight) * 0.55, 0.0, 1.0) * (1.0 - iceWeight);
-  float claimedWeight = clamp(iceWeight + basaltWeight + crackedWeight + graniteWeight, 0.0, 1.0);
-  float regolithWeight = max(1.0 - claimedWeight, 0.0);
-  float weightTotal = max(iceWeight + basaltWeight + crackedWeight + graniteWeight + regolithWeight, 0.0001);
-
+#if defined(SURFACE_COLOR_DETAIL) || defined(SURFACE_MICRODETAIL)
   // Low-frequency domain warp on the sample position so the same tiled texture does not repeat
   // identically across every triplanar cell.
   vec3 warp = vec3(
@@ -725,45 +699,48 @@ void main(void) {
   vec3 detailPosition = vObjectPosition + warp * 1.35;
   vec3 objectNormal = surface;
   vec3 triBlend = triplanarBlend(objectNormal);
+#endif
 
-  vec3 detailNormalSum = vec3(0.0);
-  float detailRoughnessSum = 0.0;
+#ifdef SURFACE_COLOR_DETAIL
+  float cameraDistance = length(cameraPosition - vWorldPosition);
+  float chemistryFade = 1.0 - smoothstep(colorDetailFadeStart, colorDetailFadeEnd, cameraDistance);
+  vec3 chemistryColor = sampleTriplanarColor(
+    chemistryColorMap,
+    detailPosition * chemistryScale,
+    triBlend
+  );
+#endif
 
-  if (graniteWeight > 0.003) {
-    vec3 p = detailPosition * 7.0;
-    detailNormalSum += sampleTriplanarNormal(graniteNormalMap, p, triBlend, objectNormal) * graniteWeight;
-    detailRoughnessSum += sampleTriplanarScalar(graniteRoughnessMap, p, triBlend) * graniteWeight;
-  }
-  if (basaltWeight > 0.003) {
-    vec3 p = detailPosition * 8.0;
-    detailNormalSum += sampleTriplanarNormal(basaltNormalMap, p, triBlend, objectNormal) * basaltWeight;
-    detailRoughnessSum += sampleTriplanarScalar(basaltRoughnessMap, p, triBlend) * basaltWeight;
-  }
-  if (crackedWeight > 0.003) {
-    vec3 p = detailPosition * 6.0;
-    detailNormalSum += sampleTriplanarNormal(crackedNormalMap, p, triBlend, objectNormal) * crackedWeight;
-    detailRoughnessSum += sampleTriplanarScalar(crackedRoughnessMap, p, triBlend) * crackedWeight;
-  }
-  if (regolithWeight > 0.003) {
-    vec3 p = detailPosition * 13.0;
-    detailNormalSum += sampleTriplanarNormal(regolithNormalMap, p, triBlend, objectNormal) * regolithWeight;
-    detailRoughnessSum += sampleTriplanarScalar(regolithRoughnessMap, p, triBlend) * regolithWeight;
-  }
-  if (iceWeight > 0.003) {
-    vec3 p = detailPosition * 10.0;
-    detailNormalSum += sampleTriplanarNormal(iceNormalMap, p, triBlend, objectNormal) * iceWeight;
-    detailRoughnessSum += sampleTriplanarScalar(iceRoughnessMap, p, triBlend) * iceWeight;
-  }
-
-  detailRoughness = detailRoughnessSum / weightTotal;
-  vec3 objectDetailNormal = normalize(mix(objectNormal, detailNormalSum / weightTotal, clamp(weightTotal, 0.0, 1.0)));
+#ifdef SURFACE_MICRODETAIL
+  // Each chemistry family selects two physically appropriate 2K materials. The secondary map
+  // emerges on slopes, crater rims, highlands, and fractures, replacing the old five-family
+  // branch forest with a predictable twelve texture samples per fragment.
+  float slope = 1.0 - clamp(dot(baseNormal, surface), 0.0, 1.0);
+  float secondaryWeight = clamp(
+    slope * 1.4 + craterRim * 1.6 + crater * 0.35 + erosion * 0.12 + fractures * 0.45,
+    0.0,
+    1.0
+  );
+  vec3 primaryPosition = detailPosition * primaryDetailScale;
+  vec3 secondaryPosition = detailPosition * secondaryDetailScale;
+  vec3 primaryNormal = sampleTriplanarNormal(primaryNormalMap, primaryPosition, triBlend, objectNormal);
+  vec3 secondaryNormal = sampleTriplanarNormal(secondaryNormalMap, secondaryPosition, triBlend, objectNormal);
+  detailRoughness = mix(
+    sampleTriplanarScalar(primaryRoughnessMap, primaryPosition, triBlend),
+    sampleTriplanarScalar(secondaryRoughnessMap, secondaryPosition, triBlend),
+    secondaryWeight
+  );
+  vec3 objectDetailNormal = normalize(mix(primaryNormal, secondaryNormal, secondaryWeight));
 
   // Fade microdetail out with distance: rich up close, smooth again from orbit so the planet
   // does not read as sandpaper in a wide shot.
-  float cameraDistance = length(cameraPosition - vWorldPosition);
-  float detailFade = 1.0 - smoothstep(detailFadeStart, detailFadeEnd, cameraDistance);
+  float normalDetailFade = 1.0 - smoothstep(
+    detailFadeStart,
+    detailFadeEnd,
+    length(cameraPosition - vWorldPosition)
+  );
   vec3 worldDetailNormal = normalize(mat3(world) * objectDetailNormal);
-  normal = normalize(mix(normal, worldDetailNormal, 0.55 * detailFade));
+  normal = normalize(mix(normal, worldDetailNormal, 0.52 * normalDetailFade));
 #endif
 
   vec3 rockColor = mix(lowColor, midColor, smoothstep(0.28, 0.62, vHeight));
@@ -776,6 +753,20 @@ void main(void) {
   // Dark volcanic crust: the ground around active fracture/hotspot networks reads as cooled,
   // ash-dark basalt rather than plain rock, independent of the emissive glow itself.
   rockColor = mix(rockColor, vec3(0.018, 0.012, 0.011), clamp(lavaStrength * 0.55, 0.0, 1.0) * (1.0 - lavaGlow));
+
+#ifdef SURFACE_COLOR_DETAIL
+  // Preserve macro palette readability while borrowing real grain and mineral hue variation from
+  // the chemistry texture. Luminance-relative tinting prevents a dark carbon map from simply
+  // crushing all procedural elevation color to black.
+  float chemistryLuminance = max(dot(chemistryColor, vec3(0.2126, 0.7152, 0.0722)), 0.08);
+  vec3 relativeChemistry = clamp(chemistryColor / chemistryLuminance, vec3(0.45), vec3(1.8));
+  vec3 chemicallyTextured = rockColor * relativeChemistry * (0.78 + chemistryLuminance * 0.36);
+  rockColor = mix(
+    rockColor,
+    chemicallyTextured,
+    chemistryStrength * chemistryFade * (1.0 - polarMask * 0.5)
+  );
+#endif
 
   float coastline = vHeight + (macroDetail - 0.5) * 0.025;
   float shoreline = waterLevel > 0.0 ? smoothstep(waterLevel + 0.016, waterLevel - 0.012, coastline) : 0.0;
@@ -800,7 +791,10 @@ void main(void) {
   surfaceColor = mix(surfaceColor, iceColor, polarMask * (0.62 + microDetail * 0.16));
 
   float diffuse = max(dot(normal, lightDirection), 0.0);
-  float wrappedLight = 0.16 + diffuse * 0.98;
+  float wrappedLight = 0.22 + diffuse * 0.94;
+  // Camera exposure adapts to the host system: stellarIntensity still changes highlights and hue,
+  // but a dim M-dwarf no longer hides the surface material the visualization is meant to show.
+  float surfaceExposure = 0.78 + clamp(stellarIntensity, 0.65, 3.2) * 0.2;
   vec3 viewDirection = normalize(cameraPosition - vWorldPosition);
   vec3 halfDirection = normalize(lightDirection + viewDirection);
   // Fresnel reflectance: water (and ice) throw more of the sky/star back at grazing angles,
@@ -815,7 +809,7 @@ void main(void) {
   float rockSpecular = pow(max(dot(normal, halfDirection), 0.0), mix(6.0, 70.0, 1.0 - detailRoughness)) * (1.0 - waterMask) * (1.0 - detailRoughness) * 0.1;
   float rim = pow(1.0 - max(dot(normal, viewDirection), 0.0), 3.0);
 
-  vec3 finalColor = surfaceColor * wrappedLight * mix(vec3(1.0), stellarColor, diffuse * 0.38) * stellarIntensity;
+  vec3 finalColor = surfaceColor * wrappedLight * mix(vec3(1.0), stellarColor, diffuse * 0.38) * surfaceExposure;
   finalColor += mix(vec3(0.34, 0.58, 0.72), stellarColor, 0.55) * (waterSpecular + iceSpecular) * stellarIntensity;
   finalColor += stellarColor * waterFresnel * stellarIntensity * 0.5;
   finalColor += stellarColor * rockSpecular * stellarIntensity;
@@ -877,24 +871,28 @@ void main(void) {
   // Wind drift is a translation along the (seed-chosen) prevailing direction, independent of
   // the planet's own rotation, which the cloud mesh already inherits from its parent transform.
   vec3 drift = vec3(windDirection.x, 0.0, windDirection.y) * time * 0.03;
-  vec3 samplePosition = normal * (2.6 * cloudScale * 0.5 + 1.3) + drift;
+  // Higher base frequency prevents the cloud shell from reading as a handful of blurry polygons
+  // at orbital distance while still leaving room for recognizable planetary-scale systems.
+  vec3 samplePosition = normal * (cloudScale * 1.7 + 4.2) + drift;
   float cloudNoise = fbm(samplePosition);
 
 #ifdef CLOUD_DETAIL
   // A second, higher-frequency octave group sampled at a different scale/speed than the base
   // layer, so the cloud field reads as multi-scale structure (large systems + fine wisps)
   // instead of one blob of noise. Skipped on fill-rate-constrained tiers.
-  vec3 fineSamplePosition = normal * (7.5 * cloudScale * 0.5 + 2.0) - drift * 1.7;
+  vec3 fineSamplePosition = normal * (cloudScale * 4.6 + 11.0) - drift * 1.7;
   float fineNoise = fbm(fineSamplePosition + cloudNoise * 0.6);
-  cloudNoise = mix(cloudNoise, cloudNoise * 0.6 + fineNoise * 0.4, 0.55);
+  float billows = 1.0 - abs(fineNoise * 2.0 - 1.0);
+  cloudNoise = cloudNoise * 0.76 + fineNoise * 0.17 + billows * 0.07;
 #endif
 
   float threshold = mix(0.74, 0.43, cloudCover);
-  float cloud = smoothstep(threshold, threshold + 0.16, cloudNoise);
+  float cloud = smoothstep(threshold, threshold + mix(0.065, 0.11, cloudCover), cloudNoise);
   vec3 viewDirection = normalize(cameraPosition - vWorldPosition);
   float rim = pow(1.0 - max(dot(normal, viewDirection), 0.0), 2.2);
   float diffuse = 0.28 + max(dot(normal, lightDirection), 0.0) * 0.78;
-  gl_FragColor = vec4(cloudColor * mix(vec3(1.0), stellarColor, 0.28) * (diffuse + rim * 0.34), cloud * (0.24 + cloudCover * 0.48));
+  vec3 litCloud = cloudColor * mix(vec3(1.0), stellarColor, 0.28) * (diffuse + rim * 0.38);
+  gl_FragColor = vec4(litCloud, cloud * (0.14 + cloudCover * 0.34));
 }
 `;
 
@@ -1356,6 +1354,7 @@ const createPlanet = (
           "cameraPosition",
           "seed",
           "elevation",
+          "planetRadius",
           "roughness",
           "craterDensity",
           "waterLevel",
@@ -1371,22 +1370,24 @@ const createPlanet = (
           "waterColor",
           "waterColorShallow",
           "emissiveColor",
-          ...(profile.surfaceMicrodetail ? ["detailFadeStart", "detailFadeEnd"] : []),
+          ...(profile.surfaceColorDetail
+            ? ["chemistryScale", "chemistryStrength", "colorDetailFadeStart", "colorDetailFadeEnd"]
+            : []),
+          ...(profile.surfaceMicrodetail
+            ? ["primaryDetailScale", "secondaryDetailScale", "detailFadeStart", "detailFadeEnd"]
+            : []),
         ],
-        samplers: profile.surfaceMicrodetail
-          ? [
-              "graniteNormalMap",
-              "graniteRoughnessMap",
-              "basaltNormalMap",
-              "basaltRoughnessMap",
-              "crackedNormalMap",
-              "crackedRoughnessMap",
-              "regolithNormalMap",
-              "regolithRoughnessMap",
-              "iceNormalMap",
-              "iceRoughnessMap",
-            ]
-          : [],
+        samplers: [
+          ...(profile.surfaceColorDetail ? ["chemistryColorMap"] : []),
+          ...(profile.surfaceMicrodetail
+            ? [
+                "primaryNormalMap",
+                "primaryRoughnessMap",
+                "secondaryNormalMap",
+                "secondaryRoughnessMap",
+              ]
+            : []),
+        ],
       },
     );
   } else if (recipe.renderer === "ice-giant") {
@@ -1472,6 +1473,7 @@ const createPlanet = (
 
   if (recipe.renderer === "rocky") {
     shader.setFloat("elevation", recipe.surface.elevation);
+    shader.setFloat("planetRadius", recipe.radiusSceneUnits);
     shader.setFloat("roughness", recipe.surface.roughness);
     shader.setFloat("craterDensity", recipe.surface.craterDensity);
     shader.setFloat("waterLevel", recipe.surface.waterLevel);
@@ -1484,22 +1486,37 @@ const createPlanet = (
     shader.setColor3("waterColorShallow", toColor3(recipe.surface.waterColorShallow));
     shader.setColor3("emissiveColor", toColor3(recipe.surface.emissiveColor));
 
-    if (profile.surfaceMicrodetail) {
-      const detail = getSurfaceDetailTextures(scene, profile.anisotropicFiltering);
-      shader.setTexture("graniteNormalMap", detail.granite.normal);
-      shader.setTexture("graniteRoughnessMap", detail.granite.roughness);
-      shader.setTexture("basaltNormalMap", detail.basalt.normal);
-      shader.setTexture("basaltRoughnessMap", detail.basalt.roughness);
-      shader.setTexture("crackedNormalMap", detail.cracked.normal);
-      shader.setTexture("crackedRoughnessMap", detail.cracked.roughness);
-      shader.setTexture("regolithNormalMap", detail.regolith.normal);
-      shader.setTexture("regolithRoughnessMap", detail.regolith.roughness);
-      shader.setTexture("iceNormalMap", detail.ice.normal);
-      shader.setTexture("iceRoughnessMap", detail.ice.roughness);
-      // Full-resolution detail up close, fading out well before orbital distance so the surface
-      // does not read as sandpaper from far away.
-      shader.setFloat("detailFadeStart", recipe.radiusSceneUnits * 4);
-      shader.setFloat("detailFadeEnd", recipe.radiusSceneUnits * 16);
+    if (profile.surfaceColorDetail || profile.surfaceMicrodetail) {
+      const selection = surfaceDetailSelectionForPalette(recipe.terrain.paletteFamily);
+      const detail = getSurfaceDetailTextures(
+        scene,
+        selection,
+        profile.surfaceMicrodetail,
+        profile.anisotropicFiltering,
+      );
+
+      if (profile.surfaceColorDetail) {
+        shader.setTexture("chemistryColorMap", detail.chemistry);
+        shader.setFloat("chemistryScale", selection.chemistryScale);
+        shader.setFloat("chemistryStrength", selection.chemistryStrength);
+        // Chemistry variation should remain legible from orbit, especially on Quest where it is
+        // the only texture path, but fade before it can shimmer at sub-pixel scale.
+        shader.setFloat("colorDetailFadeStart", recipe.radiusSceneUnits * 7);
+        shader.setFloat("colorDetailFadeEnd", recipe.radiusSceneUnits * 24);
+      }
+
+      if (profile.surfaceMicrodetail) {
+        shader.setTexture("primaryNormalMap", detail.primary.normal);
+        shader.setTexture("primaryRoughnessMap", detail.primary.roughness);
+        shader.setTexture("secondaryNormalMap", detail.secondary.normal);
+        shader.setTexture("secondaryRoughnessMap", detail.secondary.roughness);
+        shader.setFloat("primaryDetailScale", selection.primaryScale);
+        shader.setFloat("secondaryDetailScale", selection.secondaryScale);
+        // Full-resolution detail up close, fading out well before orbital distance so the surface
+        // does not read as sandpaper from far away.
+        shader.setFloat("detailFadeStart", recipe.radiusSceneUnits * 4);
+        shader.setFloat("detailFadeEnd", recipe.radiusSceneUnits * 16);
+      }
     }
   } else if (recipe.renderer === "ice-giant") {
     shader.setFloat("bandScale", recipe.atmosphereBands.bandScale);

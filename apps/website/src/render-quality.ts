@@ -43,6 +43,9 @@ export interface RenderQualityProfile {
   /** Whether rocky planets sample the triplanar PBR microdetail textures (normal + roughness).
    * Off on fill-rate-constrained tiers so they keep the cheaper pure-procedural surface. */
   surfaceMicrodetail: boolean;
+  /** A single chemistry-specific triplanar color texture. At three texture reads per fragment it
+   * is cheap enough to keep rocky worlds materially distinct on mobile and Quest. */
+  surfaceColorDetail: boolean;
   tier: RenderQualityTier;
   xrFixedFoveation: number;
   xrFramebufferScaleFactor: number;
@@ -94,12 +97,13 @@ export const deriveRenderQuality = ({
     return {
       tier: "quest",
       starCount: 420,
-      planetSegments: 40,
-      planetIcoSubdivisions: 8,
+      planetSegments: 48,
+      planetIcoSubdivisions: 12,
       ringTessellation: 56,
-      fbmOctaves: 3,
+      fbmOctaves: 4,
       maxGiantStorms: 1,
       anisotropicFiltering: 4,
+      surfaceColorDetail: true,
       surfaceMicrodetail: false,
       secondaryCloudDetail: false,
       // The headset renders through its own XR framebuffer scale, so the flat-panel scaling
@@ -107,9 +111,9 @@ export const deriveRenderQuality = ({
       maxRenderScale: 1,
       hardwareScalingLevel: roundScale(Math.max(1.3, pixelRatio / 1.2)),
       maxHardwareScalingLevel: 2,
-      xrFramebufferScaleFactor: 0.72,
-      xrFixedFoveation: 0.8,
-      maxXrFixedFoveation: 1,
+      xrFramebufferScaleFactor: 0.9,
+      xrFixedFoveation: 0.55,
+      maxXrFixedFoveation: 0.85,
     };
   }
 
@@ -117,20 +121,21 @@ export const deriveRenderQuality = ({
     return {
       tier: "quest",
       starCount: 620,
-      planetSegments: 48,
-      planetIcoSubdivisions: 10,
+      planetSegments: 60,
+      planetIcoSubdivisions: 14,
       ringTessellation: 72,
-      fbmOctaves: 4,
+      fbmOctaves: 5,
       maxGiantStorms: 2,
       anisotropicFiltering: 4,
+      surfaceColorDetail: true,
       surfaceMicrodetail: false,
       secondaryCloudDetail: false,
       maxRenderScale: 1,
       hardwareScalingLevel: roundScale(Math.max(1.2, pixelRatio / 1.35)),
       maxHardwareScalingLevel: 1.9,
-      xrFramebufferScaleFactor: 0.82,
-      xrFixedFoveation: 0.65,
-      maxXrFixedFoveation: 0.9,
+      xrFramebufferScaleFactor: 1,
+      xrFixedFoveation: 0.4,
+      maxXrFixedFoveation: 0.72,
     };
   }
 
@@ -144,6 +149,7 @@ export const deriveRenderQuality = ({
       fbmOctaves: 4,
       maxGiantStorms: 3,
       anisotropicFiltering: 8,
+      surfaceColorDetail: true,
       surfaceMicrodetail: false,
       secondaryCloudDetail: true,
       // Phone panels report 2-3x; 1.5x keeps text and planet limbs crisp without paying for a
@@ -160,12 +166,13 @@ export const deriveRenderQuality = ({
   return {
     tier: "desktop",
     starCount: 2_400,
-    planetSegments: 64,
-    planetIcoSubdivisions: 14,
+    planetSegments: 96,
+    planetIcoSubdivisions: 18,
     ringTessellation: 128,
     fbmOctaves: 5,
     maxGiantStorms: 3,
     anisotropicFiltering: 16,
+    surfaceColorDetail: true,
     surfaceMicrodetail: true,
     secondaryCloudDetail: true,
     // Render at the display's native pixel density (level 0.5 on a 2x screen). The adaptive
@@ -230,6 +237,7 @@ export const adaptFixedFoveation = (
 export const shaderDefines = (profile: RenderQualityProfile): string[] => [
   `#define FBM_OCTAVES ${profile.fbmOctaves}`,
   `#define MAX_GIANT_STORMS ${profile.maxGiantStorms}`,
+  ...(profile.surfaceColorDetail ? ["#define SURFACE_COLOR_DETAIL"] : []),
   ...(profile.surfaceMicrodetail ? ["#define SURFACE_MICRODETAIL"] : []),
   ...(profile.secondaryCloudDetail ? ["#define CLOUD_DETAIL"] : []),
 ];

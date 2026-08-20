@@ -1,74 +1,52 @@
-# Third-Party Assets
+# Planet Texture Provenance
 
-Exora's planets are procedurally generated (geometry, macro terrain, and color are all driven by
-`PlanetVisualRecipe`/`WorldRecipe` data — see `packages/worldgen`). The files below are the only
-external assets in the repository: a small curated set of CC0 PBR microdetail maps used to give
-rocky-planet surfaces close-up material richness (normal/roughness variation) without wrapping
-any photographic albedo around a planet. All planet _color_ still comes from the procedural
-recipe; these textures only contribute surface normal and roughness detail, blended per-fragment
-by a triplanar shader (`apps/website/src/planet-scene.ts`, `ROCKY_FRAGMENT_SHADER`).
+Exora's macro terrain, oceans, ice, lava, cloud systems, giant bands, geometry, and base color are
+procedurally generated from `WorldRecipe` data. Texture assets add close-range material detail;
+they are never presented as observed imagery of a real exoplanet.
 
-All five sets below are CC0 (public domain, no attribution legally required); credits are listed
-anyway for provenance.
+## CC0 physical-detail maps
 
-## Rocky-planet surface detail maps
+The rocky renderer uses a curated set of ambientCG normal and roughness maps through object-space
+triplanar projection. Each planet selects only two families appropriate to its inferred mineral
+palette, so the browser does not decode or upload all five sets.
 
-Stored under `apps/website/public/textures/<family>/`. Each family ships a `normal.png`
-(tangent-space normal map) and a `roughness.jpg` (grayscale roughness). A `height.png`
-(displacement map) is also downloaded from the same source and kept alongside for future use
-(e.g. parallax) but is not currently sampled by the shader.
+| Family     | Use                                                | ambientCG asset | Source URL                        | License |
+| ---------- | -------------------------------------------------- | --------------- | --------------------------------- | ------- |
+| `granite`  | Silicate highlands and steep mineral outcrops      | `Rock058`       | https://ambientcg.com/a/Rock058   | CC0 1.0 |
+| `basalt`   | Volcanic, iron-rich, and carbon-rich crust         | `Rock035`       | https://ambientcg.com/a/Rock035   | CC0 1.0 |
+| `cracked`  | Impact rims, sulfur crust, and fractured lava rock | `Rock063`       | https://ambientcg.com/a/Rock063   | CC0 1.0 |
+| `regolith` | Dust, desert sediment, and loose surface grains    | `Gravel043`     | https://ambientcg.com/a/Gravel043 | CC0 1.0 |
+| `ice`      | Frozen caps and globally glaciated surfaces        | `Snow006`       | https://ambientcg.com/a/Snow006   | CC0 1.0 |
 
-| Family     | Used for                                                                    | ambientCG asset | Source URL                        | Creator                   | License |
-| ---------- | --------------------------------------------------------------------------- | --------------- | --------------------------------- | ------------------------- | ------- |
-| `granite`  | Highland/steep-slope rock, granite-family outcrops                          | `Rock058`       | https://ambientcg.com/a/Rock058   | ambientCG (Lennart Demes) | CC0 1.0 |
-| `basalt`   | Volcanic rock, lava-adjacent dark rock                                      | `Rock035`       | https://ambientcg.com/a/Rock035   | ambientCG (Lennart Demes) | CC0 1.0 |
-| `cracked`  | Crater rims/floors, fractured dry terrain                                   | `Rock063`       | https://ambientcg.com/a/Rock063   | ambientCG (Lennart Demes) | CC0 1.0 |
-| `regolith` | Flat/low-slope dust — covers fine regolith, coarse regolith, sand, sediment | `Gravel043`     | https://ambientcg.com/a/Gravel043 | ambientCG (Lennart Demes) | CC0 1.0 |
-| `ice`      | Polar caps / ice-cap surface roughness & micro-detail                       | `Snow006`       | https://ambientcg.com/a/Snow006   | ambientCG (Lennart Demes) | CC0 1.0 |
+Source archives were downloaded from
+`https://ambientcg.com/get?file=<AssetId>_2K-PNG.zip`. For each family, Exora keeps the 2K
+OpenGL normal map and lossless roughness map. Source 16-bit normals were converted to 8-bit RGB:
+browser GPU texture sampling is normalized 8-bit in this path, so this removes download weight
+without reducing the precision the shader consumes. Unused color, AO, displacement, scene, and
+material files are not shipped.
 
-### Original files
+`Rock063` is natively 2048×1024; the other four families are 2048×2048. Normal and roughness maps
+remain lossless PNGs and use mipmaps plus tier-specific anisotropic filtering.
 
-Downloaded via ambientCG's public download API:
+Creator: ambientCG / Lennart Demes. Attribution is not legally required under CC0, but provenance
+is retained here.
 
-- `https://ambientcg.com/get?file=<AssetId>_1K-PNG.zip` — source for `normal.png` /
-  `height.png` (lossless PNG, so the normal/height data is not degraded by JPEG artifacts before
-  we do our own resize).
-- `https://ambientcg.com/get?file=<AssetId>_1K-JPG.zip` — source for `roughness.jpg` (roughness
-  is a smooth-varying single channel; JPEG here is a fine trade for the smaller download size).
+## Exora chemistry color-detail maps
 
-Each zip's `<AssetId>_1K-PNG_NormalGL.png` (OpenGL-convention normal map), `<AssetId>_1K-PNG_Displacement.png`,
-and `<AssetId>_1K-JPG_Roughness.jpg` were extracted; the `Color`/`AmbientOcclusion` maps and all
-non-image files (`.blend`, `.mtlx`, `.usdc`, `.tres`) were discarded — no color/albedo texture is
-shipped, per the "no photographic albedo wrapped around a planet" requirement.
+The five files under `apps/website/public/textures/chemistry/` were generated specifically for
+Exora using OpenAI's built-in image generation tool, then resized to power-of-two 1024×1024 PNGs
+for reliable mipmapping and wrapping:
 
-### Transformations applied
+- `carbon.png`
+- `ice.png`
+- `oxidized.png`
+- `silicate.png`
+- `sulfuric.png`
 
-All three maps per family were downsampled from the source 1024×1024 to 512×512 with `sips`
-(`sips -Z 512`) and re-encoded:
+They are flat-lit, orthographic, texture-only material scans with no text, objects, horizon, or
+baked directional lighting. The exact production prompt set is recorded in
+`docs/planet-texture-prompts.md`.
 
-- `normal.png` / `height.png`: kept as lossless PNG at 512×512.
-- `roughness.jpg`: re-encoded as JPEG quality 82 at 512×512.
-
-512×512 was chosen because these textures are tiled many times over a planet via triplanar
-projection (not mapped 1:1 to the mesh), so the _screen-space_ detail frequency from a 512px tile
-sampled at planetary tiling scales (6–13× per world-unit, see `ROCKY_FRAGMENT_SHADER`) is already
-well above what's visible at the distances the shader fades detail in at — 1K/2K source
-resolution would only add file size, not visible detail, for this use.
-
-Total on-disk footprint for all 15 files: ~3.7 MB.
-
-### KTX2 / Basis Universal — investigated, not yet applied
-
-The brief asked us to investigate KTX2/Basis Universal compression. No KTX2/Basis encoder
-(`toktx`, `basisu`) is available in this environment, and CLAUDE.md's toolchain rules restrict
-this repo to Vite+ (`vp`)/pnpm-managed dependencies rather than ad hoc native binaries, so
-encoding was not performed in this change. The textures currently ship as plain PNG (normal/
-height) and JPEG (roughness), which Babylon loads natively with no extra plugin. A follow-up
-could add KTX2 delivery via a `vp add`-installed encoder (e.g. wiring `@babylonjs/loaders`' KTX2
-support plus a build-time encode step) without changing the shader — it only reads
-`Texture`/`RawTexture` objects handed to it by `apps/website/src/texture-cache.ts`.
-
-### Required attribution
-
-None required (CC0 1.0 Universal). Attribution is provided above anyway for provenance
-tracking.
+On Quest and mobile, only the palette-selected 1K chemistry map is sampled. Desktop adds the two
+palette-selected 2K normal/roughness pairs. This keeps chemistry visible on constrained headsets
+without paying the full physical-detail fragment cost.
