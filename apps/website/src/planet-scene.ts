@@ -1,4 +1,3 @@
-import { ArcRotateCamera } from "@babylonjs/core/Cameras/arcRotateCamera.js";
 import { ActionManager } from "@babylonjs/core/Actions/actionManager.js";
 import { ExecuteCodeAction } from "@babylonjs/core/Actions/directActions.js";
 import "@babylonjs/core/Culling/ray.js";
@@ -15,16 +14,8 @@ import { MeshBuilder } from "@babylonjs/core/Meshes/meshBuilder.js";
 import "@babylonjs/core/Meshes/instancedMesh.js";
 import { VertexBuffer } from "@babylonjs/core/Buffers/buffer.js";
 import { VertexData } from "@babylonjs/core/Meshes/mesh.vertexData.js";
-import { Scene, ScenePerformancePriority } from "@babylonjs/core/scene.js";
+import { Scene } from "@babylonjs/core/scene.js";
 import { TransformNode } from "@babylonjs/core/Meshes/transformNode.js";
-import type { WebXRCamera } from "@babylonjs/core/XR/webXRCamera.js";
-import { WebXRDefaultExperience } from "@babylonjs/core/XR/webXRDefaultExperience.js";
-import "@babylonjs/core/XR/features/WebXRControllerMovement.js";
-import "@babylonjs/core/XR/features/WebXRControllerPointerSelection.js";
-import "@babylonjs/core/XR/features/WebXRControllerTeleportation.js";
-import "@babylonjs/core/XR/features/WebXRHandTracking.js";
-import { WebXRFeatureName } from "@babylonjs/core/XR/webXRFeaturesManager.js";
-import { WebXRState } from "@babylonjs/core/XR/webXRTypes.js";
 import type { ExoplanetProfile, StarProfile } from "@exora/contracts";
 import type {
   CustomStar,
@@ -34,28 +25,19 @@ import type {
   RockyWorldRecipe,
   WorldRecipe,
 } from "@exora/worldgen";
-import {
-  adaptFixedFoveation,
-  adaptHardwareScaling,
-  deriveRenderQuality,
-  type RenderQualityProfile,
-  type RenderQualityTier,
-  shaderDefines,
-} from "./render-quality.ts";
+import { type RenderQualityProfile, shaderDefines } from "./render-quality.ts";
 import { buildCraterField, sampleTerrainHeight } from "./planet-terrain.ts";
+import type { MountedWorld, SceneHost, WorldConsole } from "./scene-host.ts";
 import { createStellarSurface, type StellarSurface } from "./star-surface.ts";
 import { createStarfield } from "./star-visuals.ts";
 import { getSurfaceDetailTextures, surfaceDetailSelectionForPalette } from "./texture-cache.ts";
-import { createXrConsole, type XrConsole, type XrConsoleHost } from "./xr-console.ts";
 import { planetFacts } from "./xr-console-model.ts";
 import type { XrCell } from "./xr-panel-layout.ts";
-import { requestVrHandoff } from "./xr-session.ts";
 
 const PLANET_POSITION = new Vector3(0, 1.35, 9.5);
 const XR_ORBIT_STAND = new Vector3(0, 0, -7.4);
 const LIGHT_DIRECTION = new Vector3(-0.82, 0.3, -0.38).normalize();
 const DESKTOP_MOVE_SPEED = 5.2;
-const XR_MOVE_SPEED = 2.2;
 const SURFACE_GROUND_ORIGIN_Z = 18;
 const SURFACE_GROUND_BASE_Y = -1.6;
 /** Where the wearer stands when the immersive session drops onto the terrain. */
@@ -1048,19 +1030,9 @@ void main(void) {
 }
 `;
 
-export type XrStatus = "checking" | "entering" | "in-xr" | "ready" | "unavailable";
 export type ViewMode = "orbit" | "surface" | "transition";
 
-export interface PlanetExperience {
-  dispose: () => void;
-  enterVr: () => Promise<void>;
-  getFps: () => number;
-  isVrSupported: boolean;
-  qualityTier: RenderQualityTier;
-}
-
-interface PlanetExperienceOptions {
-  canvas: HTMLCanvasElement;
+interface PlanetWorldOptions {
   onFirstFrame: () => void;
   /** Immersive-only travel, so a wearer can leave for anywhere without removing the headset. */
   onForgeStar?: (star: CustomStar) => void;
@@ -1069,7 +1041,6 @@ interface PlanetExperienceOptions {
   onSelectPlanet?: (planet: ExoplanetProfile) => void;
   onSelectStar?: (star: StarProfile) => void;
   onViewModeChange: (mode: ViewMode) => void;
-  onXrStatusChange: (status: XrStatus) => void;
   planet: ExoplanetProfile;
   recipe: WorldRecipe;
 }
@@ -2125,41 +2096,29 @@ const setEnvironmentEnabled = (
   }
 };
 
-export const createPlanetExperience = ({
-  canvas,
-  onFirstFrame,
-  onForgeStar,
-  onForgeWorld,
-  onSelectHostStar,
-  onSelectPlanet,
-  onSelectStar,
-  onViewModeChange,
-  onXrStatusChange,
-  planet: planetProfile,
-  recipe,
-}: PlanetExperienceOptions): PlanetExperience => {
-  const deviceNavigator = window.navigator as Navigator & { deviceMemory?: number };
-  const profile = deriveRenderQuality({
-    userAgent: deviceNavigator.userAgent,
-    pixelRatio: window.devicePixelRatio,
-    hardwareConcurrency: deviceNavigator.hardwareConcurrency,
-    deviceMemory: deviceNavigator.deviceMemory,
-  });
-  const engine = new Engine(
-    canvas,
-    profile.tier === "desktop",
-    { antialias: profile.tier === "desktop", preserveDrawingBuffer: false, stencil: false },
-    false,
-  );
-  engine.setHardwareScalingLevel(profile.hardwareScalingLevel);
+/**
+ * Builds a planet into the shared scene.
+ *
+ * Everything expensive here — terrain displacement, shader compilation, the rock field — runs
+ * synchronously, which is what lets `world-scope.ts` tell exactly what this world added to a
+ * scene it does not own. The host fades the headset to black around the call.
+ */
+export const createPlanetWorld = (
+  host: SceneHost,
+  {
+    onFirstFrame,
+    onForgeStar,
+    onForgeWorld,
+    onSelectHostStar,
+    onSelectPlanet,
+    onSelectStar,
+    onViewModeChange,
+    planet: planetProfile,
+    recipe,
+  }: PlanetWorldOptions,
+): MountedWorld => {
+  const { camera, canvas, engine, profile, scene } = host;
 
-  let isInXr = false;
-
-  const scene = new Scene(engine);
-  scene.clearColor = new Color4(0.0015, 0.003, 0.008, 1);
-  scene.performancePriority = ScenePerformancePriority.Intermediate;
-  scene.autoClear = true;
-  scene.skipPointerMovePicking = true;
   // Babylon clears the depth buffer between rendering groups by default. Group 1 holds every
   // additive shell in the scene (the planet's atmosphere and cloud layers, the host star's
   // corona, the surface-view star halo), so with the depth buffer wiped they drew over the
@@ -2168,41 +2127,19 @@ export const createPlanetExperience = ({
   // they still show around the limb, where no opaque geometry is in front of them.
   scene.setRenderingAutoClearDepthStencil(1, false, true, true);
 
-  const camera = new ArcRotateCamera(
-    "explorerCamera",
-    -Math.PI / 2,
-    Math.PI / 2.13,
-    17.2,
-    PLANET_POSITION,
-    scene,
-  );
   camera.lowerRadiusLimit = 10.5;
   camera.upperRadiusLimit = 25;
   camera.lowerBetaLimit = 0.58;
   camera.upperBetaLimit = Math.PI - 0.58;
-  camera.wheelDeltaPercentage = 0.018;
-  camera.pinchDeltaPercentage = 0.008;
-  camera.inertia = 0.82;
-  camera.attachControl(canvas, true);
+  camera.alpha = -Math.PI / 2;
+  camera.beta = Math.PI / 2.13;
+  camera.radius = 17.2;
+  camera.setTarget(PLANET_POSITION.clone());
+  if (!host.isInXr()) camera.attachControl(canvas, true);
 
   const keyLight = new DirectionalLight("stellarLight", LIGHT_DIRECTION.scale(-1), scene);
   keyLight.diffuse = toColor3(recipe.star.color);
   keyLight.intensity = 2.2 * recipe.star.intensity;
-
-  // Travelling anywhere tears this scene down, so an immersive session has to be handed over to
-  // the next one instead of silently dropping the wearer back into the flat page.
-  const handOver = <Argument>(travel: (argument: Argument) => void) => {
-    return (argument: Argument): void => {
-      if (isInXr) requestVrHandoff();
-      travel(argument);
-    };
-  };
-  const travelToHostStar = onSelectHostStar
-    ? (): void => {
-        if (isInXr) requestVrHandoff();
-        onSelectHostStar();
-      }
-    : undefined;
 
   const starfield = createStarfield({ count: profile.starCount, scene, seed: recipe.seed });
   const {
@@ -2216,17 +2153,16 @@ export const createPlanetExperience = ({
     ringSystem,
     shader,
   } = createPlanet(scene, recipe, profile);
-  const hostStar = createHostStar(scene, recipe, profile, orbitalRoot, travelToHostStar);
+  const hostStar = createHostStar(scene, recipe, profile, orbitalRoot, onSelectHostStar);
   orbitalMeshes.push(...hostStar.meshes);
   // The deep-space starfield belongs to the orbital view only. Down on the surface the sky shader
   // owns what the sky contains, and it has to: stars there are seen through an atmosphere that
   // scatters them out entirely in daylight, so a vacuum starfield shining through a lit sky would
   // be showing the viewer something no one standing on that planet could see.
   orbitalMeshes.push(starfield.mesh);
-  const surfaceEnvironment = createSurfaceEnvironment(scene, recipe, profile, travelToHostStar);
+  const surfaceEnvironment = createSurfaceEnvironment(scene, recipe, profile, onSelectHostStar);
 
   let elapsedSeconds = 0;
-  let qualitySampleSeconds = 0;
   let viewState: "entering" | "leaving" | "orbit" | "surface" = "orbit";
   let viewTransitionSeconds = 0;
   const pressedMovementKeys = new Set<string>();
@@ -2290,10 +2226,10 @@ export const createPlanetExperience = ({
     onViewModeChange("transition");
   };
 
-  scene.onBeforeRenderObservable.add(() => {
+  const renderObserver = scene.onBeforeRenderObservable.add(() => {
+    const isInXr = host.isInXr();
     const deltaSeconds = Math.min(engine.getDeltaTime() / 1_000, 0.05);
     elapsedSeconds += deltaSeconds;
-    qualitySampleSeconds += deltaSeconds;
 
     const movementX =
       Number(pressedMovementKeys.has("KeyD")) - Number(pressedMovementKeys.has("KeyA"));
@@ -2386,56 +2322,9 @@ export const createPlanetExperience = ({
     hostStar.update(elapsedSeconds, activePosition);
     surfaceEnvironment.star.update(elapsedSeconds, activePosition);
     starfield.update(elapsedSeconds, activePosition);
-
-    // Locomotion owns the XR rig after entry. Rewriting its position here causes visible
-    // snap-backs on room-scale headsets, so only the head-locked console needs a frame update.
-    if (isInXr) xrConsole?.update(deltaSeconds);
-
-    if (qualitySampleSeconds >= 3) {
-      qualitySampleSeconds = 0;
-      if (isInXr) {
-        adaptSessionFoveation(engine.getFps());
-      } else {
-        const currentLevel = engine.getHardwareScalingLevel();
-        const nextLevel = adaptHardwareScaling(currentLevel, engine.getFps(), profile, false);
-        if (nextLevel !== currentLevel) {
-          engine.setHardwareScalingLevel(nextLevel);
-          engine.resize();
-        }
-      }
-    }
   });
 
-  scene.onAfterRenderObservable.addOnce(onFirstFrame);
-  engine.runRenderLoop(() => scene.render());
-
-  const resize = (): void => engine.resize();
-  window.addEventListener("resize", resize);
-
-  onXrStatusChange("checking");
-  let xr: WebXRDefaultExperience | null = null;
-  let xrConsole: XrConsole | null = null;
-  let isVrSupported = false;
-  let disposed = false;
-
-  const xrCamera = (): WebXRCamera | null => xr?.baseExperience.camera ?? null;
-
-  let sessionFoveation = profile.xrFixedFoveation;
-
-  /**
-   * Trades peripheral sharpness for frame rate while the headset is on.
-   *
-   * Canvas resolution is fixed for the lifetime of a session, so foveation is the only lever
-   * left; a Quest 2 that starts missing 72 Hz recovers by blurring further from the eye.
-   */
-  const adaptSessionFoveation = (fps: number): void => {
-    const sessionManager = xr?.baseExperience.sessionManager;
-    if (!sessionManager?.isFixedFoveationSupported) return;
-    const next = adaptFixedFoveation(sessionFoveation, fps, profile);
-    if (next === sessionFoveation) return;
-    sessionFoveation = next;
-    sessionManager.fixedFoveation = next;
-  };
+  const firstFrameObserver = scene.onAfterRenderObservable.addOnce(onFirstFrame);
 
   /**
    * Moves the rig to the spot that makes sense for a view.
@@ -2445,7 +2334,7 @@ export const createPlanetExperience = ({
    * already sits at head height and the offset has to be added back by hand.
    */
   const placeXrCamera = (surface: boolean, initial: boolean): void => {
-    const rig = xrCamera();
+    const rig = host.xrCamera();
     if (!rig) return;
     const headOffset = initial ? 0 : rig.realWorldHeight;
     if (surface) {
@@ -2469,6 +2358,16 @@ export const createPlanetExperience = ({
     camera.beta = surface ? 1.23 : Math.PI / 2.13;
     camera.alpha = -Math.PI / 2;
     camera.attachControl(canvas, true);
+  };
+
+  /** Switches view from inside the headset, where the orbit camera transition cannot be used. */
+  const applyXrView = (surface: boolean, initial: boolean): void => {
+    viewState = surface ? "surface" : "orbit";
+    viewTransitionSeconds = 0;
+    applyViewEnvironment(surface);
+    placeXrCamera(surface, initial);
+    host.refreshConsole();
+    onViewModeChange(surface ? "surface" : "orbit");
   };
 
   const buildSceneActions = (): XrCell[] => {
@@ -2495,25 +2394,24 @@ export const createPlanetExperience = ({
       },
     ];
 
-    if (travelToHostStar) {
+    if (onSelectHostStar) {
       actions.push({
         detail: `Visit ${planetProfile.hostStar}`,
         id: "host-star",
         label: "Travel to the host star",
-        onSelect: travelToHostStar,
+        onSelect: onSelectHostStar,
       });
     }
 
     return actions;
   };
 
-  const consoleHost: XrConsoleHost = {
+  const consoleContributions: WorldConsole = {
     facts: () => planetFacts(planetProfile),
-    onExit: () => void xr?.baseExperience.exitXRAsync(),
-    onForgePlanet: onForgeWorld ? handOver(onForgeWorld) : undefined,
-    onForgeStar: onForgeStar ? handOver(onForgeStar) : undefined,
-    onTravelPlanet: onSelectPlanet ? handOver(onSelectPlanet) : undefined,
-    onTravelStar: onSelectStar ? handOver(onSelectStar) : undefined,
+    onForgePlanet: onForgeWorld,
+    onForgeStar,
+    onTravelPlanet: onSelectPlanet,
+    onTravelStar: onSelectStar,
     sceneActions: buildSceneActions,
     source: () => `${planetProfile.source.archive} · ${planetProfile.source.retrievedOn}`,
     subtitle: () =>
@@ -2522,123 +2420,18 @@ export const createPlanetExperience = ({
     title: () => planetProfile.name,
   };
 
-  /** Switches view from inside the headset, where the orbit camera transition cannot be used. */
-  const applyXrView = (surface: boolean, initial: boolean): void => {
-    viewState = surface ? "surface" : "orbit";
-    viewTransitionSeconds = 0;
-    applyViewEnvironment(surface);
-    placeXrCamera(surface, initial);
-    xrConsole?.refresh();
-    onViewModeChange(surface ? "surface" : "orbit");
-  };
-
-  void WebXRDefaultExperience.CreateAsync(scene, {
-    disableDefaultUI: true,
-    disableNearInteraction: true,
-    disableTeleportation: true,
-    // The rigged hand mesh is a remote glTF and no loader is bundled, so joint spheres are used.
-    handSupportOptions: { handMeshes: { disableDefaultMeshes: true } },
-    inputOptions: { doNotLoadControllerMeshes: true },
-    optionalFeatures: ["hand-tracking"],
-    outputCanvasOptions: {
-      canvasOptions: {
-        // Quest 2's compositor is unreliable with an explicitly opaque WebGL layer. Babylon's
-        // compatible default is alpha-enabled; the scene still clears to opaque black each frame.
-        alpha: true,
-        antialias: false,
-        depth: true,
-        stencil: false,
-        framebufferScaleFactor: profile.xrFramebufferScaleFactor,
-      },
-    },
-  })
-    .then(async (createdXr) => {
-      if (disposed) {
-        createdXr.dispose();
-        return;
-      }
-
-      xr = createdXr;
-      createdXr.baseExperience.featuresManager.enableFeature(WebXRFeatureName.MOVEMENT, "latest", {
-        movementEnabled: true,
-        movementOrientationFollowsController: false,
-        movementOrientationFollowsViewerPose: true,
-        movementSpeed: XR_MOVE_SPEED,
-        movementThreshold: 0.16,
-        rotationEnabled: true,
-        rotationSpeed: 0.42,
-        rotationThreshold: 0.18,
-        xrInput: createdXr.input,
-      });
-      xrConsole = createXrConsole(scene, consoleHost, profile.anisotropicFiltering);
-      xrConsole.attach(createdXr);
-
-      // The rig lands wherever the headset happens to face, so the view has to be aimed at the
-      // subject; otherwise the session opens on empty starfield and looks broken.
-      createdXr.baseExperience.onInitialXRPoseSetObservable.add(() => {
-        applyXrView(viewState === "surface", true);
-      });
-
-      createdXr.baseExperience.onStateChangedObservable.add((state) => {
-        if (disposed) return;
-        if (state === WebXRState.ENTERING_XR) {
-          onXrStatusChange("entering");
-        }
-        if (state === WebXRState.IN_XR) {
-          isInXr = true;
-          sessionFoveation = profile.xrFixedFoveation;
-          if (createdXr.baseExperience.sessionManager.isFixedFoveationSupported) {
-            createdXr.baseExperience.sessionManager.fixedFoveation = sessionFoveation;
-          }
-          xrConsole?.setVisible(true);
-          onXrStatusChange("in-xr");
-        }
-        if (state === WebXRState.NOT_IN_XR) {
-          isInXr = false;
-          xrConsole?.setVisible(false);
-          syncDesktopCamera(viewState === "surface");
-          onXrStatusChange(isVrSupported ? "ready" : "unavailable");
-        }
-      });
-
-      isVrSupported =
-        await createdXr.baseExperience.sessionManager.isSessionSupportedAsync("immersive-vr");
-      if (disposed) {
-        createdXr.dispose();
-        if (xr === createdXr) xr = null;
-        return;
-      }
-      onXrStatusChange(isVrSupported ? "ready" : "unavailable");
-    })
-    .catch(() => {
-      if (!disposed) onXrStatusChange("unavailable");
-    });
-
   return {
-    get isVrSupported() {
-      return isVrSupported;
-    },
-    qualityTier: profile.tier,
-    getFps: () => engine.getFps(),
-    enterVr: async () => {
-      if (!xr || !isVrSupported) return;
-      // Babylon appends the reference space and every enabled optional feature (including
-      // hand tracking) to the session request, so nothing has to be listed by hand here.
-      await xr.baseExperience.enterXRAsync("immersive-vr", "local-floor", xr.renderTarget);
-    },
+    console: consoleContributions,
+    focusXrRig: (initial) => applyXrView(viewState === "surface", initial),
+    restoreDesktopView: () => syncDesktopCamera(viewState === "surface"),
+    // Meshes, materials and the key light are removed by the world scope the host opened around
+    // this build; what is left here is everything that lives outside the scene graph.
     dispose: () => {
-      if (disposed) return;
-      disposed = true;
-      window.removeEventListener("resize", resize);
       window.removeEventListener("keydown", onMovementKeyDown);
       window.removeEventListener("keyup", onMovementKeyUp);
       window.removeEventListener("blur", clearMovementKeys);
-      xrConsole?.dispose();
-      xrConsole = null;
-      xr?.dispose();
-      engine.stopRenderLoop();
-      scene.dispose();
-      engine.dispose();
+      scene.onBeforeRenderObservable.remove(renderObserver);
+      scene.onAfterRenderObservable.remove(firstFrameObserver);
     },
   };
 };

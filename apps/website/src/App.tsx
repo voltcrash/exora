@@ -10,6 +10,7 @@ import {
 import { PlanetExperience } from "./components/PlanetExperience.tsx";
 import { featuredPlanet } from "./planet-profile.ts";
 import { hasRenderer } from "./planet-utils.tsx";
+import { useSceneHost } from "./use-scene-host.ts";
 
 const PlanetCatalog = lazy(() =>
   import("./components/PlanetCatalog.tsx").then((module) => ({ default: module.PlanetCatalog })),
@@ -51,6 +52,11 @@ const loadRequestedObject = async (): Promise<ActiveObject> => {
 };
 
 export const App = () => {
+  // The canvas and the renderer behind it belong to the page, not to either view. Travelling
+  // from a world to its host star swaps which view is mounted, and a WebXR session cannot
+  // survive its WebGL context being torn down and rebuilt underneath it.
+  const [canvas, setCanvas] = useState<HTMLCanvasElement | null>(null);
+  const sceneHost = useSceneHost(canvas);
   const [catalogOpen, setCatalogOpen] = useState(false);
   const [starCatalogOpen, setStarCatalogOpen] = useState(false);
   const [builderOpen, setBuilderOpen] = useState(false);
@@ -120,23 +126,34 @@ export const App = () => {
     });
   }, []);
 
-  if (!activeObject) {
-    return (
-      <div className="loading-screen initial-loading" role="status">
-        <div className="loading-orbit" aria-hidden="true">
-          <span />
-        </div>
-        <p>CONTACTING OBSERVATORIES</p>
-        <small>RESOLVING CELESTIAL OBJECT</small>
-      </div>
-    );
-  }
+  const subject = activeObject
+    ? activeObject.type === "planet"
+      ? activeObject.result.planet.name
+      : activeObject.result.star.name
+    : null;
 
   return (
     <>
-      {activeObject.type === "planet" ? (
+      <canvas
+        ref={setCanvas}
+        id="render-canvas"
+        aria-label={
+          subject ? `Interactive visualization of ${subject}` : "Celestial object visualization"
+        }
+        tabIndex={0}
+      />
+      {!activeObject ? (
+        <div className="loading-screen initial-loading" role="status">
+          <div className="loading-orbit" aria-hidden="true">
+            <span />
+          </div>
+          <p>CONTACTING OBSERVATORIES</p>
+          <small>RESOLVING CELESTIAL OBJECT</small>
+        </div>
+      ) : activeObject.type === "planet" ? (
         <PlanetExperience
           key={activeObject.result.planet.id}
+          host={sceneHost}
           result={activeObject.result}
           onGeneratePlanet={generatePlanet}
           onGenerateStar={generateStar}
@@ -152,6 +169,7 @@ export const App = () => {
         <Suspense fallback={null}>
           <StarExperience
             key={activeObject.result.star.id}
+            host={sceneHost}
             result={activeObject.result}
             systemHostName={systemHostName}
             onGeneratePlanet={generatePlanet}
@@ -174,7 +192,7 @@ export const App = () => {
           <StarCatalog open onClose={() => setStarCatalogOpen(false)} onSelect={selectStar} />
         </Suspense>
       ) : null}
-      {builderOpen ? (
+      {builderOpen && activeObject ? (
         <Suspense fallback={null}>
           <WorldForge
             initialMode={activeObject.type}
