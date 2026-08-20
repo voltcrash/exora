@@ -1,85 +1,153 @@
 # Exora
 
-Explore planets and stars through interactive, data-informed visualizations. Exora combines confirmed NASA exoplanet data with stellar observations from SIMBAD in a React + Vite experience targeting desktop and WebXR.
+## Purpose
 
-## Current vertical slice
+Exora turns catalogued astronomy into a place you can stand in. It reads confirmed exoplanets from the NASA Exoplanet Archive and stars from SIMBAD, derives a deterministic visual recipe from each object's measured properties, and renders that recipe as a real-time Babylon.js world you can orbit on a desktop or walk inside a WebXR headset.
 
-The current slice renders HIP 65426 b using a normalized response from the NASA Exoplanet Archive. It includes:
+Every world is a reading of a catalog row, never observed imagery. Exora keeps the three tiers apart at the type level and in the interface: **measured** values are printed verbatim from the archive, **derived** values come from established physics applied to those measurements, and **inferred** appearance is a cautious probabilistic read carrying its own confidence. A field the catalog never reported stays `null` rather than being backfilled with a plausible number.
 
-- a React interface composed around an isolated Babylon.js rendering lifecycle;
-- a Hono API with NASA TAP queries, response normalization, and a six-hour in-memory cache;
-- an optional PostgreSQL catalog with idempotent NASA synchronization;
-- a shared planet contract used by the API and renderer;
-- a searchable confirmed-planet catalog with live scene switching;
-- a keyless SIMBAD TAP integration with exact-name star resolution, featured stellar destinations, and twelve-hour caching;
-- interactive stellar visualizations inferred from observed spectral classes;
-- a two-mode World Forge for procedural planets and custom stars;
-- a deterministic data-to-world recipe;
-- procedural gas-giant clouds, methane-hazed ice giants, and displaced rocky terrain;
-- an interactive Babylon.js scene with desktop orbit controls;
-- a responsive observation HUD; and
-- a WebXR entry flow with a teleportable viewing deck;
-- an opt-in emulated WebXR runtime for debugging immersive mode in a desktop browser;
-- adaptive Quest rendering with a separate Quest 2 budget, reduced geometry and shader detail, dynamic desktop resolution, and foveation that adapts to the headset frame rate;
-- a local data fallback when NASA or the API is unavailable.
+## Features
 
-The visualization distinguishes archive observations from Exora's inferred and generated details. It is not observed imagery.
+- **Confirmed-planet catalog:** Search, browse, and switch worlds live against the NASA Exoplanet Archive, with twelve curated discovery collections from `earth-like` and `ocean-candidates` through `lava-worlds` and `record-breakers`.
+- **Stellar catalog:** Resolve stars by exact identifier through SIMBAD's keyless TAP service, with twelve stellar collections spanning nearby stars, solar analogs, blue giants, binaries, variables, and stellar remnants.
+- **Deterministic world recipes:** A shared, versioned `worldgen` package maps an object's physical properties to a visual class, palette family, terrain, cloud, and ring recipe. The same catalog row always produces the same world, and `WORLDGEN_VERSION` invalidates persisted recipes when the rules change.
+- **Physically motivated renderers:** Procedural gas-giant bands and storms, methane-hazed ice giants with ring systems, and displaced rocky terrain with oceans, ice caps, and lava driven by inferred chemistry.
+- **One resolved star implementation:** Photosphere with multi-scale convection, a supergranular magnetic network, limb-brightened faculae, deterministic starspots, limb darkening, corona, and glare — shared by the star scene and by every host star hanging in a planet's sky.
+- **World Forge:** A two-mode builder for procedural planets and custom stars, seeded and reproducible, using the same recipe engine as the catalog.
+- **Persistent immersive session:** The engine, scene, camera, and WebXR session outlive any single destination. Travelling from a world to its host star swaps the contents of one scene instead of rebuilding the context, so the headset never drops back to the flat page.
+- **In-headset console:** A holographic panel that rebuilds every browser dialog as a page in VR — collection browsing, an in-world keyboard for search, the archive's own numbers for the object in front of you, the World Forge, and travel — so nothing requires taking the headset off.
+- **Adaptive rendering budget:** Separate desktop, mobile, and Quest profiles govern shader octaves, sphere tessellation, star count, texture detail, and render scale. Immersive sessions raise fixed foveation after three seconds below 62 FPS and relax it again above 70.
+- **Desktop WebXR emulation:** An opt-in Immersive Web Emulation Runtime installs a synthetic Quest over `navigator.xr`, so the immersive path runs unmodified in a normal tab.
+- **Graceful degradation:** A six-hour planet cache, a twelve-hour star cache, and a bundled local profile keep the experience alive when NASA, SIMBAD, or the API is unreachable.
+
+## Stack
+
+- **Toolchain and monorepo:** Vite+ (`vp`), pnpm workspaces with a version catalog, TypeScript
+- **Web:** React 19, Vite, Babylon.js 9 (WebGL2 + WebXR)
+- **API:** Hono on Node 24
+- **Data sources:** NASA Exoplanet Archive TAP, SIMBAD TAP (CDS, Strasbourg)
+- **Catalog store:** Neon Postgres via `postgres`, with idempotent synchronization
+- **Immersive tooling:** IWER and `@iwer/devui` for desktop WebXR emulation
+- **Hosting:** Vercel static output plus a Vercel Function, with Analytics and Speed Insights
 
 ## Development
 
-Install the workspace and start the API and site together:
+Install the workspace and run the static checks and tests with Vite+:
 
-```bash
+```sh
 vp install
-vp run dev
+vp check
+vp test
 ```
 
-Then open <http://localhost:5173>.
+The website and API are separate workspace applications with their own commands, so they run through Vite Task:
 
-The Hono API listens on <http://localhost:8787>. Its initial routes are:
+```sh
+vp run dev          # website and API together
+vp run dev:web      # website only
+vp run dev:api      # API only
+vp run ready        # check, test, and build every workspace
+```
+
+The site serves on <http://localhost:5173> and the API on <http://localhost:8787>:
 
 ```text
 GET /api/health
 GET /api/planets?q=kepler&limit=12
+GET /api/planets?category=ocean-candidates&limit=12
+GET /api/planets?host=Kepler-297
 GET /api/planets/featured
 GET /api/planets/:name
-GET /api/stars/featured
 GET /api/stars?q=sirius&limit=12
+GET /api/stars?category=nearby-stars&limit=12
+GET /api/stars/featured
 GET /api/stars/:name
 ```
 
-Run the complete validation suite:
+`vp dev` and `vp build` always invoke Vite's built-in commands. Use `vp run dev` in this repository so both applications start.
 
-```bash
-vp run ready
-```
+### PostgreSQL catalog
 
-## PostgreSQL catalog
+Copy `.env.example` to `.env`, set `DATABASE_URL`, then initialize and synchronize:
 
-Copy `.env.example` to `.env` and provide `DATABASE_URL`, then initialize and synchronize the catalog:
-
-```bash
+```sh
 vp run db:migrate
 vp run db:sync
 ```
 
-When `DATABASE_URL` is present, the API serves lookups and searches from PostgreSQL. Without it, local development continues to query NASA directly. Catalog synchronization runs as an explicit job so production can schedule it independently from API startup.
+When `DATABASE_URL` is present the API serves lookups and searches from Postgres; without it, it queries NASA directly. Synchronization is an explicit job so production can schedule it independently from API startup.
 
-WebXR requires a secure context. Localhost works for desktop development; testing from a Quest on the local network will require serving the app over HTTPS or deploying it to an HTTPS host.
+### Immersive mode
 
-To exercise the immersive flow without a headset, open <http://localhost:5173/?xr=emulate>. The dev server then installs an emulated Quest runtime over `navigator.xr` and shows an on-screen headset and controller rig. See the [desktop WebXR emulation guide](docs/webxr-emulation.md).
+WebXR requires a secure context. Localhost works for desktop development, but testing from a Quest on the local network needs HTTPS or a deployed origin.
 
-Use the [Meta Quest smoke-test checklist](docs/quest-testing.md) for headset validation and performance targets.
+To exercise the immersive flow without a headset, open <http://localhost:5173/?xr=emulate>; `?xr=stereo` renders both eyes side by side and `?xr=off` returns to the native runtime. See the [desktop WebXR emulation guide](docs/webxr-emulation.md), and use the [Meta Quest smoke-test checklist](docs/quest-testing.md) for headset validation and performance targets.
 
-## Current workspace
+## Workspace
 
 ```text
-apps/api                 Hono API with NASA and SIMBAD TAP adapters
-apps/website             React + Vite interface and Babylon.js experience
-packages/contracts       Shared API and exoplanet types
-packages/worldgen        Deterministic data-to-world recipe engine
+apps/api             Hono API with NASA and SIMBAD TAP adapters and the Postgres catalog
+apps/website         React interface and the Babylon.js scene host
+packages/contracts   Shared API, exoplanet, and star types
+packages/worldgen    Deterministic data-to-world recipe engine
 ```
 
-Gas giants, ice giants, and rocky worlds can be explored from catalog results. Only worlds without enough data for classification remain disabled. World generation lives in a shared package, while the API can synchronize NASA's confirmed catalog into PostgreSQL for durable, low-latency queries.
+`packages/worldgen` is the only place a catalog row becomes an appearance, so the API, the browser renderer, and the in-headset console all describe an object the same way. Texture provenance and licensing for the close-range detail maps are recorded in [THIRD_PARTY_ASSETS.md](THIRD_PARTY_ASSETS.md).
 
-Stars are resolved by exact identifiers through the free, registration-free SIMBAD service operated by CDS, Strasbourg. Exora clearly labels the archive measurements separately from visual properties inferred from each star's spectral class.
+## Current deployment architecture
+
+The website builds to static output served from Vercel's edge, and the Hono application is bundled into a single Vercel Function pinned to `sin1`. A rewrite sends every `/api/*` path to that one function, which keeps routing inside Hono rather than splitting it across per-route handlers.
+
+The function resolves its repository at startup. With `DATABASE_URL` set it reads planets from Neon Postgres — one pooled connection per instance, since Neon handles cross-instance concurrency — and otherwise falls back to querying the NASA Exoplanet Archive directly. Stars always resolve through SIMBAD, which needs no registration or key.
+
+Both upstream adapters wrap their TAP queries in an in-memory cache with a request timeout, six hours for planets and twelve for stars, and every response also carries `Cache-Control` with `stale-while-revalidate` so Vercel's CDN absorbs repeated reads. Catalog synchronization runs as a separate job against the same database, so the request path never waits on an archive-wide refresh.
+
+The browser holds one Babylon engine for the lifetime of the page. Worlds are built into and removed from that single scene, which is what lets an immersive session survive travel between destinations.
+
+```mermaid
+flowchart TB
+    subgraph Clients
+        Desktop["Desktop browser<br/>orbit controls"]
+        Headset["Meta Quest<br/>WebXR immersive session"]
+    end
+
+    subgraph Browser["Browser runtime"]
+        UI["React interface<br/>catalogs + World Forge"]
+        Host["Scene host<br/>one Babylon engine + XR session"]
+        Console["In-headset console"]
+        Worldgen["@exora/worldgen<br/>deterministic recipes"]
+    end
+
+    subgraph Vercel["Vercel"]
+        Static["Static site<br/>apps/website/dist"]
+        Fn["API Function<br/>Hono, sin1, /api/*"]
+    end
+
+    subgraph Data["Data"]
+        Neon["Neon Postgres<br/>synchronized planet catalog"]
+        Sync["Catalog sync job<br/>db:migrate + db:sync"]
+    end
+
+    subgraph Archives["Archives"]
+        NASA["NASA Exoplanet Archive<br/>TAP"]
+        SIMBAD["SIMBAD<br/>TAP, keyless"]
+    end
+
+    Desktop --> Static
+    Headset --> Static
+    Static --> UI
+    UI --> Host
+    Host --> Console
+    Host --> Worldgen
+    Console --> Worldgen
+
+    UI -->|/api/planets, /api/stars| Fn
+    Console -->|search + travel| Fn
+
+    Fn -->|when DATABASE_URL is set| Neon
+    Fn -->|fallback + featured lookups| NASA
+    Fn --> SIMBAD
+
+    Sync --> NASA
+    Sync --> Neon
+```
