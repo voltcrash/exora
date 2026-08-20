@@ -15,7 +15,7 @@ import { featuredPlanet } from "./planet-profile.ts";
 test("uses normalized live API data", async () => {
   const result = await loadFeaturedPlanet(featuredPlanet, async () =>
     Response.json({
-      data: { ...featuredPlanet, name: "HIP 65426 b · live" },
+      data: { ...featuredPlanet, name: `${featuredPlanet.name} · live` },
       meta: { cached: true, source: "NASA Exoplanet Archive" },
     }),
   );
@@ -62,26 +62,26 @@ test("returns normalized planet search results", async () => {
       }),
   });
 
-  expect(result).toMatchObject({ planets: [{ id: "hip-65426-b" }], query: "wasp" });
+  expect(result).toMatchObject({ planets: [{ id: featuredPlanet.id }], query: "wasp" });
 });
 
 test("loads the confirmed planets connected to a star", async () => {
-  const result = await loadPlanetsByHost("HIP 65426", {
+  const result = await loadPlanetsByHost(featuredPlanet.hostStar, {
     fetcher: async (input) => {
-      expect(input).toContain("host=HIP%2065426");
+      expect(input).toContain(`host=${encodeURIComponent(featuredPlanet.hostStar)}`);
       return Response.json({
         data: [featuredPlanet],
         meta: {
           cached: true,
           count: 1,
-          query: "HIP 65426",
+          query: featuredPlanet.hostStar,
           source: "NASA Exoplanet Archive",
         },
       });
     },
   });
 
-  expect(result).toMatchObject({ cached: true, planets: [{ id: "hip-65426-b" }] });
+  expect(result).toMatchObject({ cached: true, planets: [{ id: featuredPlanet.id }] });
 });
 
 test("loads a broad field for local physical filtering", async () => {
@@ -100,7 +100,7 @@ test("loads a broad field for local physical filtering", async () => {
     },
   });
 
-  expect(result).toMatchObject({ planets: [{ id: "hip-65426-b" }] });
+  expect(result).toMatchObject({ planets: [{ id: featuredPlanet.id }] });
 });
 
 test("chooses a renderable surprise planet from a curated archive result", async () => {
@@ -120,7 +120,7 @@ test("chooses a renderable surprise planet from a curated archive result", async
     },
   });
 
-  expect(result).toMatchObject({ cached: true, planet: { id: "hip-65426-b" } });
+  expect(result).toMatchObject({ cached: true, planet: { id: featuredPlanet.id } });
 });
 
 const starPayload = {
