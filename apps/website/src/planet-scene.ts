@@ -2580,8 +2580,11 @@ export const createPlanetExperience = ({
         }
         rig.position.y += VIEWING_DECK_POSITION.y - (rig.position.y - eyeHeight);
       }
-      xrConsole?.update(deltaSeconds);
     }
+    // Console placement is driven by the XR camera itself, not by the optional locomotion rig.
+    // Keeping this outside the rig guard guarantees its summon animation and delayed head-pose
+    // anchor continue on browsers that expose the rig a frame or two late.
+    if (isInXr) xrConsole?.update(deltaSeconds);
 
     if (qualitySampleSeconds >= 3) {
       qualitySampleSeconds = 0;
