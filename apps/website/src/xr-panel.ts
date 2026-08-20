@@ -5,10 +5,12 @@
  * the headset takes over and the panel becomes the whole interface. Two things matter for it to
  * feel like part of the world rather than a sticker on the visor:
  *
- * - it is **head-locked**. The panel keeps a constant centred pose from the XR headset camera,
- *   so walking, turning, and teleporting never leave it behind or trigger visible recall jumps.
+ * - it **follows the head but not its pitch**. The panel tracks the wearer's position and yaw, so
+ *   walking, turning, and teleporting never leave it behind or trigger visible recall jumps, but it
+ *   rests below the horizon the way the Quest system keyboard does: clear of the forward view, and
+ *   brought into focus by glancing down. `xr-hud-pose.ts` works out the pose.
  * - it is **summoned**, not permanent. A face button (or the pad on the wearer's wrist) recalls it
- *   to the centre of the view and dismisses it again, which keeps a viewing session unobstructed.
+ *   below the wearer's gaze and dismisses it again, which keeps a viewing session unobstructed.
  *
  * Everything is drawn from core primitives — one canvas texture on one plane — so no
  * `@babylonjs/gui` dependency is pulled into the bundle, and a controller ray picks entries by
@@ -34,6 +36,7 @@ import type { WebXRDefaultExperience } from "@babylonjs/core/XR/webXRDefaultExpe
 import type { WebXRInputSource } from "@babylonjs/core/XR/webXRInputSource.js";
 import type { WebXRAbstractMotionController } from "@babylonjs/core/XR/motionController/webXRAbstractMotionController.js";
 import type { Scene } from "@babylonjs/core/scene.js";
+import { hudPose } from "./xr-hud-pose.ts";
 import {
   hitTestPanel,
   layoutPanel,
@@ -48,8 +51,6 @@ import {
 const PANEL_SIZE = { height: 1.15, width: 0.92 };
 /** Supersampling keeps text and fine rules crisp once the panel is angled in the headset. */
 const PANEL_TEXTURE_SCALE = 2;
-/** Camera-local placement: dead centre of the view, at the focal centre and within controller reach. */
-const HUD_POSITION = new Vector3(0, 0, 1.55);
 const OPEN_SECONDS = 0.16;
 /** Drawn after the world so the console always reads, whatever it happens to be floating over. */
 const PANEL_RENDERING_GROUP = 2;
@@ -462,13 +463,13 @@ export interface XrPanel {
   dispose: () => void;
   hide: () => void;
   isVisible: () => boolean;
-  /** Restores the panel's fixed centred camera placement without changing what it shows. */
+  /** Restores the panel's fixed placement below the gaze without changing what it shows. */
   recall: () => void;
   setView: (view: XrPanelView) => void;
-  /** Shows the panel in the centre of the wearer's view. */
+  /** Shows the panel below the wearer's gaze, centred on where they are facing. */
   summon: () => void;
   toggle: () => void;
-  /** Maintains the head-locked placement and runs the open animation. */
+  /** Maintains the placement below the gaze and runs the open animation. */
   update: (deltaSeconds: number) => void;
 }
 
@@ -611,8 +612,9 @@ export const createXrPanel = (scene: Scene, anisotropy = 4): XrPanel => {
   let camera: WebXRCamera | null = null;
   const eyePosition = new Vector3();
   const headForward = new Vector3();
-  const headRight = new Vector3();
   const headUp = new Vector3();
+  const lookDirection = new Vector3();
+  const panelUp = new Vector3();
 
   const placeHud = (): void => {
     if (!camera) return;
@@ -627,14 +629,13 @@ export const createXrPanel = (scene: Scene, anisotropy = 4): XrPanel => {
     }
 
     headForward.copyFrom(poseCamera.getDirection(Axis.Z)).normalize();
-    headRight.copyFrom(poseCamera.getDirection(Axis.X)).normalize();
     headUp.copyFrom(poseCamera.getDirection(Axis.Y)).normalize();
-    root.position
-      .copyFrom(eyePosition)
-      .addInPlace(headRight.scale(HUD_POSITION.x))
-      .addInPlace(headUp.scale(HUD_POSITION.y))
-      .addInPlace(headForward.scale(HUD_POSITION.z));
-    Quaternion.FromLookDirectionLHToRef(headForward.negate(), headUp, orientation);
+
+    const pose = hudPose(eyePosition, headForward, headUp);
+    root.position.set(pose.position.x, pose.position.y, pose.position.z);
+    lookDirection.set(pose.look.x, pose.look.y, pose.look.z);
+    panelUp.set(pose.up.x, pose.up.y, pose.up.z);
+    Quaternion.FromLookDirectionLHToRef(lookDirection, panelUp, orientation);
     root.rotationQuaternion = orientation;
   };
 
