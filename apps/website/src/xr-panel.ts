@@ -5,11 +5,10 @@
  * the headset takes over and the panel becomes the whole interface. Two things matter for it to
  * feel like part of the world rather than a sticker on the visor:
  *
- * - it is **world-locked**. Summoning it drops it in front of the wearer once; after that it stays
- *   where it was left, so looking at the planet means looking away from the panel instead of
- *   dragging it across the view.
+ * - it is **head-locked**. The panel keeps a constant lower-left pose from the XR headset camera,
+ *   so walking, turning, and teleporting never leave it behind or trigger visible recall jumps.
  * - it is **summoned**, not permanent. A face button (or the pad on the wearer's wrist) recalls it
- *   to arm's length and dismisses it again, which is what keeps a viewing session unobstructed.
+ *   to the lower-left and dismisses it again, which keeps a viewing session unobstructed.
  *
  * Everything is drawn from core primitives — one canvas texture on one plane — so no
  * `@babylonjs/gui` dependency is pulled into the bundle, and a controller ray picks entries by
@@ -22,8 +21,8 @@ import { DynamicTexture } from "@babylonjs/core/Materials/Textures/dynamicTextur
 import { Texture } from "@babylonjs/core/Materials/Textures/texture.js";
 import { StandardMaterial } from "@babylonjs/core/Materials/standardMaterial.js";
 import { Color3 } from "@babylonjs/core/Maths/math.color.js";
-import { Quaternion, Vector3 } from "@babylonjs/core/Maths/math.vector.js";
 import { Axis } from "@babylonjs/core/Maths/math.axis.js";
+import { Quaternion, Vector3 } from "@babylonjs/core/Maths/math.vector.js";
 import type { Mesh } from "@babylonjs/core/Meshes/mesh.js";
 import { MeshBuilder } from "@babylonjs/core/Meshes/meshBuilder.js";
 import { TransformNode } from "@babylonjs/core/Meshes/transformNode.js";
@@ -49,20 +48,8 @@ import {
 const PANEL_SIZE = { height: 1.15, width: 0.92 };
 /** Supersampling keeps text and fine rules crisp once the panel is angled in the headset. */
 const PANEL_TEXTURE_SCALE = 2;
-/** How far from the wearer a summoned panel lands. */
-const SUMMON_DISTANCE = 1.55;
-/** How far below eye level it lands, which keeps it comfortably inside a controller ray. */
-const SUMMON_DROP = 0.52;
-/**
- * The console opens to the wearer's left instead of on the optical axis. It remains world-locked
- * after that one placement, so the planet or star stays unobstructed without putting the panel
- * outside the headset's forward field of view.
- */
-const SUMMON_YAW = -Math.PI * 0.16;
-/** Past this the panel has been walked away from and is recalled within reach. */
-const ABANDON_DISTANCE = 5;
-/** The panel stays world-locked until it leaves the useful horizontal field of view. */
-const RECALL_ANGLE = Math.PI * 0.25;
+/** Camera-local placement: lower-left, below the focal centre, and within controller reach. */
+const HUD_POSITION = new Vector3(-0.68, -0.5, 1.55);
 const OPEN_SECONDS = 0.16;
 /** Drawn after the world so the console always reads, whatever it happens to be floating over. */
 const PANEL_RENDERING_GROUP = 2;
@@ -470,18 +457,18 @@ const paintChrome = (context: CanvasRenderingContext2D, view: XrPanelView): void
 };
 
 export interface XrPanel {
-  /** Wires controller buttons, the wrist pad, and the head pose the panel anchors against. */
+  /** Wires controller buttons, the wrist pad, and the headset camera the panel is fixed to. */
   attach: (xr: WebXRDefaultExperience) => void;
   dispose: () => void;
   hide: () => void;
   isVisible: () => boolean;
-  /** Moves an open panel back within reach without changing what it shows. */
+  /** Restores the panel's fixed lower-left camera placement without changing what it shows. */
   recall: () => void;
   setView: (view: XrPanelView) => void;
-  /** Shows the panel and re-anchors it at arm's length in front of the wearer. */
+  /** Shows the panel in the lower-left of the wearer's view. */
   summon: () => void;
   toggle: () => void;
-  /** Runs the open animation and drops the panel if it has been walked away from. */
+  /** Maintains the head-locked placement and runs the open animation. */
   update: (deltaSeconds: number) => void;
 }
 
@@ -550,12 +537,6 @@ export const createXrPanel = (scene: Scene, anisotropy = 4): XrPanel => {
   let hovered: XrCell | null = null;
   let openProgress = 0;
   let visible = false;
-  /**
-   * Frames to wait before reading the head pose. Teleporting the rig (entering a session,
-   * recentring, swapping view) only reaches the camera's world matrix on a later frame, so
-   * anchoring immediately would leave the panel behind at the wearer's previous position.
-   */
-  let pendingFrames = 0;
 
   const paint = (view: XrPanelView): void => {
     paintChrome(context, view);
@@ -618,7 +599,9 @@ export const createXrPanel = (scene: Scene, anisotropy = 4): XrPanel => {
       }
       return;
     }
-    if (info.type !== PointerEventTypes.POINTERPICK) return;
+    // Babylon's WebXR controller selection simulates POINTERDOWN on trigger press. POINTERPICK is
+    // a browser-style click event and is not consistently emitted by Quest Browser.
+    if (info.type !== PointerEventTypes.POINTERDOWN) return;
     const hit = resolve(info);
     if (!hit) return;
     pulse(0.35, 26);
@@ -626,78 +609,39 @@ export const createXrPanel = (scene: Scene, anisotropy = 4): XrPanel => {
   });
 
   let camera: WebXRCamera | null = null;
-  const anchorPosition = new Vector3();
   const eyePosition = new Vector3();
-  const eyeForward = new Vector3();
+  const headForward = new Vector3();
+  const headRight = new Vector3();
+  const headUp = new Vector3();
 
-  /**
-   * Reads where the wearer's eyes actually are.
-   *
-   * The rig camera is the one the frame is rendered from. Its parent — the `WebXRCamera` — is
-   * the rig's own idea of where it stands, and the two only agree while the reference space
-   * offset a teleport asks for is honoured. Anchoring against the eyes keeps the panel in front
-   * of the wearer either way.
-   */
-  const readEye = (): boolean => {
-    if (!camera) return false;
+  const placeHud = (): void => {
+    if (!camera) return;
     const eyes = camera.rigCameras;
+    const poseCamera = eyes[0] ?? camera;
     if (eyes.length === 0) {
       eyePosition.copyFrom(camera.globalPosition);
-      eyeForward.copyFrom(camera.getDirection(Axis.Z));
-      return true;
+    } else {
+      eyePosition.setAll(0);
+      for (const eye of eyes) eyePosition.addInPlace(eye.globalPosition);
+      eyePosition.scaleInPlace(1 / eyes.length);
     }
-    eyePosition.setAll(0);
-    for (const eye of eyes) eyePosition.addInPlace(eye.globalPosition);
-    eyePosition.scaleInPlace(1 / eyes.length);
-    eyeForward.copyFrom((eyes[0] ?? camera).getDirection(Axis.Z));
-    return true;
-  };
 
-  const anchor = (): void => {
-    if (!readEye()) return;
-    const flat = new Vector3(eyeForward.x, 0, eyeForward.z);
-    if (flat.lengthSquared() < 1e-4) flat.set(0, 0, 1);
-    flat.normalize();
-
-    const right = new Vector3(flat.z, 0, -flat.x);
-    const summonDirection = flat
-      .scale(Math.cos(SUMMON_YAW))
-      .addInPlace(right.scale(Math.sin(SUMMON_YAW)))
-      .normalize();
-
-    anchorPosition.set(
-      eyePosition.x + summonDirection.x * SUMMON_DISTANCE,
-      eyePosition.y - SUMMON_DROP,
-      eyePosition.z + summonDirection.z * SUMMON_DISTANCE,
-    );
-    root.position.copyFrom(anchorPosition);
-
-    // A Babylon plane faces its own -Z, and `FromLookDirectionLH` puts +Z opposite the direction
-    // it is given, so handing it the direction back towards the wearer turns the front face —
-    // and the texture, unmirrored — squarely towards the eyes. The up vector has to be made
-    // orthogonal to that direction or the basis comes out skewed, which is what tilts the panel
-    // back to meet a gaze aimed below eye level.
-    const toViewer = eyePosition.subtract(anchorPosition).normalize();
-    const upright = Vector3.UpReadOnly.subtract(
-      toViewer.scale(Vector3.Dot(Vector3.UpReadOnly, toViewer)),
-    );
-    if (upright.lengthSquared() < 1e-4) upright.copyFrom(Vector3.UpReadOnly);
-    upright.normalize();
-    Quaternion.FromLookDirectionLHToRef(toViewer, upright, orientation);
+    headForward.copyFrom(poseCamera.getDirection(Axis.Z)).normalize();
+    headRight.copyFrom(poseCamera.getDirection(Axis.X)).normalize();
+    headUp.copyFrom(poseCamera.getDirection(Axis.Y)).normalize();
+    root.position
+      .copyFrom(eyePosition)
+      .addInPlace(headRight.scale(HUD_POSITION.x))
+      .addInPlace(headUp.scale(HUD_POSITION.y))
+      .addInPlace(headForward.scale(HUD_POSITION.z));
+    Quaternion.FromLookDirectionLHToRef(headForward.negate(), headUp, orientation);
     root.rotationQuaternion = orientation;
   };
 
   const summon = (): void => {
     visible = true;
-    // Put the panel somewhere useful immediately. In a real headset the first stable eye pose
-    // arrives over the next couple of frames, but waiting for that pose while the material is
-    // transparent made the console disappear forever whenever a browser briefly withheld its XR
-    // rig camera (notably Quest Browser and IWER). Keep the material fully opaque throughout the
-    // scale-in animation; the delayed anchors below still refine the world-locked placement once
-    // tracking has settled.
-    anchor();
+    placeHud();
     openProgress = 0.35;
-    pendingFrames = 2;
     hovered = null;
     highlight.setEnabled(false);
     material.alpha = 1;
@@ -708,9 +652,9 @@ export const createXrPanel = (scene: Scene, anisotropy = 4): XrPanel => {
     pulse(0.25, 20);
   };
 
-  /** Re-anchors an open panel, used when the scene teleports the wearer somewhere else. */
+  /** Restores the fixed HUD transform, used after scene-level view changes. */
   const recall = (): void => {
-    if (visible) pendingFrames = 2;
+    if (visible) placeHud();
   };
 
   const hide = (): void => {
@@ -778,8 +722,7 @@ export const createXrPanel = (scene: Scene, anisotropy = 4): XrPanel => {
     pad.applyFog = false;
     pad.renderingGroupId = PANEL_RENDERING_GROUP;
     pad.setEnabled(!visible);
-    // ActionManager uses Babylon's XR pointer-selection path directly. This is more reliable on
-    // Quest and in IWER than waiting for a browser-style POINTERPICK notification on the scene.
+    // ActionManager uses Babylon's XR pointer-selection path directly for this small summon pad.
     pad.actionManager = new ActionManager(scene);
     pad.actionManager.registerAction(
       new ExecuteCodeAction(ActionManager.OnPickTrigger, () => {
@@ -828,27 +771,11 @@ export const createXrPanel = (scene: Scene, anisotropy = 4): XrPanel => {
 
   const update = (deltaSeconds: number): void => {
     if (!visible) return;
-    if (pendingFrames > 0) {
-      pendingFrames -= 1;
-      if (pendingFrames === 0) anchor();
-      return;
-    }
+    placeHud();
     if (openProgress < 1) {
       openProgress = Math.min(1, openProgress + deltaSeconds / OPEN_SECONDS);
       const eased = openProgress * openProgress * (3 - 2 * openProgress);
       root.scaling.setAll(0.88 + eased * 0.12);
-    }
-    if (!readEye()) return;
-
-    const toPanel = anchorPosition.subtract(eyePosition);
-    const distance = toPanel.length();
-    toPanel.y = 0;
-    const flatForward = new Vector3(eyeForward.x, 0, eyeForward.z);
-    if (toPanel.lengthSquared() > 1e-4 && flatForward.lengthSquared() > 1e-4) {
-      toPanel.normalize();
-      flatForward.normalize();
-      const outsideView = Vector3.Dot(flatForward, toPanel) < Math.cos(RECALL_ANGLE);
-      if (outsideView || distance > ABANDON_DISTANCE) anchor();
     }
   };
 
