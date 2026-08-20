@@ -683,14 +683,20 @@ export const createXrPanel = (scene: Scene, anisotropy = 4): XrPanel => {
 
   const summon = (): void => {
     visible = true;
-    openProgress = 0;
+    // Put the panel somewhere useful immediately. In a real headset the first stable eye pose
+    // arrives over the next couple of frames, but waiting for that pose while the material is
+    // fully transparent made the console disappear forever whenever a browser briefly withheld
+    // its XR rig camera (notably Quest Browser and IWER). The delayed anchors below still refine
+    // the world-locked placement once tracking has settled.
+    anchor();
+    openProgress = 0.35;
     pendingFrames = 2;
     hovered = null;
     highlight.setEnabled(false);
-    material.alpha = 0;
-    highlightMaterial.alpha = 0;
+    material.alpha = 0.35;
+    highlightMaterial.alpha = 0.35 * 0.26;
     root.setEnabled(true);
-    root.scaling.setAll(0.88);
+    root.scaling.setAll(0.92);
     pulse(0.25, 20);
   };
 

@@ -781,8 +781,10 @@ export const createStarScene = ({
         rig.position.z = STAR_DECK_POSITION.z + offsetZ * scale;
       }
       rig.position.y += STAR_DECK_POSITION.y - (rig.position.y - rig.realWorldHeight);
-      xrConsole?.update(deltaSeconds);
     }
+    // The in-world console must keep updating even while a browser is still publishing its
+    // locomotion rig. Its own XR camera pose is sufficient for anchoring and interaction.
+    if (isInXr) xrConsole?.update(deltaSeconds);
 
     if (qualitySampleSeconds >= 3) {
       qualitySampleSeconds = 0;
