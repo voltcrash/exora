@@ -1,4 +1,5 @@
-import type { ExoplanetProfile } from "@exora/contracts";
+import type { ExoplanetProfile, StarProfile } from "@exora/contracts";
+import type { CustomStar, CustomWorld } from "@exora/worldgen";
 import { useEffect, useRef, useState } from "react";
 import { loadPlanetsByHost, type StarLoadResult } from "../api-client.ts";
 import type { StarSceneExperience } from "../star-scene.ts";
@@ -9,10 +10,13 @@ import { clearVrHandoff, consumeVrHandoff } from "../xr-session.ts";
 import type { XrStatus } from "../planet-scene.ts";
 
 interface StarExperienceProps {
+  onGeneratePlanet: (world: CustomWorld) => void;
+  onGenerateStar: (star: CustomStar) => void;
   onOpenBuilder: () => void;
   onOpenPlanets: () => void;
   onOpenStars: () => void;
   onSelectPlanet: (planet: ExoplanetProfile, cached: boolean) => void;
+  onSelectStar: (star: StarProfile, cached: boolean) => void;
   result: StarLoadResult;
   systemHostName: string | null;
 }
@@ -26,10 +30,13 @@ const xrCopy: Record<XrStatus, { button: string; label: string }> = {
 };
 
 export const StarExperience = ({
+  onGeneratePlanet,
+  onGenerateStar,
   onOpenBuilder,
   onOpenPlanets,
   onOpenStars,
   onSelectPlanet,
+  onSelectStar,
   result,
   systemHostName,
 }: StarExperienceProps) => {
@@ -106,6 +113,12 @@ export const StarExperience = ({
         createStarScene({
           canvas,
           star,
+          // The console inside the headset can travel anywhere the browser catalog can, so the
+          // same selection handlers the DOM dialogs use are handed to the scene.
+          onSelectPlanet: (destination) => onSelectPlanet(destination, false),
+          onSelectStar: (destination) => onSelectStar(destination, false),
+          onForgeWorld: onGeneratePlanet,
+          onForgeStar: onGenerateStar,
           onFirstFrame: () => {
             if (!disposed) setSceneState("ready");
           },
@@ -134,7 +147,7 @@ export const StarExperience = ({
       experienceRef.current?.dispose();
       experienceRef.current = null;
     };
-  }, [star]);
+  }, [onGeneratePlanet, onGenerateStar, onSelectPlanet, onSelectStar, star]);
 
   return (
     <div

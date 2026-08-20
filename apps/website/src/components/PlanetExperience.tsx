@@ -1,4 +1,10 @@
-import { deriveWorldRecipe, type WorldRecipe } from "@exora/worldgen";
+import type { ExoplanetProfile, StarProfile } from "@exora/contracts";
+import {
+  deriveWorldRecipe,
+  type CustomStar,
+  type CustomWorld,
+  type WorldRecipe,
+} from "@exora/worldgen";
 import { useEffect, useMemo, useRef, useState } from "react";
 import type { PlanetLoadResult } from "../api-client.ts";
 import type { PlanetExperience as BabylonExperience, ViewMode, XrStatus } from "../planet-scene.ts";
@@ -7,10 +13,14 @@ import { isXrEmulated } from "../xr-emulator.ts";
 import { clearVrHandoff, consumeVrHandoff } from "../xr-session.ts";
 
 interface PlanetExperienceProps {
+  onGeneratePlanet: (world: CustomWorld) => void;
+  onGenerateStar: (star: CustomStar) => void;
   onOpenCatalog: () => void;
   onOpenBuilder: () => void;
   onOpenStars: () => void;
   onSelectHostStar: (hostStar: string) => Promise<boolean>;
+  onSelectPlanet: (planet: ExoplanetProfile, cached: boolean) => void;
+  onSelectStar: (star: StarProfile, cached: boolean) => void;
   recipeOverride: WorldRecipe | null;
   result: PlanetLoadResult;
 }
@@ -24,10 +34,14 @@ const xrCopy: Record<XrStatus, { button: string; label: string }> = {
 };
 
 export const PlanetExperience = ({
+  onGeneratePlanet,
+  onGenerateStar,
   onOpenBuilder,
   onOpenCatalog,
   onOpenStars,
   onSelectHostStar,
+  onSelectPlanet,
+  onSelectStar,
   recipeOverride,
   result,
 }: PlanetExperienceProps) => {
@@ -79,10 +93,17 @@ export const PlanetExperience = ({
       .then(({ createPlanetExperience }) =>
         createPlanetExperience({
           canvas,
+          planet,
           recipe,
           onViewModeChange: setViewMode,
           onXrStatusChange: setXrStatus,
           onSelectHostStar: result.mode === "custom" ? undefined : () => void openHostStar(),
+          // The console inside the headset can travel anywhere the browser catalog can, so the
+          // same selection handlers the DOM dialogs use are handed to the scene.
+          onSelectPlanet: (destination) => onSelectPlanet(destination, false),
+          onSelectStar: (destination) => onSelectStar(destination, false),
+          onForgeWorld: onGeneratePlanet,
+          onForgeStar: onGenerateStar,
           onFirstFrame: () => {
             if (!disposed) setSceneState("ready");
           },
@@ -111,7 +132,16 @@ export const PlanetExperience = ({
       experienceRef.current?.dispose();
       experienceRef.current = null;
     };
-  }, [planet.id, recipe, result.mode, onSelectHostStar]);
+  }, [
+    onGeneratePlanet,
+    onGenerateStar,
+    onSelectHostStar,
+    onSelectPlanet,
+    onSelectStar,
+    planet,
+    recipe,
+    result.mode,
+  ]);
 
   const massUnit =
     observation.massJupiter !== null ? (
