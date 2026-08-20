@@ -1,8 +1,6 @@
-import { ArcRotateCamera } from "@babylonjs/core/Cameras/arcRotateCamera.js";
 import { ActionManager } from "@babylonjs/core/Actions/actionManager.js";
 import "@babylonjs/core/Culling/ray.js";
 import { ExecuteCodeAction } from "@babylonjs/core/Actions/directActions.js";
-import { Engine } from "@babylonjs/core/Engines/engine.js";
 import { GlowLayer } from "@babylonjs/core/Layers/glowLayer.js";
 import { Color3, Color4 } from "@babylonjs/core/Maths/math.color.js";
 import { Vector3 } from "@babylonjs/core/Maths/math.vector.js";
@@ -10,105 +8,60 @@ import { StandardMaterial } from "@babylonjs/core/Materials/standardMaterial.js"
 import { MeshBuilder } from "@babylonjs/core/Meshes/meshBuilder.js";
 import { TransformNode } from "@babylonjs/core/Meshes/transformNode.js";
 import "@babylonjs/core/Meshes/instancedMesh.js";
-import { Scene, ScenePerformancePriority } from "@babylonjs/core/scene.js";
-import type { WebXRCamera } from "@babylonjs/core/XR/webXRCamera.js";
-import { WebXRDefaultExperience } from "@babylonjs/core/XR/webXRDefaultExperience.js";
-import "@babylonjs/core/XR/features/WebXRControllerMovement.js";
-import "@babylonjs/core/XR/features/WebXRControllerPointerSelection.js";
-import "@babylonjs/core/XR/features/WebXRHandTracking.js";
-import { WebXRFeatureName } from "@babylonjs/core/XR/webXRFeaturesManager.js";
-import { WebXRState } from "@babylonjs/core/XR/webXRTypes.js";
 import type { ExoplanetProfile, StarProfile } from "@exora/contracts";
 import { deriveStarRecipe, type CustomStar, type CustomWorld } from "@exora/worldgen";
-import {
-  adaptFixedFoveation,
-  deriveRenderQuality,
-  type RenderQualityTier,
-} from "./render-quality.ts";
-import type { XrStatus } from "./planet-scene.ts";
+import type { MountedWorld, SceneHost, WorldConsole } from "./scene-host.ts";
 import { createStellarSurface } from "./star-surface.ts";
 import { starKindLabel, starSummary } from "./star-utils.ts";
 import { createStarfield } from "./star-visuals.ts";
-import { createXrConsole, type XrConsole, type XrConsoleHost } from "./xr-console.ts";
 import { starFacts } from "./xr-console-model.ts";
 import type { XrCell } from "./xr-panel-layout.ts";
-import { requestVrHandoff } from "./xr-session.ts";
 
 const STAR_POSITION = new Vector3(0, 0.8, 7.5);
 /** Initial immersive viewpoint, parked outside the widest planetary orbit in the system. */
 const XR_STAR_STAND = new Vector3(0, 0, -9);
-const XR_MOVE_SPEED = 2.2;
 
-export interface StarSceneExperience {
-  dispose: () => void;
-  enterVr: () => Promise<void>;
-  getFps: () => number;
-  qualityTier: RenderQualityTier;
+export interface StarWorld extends MountedWorld {
   setPlanetTargets: (
     planets: readonly ExoplanetProfile[],
     onSelectPlanet: (planet: ExoplanetProfile) => void,
   ) => void;
 }
 
-interface StarSceneOptions {
-  canvas: HTMLCanvasElement;
+interface StarWorldOptions {
   onFirstFrame: () => void;
   /** Immersive-only travel, so a wearer can leave for anywhere without removing the headset. */
   onForgeStar?: (star: CustomStar) => void;
   onForgeWorld?: (world: CustomWorld) => void;
   onSelectPlanet?: (planet: ExoplanetProfile) => void;
   onSelectStar?: (star: StarProfile) => void;
-  onXrStatusChange: (status: XrStatus) => void;
   star: StarProfile;
 }
 
-export const createStarScene = ({
-  canvas,
-  onFirstFrame,
-  onForgeStar,
-  onForgeWorld,
-  onSelectPlanet,
-  onSelectStar,
-  onXrStatusChange,
-  star,
-}: StarSceneOptions): StarSceneExperience => {
-  const deviceNavigator = window.navigator as Navigator & { deviceMemory?: number };
-  const profile = deriveRenderQuality({
-    userAgent: deviceNavigator.userAgent,
-    pixelRatio: window.devicePixelRatio,
-    hardwareConcurrency: deviceNavigator.hardwareConcurrency,
-    deviceMemory: deviceNavigator.deviceMemory,
-  });
-  const engine = new Engine(canvas, profile.tier === "desktop", {
-    antialias: profile.tier === "desktop",
-    preserveDrawingBuffer: false,
-    stencil: false,
-  });
-  engine.setHardwareScalingLevel(profile.hardwareScalingLevel);
-  const scene = new Scene(engine);
-  scene.clearColor = new Color4(0.001, 0.002, 0.006, 1);
-  scene.performancePriority = ScenePerformancePriority.Intermediate;
-  // The intermediate priority also turns off the colour clear, which leaves each eye smearing
-  // the previous frame in an immersive session. Nothing here paints every pixel, so clear.
-  scene.autoClear = true;
-  scene.skipPointerMovePicking = true;
+/**
+ * Builds a star into the shared scene.
+ *
+ * Like the planet world, everything here is built synchronously so the host's world scope can
+ * tell precisely what was added. The system's known worlds arrive later over the network, so
+ * those orbits are the one part this module has to take back out itself.
+ */
+export const createStarWorld = (
+  host: SceneHost,
+  { onFirstFrame, onForgeStar, onForgeWorld, onSelectPlanet, onSelectStar, star }: StarWorldOptions,
+): StarWorld => {
+  const { camera, canvas, engine, profile, scene } = host;
 
-  const camera = new ArcRotateCamera(
-    "stellar-camera",
-    -Math.PI / 2,
-    Math.PI / 2.08,
-    15.5,
-    STAR_POSITION.clone(),
-    scene,
-  );
+  scene.clearColor = new Color4(0.001, 0.002, 0.006, 1);
+
   camera.lowerRadiusLimit = 9.5;
   camera.upperRadiusLimit = 24;
   camera.lowerBetaLimit = 0.45;
   camera.upperBetaLimit = Math.PI - 0.45;
-  camera.wheelDeltaPercentage = 0.018;
-  camera.pinchDeltaPercentage = 0.008;
-  camera.inertia = 0.82;
-  camera.attachControl(canvas, true);
+  camera.alpha = -Math.PI / 2;
+  camera.beta = Math.PI / 2.08;
+  camera.radius = 15.5;
+  camera.setTarget(STAR_POSITION.clone());
+  if (!host.isInXr()) camera.attachControl(canvas, true);
 
   const recipe = deriveStarRecipe(star);
   const seed = recipe.seed;
@@ -140,20 +93,32 @@ export const createStarScene = ({
   glow.addIncludedOnlyMesh(starMesh);
 
   let planetTargetRoots: TransformNode[] = [];
+  let planetTargetManagers: ActionManager[] = [];
   let menuPlanets: readonly ExoplanetProfile[] = [];
   let selectPlanet: ((planet: ExoplanetProfile) => void) | null = null;
+
+  /**
+   * The system's known worlds, drawn as orbits around the star.
+   *
+   * These land after the host's world scope has closed, because the archive query that finds
+   * them is a network round trip, so this is the one part of the star world that has to be
+   * disposed by hand rather than swept up with the rest.
+   */
+  const clearPlanetTargets = (): void => {
+    for (const manager of planetTargetManagers) manager.dispose();
+    for (const root of planetTargetRoots) root.dispose(false, true);
+    planetTargetManagers = [];
+    planetTargetRoots = [];
+  };
+
   const setPlanetTargets = (
     planets: readonly ExoplanetProfile[],
-    onSelectPlanet: (planet: ExoplanetProfile) => void,
+    onSelect: (planet: ExoplanetProfile) => void,
   ): void => {
     menuPlanets = planets;
-    // Picking a world in-scene rebuilds the renderer, so an active session is handed over.
-    selectPlanet = (planet: ExoplanetProfile): void => {
-      if (isInXr) requestVrHandoff();
-      onSelectPlanet(planet);
-    };
-    refreshXrConsole();
-    for (const root of planetTargetRoots) root.dispose(false, true);
+    selectPlanet = onSelect;
+    host.refreshConsole();
+    clearPlanetTargets();
     planetTargetRoots = planets.slice(0, 8).map((planet, index) => {
       const root = new TransformNode(`system-world-orbit-${planet.id}`, scene);
       root.position.copyFrom(starMesh.position);
@@ -214,10 +179,12 @@ export const createStarScene = ({
       pointerTarget.material = pointerMaterial;
 
       for (const target of [world, pointerTarget]) {
-        target.actionManager = new ActionManager(scene);
-        target.actionManager.registerAction(
+        const manager = new ActionManager(scene);
+        manager.registerAction(
           new ExecuteCodeAction(ActionManager.OnPickTrigger, () => selectPlanet?.(planet)),
         );
+        target.actionManager = manager;
+        planetTargetManagers.push(manager);
       }
       root.rotation.y = (index / Math.max(1, planets.length)) * Math.PI * 2;
       return root;
@@ -225,60 +192,19 @@ export const createStarScene = ({
   };
 
   let elapsed = 0;
-  let qualitySampleSeconds = 0;
-  let firstFrame = true;
-  scene.onBeforeRenderObservable.add(() => {
+  const renderObserver = scene.onBeforeRenderObservable.add(() => {
     const deltaSeconds = Math.min(engine.getDeltaTime() / 1_000, 0.05);
     elapsed += deltaSeconds;
-    qualitySampleSeconds += deltaSeconds;
     const activeCameraPosition = scene.activeCamera?.globalPosition ?? camera.globalPosition;
     stellarSurface.update(elapsed, activeCameraPosition);
     starfield.update(elapsed, activeCameraPosition);
     for (let index = 0; index < planetTargetRoots.length; index += 1) {
       const root = planetTargetRoots[index];
-      if (root) root.rotation.y += ((0.025 + index * 0.004) * engine.getDeltaTime()) / 1_000;
-    }
-
-    // Locomotion owns the XR rig after entry; rewriting it per frame causes room-scale snap-back.
-    if (isInXr) xrConsole?.update(deltaSeconds);
-
-    if (qualitySampleSeconds >= 3) {
-      qualitySampleSeconds = 0;
-      if (isInXr) adaptSessionFoveation(engine.getFps());
+      if (root) root.rotation.y += (0.025 + index * 0.004) * deltaSeconds;
     }
   });
-  engine.runRenderLoop(() => {
-    scene.render();
-    if (firstFrame) {
-      firstFrame = false;
-      onFirstFrame();
-    }
-  });
-  const resize = (): void => engine.resize();
-  window.addEventListener("resize", resize);
 
-  let xr: WebXRDefaultExperience | null = null;
-  let xrConsole: XrConsole | null = null;
-  let isInXr = false;
-  let vrSupported = false;
-  let disposed = false;
-
-  const xrCamera = (): WebXRCamera | null => xr?.baseExperience.camera ?? null;
-
-  let sessionFoveation = profile.xrFixedFoveation;
-
-  /**
-   * Trades peripheral sharpness for frame rate while the headset is on, since canvas
-   * resolution is fixed for the lifetime of an immersive session.
-   */
-  const adaptSessionFoveation = (fps: number): void => {
-    const sessionManager = xr?.baseExperience.sessionManager;
-    if (!sessionManager?.isFixedFoveationSupported) return;
-    const next = adaptFixedFoveation(sessionFoveation, fps, profile);
-    if (next === sessionFoveation) return;
-    sessionFoveation = next;
-    sessionManager.fixedFoveation = next;
-  };
+  const firstFrameObserver = scene.onAfterRenderObservable.addOnce(onFirstFrame);
 
   /**
    * Puts the wearer at the initial orbital viewpoint facing the star.
@@ -287,7 +213,7 @@ export const createStarScene = ({
    * sparse means staring at empty starfield with no clue that anything rendered at all.
    */
   const placeXrCamera = (initial: boolean): void => {
-    const rig = xrCamera();
+    const rig = host.xrCamera();
     if (!rig) return;
     const headOffset = initial ? 0 : rig.realWorldHeight;
     rig.position.set(XR_STAR_STAND.x, XR_STAR_STAND.y + headOffset, XR_STAR_STAND.z);
@@ -320,22 +246,12 @@ export const createStarScene = ({
     return actions;
   };
 
-  // Travelling anywhere rebuilds the renderer, so an active session is handed over rather than
-  // dropping the wearer back into the flat page.
-  const handOver = <Argument>(travel: (argument: Argument) => void) => {
-    return (argument: Argument): void => {
-      if (isInXr) requestVrHandoff();
-      travel(argument);
-    };
-  };
-
-  const consoleHost: XrConsoleHost = {
+  const consoleContributions: WorldConsole = {
     facts: () => starFacts(star),
-    onExit: () => void xr?.baseExperience.exitXRAsync(),
-    onForgePlanet: onForgeWorld ? handOver(onForgeWorld) : undefined,
-    onForgeStar: onForgeStar ? handOver(onForgeStar) : undefined,
-    onTravelPlanet: onSelectPlanet ? handOver(onSelectPlanet) : undefined,
-    onTravelStar: onSelectStar ? handOver(onSelectStar) : undefined,
+    onForgePlanet: onForgeWorld,
+    onForgeStar,
+    onTravelPlanet: onSelectPlanet,
+    onTravelStar: onSelectStar,
     sceneActions: buildSceneActions,
     source: () => `${star.source.archive} · ${star.source.retrievedOn}`,
     subtitle: () => `${starKindLabel(star)} · orbital view`,
@@ -343,95 +259,18 @@ export const createStarScene = ({
     title: () => star.name,
   };
 
-  const refreshXrConsole = (): void => xrConsole?.refresh();
-
-  onXrStatusChange("checking");
-  void WebXRDefaultExperience.CreateAsync(scene, {
-    disableDefaultUI: true,
-    disableNearInteraction: true,
-    disableTeleportation: true,
-    // The rigged hand mesh is a remote glTF and no loader is bundled, so joint spheres are used.
-    handSupportOptions: { handMeshes: { disableDefaultMeshes: true } },
-    inputOptions: { doNotLoadControllerMeshes: true },
-    optionalFeatures: ["hand-tracking"],
-    outputCanvasOptions: {
-      canvasOptions: {
-        // Quest 2's compositor is unreliable with an explicitly opaque WebGL layer. Babylon's
-        // compatible default is alpha-enabled; the scene still clears to opaque black each frame.
-        alpha: true,
-        antialias: false,
-        depth: true,
-        stencil: false,
-        framebufferScaleFactor: profile.xrFramebufferScaleFactor,
-      },
-    },
-  })
-    .then(async (createdXr) => {
-      if (disposed) return createdXr.dispose();
-      xr = createdXr;
-      createdXr.baseExperience.featuresManager.enableFeature(WebXRFeatureName.MOVEMENT, "latest", {
-        movementEnabled: true,
-        movementOrientationFollowsController: false,
-        movementOrientationFollowsViewerPose: true,
-        movementSpeed: XR_MOVE_SPEED,
-        movementThreshold: 0.16,
-        rotationEnabled: true,
-        rotationSpeed: 0.42,
-        rotationThreshold: 0.18,
-        xrInput: createdXr.input,
-      });
-
-      xrConsole = createXrConsole(scene, consoleHost, profile.anisotropicFiltering);
-      xrConsole.attach(createdXr);
-
-      createdXr.baseExperience.onInitialXRPoseSetObservable.add(() => placeXrCamera(true));
-      createdXr.baseExperience.onStateChangedObservable.add((state) => {
-        if (disposed) return;
-        if (state === WebXRState.ENTERING_XR) {
-          onXrStatusChange("entering");
-        }
-        if (state === WebXRState.IN_XR) {
-          isInXr = true;
-          sessionFoveation = profile.xrFixedFoveation;
-          if (createdXr.baseExperience.sessionManager.isFixedFoveationSupported) {
-            createdXr.baseExperience.sessionManager.fixedFoveation = sessionFoveation;
-          }
-          xrConsole?.setVisible(true);
-          onXrStatusChange("in-xr");
-        }
-        if (state === WebXRState.NOT_IN_XR) {
-          isInXr = false;
-          xrConsole?.setVisible(false);
-          camera.attachControl(canvas, true);
-          onXrStatusChange(vrSupported ? "ready" : "unavailable");
-        }
-      });
-      vrSupported =
-        await createdXr.baseExperience.sessionManager.isSessionSupportedAsync("immersive-vr");
-      if (!disposed) onXrStatusChange(vrSupported ? "ready" : "unavailable");
-    })
-    .catch(() => {
-      if (!disposed) onXrStatusChange("unavailable");
-    });
-
   return {
-    qualityTier: profile.tier,
+    console: consoleContributions,
     setPlanetTargets,
-    getFps: () => engine.getFps(),
-    enterVr: async () => {
-      if (!xr || !vrSupported) return;
-      await xr.baseExperience.enterXRAsync("immersive-vr", "local-floor", xr.renderTarget);
-    },
+    focusXrRig: placeXrCamera,
+    restoreDesktopView: () => camera.attachControl(canvas, true),
     dispose: () => {
-      if (disposed) return;
-      disposed = true;
-      window.removeEventListener("resize", resize);
-      xrConsole?.dispose();
-      xrConsole = null;
-      xr?.dispose();
-      engine.stopRenderLoop();
-      scene.dispose();
-      engine.dispose();
+      scene.onBeforeRenderObservable.remove(renderObserver);
+      scene.onAfterRenderObservable.remove(firstFrameObserver);
+      clearPlanetTargets();
+      // The glow layer owns render targets rather than scene nodes, so the world scope that
+      // sweeps up the meshes cannot see it.
+      glow.dispose();
     },
   };
 };

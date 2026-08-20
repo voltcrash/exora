@@ -5,14 +5,15 @@ import {
   type CustomWorld,
   type WorldRecipe,
 } from "@exora/worldgen";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import type { PlanetLoadResult } from "../api-client.ts";
-import type { PlanetExperience as BabylonExperience, ViewMode, XrStatus } from "../planet-scene.ts";
+import type { ViewMode } from "../planet-scene.ts";
 import { formatNumber, formatPlanetName } from "../planet-utils.tsx";
+import type { SceneHost, XrStatus } from "../scene-host.ts";
 import { isXrEmulated } from "../xr-emulator.ts";
-import { clearVrHandoff, consumeVrHandoff } from "../xr-session.ts";
 
 interface PlanetExperienceProps {
+  host: SceneHost | null;
   onGeneratePlanet: (world: CustomWorld) => void;
   onGenerateStar: (star: CustomStar) => void;
   onOpenCatalog: () => void;
@@ -34,6 +35,7 @@ const xrCopy: Record<XrStatus, { button: string; label: string }> = {
 };
 
 export const PlanetExperience = ({
+  host,
   onGeneratePlanet,
   onGenerateStar,
   onOpenBuilder,
@@ -45,8 +47,6 @@ export const PlanetExperience = ({
   recipeOverride,
   result,
 }: PlanetExperienceProps) => {
-  const canvasRef = useRef<HTMLCanvasElement>(null);
-  const experienceRef = useRef<BabylonExperience | null>(null);
   const [fps, setFps] = useState("--");
   const [qualityTier, setQualityTier] = useState("AUTO");
   const [sceneState, setSceneState] = useState<"loading" | "ready" | "error">("loading");
@@ -71,68 +71,58 @@ export const PlanetExperience = ({
     document.body.dataset.xrStatus = xrStatus;
   }, [xrStatus]);
 
-  // Travelling between celestial objects rebuilds the renderer and therefore ends the running
-  // session; re-entering as soon as the new scene is ready keeps the headset on.
-  useEffect(() => {
-    if (xrStatus !== "ready" || !consumeVrHandoff()) return;
-    void experienceRef.current?.enterVr().catch(() => clearVrHandoff());
-  }, [xrStatus]);
+  useEffect(() => host?.onXrStatus(setXrStatus), [host]);
 
   useEffect(() => {
-    const canvas = canvasRef.current;
-    if (!canvas) return;
+    if (!host) return;
+    setQualityTier(host.qualityTier.toUpperCase());
+    document.body.dataset.qualityTier = host.qualityTier;
+    const fpsTimer = window.setInterval(() => {
+      setFps(Math.round(host.getFps()).toString());
+    }, 1_000);
+    return () => window.clearInterval(fpsTimer);
+  }, [host]);
 
-    let disposed = false;
-    let fpsTimer: number | undefined;
+  // The world is handed to the shared renderer, which disposes the previous one as it takes
+  // this one. Nothing is torn down when this view unmounts: a running immersive session is
+  // living on that renderer, and the destination replacing this view is what releases it.
+  useEffect(() => {
+    if (!host) return;
+
+    let abandoned = false;
     setSceneState("loading");
-    setXrStatus("checking");
     setViewMode("orbit");
-    setFps("--");
 
     void import("../planet-scene.ts")
-      .then(({ createPlanetExperience }) =>
-        createPlanetExperience({
-          canvas,
-          planet,
-          recipe,
-          onViewModeChange: setViewMode,
-          onXrStatusChange: setXrStatus,
-          onSelectHostStar: result.mode === "custom" ? undefined : () => void openHostStar(),
-          // The console inside the headset can travel anywhere the browser catalog can, so the
-          // same selection handlers the DOM dialogs use are handed to the scene.
-          onSelectPlanet: (destination) => onSelectPlanet(destination, false),
-          onSelectStar: (destination) => onSelectStar(destination, false),
-          onForgeWorld: onGeneratePlanet,
-          onForgeStar: onGenerateStar,
-          onFirstFrame: () => {
-            if (!disposed) setSceneState("ready");
-          },
-        }),
+      .then(({ createPlanetWorld }) =>
+        host.mountWorld(() =>
+          createPlanetWorld(host, {
+            planet,
+            recipe,
+            onViewModeChange: setViewMode,
+            onSelectHostStar: result.mode === "custom" ? undefined : () => void openHostStar(),
+            // The console inside the headset can travel anywhere the browser catalog can, so the
+            // same selection handlers the DOM dialogs use are handed to the scene.
+            onSelectPlanet: (destination) => onSelectPlanet(destination, false),
+            onSelectStar: (destination) => onSelectStar(destination, false),
+            onForgeWorld: onGeneratePlanet,
+            onForgeStar: onGenerateStar,
+            onFirstFrame: () => {
+              if (!abandoned) setSceneState("ready");
+            },
+          }),
+        ),
       )
-      .then((experience) => {
-        if (disposed) {
-          experience.dispose();
-          return;
-        }
-        experienceRef.current = experience;
-        setQualityTier(experience.qualityTier.toUpperCase());
-        document.body.dataset.qualityTier = experience.qualityTier;
-        fpsTimer = window.setInterval(() => {
-          setFps(Math.round(experience.getFps()).toString());
-        }, 1_000);
-      })
       .catch((error: unknown) => {
         console.error(error);
-        if (!disposed) setSceneState("error");
+        if (!abandoned) setSceneState("error");
       });
 
     return () => {
-      disposed = true;
-      if (fpsTimer !== undefined) window.clearInterval(fpsTimer);
-      experienceRef.current?.dispose();
-      experienceRef.current = null;
+      abandoned = true;
     };
   }, [
+    host,
     onGeneratePlanet,
     onGenerateStar,
     onSelectHostStar,
@@ -170,12 +160,6 @@ export const PlanetExperience = ({
     <div
       className={`experience-shell view-${viewMode} ${sceneState === "ready" || sceneState === "error" ? "scene-ready" : ""} ${sceneState === "error" ? "scene-error" : ""}`}
     >
-      <canvas
-        ref={canvasRef}
-        id="render-canvas"
-        aria-label={`Interactive visualization of ${planet.name}`}
-        tabIndex={0}
-      />
       <div className="space-haze" aria-hidden="true" />
       <div className="viewport-grid" aria-hidden="true" />
       <div className="surface-veil" aria-hidden="true" />
@@ -378,7 +362,7 @@ export const PlanetExperience = ({
           className="enter-vr"
           type="button"
           disabled={xrStatus !== "ready"}
-          onClick={() => void experienceRef.current?.enterVr().catch(() => setXrStatus("ready"))}
+          onClick={() => void host?.enterVr().catch((error: unknown) => console.error(error))}
         >
           <span className="button-orbit" aria-hidden="true" />
           <span>

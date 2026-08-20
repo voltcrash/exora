@@ -14,8 +14,10 @@ from a plain LAN HTTP address.
    responds: change view, recentre, travel, and exit.
 6. Walk the surface excursion with the thumbstick and confirm the wearer stays on the terrain.
 7. Exit and re-enter VR, then switch worlds and enter again.
-8. Travel from a world to its host star from inside the headset and confirm the session is
-   handed over rather than dropping back to the flat page.
+8. Travel from a world to its host star from inside the headset, then on to a world in that
+   star's system. The session must never end: the view fades to black, the new object fades in
+   around the wearer, and the headset is never returned to the flat page or the VR entry prompt
+   in between. The panel stays open on the page it was on, now describing the new object.
 9. Leave the experience running for ten minutes to catch thermal throttling or memory growth.
 
 Movement is thumbstick locomotion with smooth turning; teleportation is deliberately off, so a
