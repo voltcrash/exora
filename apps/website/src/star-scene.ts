@@ -74,6 +74,10 @@ uniform vec3 hotColor;
 uniform vec3 spotColor;
 uniform vec3 cameraPosition;
 
+/** How hard the photosphere blows out on screen. Purely a display choice — it never feeds
+ * back into the blackbody colour or into anything the planet renderer lights from. */
+const float STAR_EXPOSURE = 2.0;
+
 float hash13(vec3 p) {
   p = fract(p * 0.1031 + seed * 0.00001357);
   p += dot(p, p.zyx + 31.32);
@@ -119,10 +123,15 @@ vec3 domainWarp(vec3 p, float speed) {
 // Cellular/Voronoi field with per-cell drift: feature points wobble in place over time rather
 // than sliding uniformly, so cells evolve and occasionally reshuffle like real convection
 // granules instead of looking like a texture scrolling underneath the surface.
-vec2 cellular(vec3 p) {
+//
+// Returns (F1, F2, cellHash). F2 - F1 goes to zero exactly on a cell boundary, which is what
+// gives the thin intergranular downflow lanes their shape — a plain F1 distance band would
+// instead draw rings inside each cell.
+vec3 cellular(vec3 p) {
   vec3 base = floor(p);
   vec3 local = fract(p);
-  float minDistance = 8.0;
+  float nearest = 8.0;
+  float second = 8.0;
   float cellHash = 0.0;
   for (int z = -1; z <= 1; z += 1) {
     for (int y = -1; y <= 1; y += 1) {
@@ -133,14 +142,17 @@ vec2 cellular(vec3 p) {
         float wobblePhase = jitter.x * 6.28318 + time * (0.1 + jitter.y * 0.15);
         featurePoint += 0.16 * jitter.z * vec3(sin(wobblePhase), cos(wobblePhase * 1.3), sin(wobblePhase * 0.7));
         float distanceToPoint = length(local - featurePoint);
-        if (distanceToPoint < minDistance) {
-          minDistance = distanceToPoint;
+        if (distanceToPoint < nearest) {
+          second = nearest;
+          nearest = distanceToPoint;
           cellHash = hash13(base + offset);
+        } else if (distanceToPoint < second) {
+          second = distanceToPoint;
         }
       }
     }
   }
-  return vec2(minDistance, cellHash);
+  return vec3(nearest, second, cellHash);
 }
 
 #ifdef STAR_ADVANCED
@@ -157,12 +169,13 @@ vec3 starspotField(vec3 p) {
   vec3 rotated = rotateY(p, time * (0.015 + rotationFactor * 0.05));
   float latitudeBias = mix(0.4, 1.0, exp(-pow((abs(rotated.y) - 0.5) * 2.4, 2.0)));
   vec3 warped = rotated + (fbm(rotated * 1.6 + 9.1) - 0.5) * 0.4;
-  vec2 clusters = cellular(warped * 2.4);
+  vec3 clusters = cellular(warped * 2.4);
   float threshold = 1.0 - clamp(spotCoverage * 1.9 * latitudeBias, 0.0, 0.96);
-  float clusterActive = step(threshold, clusters.y);
-  float clusterRadius = mix(0.055, 0.17, fract(clusters.y * 17.23));
-  vec2 fineEdge = cellular(warped * 7.0 + 5.0);
-  float boundary = clusters.x + (fineEdge.x - 0.5) * 0.09;
+  float clusterActive = step(threshold, clusters.z);
+  float clusterRadius = mix(0.055, 0.17, fract(clusters.z * 17.23));
+  // Noise, not a second Voronoi pass: this only has to make the spot outline ragged so it does
+  // not read as a circular decal, and noise breaks the circle just as well for far less cost.
+  float boundary = clusters.x + (noise(warped * 9.0 + 5.0) - 0.5) * 0.09;
   float umbra = (1.0 - smoothstep(clusterRadius * 0.45, clusterRadius, boundary)) * clusterActive;
   float penumbra = (1.0 - smoothstep(clusterRadius, clusterRadius * 1.55, boundary)) * clusterActive;
   float plage = (1.0 - smoothstep(clusterRadius * 1.55, clusterRadius * 2.2, boundary)) * clusterActive;
@@ -173,17 +186,47 @@ vec3 starspotField(vec3 p) {
 void main(void) {
   vec3 p = normalize(vObjectPosition);
 
-  vec3 warped = domainWarp(p * (granulationScale * 3.4 + 1.6), 0.02);
-  vec2 fineCells = cellular(warped * 6.5);
-  vec2 coarseCells = cellular(warped * 1.9 + 4.3);
-  float granuleShape = 1.0 - smoothstep(0.0, 0.46, fineCells.x);
-  float intergranularLane = smoothstep(0.0, 0.1, fineCells.x) * (1.0 - smoothstep(0.28, 0.5, fineCells.x));
-  float supergranulation = smoothstep(0.15, 0.85, 1.0 - coarseCells.x);
-  float perGranuleBrightness = mix(0.82, 1.22, fineCells.y);
+  vec3 viewDirection = normalize(cameraPosition - vWorldPosition);
+  float mu = clamp(dot(normalize(vNormal), viewDirection), 0.0, 1.0);
 
-  float granulation = clamp(granuleShape * perGranuleBrightness * (0.7 + supergranulation * 0.3), 0.0, 1.4);
-  vec3 color = mix(baseColor * 0.86, hotColor, granulation * (0.4 + granulationStrength));
-  color *= 1.0 - intergranularLane * (0.22 + granulationStrength * 0.18);
+  // Granule size. Cooler, more convective stars get somewhat larger cells, but the base stays
+  // high enough that granules read as fine surface texture rather than as a cracked-mud
+  // pattern of a dozen huge polygons.
+  float granuleFrequency = 11.0 + granulationScale * 6.0;
+  vec3 warped = domainWarp(p * granuleFrequency, 0.02);
+  // A second, finer warp makes the cell walls wander. Without it the Voronoi edges stay evenly
+  // spaced and the surface reads as lizard skin stretched over a ball.
+  warped += (vec3(
+    noise(warped * 3.1 + 11.0),
+    noise(warped * 3.1 + 23.0),
+    noise(warped * 3.1 + 37.0)
+  ) - 0.5) * 0.5;
+
+  vec3 cells = cellular(warped);
+
+  float laneWidth = mix(0.05, 0.14, noise(warped * 1.7 + 3.0));
+  float lane = 1.0 - smoothstep(0.0, laneWidth, cells.y - cells.x);
+  float core = 1.0 - smoothstep(0.02, 0.6, cells.x);
+  float cellBrightness = mix(0.92, 1.1, fract(cells.z * 7.31));
+  // Supergranulation: a much coarser convection scale that mottles whole groups of granules.
+  // Cheap fbm rather than a second cellular lookup — at this scale only the broad light/dark
+  // drift is visible, and a 27-tap Voronoi for it is not worth the fragment cost.
+  float supergranule = mix(0.96, 1.05, fbm(warped * 0.25 + 4.3));
+
+  float granulation = (0.9 + core * 0.24) * cellBrightness * supergranule;
+  granulation *= 1.0 - lane * (0.1 + granulationStrength * 0.16);
+  // Granulation contrast falls away toward the limb, where the line of sight grazes the tops of
+  // the cells rather than looking straight down into them.
+  granulation = mix(1.0, granulation, mix(0.3, 1.0, mu));
+
+  // Granulation drives emission level; the hottest granule cores also shift toward the star's
+  // hot colour, so brightness and hue move together the way rising convection cells do.
+  vec3 color = mix(
+    baseColor,
+    hotColor,
+    clamp((granulation - 0.85) * 1.6, 0.0, 1.0) * (0.35 + granulationStrength * 0.5)
+  );
+  color *= granulation;
 
 #ifdef STAR_ADVANCED
   vec3 spots = starspotField(p);
@@ -198,19 +241,20 @@ void main(void) {
   // Mandatory limb darkening: cooler photospheres darken more sharply toward the edge than
   // hotter, more radiative ones. mu is the view-angle cosine, independent of any light
   // direction, since the star is the light source rather than something lit externally.
-  vec3 viewDirection = normalize(cameraPosition - vWorldPosition);
-  float mu = clamp(dot(normalize(vNormal), viewDirection), 0.0, 1.0);
   float temperatureNorm = clamp((temperatureKelvin - 3000.0) / 27000.0, 0.0, 1.0);
   float limbCoefficient = mix(0.82, 0.32, temperatureNorm);
   float limb = pow(1.0 - limbCoefficient * (1.0 - mu), 1.0 + limbCoefficient * 0.5);
   color *= limb;
 
-  // Display/exposure adaptation: a separate pass from the physical blackbody color above,
-  // so bright granule cores and active regions compress toward white instead of clipping flat.
-  vec3 exposed = color / (color + vec3(1.0));
-  exposed = pow(clamp(exposed, 0.0, 1.0), vec3(0.88));
+  // Display/exposure adaptation, kept separate from the physical blackbody colour above. A
+  // photosphere is a light source, so it has to saturate toward white across the disc rather
+  // than settle at some mid grey — a plain Reinhard curve maps an emission of 1.0 to 0.5 and
+  // makes the star read as a dull tan ball. The per-channel exponential desaturates the
+  // brightest regions on its own, exactly the way an overexposed star photograph does, while
+  // the limb keeps the temperature's colour because it never reaches saturation.
+  vec3 exposed = vec3(1.0) - exp(-color * STAR_EXPOSURE);
 
-  gl_FragColor = vec4(exposed, 1.0);
+  gl_FragColor = vec4(clamp(exposed, 0.0, 1.0), 1.0);
 }`;
 
 const CORONA_VERTEX_SHADER = `
@@ -241,6 +285,8 @@ varying vec3 vWorldPosition;
 uniform float time;
 uniform float seed;
 uniform float coronalIntensity;
+uniform float starRadius;
+uniform vec3 starCenter;
 uniform vec3 coronaColor;
 uniform vec3 cameraPosition;
 
@@ -269,20 +315,28 @@ float fbm(vec3 p) {
   return value;
 }
 void main(void) {
-  vec3 viewDirection = normalize(cameraPosition - vWorldPosition);
-  float facing = clamp(dot(normalize(vNormal), viewDirection), 0.0, 1.0);
-  // A steep power keeps this a thin limb halo rather than a flat translucent disc covering
-  // the whole shell: this shell's angular size means facing stays well above zero across most
-  // of the visible disc, so a low power (as would suit a screen-filling Fresnel rim) leaves
-  // the whole disc dimly lit instead of just the grazing edge.
-  float fresnel = pow(1.0 - facing, 8.0);
+  // Impact parameter of this fragment's view ray, measured from the star's centre in stellar
+  // radii. Keying the falloff to distance from the STAR — rather than to a Fresnel term on the
+  // shell — is what anchors the glow to the photosphere's limb. A shell Fresnel instead peaks
+  // at the shell's own silhouette, where it saturates into a hard-edged bright circle floating
+  // in empty space, which reads as a black disc with a ring drawn around it.
+  vec3 rayDirection = normalize(vWorldPosition - cameraPosition);
+  vec3 toStar = starCenter - cameraPosition;
+  float along = dot(toStar, rayDirection);
+  float impact = length(toStar - rayDirection * along);
+  float radii = impact / max(starRadius, 0.0001);
 
   float drift = time * 0.012;
   float streamers = fbm(vObjectPosition * 2.1 + vec3(drift, -drift * 0.7, drift * 0.5));
-  float shape = smoothstep(0.3, 0.85, streamers);
+  float shape = 0.45 + smoothstep(0.25, 0.8, streamers) * 0.55;
 
-  float alpha = fresnel * (0.35 + shape * 0.65) * coronalIntensity * 3.2;
-  gl_FragColor = vec4(coronaColor, clamp(alpha, 0.0, 1.0));
+  // Exponential density falloff away from the limb, tuned so the corona has already faded to
+  // nothing well before the shell's own edge — that is what keeps the shell invisible as
+  // geometry. Cut off inside the disc so the photosphere stays crisp under its own corona.
+  float density = exp(-(radii - 1.0) * 3.8) * smoothstep(0.98, 1.07, radii);
+  float alpha = clamp(density * shape * coronalIntensity * 0.9, 0.0, 0.8);
+
+  gl_FragColor = vec4(coronaColor, alpha);
 }`;
 
 const STAR_POSITION = new Vector3(0, 0.8, 7.5);
@@ -452,7 +506,7 @@ export const createStarScene = ({
   // hotColor drives bright granule cores and active regions (lifted toward white); spotColor
   // drives umbra/penumbra (pulled toward black and slightly desaturated, the way a sunspot
   // reads darker and cooler rather than simply dimmer).
-  const hotColor = Color3.Lerp(baseColor, Color3.White(), 0.62);
+  const hotColor = Color3.Lerp(baseColor, Color3.White(), 0.45);
   const spotColor = Color3.Lerp(baseColor, Color3.Black(), 0.72);
   material.setColor3("baseColor", baseColor);
   material.setColor3("hotColor", hotColor);
@@ -476,11 +530,15 @@ export const createStarScene = ({
   if (starIsAdvancedTier) {
     coronaMesh = MeshBuilder.CreateSphere(
       "stellar-corona",
-      { diameter: diameter * 1.32, segments: profile.tier === "desktop" ? 64 : 40 },
+      { diameter: diameter * 2.2, segments: profile.tier === "desktop" ? 64 : 40 },
       scene,
     );
     coronaMesh.position.copyFrom(STAR_POSITION);
     coronaMesh.isPickable = false;
+    // Group 1 draws after everything else, matching the planet atmosphere shell. Left in the
+    // default group the transparent shell sorts against the starfield and blanks it out,
+    // leaving a black annulus around the star instead of blending over it.
+    coronaMesh.renderingGroupId = 1;
     coronaMaterial = new ShaderMaterial(
       "stellar-corona-material",
       scene,
@@ -496,16 +554,24 @@ export const createStarScene = ({
           "seed",
           "coronalIntensity",
           "coronaColor",
+          "starCenter",
+          "starRadius",
         ],
         needAlphaBlending: true,
       },
     );
+    // Standard alpha blending, not ALPHA_ADD: the scene runs at Intermediate performance
+    // priority, which keeps render state between frames, and an explicitly forced additive
+    // mode ends up stale here — the shell then blanks the starfield behind it and leaves a
+    // black annulus around the star. This mirrors the host-star corona in the planet scene,
+    // which blends correctly under the same scene settings.
     coronaMaterial.backFaceCulling = true;
-    coronaMaterial.alphaMode = Engine.ALPHA_ADD;
     coronaMaterial.disableDepthWrite = true;
     coronaMaterial.setColor3("coronaColor", Color3.Lerp(hotColor, Color3.White(), 0.15));
     coronaMaterial.setFloat("seed", seed);
     coronaMaterial.setFloat("coronalIntensity", recipe.coronalIntensity);
+    coronaMaterial.setVector3("starCenter", STAR_POSITION);
+    coronaMaterial.setFloat("starRadius", diameter * 0.5);
     coronaMaterial.setFloat("time", 0);
     coronaMesh.material = coronaMaterial;
   }
@@ -516,9 +582,8 @@ export const createStarScene = ({
     blurKernelSize: profile.tier === "desktop" ? 40 : 20,
     mainTextureFixedSize: profile.tier === "desktop" ? 512 : 256,
   });
-  glow.intensity = 0.22 + activity * 0.2;
+  glow.intensity = 0.5 + activity * 0.3;
   glow.addIncludedOnlyMesh(starMesh);
-  if (coronaMesh) glow.addIncludedOnlyMesh(coronaMesh);
 
   // Immersive sessions need something solid underfoot; the deck stays hidden on the flat page.
   const deck = MeshBuilder.CreateCylinder(
