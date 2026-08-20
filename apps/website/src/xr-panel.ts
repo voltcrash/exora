@@ -5,10 +5,10 @@
  * the headset takes over and the panel becomes the whole interface. Two things matter for it to
  * feel like part of the world rather than a sticker on the visor:
  *
- * - it is **head-locked**. The panel keeps a constant lower-left pose from the XR headset camera,
+ * - it is **head-locked**. The panel keeps a constant centred pose from the XR headset camera,
  *   so walking, turning, and teleporting never leave it behind or trigger visible recall jumps.
  * - it is **summoned**, not permanent. A face button (or the pad on the wearer's wrist) recalls it
- *   to the lower-left and dismisses it again, which keeps a viewing session unobstructed.
+ *   to the centre of the view and dismisses it again, which keeps a viewing session unobstructed.
  *
  * Everything is drawn from core primitives — one canvas texture on one plane — so no
  * `@babylonjs/gui` dependency is pulled into the bundle, and a controller ray picks entries by
@@ -48,8 +48,8 @@ import {
 const PANEL_SIZE = { height: 1.15, width: 0.92 };
 /** Supersampling keeps text and fine rules crisp once the panel is angled in the headset. */
 const PANEL_TEXTURE_SCALE = 2;
-/** Camera-local placement: lower-left, below the focal centre, and within controller reach. */
-const HUD_POSITION = new Vector3(-0.68, -0.5, 1.55);
+/** Camera-local placement: dead centre of the view, at the focal centre and within controller reach. */
+const HUD_POSITION = new Vector3(0, 0, 1.55);
 const OPEN_SECONDS = 0.16;
 /** Drawn after the world so the console always reads, whatever it happens to be floating over. */
 const PANEL_RENDERING_GROUP = 2;
@@ -462,10 +462,10 @@ export interface XrPanel {
   dispose: () => void;
   hide: () => void;
   isVisible: () => boolean;
-  /** Restores the panel's fixed lower-left camera placement without changing what it shows. */
+  /** Restores the panel's fixed centred camera placement without changing what it shows. */
   recall: () => void;
   setView: (view: XrPanelView) => void;
-  /** Shows the panel in the lower-left of the wearer's view. */
+  /** Shows the panel in the centre of the wearer's view. */
   summon: () => void;
   toggle: () => void;
   /** Maintains the head-locked placement and runs the open animation. */
