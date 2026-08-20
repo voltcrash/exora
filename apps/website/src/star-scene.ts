@@ -343,9 +343,8 @@ void main(void) {
 }`;
 
 const STAR_POSITION = new Vector3(0, 0.8, 7.5);
-/** Observation platform, parked outside the widest planetary orbit in the system. */
-const STAR_DECK_POSITION = new Vector3(0, 0, -9);
-const STAR_DECK_RADIUS = 3.6;
+/** Initial immersive viewpoint, parked outside the widest planetary orbit in the system. */
+const XR_STAR_STAND = new Vector3(0, 0, -9);
 const XR_MOVE_SPEED = 2.2;
 
 export interface StarSceneExperience {
@@ -597,73 +596,6 @@ export const createStarScene = ({
   glow.intensity = 0.5 + activity * 0.3;
   glow.addIncludedOnlyMesh(starMesh);
 
-  // Immersive sessions need something solid underfoot; the deck stays hidden on the flat page.
-  const deck = MeshBuilder.CreateCylinder(
-    "stellar-deck",
-    { diameter: STAR_DECK_RADIUS * 2.2, height: 0.12, tessellation: 64 },
-    scene,
-  );
-  deck.position.set(STAR_DECK_POSITION.x, STAR_DECK_POSITION.y - 0.06, STAR_DECK_POSITION.z);
-  deck.isPickable = false;
-  deck.isVisible = false;
-  const deckMaterial = new StandardMaterial("stellar-deck-material", scene);
-  deckMaterial.diffuseColor = new Color3(0.006, 0.018, 0.03);
-  deckMaterial.emissiveColor = new Color3(0.008, 0.038, 0.06);
-  deckMaterial.specularColor = new Color3(0.12, 0.5, 0.62);
-  deckMaterial.alpha = 0.32;
-  deckMaterial.backFaceCulling = false;
-  deckMaterial.freeze();
-  deck.material = deckMaterial;
-  deck.freezeWorldMatrix();
-
-  const deckRingMaterial = new StandardMaterial("stellar-deck-ring-material", scene);
-  deckRingMaterial.disableLighting = true;
-  deckRingMaterial.emissiveColor = new Color3(1, 0.54, 0.18);
-  deckRingMaterial.alpha = 0.78;
-  deckRingMaterial.freeze();
-
-  const makeDeckRing = (name: string, diameter: number, thickness: number): Mesh => {
-    const ring = MeshBuilder.CreateTorus(
-      name,
-      { diameter, thickness, tessellation: profile.ringTessellation },
-      scene,
-    );
-    ring.position.set(STAR_DECK_POSITION.x, STAR_DECK_POSITION.y + 0.012, STAR_DECK_POSITION.z);
-    ring.isPickable = false;
-    ring.isVisible = false;
-    ring.material = deckRingMaterial;
-    ring.freezeWorldMatrix();
-    return ring;
-  };
-
-  const deckOuterRing = makeDeckRing("stellar-deck-outer-ring", STAR_DECK_RADIUS * 2, 0.032);
-  const deckInnerRing = makeDeckRing("stellar-deck-inner-ring", 1.35, 0.018);
-  const deckMarkers = Array.from({ length: 12 }, (_, index) => {
-    const angle = (index / 12) * Math.PI * 2;
-    const marker = MeshBuilder.CreateBox(
-      `stellar-deck-bearing-${index}`,
-      { depth: 0.34, height: 0.012, width: index % 3 === 0 ? 0.055 : 0.028 },
-      scene,
-    );
-    marker.position.set(
-      STAR_DECK_POSITION.x + Math.sin(angle) * STAR_DECK_RADIUS * 0.9,
-      STAR_DECK_POSITION.y + 0.014,
-      STAR_DECK_POSITION.z + Math.cos(angle) * STAR_DECK_RADIUS * 0.9,
-    );
-    marker.rotation.y = angle;
-    marker.isPickable = false;
-    marker.isVisible = false;
-    marker.material = deckRingMaterial;
-    marker.freezeWorldMatrix();
-    return marker;
-  });
-
-  const deckVisuals = [deck, deckOuterRing, deckInnerRing, ...deckMarkers];
-
-  const setDeckVisible = (visible: boolean): void => {
-    for (const mesh of deckVisuals) mesh.isVisible = visible;
-  };
-
   let planetTargetRoots: TransformNode[] = [];
   let menuPlanets: readonly ExoplanetProfile[] = [];
   let selectPlanet: ((planet: ExoplanetProfile) => void) | null = null;
@@ -769,21 +701,7 @@ export const createStarScene = ({
       if (root) root.rotation.y += ((0.025 + index * 0.004) * engine.getDeltaTime()) / 1_000;
     }
 
-    const rig = isInXr ? xrCamera() : null;
-    if (rig) {
-      // Thumbstick movement is flat and unbounded, so the wearer is held on the platform.
-      const offsetX = rig.position.x - STAR_DECK_POSITION.x;
-      const offsetZ = rig.position.z - STAR_DECK_POSITION.z;
-      const distance = Math.hypot(offsetX, offsetZ);
-      if (distance > STAR_DECK_RADIUS) {
-        const scale = STAR_DECK_RADIUS / distance;
-        rig.position.x = STAR_DECK_POSITION.x + offsetX * scale;
-        rig.position.z = STAR_DECK_POSITION.z + offsetZ * scale;
-      }
-      rig.position.y += STAR_DECK_POSITION.y - (rig.position.y - rig.realWorldHeight);
-    }
-    // The in-world console must keep updating even while a browser is still publishing its
-    // locomotion rig. Its own XR camera pose is sufficient for anchoring and interaction.
+    // Locomotion owns the XR rig after entry; rewriting it per frame causes room-scale snap-back.
     if (isInXr) xrConsole?.update(deltaSeconds);
 
     if (qualitySampleSeconds >= 3) {
@@ -825,7 +743,7 @@ export const createStarScene = ({
   };
 
   /**
-   * Puts the wearer on the observation deck facing the star.
+   * Puts the wearer at the initial orbital viewpoint facing the star.
    *
    * The rig otherwise starts wherever the headset happened to be pointing, which in a scene this
    * sparse means staring at empty starfield with no clue that anything rendered at all.
@@ -834,10 +752,8 @@ export const createStarScene = ({
     const rig = xrCamera();
     if (!rig) return;
     const headOffset = initial ? 0 : rig.realWorldHeight;
-    rig.position.set(STAR_DECK_POSITION.x, STAR_DECK_POSITION.y + headOffset, STAR_DECK_POSITION.z);
+    rig.position.set(XR_STAR_STAND.x, XR_STAR_STAND.y + headOffset, XR_STAR_STAND.z);
     rig.setTarget(STAR_POSITION);
-    // The console is world-locked, so a teleport would otherwise strand it where the wearer was.
-    xrConsole?.recall();
   };
 
   const buildSceneActions = (): XrCell[] => {
@@ -884,7 +800,7 @@ export const createStarScene = ({
     onTravelStar: onSelectStar ? handOver(onSelectStar) : undefined,
     sceneActions: buildSceneActions,
     source: () => `${star.source.archive} · ${star.source.retrievedOn}`,
-    subtitle: () => `${starKindLabel(star)} · observation deck`,
+    subtitle: () => `${starKindLabel(star)} · orbital view`,
     summary: () => starSummary(star),
     title: () => star.name,
   };
@@ -896,7 +812,6 @@ export const createStarScene = ({
     disableDefaultUI: true,
     disableNearInteraction: true,
     disableTeleportation: true,
-    floorMeshes: [deck],
     // The rigged hand mesh is a remote glTF and no loader is bundled, so joint spheres are used.
     handSupportOptions: { handMeshes: { disableDefaultMeshes: true } },
     inputOptions: { doNotLoadControllerMeshes: true },
@@ -935,7 +850,6 @@ export const createStarScene = ({
       createdXr.baseExperience.onStateChangedObservable.add((state) => {
         if (disposed) return;
         if (state === WebXRState.ENTERING_XR) {
-          setDeckVisible(true);
           onXrStatusChange("entering");
         }
         if (state === WebXRState.IN_XR) {
@@ -950,7 +864,6 @@ export const createStarScene = ({
         if (state === WebXRState.NOT_IN_XR) {
           isInXr = false;
           xrConsole?.setVisible(false);
-          setDeckVisible(false);
           camera.attachControl(canvas, true);
           onXrStatusChange(vrSupported ? "ready" : "unavailable");
         }
