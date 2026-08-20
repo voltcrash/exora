@@ -16,6 +16,8 @@
  * turning the hit's texture coordinates back into canvas pixels.
  */
 
+import { ActionManager } from "@babylonjs/core/Actions/actionManager.js";
+import { ExecuteCodeAction } from "@babylonjs/core/Actions/directActions.js";
 import { DynamicTexture } from "@babylonjs/core/Materials/Textures/dynamicTexture.js";
 import { Texture } from "@babylonjs/core/Materials/Textures/texture.js";
 import { StandardMaterial } from "@babylonjs/core/Materials/standardMaterial.js";
@@ -55,8 +57,10 @@ const SUMMON_DROP = 0.52;
  * outside the headset's forward field of view.
  */
 const SUMMON_YAW = -Math.PI * 0.16;
-/** Past this the panel has been walked away from and is dismissed rather than left floating. */
+/** Past this the panel has been walked away from and is recalled within reach. */
 const ABANDON_DISTANCE = 5;
+/** The panel stays world-locked until it leaves the useful horizontal field of view. */
+const RECALL_ANGLE = Math.PI * 0.25;
 const OPEN_SECONDS = 0.16;
 /** Drawn after the world so the console always reads, whatever it happens to be floating over. */
 const PANEL_RENDERING_GROUP = 2;
@@ -704,6 +708,13 @@ export const createXrPanel = (scene: Scene, anisotropy = 4): XrPanel => {
 
   const toggle = (): void => (visible ? hide() : summon());
 
+  // The emulated Quest maps controller buttons differently across browsers. C is an explicit
+  // desktop-only escape hatch that exercises the exact same summon path as A/X on a headset.
+  const onConsoleKeyDown = (event: KeyboardEvent): void => {
+    if (event.code === "KeyC" && !event.repeat && scene.activeCamera === camera) summon();
+  };
+  window.addEventListener("keydown", onConsoleKeyDown);
+
   const wristPads: Mesh[] = [];
 
   /**
@@ -751,16 +762,17 @@ export const createXrPanel = (scene: Scene, anisotropy = 4): XrPanel => {
     pad.isPickable = true;
     pad.applyFog = false;
     pad.renderingGroupId = PANEL_RENDERING_GROUP;
+    // ActionManager uses Babylon's XR pointer-selection path directly. This is more reliable on
+    // Quest and in IWER than waiting for a browser-style POINTERPICK notification on the scene.
+    pad.actionManager = new ActionManager(scene);
+    pad.actionManager.registerAction(
+      new ExecuteCodeAction(ActionManager.OnPickTrigger, () => {
+        pulse(0.35, 26);
+        toggle();
+      }),
+    );
     wristPads.push(pad);
   };
-
-  const wristObserver = scene.onPointerObservable.add((info) => {
-    if (info.type !== PointerEventTypes.POINTERPICK) return;
-    const picked = info.pickInfo?.pickedMesh;
-    if (!picked || !wristPads.includes(picked as Mesh)) return;
-    pulse(0.35, 26);
-    toggle();
-  });
 
   const bindController = (controller: WebXRInputSource): void => {
     controller.onMotionControllerInitObservable.add((motionController) => {
@@ -812,14 +824,25 @@ export const createXrPanel = (scene: Scene, anisotropy = 4): XrPanel => {
       material.alpha = eased;
       highlightMaterial.alpha = eased * 0.26;
     }
-    if (readEye() && Vector3.Distance(eyePosition, anchorPosition) > ABANDON_DISTANCE) hide();
+    if (!readEye()) return;
+
+    const toPanel = anchorPosition.subtract(eyePosition);
+    const distance = toPanel.length();
+    toPanel.y = 0;
+    const flatForward = new Vector3(eyeForward.x, 0, eyeForward.z);
+    if (toPanel.lengthSquared() > 1e-4 && flatForward.lengthSquared() > 1e-4) {
+      toPanel.normalize();
+      flatForward.normalize();
+      const outsideView = Vector3.Dot(flatForward, toPanel) < Math.cos(RECALL_ANGLE);
+      if (outsideView || distance > ABANDON_DISTANCE) anchor();
+    }
   };
 
   return {
     attach,
     dispose: () => {
+      window.removeEventListener("keydown", onConsoleKeyDown);
       if (pointerObserver) scene.onPointerObservable.remove(pointerObserver);
-      if (wristObserver) scene.onPointerObservable.remove(wristObserver);
       for (const pad of wristPads) {
         pad.material?.dispose(true, true);
         pad.dispose();
