@@ -7,8 +7,8 @@ settings:
 catalogs:
   default:
     '@babylonjs/core':
-      specifier: ^9.20.0
-      version: 9.20.0
+      specifier: ^9.22.0
+      version: 9.22.0
     '@hono/node-server':
       specifier: ^2.1.0
       version: 2.1.0
@@ -107,7 +107,7 @@ importers:
     dependencies:
       '@babylonjs/core':
         specifier: 'catalog:'
-        version: 9.20.0
+        version: 9.22.0
       '@exora/contracts':
         specifier: workspace:*
         version: link:../../packages/contracts
@@ -194,8 +194,8 @@ packages:
     resolution: {integrity: sha512-Nq8OhGWiZIZGV6hLHoyAKLLcJihP/xFeBMGJoUrxTX2psI8dCifzLhZISFb+VWS3wFMRDmCGw5R+dOySCqPLhw==}
     engines: {node: '>=6.9.0'}
 
-  '@babylonjs/core@9.20.0':
-    resolution: {integrity: sha512-iWM/Re+FnqTEOxkGxvjRjChcPZzydcb0OGtnVk5o0vDQizqwkcpWFlJzfIv1Ij7Li2edJJJDZd6jRzC8QSWuuw==}
+  '@babylonjs/core@9.22.0':
+    resolution: {integrity: sha512-rbQJWF9bUiVAMpUxGnEPQvqg/ZMzoKFZ8bahlzXs35vHyGENRSLPYRT14k5GtMPQGIerbWwkLVW8wNob3Kj6ug==}
 
   '@blazediff/core@1.9.1':
     resolution: {integrity: sha512-ehg3jIkYKulZh+8om/O25vkvSsXXwC+skXmyA87FFx6A/45eqOkZsBltMw/TVteb0mloiGT8oGRTcjRAz66zaA==}
@@ -3135,7 +3135,7 @@ snapshots:
 
   '@babel/runtime@7.29.7': {}
 
-  '@babylonjs/core@9.20.0': {}
+  '@babylonjs/core@9.22.0': {}
 
   '@blazediff/core@1.9.1': {}
 
