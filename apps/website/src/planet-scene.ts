@@ -25,7 +25,15 @@ import "@babylonjs/core/XR/features/WebXRControllerTeleportation.js";
 import "@babylonjs/core/XR/features/WebXRHandTracking.js";
 import { WebXRFeatureName } from "@babylonjs/core/XR/webXRFeaturesManager.js";
 import { WebXRState } from "@babylonjs/core/XR/webXRTypes.js";
-import type { Rgb, RingRecipe, RockyWorldRecipe, WorldRecipe } from "@exora/worldgen";
+import type { ExoplanetProfile, StarProfile } from "@exora/contracts";
+import type {
+  CustomStar,
+  CustomWorld,
+  Rgb,
+  RingRecipe,
+  RockyWorldRecipe,
+  WorldRecipe,
+} from "@exora/worldgen";
 import {
   adaptFixedFoveation,
   adaptHardwareScaling,
@@ -36,7 +44,9 @@ import {
 } from "./render-quality.ts";
 import { buildCraterField, sampleTerrainHeight } from "./planet-terrain.ts";
 import { getSurfaceDetailTextures } from "./texture-cache.ts";
-import { createXrMenu, type XrMenu, type XrMenuItem } from "./xr-menu.ts";
+import { createXrConsole, type XrConsole, type XrConsoleHost } from "./xr-console.ts";
+import { planetFacts } from "./xr-console-model.ts";
+import type { XrCell } from "./xr-panel-layout.ts";
 import { requestVrHandoff } from "./xr-session.ts";
 
 const PLANET_POSITION = new Vector3(0, 1.35, 9.5);
@@ -1043,9 +1053,15 @@ export interface PlanetExperience {
 interface PlanetExperienceOptions {
   canvas: HTMLCanvasElement;
   onFirstFrame: () => void;
+  /** Immersive-only travel, so a wearer can leave for anywhere without removing the headset. */
+  onForgeStar?: (star: CustomStar) => void;
+  onForgeWorld?: (world: CustomWorld) => void;
   onSelectHostStar?: () => void;
+  onSelectPlanet?: (planet: ExoplanetProfile) => void;
+  onSelectStar?: (star: StarProfile) => void;
   onViewModeChange: (mode: ViewMode) => void;
   onXrStatusChange: (status: XrStatus) => void;
+  planet: ExoplanetProfile;
   recipe: WorldRecipe;
 }
 
@@ -1161,7 +1177,7 @@ const createHostStar = (
 
 interface ViewingDeck {
   floor: Mesh;
-  ring: Mesh;
+  visuals: readonly Mesh[];
 }
 
 const createViewingDeck = (scene: Scene, profile: RenderQualityProfile): ViewingDeck => {
@@ -1174,37 +1190,67 @@ const createViewingDeck = (scene: Scene, profile: RenderQualityProfile): Viewing
   deck.position.y = -0.06;
 
   const deckMaterial = new StandardMaterial("deckMaterial", scene);
-  deckMaterial.diffuseColor = new Color3(0.008, 0.014, 0.025);
-  deckMaterial.emissiveColor = new Color3(0.015, 0.045, 0.07);
-  deckMaterial.specularColor = new Color3(0.1, 0.36, 0.46);
-  deckMaterial.alpha = 0.82;
+  deckMaterial.diffuseColor = new Color3(0.006, 0.018, 0.03);
+  deckMaterial.emissiveColor = new Color3(0.008, 0.038, 0.06);
+  deckMaterial.specularColor = new Color3(0.12, 0.5, 0.62);
+  deckMaterial.alpha = 0.32;
+  deckMaterial.backFaceCulling = false;
   deckMaterial.freeze();
   deck.material = deckMaterial;
   deck.freezeWorldMatrix();
   deck.isVisible = false;
 
-  const deckRing = MeshBuilder.CreateTorus(
-    "deckRing",
-    { diameter: 5.25, thickness: 0.026, tessellation: profile.ringTessellation },
-    scene,
-  );
-  deckRing.position.set(VIEWING_DECK_POSITION.x, 0.015, VIEWING_DECK_POSITION.z);
-
   const ringMaterial = new StandardMaterial("deckRingMaterial", scene);
   ringMaterial.disableLighting = true;
-  ringMaterial.emissiveColor = new Color3(0.08, 0.82, 1);
-  ringMaterial.alpha = 0.68;
+  ringMaterial.emissiveColor = new Color3(0.08, 0.76, 1);
+  ringMaterial.alpha = 0.76;
   ringMaterial.freeze();
-  deckRing.material = ringMaterial;
-  deckRing.freezeWorldMatrix();
-  deckRing.isVisible = false;
 
-  return { floor: deck, ring: deckRing };
+  const makeRing = (name: string, diameter: number, thickness: number): Mesh => {
+    const ring = MeshBuilder.CreateTorus(
+      name,
+      { diameter, thickness, tessellation: profile.ringTessellation },
+      scene,
+    );
+    ring.position.set(VIEWING_DECK_POSITION.x, 0.012, VIEWING_DECK_POSITION.z);
+    ring.material = ringMaterial;
+    ring.freezeWorldMatrix();
+    ring.isVisible = false;
+    ring.isPickable = false;
+    return ring;
+  };
+
+  const outerRing = makeRing("deckOuterRing", 5.25, 0.032);
+  const innerRing = makeRing("deckInnerRing", 1.35, 0.018);
+
+  // Short luminous ticks make the platform read as a navigational instrument without putting a
+  // rail or console between the wearer and the subject. They stay at ankle height and cost only
+  // simple emissive geometry on the Quest profile.
+  const markers = Array.from({ length: 12 }, (_, index) => {
+    const angle = (index / 12) * Math.PI * 2;
+    const marker = MeshBuilder.CreateBox(
+      `deckBearing-${index}`,
+      { depth: 0.34, height: 0.012, width: index % 3 === 0 ? 0.055 : 0.028 },
+      scene,
+    );
+    marker.position.set(
+      VIEWING_DECK_POSITION.x + Math.sin(angle) * 2.3,
+      0.014,
+      VIEWING_DECK_POSITION.z + Math.cos(angle) * 2.3,
+    );
+    marker.rotation.y = angle;
+    marker.material = ringMaterial;
+    marker.freezeWorldMatrix();
+    marker.isVisible = false;
+    marker.isPickable = false;
+    return marker;
+  });
+
+  return { floor: deck, visuals: [deck, outerRing, innerRing, ...markers] };
 };
 
 const setViewingDeckVisible = (viewingDeck: ViewingDeck, visible: boolean): void => {
-  viewingDeck.floor.isVisible = visible;
-  viewingDeck.ring.isVisible = visible;
+  for (const mesh of viewingDeck.visuals) mesh.isVisible = visible;
 };
 
 /**
@@ -2260,9 +2306,14 @@ const setEnvironmentEnabled = (
 export const createPlanetExperience = ({
   canvas,
   onFirstFrame,
+  onForgeStar,
+  onForgeWorld,
   onSelectHostStar,
+  onSelectPlanet,
+  onSelectStar,
   onViewModeChange,
   onXrStatusChange,
+  planet: planetProfile,
   recipe,
 }: PlanetExperienceOptions): PlanetExperience => {
   const deviceNavigator = window.navigator as Navigator & { deviceMemory?: number };
@@ -2316,8 +2367,14 @@ export const createPlanetExperience = ({
   keyLight.diffuse = toColor3(recipe.star.color);
   keyLight.intensity = 2.2 * recipe.star.intensity;
 
-  // Picking the host star tears this scene down, so an immersive session has to be handed over
-  // to the star scene instead of silently dropping the wearer back into the flat page.
+  // Travelling anywhere tears this scene down, so an immersive session has to be handed over to
+  // the next one instead of silently dropping the wearer back into the flat page.
+  const handOver = <Argument>(travel: (argument: Argument) => void) => {
+    return (argument: Argument): void => {
+      if (isInXr) requestVrHandoff();
+      travel(argument);
+    };
+  };
   const travelToHostStar = onSelectHostStar
     ? (): void => {
         if (isInXr) requestVrHandoff();
@@ -2523,7 +2580,7 @@ export const createPlanetExperience = ({
         }
         rig.position.y += VIEWING_DECK_POSITION.y - (rig.position.y - eyeHeight);
       }
-      xrMenu?.update(rig, deltaSeconds);
+      xrConsole?.update(deltaSeconds);
     }
 
     if (qualitySampleSeconds >= 3) {
@@ -2549,7 +2606,7 @@ export const createPlanetExperience = ({
 
   onXrStatusChange("checking");
   let xr: WebXRDefaultExperience | null = null;
-  let xrMenu: XrMenu | null = null;
+  let xrConsole: XrConsole | null = null;
   let isVrSupported = false;
   let disposed = false;
 
@@ -2595,6 +2652,8 @@ export const createPlanetExperience = ({
       );
       rig.setTarget(PLANET_POSITION);
     }
+    // The console is world-locked, so a teleport would otherwise strand it where the wearer was.
+    xrConsole?.recall();
   };
 
   /** Restores the desktop camera so leaving the headset lands on the view the wearer left in. */
@@ -2610,46 +2669,55 @@ export const createPlanetExperience = ({
     camera.attachControl(canvas, true);
   };
 
-  const buildXrMenuItems = (): XrMenuItem[] => {
+  const buildSceneActions = (): XrCell[] => {
     const surface = viewState === "surface";
-    const items: XrMenuItem[] = [
+    const actions: XrCell[] = [
       surface
         ? {
+            detail: "See the whole world again",
             id: "orbit",
             label: "Return to orbit",
-            detail: "See the whole world again",
             onSelect: () => applyXrView(false, false),
           }
         : {
+            detail: "Walk the terrain",
             id: "surface",
             label: "Descend to the surface",
-            detail: "Walk the terrain",
             onSelect: () => applyXrView(true, false),
           },
       {
+        detail: surface ? "Face the horizon" : "Face the planet",
         id: "recentre",
         label: "Recentre me",
-        detail: surface ? "Face the horizon" : "Face the planet",
         onSelect: () => placeXrCamera(viewState === "surface", false),
       },
     ];
 
     if (travelToHostStar) {
-      items.push({
+      actions.push({
+        detail: `Visit ${planetProfile.hostStar}`,
         id: "host-star",
         label: "Travel to the host star",
-        detail: "Rebuilds the immersive session",
         onSelect: travelToHostStar,
       });
     }
 
-    items.push({
-      id: "exit",
-      label: "Exit immersive VR",
-      detail: "Back to the browser view",
-      onSelect: () => void xr?.baseExperience.exitXRAsync(),
-    });
-    return items;
+    return actions;
+  };
+
+  const consoleHost: XrConsoleHost = {
+    facts: () => planetFacts(planetProfile),
+    onExit: () => void xr?.baseExperience.exitXRAsync(),
+    onForgePlanet: onForgeWorld ? handOver(onForgeWorld) : undefined,
+    onForgeStar: onForgeStar ? handOver(onForgeStar) : undefined,
+    onTravelPlanet: onSelectPlanet ? handOver(onSelectPlanet) : undefined,
+    onTravelStar: onSelectStar ? handOver(onSelectStar) : undefined,
+    sceneActions: buildSceneActions,
+    source: () => `${planetProfile.source.archive} · ${planetProfile.source.retrievedOn}`,
+    subtitle: () =>
+      `${recipe.classification} · ${viewState === "surface" ? "surface excursion" : "orbital deck"}`,
+    summary: () => recipe.summary,
+    title: () => planetProfile.name,
   };
 
   /** Switches view from inside the headset, where the orbit camera transition cannot be used. */
@@ -2659,8 +2727,7 @@ export const createPlanetExperience = ({
     applyViewEnvironment(surface);
     setViewingDeckVisible(viewingDeck, !surface);
     placeXrCamera(surface, initial);
-    xrMenu?.setTitle(surface ? "Surface excursion" : "Orbital deck");
-    xrMenu?.setItems(buildXrMenuItems());
+    xrConsole?.refresh();
     onViewModeChange(surface ? "surface" : "orbit");
   };
 
@@ -2675,9 +2742,9 @@ export const createPlanetExperience = ({
     optionalFeatures: ["hand-tracking"],
     outputCanvasOptions: {
       canvasOptions: {
-        // An opaque immersive layer saves the headset compositor a per-pixel blend it would
-        // otherwise do against nothing, and no view here ever wants to see through the world.
-        alpha: false,
+        // Quest 2's compositor is unreliable with an explicitly opaque WebGL layer. Babylon's
+        // compatible default is alpha-enabled; the scene still clears to opaque black each frame.
+        alpha: true,
         antialias: false,
         depth: true,
         stencil: false,
@@ -2703,8 +2770,8 @@ export const createPlanetExperience = ({
         rotationThreshold: 0.18,
         xrInput: createdXr.input,
       });
-      xrMenu = createXrMenu(scene, viewState === "surface" ? "Surface excursion" : "Orbital deck");
-      xrMenu.setItems(buildXrMenuItems());
+      xrConsole = createXrConsole(scene, consoleHost, profile.anisotropicFiltering);
+      xrConsole.attach(createdXr);
 
       // The rig lands wherever the headset happens to face, so the view has to be aimed at the
       // subject; otherwise the session opens on empty starfield and looks broken.
@@ -2724,13 +2791,12 @@ export const createPlanetExperience = ({
           if (createdXr.baseExperience.sessionManager.isFixedFoveationSupported) {
             createdXr.baseExperience.sessionManager.fixedFoveation = sessionFoveation;
           }
-          xrMenu?.setItems(buildXrMenuItems());
-          xrMenu?.setVisible(true);
+          xrConsole?.setVisible(true);
           onXrStatusChange("in-xr");
         }
         if (state === WebXRState.NOT_IN_XR) {
           isInXr = false;
-          xrMenu?.setVisible(false);
+          xrConsole?.setVisible(false);
           setViewingDeckVisible(viewingDeck, false);
           syncDesktopCamera(viewState === "surface");
           onXrStatusChange(isVrSupported ? "ready" : "unavailable");
@@ -2769,8 +2835,8 @@ export const createPlanetExperience = ({
       window.removeEventListener("keydown", onMovementKeyDown);
       window.removeEventListener("keyup", onMovementKeyUp);
       window.removeEventListener("blur", clearMovementKeys);
-      xrMenu?.dispose();
-      xrMenu = null;
+      xrConsole?.dispose();
+      xrConsole = null;
       xr?.dispose();
       engine.stopRenderLoop();
       scene.dispose();

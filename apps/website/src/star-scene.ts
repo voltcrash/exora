@@ -23,7 +23,7 @@ import "@babylonjs/core/XR/features/WebXRHandTracking.js";
 import { WebXRFeatureName } from "@babylonjs/core/XR/webXRFeaturesManager.js";
 import { WebXRState } from "@babylonjs/core/XR/webXRTypes.js";
 import type { ExoplanetProfile, StarProfile } from "@exora/contracts";
-import { deriveStarRecipe } from "@exora/worldgen";
+import { deriveStarRecipe, type CustomStar, type CustomWorld } from "@exora/worldgen";
 import {
   adaptFixedFoveation,
   deriveRenderQuality,
@@ -31,7 +31,10 @@ import {
   shaderDefines,
 } from "./render-quality.ts";
 import type { XrStatus } from "./planet-scene.ts";
-import { createXrMenu, type XrMenu, type XrMenuItem } from "./xr-menu.ts";
+import { starKindLabel, starSummary } from "./star-utils.ts";
+import { createXrConsole, type XrConsole, type XrConsoleHost } from "./xr-console.ts";
+import { starFacts } from "./xr-console-model.ts";
+import type { XrCell } from "./xr-panel-layout.ts";
 import { requestVrHandoff } from "./xr-session.ts";
 
 const STAR_VERTEX_SHADER = `
@@ -359,6 +362,11 @@ export interface StarSceneExperience {
 interface StarSceneOptions {
   canvas: HTMLCanvasElement;
   onFirstFrame: () => void;
+  /** Immersive-only travel, so a wearer can leave for anywhere without removing the headset. */
+  onForgeStar?: (star: CustomStar) => void;
+  onForgeWorld?: (world: CustomWorld) => void;
+  onSelectPlanet?: (planet: ExoplanetProfile) => void;
+  onSelectStar?: (star: StarProfile) => void;
   onXrStatusChange: (status: XrStatus) => void;
   star: StarProfile;
 }
@@ -406,6 +414,10 @@ const createStarfield = (scene: Scene, seed: number, count: number): Mesh => {
 export const createStarScene = ({
   canvas,
   onFirstFrame,
+  onForgeStar,
+  onForgeWorld,
+  onSelectPlanet,
+  onSelectStar,
   onXrStatusChange,
   star,
 }: StarSceneOptions): StarSceneExperience => {
@@ -595,33 +607,61 @@ export const createStarScene = ({
   deck.isPickable = false;
   deck.isVisible = false;
   const deckMaterial = new StandardMaterial("stellar-deck-material", scene);
-  deckMaterial.diffuseColor = new Color3(0.008, 0.014, 0.025);
-  deckMaterial.emissiveColor = new Color3(0.015, 0.045, 0.07);
-  deckMaterial.specularColor = new Color3(0.1, 0.36, 0.46);
-  deckMaterial.alpha = 0.82;
+  deckMaterial.diffuseColor = new Color3(0.006, 0.018, 0.03);
+  deckMaterial.emissiveColor = new Color3(0.008, 0.038, 0.06);
+  deckMaterial.specularColor = new Color3(0.12, 0.5, 0.62);
+  deckMaterial.alpha = 0.32;
+  deckMaterial.backFaceCulling = false;
   deckMaterial.freeze();
   deck.material = deckMaterial;
   deck.freezeWorldMatrix();
 
-  const deckRing = MeshBuilder.CreateTorus(
-    "stellar-deck-ring",
-    { diameter: STAR_DECK_RADIUS * 2, thickness: 0.026, tessellation: 96 },
-    scene,
-  );
-  deckRing.position.set(STAR_DECK_POSITION.x, 0.015, STAR_DECK_POSITION.z);
-  deckRing.isPickable = false;
-  deckRing.isVisible = false;
   const deckRingMaterial = new StandardMaterial("stellar-deck-ring-material", scene);
   deckRingMaterial.disableLighting = true;
-  deckRingMaterial.emissiveColor = new Color3(0.08, 0.82, 1);
-  deckRingMaterial.alpha = 0.68;
+  deckRingMaterial.emissiveColor = new Color3(1, 0.54, 0.18);
+  deckRingMaterial.alpha = 0.78;
   deckRingMaterial.freeze();
-  deckRing.material = deckRingMaterial;
-  deckRing.freezeWorldMatrix();
+
+  const makeDeckRing = (name: string, diameter: number, thickness: number): Mesh => {
+    const ring = MeshBuilder.CreateTorus(
+      name,
+      { diameter, thickness, tessellation: profile.ringTessellation },
+      scene,
+    );
+    ring.position.set(STAR_DECK_POSITION.x, STAR_DECK_POSITION.y + 0.012, STAR_DECK_POSITION.z);
+    ring.isPickable = false;
+    ring.isVisible = false;
+    ring.material = deckRingMaterial;
+    ring.freezeWorldMatrix();
+    return ring;
+  };
+
+  const deckOuterRing = makeDeckRing("stellar-deck-outer-ring", STAR_DECK_RADIUS * 2, 0.032);
+  const deckInnerRing = makeDeckRing("stellar-deck-inner-ring", 1.35, 0.018);
+  const deckMarkers = Array.from({ length: 12 }, (_, index) => {
+    const angle = (index / 12) * Math.PI * 2;
+    const marker = MeshBuilder.CreateBox(
+      `stellar-deck-bearing-${index}`,
+      { depth: 0.34, height: 0.012, width: index % 3 === 0 ? 0.055 : 0.028 },
+      scene,
+    );
+    marker.position.set(
+      STAR_DECK_POSITION.x + Math.sin(angle) * STAR_DECK_RADIUS * 0.9,
+      STAR_DECK_POSITION.y + 0.014,
+      STAR_DECK_POSITION.z + Math.cos(angle) * STAR_DECK_RADIUS * 0.9,
+    );
+    marker.rotation.y = angle;
+    marker.isPickable = false;
+    marker.isVisible = false;
+    marker.material = deckRingMaterial;
+    marker.freezeWorldMatrix();
+    return marker;
+  });
+
+  const deckVisuals = [deck, deckOuterRing, deckInnerRing, ...deckMarkers];
 
   const setDeckVisible = (visible: boolean): void => {
-    deck.isVisible = visible;
-    deckRing.isVisible = visible;
+    for (const mesh of deckVisuals) mesh.isVisible = visible;
   };
 
   let planetTargetRoots: TransformNode[] = [];
@@ -637,7 +677,7 @@ export const createStarScene = ({
       if (isInXr) requestVrHandoff();
       onSelectPlanet(planet);
     };
-    refreshXrMenu();
+    refreshXrConsole();
     for (const root of planetTargetRoots) root.dispose(false, true);
     planetTargetRoots = planets.slice(0, 8).map((planet, index) => {
       const root = new TransformNode(`system-world-orbit-${planet.id}`, scene);
@@ -741,7 +781,7 @@ export const createStarScene = ({
         rig.position.z = STAR_DECK_POSITION.z + offsetZ * scale;
       }
       rig.position.y += STAR_DECK_POSITION.y - (rig.position.y - rig.realWorldHeight);
-      xrMenu?.update(rig, deltaSeconds);
+      xrConsole?.update(deltaSeconds);
     }
 
     if (qualitySampleSeconds >= 3) {
@@ -760,7 +800,7 @@ export const createStarScene = ({
   window.addEventListener("resize", resize);
 
   let xr: WebXRDefaultExperience | null = null;
-  let xrMenu: XrMenu | null = null;
+  let xrConsole: XrConsole | null = null;
   let isInXr = false;
   let vrSupported = false;
   let disposed = false;
@@ -794,14 +834,16 @@ export const createStarScene = ({
     const headOffset = initial ? 0 : rig.realWorldHeight;
     rig.position.set(STAR_DECK_POSITION.x, STAR_DECK_POSITION.y + headOffset, STAR_DECK_POSITION.z);
     rig.setTarget(STAR_POSITION);
+    // The console is world-locked, so a teleport would otherwise strand it where the wearer was.
+    xrConsole?.recall();
   };
 
-  const buildXrMenuItems = (): XrMenuItem[] => {
-    const items: XrMenuItem[] = [
+  const buildSceneActions = (): XrCell[] => {
+    const actions: XrCell[] = [
       {
+        detail: "Face the star",
         id: "recentre",
         label: "Recentre me",
-        detail: "Face the star",
         onSelect: () => placeXrCamera(false),
       },
     ];
@@ -809,25 +851,43 @@ export const createStarScene = ({
     const travel = selectPlanet;
     if (travel) {
       for (const planet of menuPlanets.slice(0, 5)) {
-        items.push({
+        actions.push({
+          badge: planet.kind === "unknown" ? undefined : planet.kind.replace("-", " "),
+          detail: "Travel to this world",
           id: `planet-${planet.id}`,
           label: planet.name,
-          detail: "Travel to this world",
           onSelect: () => travel(planet),
         });
       }
     }
 
-    items.push({
-      id: "exit",
-      label: "Exit immersive VR",
-      detail: "Back to the browser view",
-      onSelect: () => void xr?.baseExperience.exitXRAsync(),
-    });
-    return items;
+    return actions;
   };
 
-  const refreshXrMenu = (): void => xrMenu?.setItems(buildXrMenuItems());
+  // Travelling anywhere rebuilds the renderer, so an active session is handed over rather than
+  // dropping the wearer back into the flat page.
+  const handOver = <Argument>(travel: (argument: Argument) => void) => {
+    return (argument: Argument): void => {
+      if (isInXr) requestVrHandoff();
+      travel(argument);
+    };
+  };
+
+  const consoleHost: XrConsoleHost = {
+    facts: () => starFacts(star),
+    onExit: () => void xr?.baseExperience.exitXRAsync(),
+    onForgePlanet: onForgeWorld ? handOver(onForgeWorld) : undefined,
+    onForgeStar: onForgeStar ? handOver(onForgeStar) : undefined,
+    onTravelPlanet: onSelectPlanet ? handOver(onSelectPlanet) : undefined,
+    onTravelStar: onSelectStar ? handOver(onSelectStar) : undefined,
+    sceneActions: buildSceneActions,
+    source: () => `${star.source.archive} · ${star.source.retrievedOn}`,
+    subtitle: () => `${starKindLabel(star)} · observation deck`,
+    summary: () => starSummary(star),
+    title: () => star.name,
+  };
+
+  const refreshXrConsole = (): void => xrConsole?.refresh();
 
   onXrStatusChange("checking");
   void WebXRDefaultExperience.CreateAsync(scene, {
@@ -841,9 +901,9 @@ export const createStarScene = ({
     optionalFeatures: ["hand-tracking"],
     outputCanvasOptions: {
       canvasOptions: {
-        // An opaque immersive layer saves the headset compositor a per-pixel blend it would
-        // otherwise do against nothing, and no view here ever wants to see through the world.
-        alpha: false,
+        // Quest 2's compositor is unreliable with an explicitly opaque WebGL layer. Babylon's
+        // compatible default is alpha-enabled; the scene still clears to opaque black each frame.
+        alpha: true,
         antialias: false,
         depth: true,
         stencil: false,
@@ -866,8 +926,8 @@ export const createStarScene = ({
         xrInput: createdXr.input,
       });
 
-      xrMenu = createXrMenu(scene, star.name);
-      refreshXrMenu();
+      xrConsole = createXrConsole(scene, consoleHost, profile.anisotropicFiltering);
+      xrConsole.attach(createdXr);
 
       createdXr.baseExperience.onInitialXRPoseSetObservable.add(() => placeXrCamera(true));
       createdXr.baseExperience.onStateChangedObservable.add((state) => {
@@ -882,13 +942,12 @@ export const createStarScene = ({
           if (createdXr.baseExperience.sessionManager.isFixedFoveationSupported) {
             createdXr.baseExperience.sessionManager.fixedFoveation = sessionFoveation;
           }
-          refreshXrMenu();
-          xrMenu?.setVisible(true);
+          xrConsole?.setVisible(true);
           onXrStatusChange("in-xr");
         }
         if (state === WebXRState.NOT_IN_XR) {
           isInXr = false;
-          xrMenu?.setVisible(false);
+          xrConsole?.setVisible(false);
           setDeckVisible(false);
           camera.attachControl(canvas, true);
           onXrStatusChange(vrSupported ? "ready" : "unavailable");
@@ -914,8 +973,8 @@ export const createStarScene = ({
       if (disposed) return;
       disposed = true;
       window.removeEventListener("resize", resize);
-      xrMenu?.dispose();
-      xrMenu = null;
+      xrConsole?.dispose();
+      xrConsole = null;
       xr?.dispose();
       engine.stopRenderLoop();
       scene.dispose();

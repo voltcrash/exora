@@ -57,20 +57,22 @@ export const App = () => {
     return () => window.removeEventListener("popstate", loadFromLocation);
   }, [loadFromLocation]);
 
-  const selectPlanet = (planet: ExoplanetProfile, cached: boolean): void => {
+  // Stable identities: the immersive console hands these to the Babylon scene, and a new
+  // function on every render would tear the renderer down and rebuild it mid-session.
+  const selectPlanet = useCallback((planet: ExoplanetProfile, cached: boolean): void => {
     window.history.pushState({}, "", `?planet=${encodeURIComponent(planet.name)}`);
     setCatalogOpen(false);
     setCustomRecipe(null);
     setActiveObject({ result: { cached, mode: "live", planet }, type: "planet" });
-  };
+  }, []);
 
-  const selectStar = (star: StarProfile, cached: boolean): void => {
+  const selectStar = useCallback((star: StarProfile, cached: boolean): void => {
     window.history.pushState({}, "", `?star=${encodeURIComponent(star.name)}`);
     setStarCatalogOpen(false);
     setCustomRecipe(null);
     setSystemHostName(null);
     setActiveObject({ result: { cached, mode: "live", star }, type: "star" });
-  };
+  }, []);
 
   const selectHostStar = useCallback(async (hostStar: string): Promise<boolean> => {
     const result = await loadStarByName(hostStar);
@@ -82,7 +84,7 @@ export const App = () => {
     return true;
   }, []);
 
-  const generatePlanet = ({ planet, recipe }: CustomWorld): void => {
+  const generatePlanet = useCallback(({ planet, recipe }: CustomWorld): void => {
     window.history.pushState({}, "", `?custom=${encodeURIComponent(planet.name)}`);
     setBuilderOpen(false);
     setCustomRecipe(recipe);
@@ -90,9 +92,9 @@ export const App = () => {
       result: { cached: false, mode: "custom", planet },
       type: "planet",
     });
-  };
+  }, []);
 
-  const generateStar = ({ star }: CustomStar): void => {
+  const generateStar = useCallback(({ star }: CustomStar): void => {
     window.history.pushState({}, "", `?customStar=${encodeURIComponent(star.name)}`);
     setBuilderOpen(false);
     setCustomRecipe(null);
@@ -100,7 +102,7 @@ export const App = () => {
       result: { cached: false, mode: "custom", star },
       type: "star",
     });
-  };
+  }, []);
 
   if (!activeObject) {
     return (
@@ -120,10 +122,14 @@ export const App = () => {
         <PlanetExperience
           key={activeObject.result.planet.id}
           result={activeObject.result}
+          onGeneratePlanet={generatePlanet}
+          onGenerateStar={generateStar}
           onOpenCatalog={() => setCatalogOpen(true)}
           onOpenBuilder={() => setBuilderOpen(true)}
           onOpenStars={() => setStarCatalogOpen(true)}
           onSelectHostStar={selectHostStar}
+          onSelectPlanet={selectPlanet}
+          onSelectStar={selectStar}
           recipeOverride={customRecipe}
         />
       ) : (
@@ -131,7 +137,10 @@ export const App = () => {
           key={activeObject.result.star.id}
           result={activeObject.result}
           systemHostName={systemHostName}
+          onGeneratePlanet={generatePlanet}
+          onGenerateStar={generateStar}
           onSelectPlanet={selectPlanet}
+          onSelectStar={selectStar}
           onOpenPlanets={() => setCatalogOpen(true)}
           onOpenStars={() => setStarCatalogOpen(true)}
           onOpenBuilder={() => setBuilderOpen(true)}
