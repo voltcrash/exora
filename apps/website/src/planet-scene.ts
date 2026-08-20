@@ -50,7 +50,7 @@ import type { XrCell } from "./xr-panel-layout.ts";
 import { requestVrHandoff } from "./xr-session.ts";
 
 const PLANET_POSITION = new Vector3(0, 1.35, 9.5);
-const VIEWING_DECK_POSITION = new Vector3(0, 0, -7.4);
+const XR_ORBIT_STAND = new Vector3(0, 0, -7.4);
 const LIGHT_DIRECTION = new Vector3(-0.82, 0.3, -0.38).normalize();
 const DESKTOP_MOVE_SPEED = 5.2;
 const XR_MOVE_SPEED = 2.2;
@@ -58,12 +58,6 @@ const SURFACE_GROUND_ORIGIN_Z = 18;
 const SURFACE_GROUND_BASE_Y = -1.6;
 /** Where the wearer stands when the immersive session drops onto the terrain. */
 const XR_SURFACE_STAND = new Vector3(0, 0, 12);
-const XR_SURFACE_BOUNDS = { maxX: 30, maxZ: 50, minX: -30, minZ: -14 };
-/** Radius of the orbital platform, so a thumbstick cannot walk the wearer into empty space. */
-const XR_DECK_RADIUS = 2.4;
-
-const clamp = (value: number, minimum: number, maximum: number): number =>
-  Math.min(maximum, Math.max(minimum, value));
 
 const SKY_VERTEX_SHADER = `
 precision highp float;
@@ -1173,84 +1167,6 @@ const createHostStar = (
   }
 
   return [star, corona];
-};
-
-interface ViewingDeck {
-  floor: Mesh;
-  visuals: readonly Mesh[];
-}
-
-const createViewingDeck = (scene: Scene, profile: RenderQualityProfile): ViewingDeck => {
-  const deck = MeshBuilder.CreateCylinder(
-    "viewingDeck",
-    { diameter: 5.8, height: 0.12, tessellation: 64 },
-    scene,
-  );
-  deck.position.copyFrom(VIEWING_DECK_POSITION);
-  deck.position.y = -0.06;
-
-  const deckMaterial = new StandardMaterial("deckMaterial", scene);
-  deckMaterial.diffuseColor = new Color3(0.006, 0.018, 0.03);
-  deckMaterial.emissiveColor = new Color3(0.008, 0.038, 0.06);
-  deckMaterial.specularColor = new Color3(0.12, 0.5, 0.62);
-  deckMaterial.alpha = 0.32;
-  deckMaterial.backFaceCulling = false;
-  deckMaterial.freeze();
-  deck.material = deckMaterial;
-  deck.freezeWorldMatrix();
-  deck.isVisible = false;
-
-  const ringMaterial = new StandardMaterial("deckRingMaterial", scene);
-  ringMaterial.disableLighting = true;
-  ringMaterial.emissiveColor = new Color3(0.08, 0.76, 1);
-  ringMaterial.alpha = 0.76;
-  ringMaterial.freeze();
-
-  const makeRing = (name: string, diameter: number, thickness: number): Mesh => {
-    const ring = MeshBuilder.CreateTorus(
-      name,
-      { diameter, thickness, tessellation: profile.ringTessellation },
-      scene,
-    );
-    ring.position.set(VIEWING_DECK_POSITION.x, 0.012, VIEWING_DECK_POSITION.z);
-    ring.material = ringMaterial;
-    ring.freezeWorldMatrix();
-    ring.isVisible = false;
-    ring.isPickable = false;
-    return ring;
-  };
-
-  const outerRing = makeRing("deckOuterRing", 5.25, 0.032);
-  const innerRing = makeRing("deckInnerRing", 1.35, 0.018);
-
-  // Short luminous ticks make the platform read as a navigational instrument without putting a
-  // rail or console between the wearer and the subject. They stay at ankle height and cost only
-  // simple emissive geometry on the Quest profile.
-  const markers = Array.from({ length: 12 }, (_, index) => {
-    const angle = (index / 12) * Math.PI * 2;
-    const marker = MeshBuilder.CreateBox(
-      `deckBearing-${index}`,
-      { depth: 0.34, height: 0.012, width: index % 3 === 0 ? 0.055 : 0.028 },
-      scene,
-    );
-    marker.position.set(
-      VIEWING_DECK_POSITION.x + Math.sin(angle) * 2.3,
-      0.014,
-      VIEWING_DECK_POSITION.z + Math.cos(angle) * 2.3,
-    );
-    marker.rotation.y = angle;
-    marker.material = ringMaterial;
-    marker.freezeWorldMatrix();
-    marker.isVisible = false;
-    marker.isPickable = false;
-    return marker;
-  });
-
-  return { floor: deck, visuals: [deck, outerRing, innerRing, ...markers] };
-};
-
-const setViewingDeckVisible = (viewingDeck: ViewingDeck, visible: boolean): void => {
-  for (const mesh of viewingDeck.visuals) mesh.isVisible = visible;
 };
 
 /**
@@ -2383,7 +2299,6 @@ export const createPlanetExperience = ({
     : undefined;
 
   createStarfield(scene, recipe.seed, profile.starCount);
-  const viewingDeck = createViewingDeck(scene, profile);
   const {
     atmosphere,
     cloudLayer,
@@ -2559,31 +2474,8 @@ export const createPlanetExperience = ({
     cloudLayer?.setVector3("cameraPosition", activePosition);
     ringMaterial?.setVector3("cameraPosition", activePosition);
 
-    const rig = isInXr ? xrCamera() : null;
-    if (rig) {
-      // Thumbstick movement slides the rig across a flat plane, so the wearer has to be kept on
-      // the terrain (or on the deck) instead of hovering above it or walking off the world.
-      const eyeHeight = rig.realWorldHeight;
-      if (viewState === "surface") {
-        rig.position.x = clamp(rig.position.x, XR_SURFACE_BOUNDS.minX, XR_SURFACE_BOUNDS.maxX);
-        rig.position.z = clamp(rig.position.z, XR_SURFACE_BOUNDS.minZ, XR_SURFACE_BOUNDS.maxZ);
-        const groundY = surfaceGroundHeight(rig.position.x, rig.position.z, recipe);
-        rig.position.y += groundY - (rig.position.y - eyeHeight);
-      } else {
-        const offsetX = rig.position.x - VIEWING_DECK_POSITION.x;
-        const offsetZ = rig.position.z - VIEWING_DECK_POSITION.z;
-        const distance = Math.hypot(offsetX, offsetZ);
-        if (distance > XR_DECK_RADIUS) {
-          const scale = XR_DECK_RADIUS / distance;
-          rig.position.x = VIEWING_DECK_POSITION.x + offsetX * scale;
-          rig.position.z = VIEWING_DECK_POSITION.z + offsetZ * scale;
-        }
-        rig.position.y += VIEWING_DECK_POSITION.y - (rig.position.y - eyeHeight);
-      }
-    }
-    // Console placement is driven by the XR camera itself, not by the optional locomotion rig.
-    // Keeping this outside the rig guard guarantees its summon animation and delayed head-pose
-    // anchor continue on browsers that expose the rig a frame or two late.
+    // Locomotion owns the XR rig after entry. Rewriting its position here causes visible
+    // snap-backs on room-scale headsets, so only the head-locked console needs a frame update.
     if (isInXr) xrConsole?.update(deltaSeconds);
 
     if (qualitySampleSeconds >= 3) {
@@ -2648,15 +2540,9 @@ export const createPlanetExperience = ({
       rig.position.set(XR_SURFACE_STAND.x, groundY + headOffset, XR_SURFACE_STAND.z);
       rig.setTarget(new Vector3(XR_SURFACE_STAND.x, groundY + 1.4, XR_SURFACE_STAND.z + 18));
     } else {
-      rig.position.set(
-        VIEWING_DECK_POSITION.x,
-        VIEWING_DECK_POSITION.y + headOffset,
-        VIEWING_DECK_POSITION.z,
-      );
+      rig.position.set(XR_ORBIT_STAND.x, XR_ORBIT_STAND.y + headOffset, XR_ORBIT_STAND.z);
       rig.setTarget(PLANET_POSITION);
     }
-    // The console is world-locked, so a teleport would otherwise strand it where the wearer was.
-    xrConsole?.recall();
   };
 
   /** Restores the desktop camera so leaving the headset lands on the view the wearer left in. */
@@ -2718,7 +2604,7 @@ export const createPlanetExperience = ({
     sceneActions: buildSceneActions,
     source: () => `${planetProfile.source.archive} · ${planetProfile.source.retrievedOn}`,
     subtitle: () =>
-      `${recipe.classification} · ${viewState === "surface" ? "surface excursion" : "orbital deck"}`,
+      `${recipe.classification} · ${viewState === "surface" ? "surface excursion" : "orbital view"}`,
     summary: () => recipe.summary,
     title: () => planetProfile.name,
   };
@@ -2728,7 +2614,6 @@ export const createPlanetExperience = ({
     viewState = surface ? "surface" : "orbit";
     viewTransitionSeconds = 0;
     applyViewEnvironment(surface);
-    setViewingDeckVisible(viewingDeck, !surface);
     placeXrCamera(surface, initial);
     xrConsole?.refresh();
     onViewModeChange(surface ? "surface" : "orbit");
@@ -2738,7 +2623,6 @@ export const createPlanetExperience = ({
     disableDefaultUI: true,
     disableNearInteraction: true,
     disableTeleportation: true,
-    floorMeshes: [viewingDeck.floor],
     // The rigged hand mesh is a remote glTF and no loader is bundled, so joint spheres are used.
     handSupportOptions: { handMeshes: { disableDefaultMeshes: true } },
     inputOptions: { doNotLoadControllerMeshes: true },
@@ -2785,7 +2669,6 @@ export const createPlanetExperience = ({
       createdXr.baseExperience.onStateChangedObservable.add((state) => {
         if (disposed) return;
         if (state === WebXRState.ENTERING_XR) {
-          setViewingDeckVisible(viewingDeck, viewState !== "surface");
           onXrStatusChange("entering");
         }
         if (state === WebXRState.IN_XR) {
@@ -2800,7 +2683,6 @@ export const createPlanetExperience = ({
         if (state === WebXRState.NOT_IN_XR) {
           isInXr = false;
           xrConsole?.setVisible(false);
-          setViewingDeckVisible(viewingDeck, false);
           syncDesktopCamera(viewState === "surface");
           onXrStatusChange(isVrSupported ? "ready" : "unavailable");
         }
