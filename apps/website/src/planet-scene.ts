@@ -43,6 +43,8 @@ import {
   shaderDefines,
 } from "./render-quality.ts";
 import { buildCraterField, sampleTerrainHeight } from "./planet-terrain.ts";
+import { createStellarSurface, type StellarSurface } from "./star-surface.ts";
+import { createStarfield } from "./star-visuals.ts";
 import { getSurfaceDetailTextures } from "./texture-cache.ts";
 import { createXrConsole, type XrConsole, type XrConsoleHost } from "./xr-console.ts";
 import { planetFacts } from "./xr-console-model.ts";
@@ -128,10 +130,25 @@ void main(void) {
   cloudBand *= smoothstep(-0.14, 0.35, direction.y) * (1.0 - smoothstep(0.62, 0.96, direction.y));
   sky = mix(sky, cloudColor, cloudBand * cloudiness * (0.34 + density * 0.46));
 
-  vec2 starCell = floor(vec2(longitude * 210.0, asin(direction.y) * 180.0));
-  float star = step(0.994, hash(starCell)) * pow(hash(starCell + 9.4), 5.0);
-  star *= smoothstep(0.08, 0.72, direction.y) * starVisibility;
-  sky += vec3(0.72, 0.86, 1.0) * star * 2.4;
+  // Naked-eye stars in the planet's own sky. The lattice only chooses WHERE each star sits; its
+  // brightness then falls off from a point inside its cell. Thresholding the cell hash directly
+  // instead lights the whole cell, which fills the sky with little squares rather than stars.
+  vec2 starGrid = vec2(longitude * 88.0, asin(direction.y) * 104.0);
+  vec2 starCell = floor(starGrid);
+  vec2 starOffset = vec2(hash(starCell + 3.7), hash(starCell + 8.1));
+  float starDistance = length((fract(starGrid) - starOffset) * vec2(1.0, 1.2));
+  float magnitude = pow(hash(starCell + 9.4), 4.0) * step(0.84, hash(starCell));
+  // A tight core over a wider halo — the same two-term point spread the orbital starfield uses,
+  // and the reason a star reads as a light source instead of as a lit pixel.
+  float star = (exp(-starDistance * starDistance * 300.0) + exp(-starDistance * 10.0) * 0.14)
+    * magnitude;
+  // Scintillation. Unlike the vacuum starfield this one really is being viewed through moving
+  // air, so the twinkle is physical here, and it deepens with the thickness of that air.
+  star *= 1.0 - (0.12 + density * 0.3)
+    * (0.5 + 0.5 * sin(time * (2.2 + hash(starCell + 1.3) * 5.0) + hash(starCell) * 40.0));
+  star *= smoothstep(0.02, 0.5, direction.y) * starVisibility;
+  vec3 starTint = mix(vec3(1.0, 0.79, 0.63), vec3(0.71, 0.84, 1.0), hash(starCell + 5.5));
+  sky += starTint * star * 2.6;
 
   float dither = (hash(gl_FragCoord.xy) - 0.5) / 255.0;
   gl_FragColor = vec4(sky + dither, 1.0);
@@ -1061,104 +1078,39 @@ interface PlanetExperienceOptions {
 
 const toColor3 = ([red, green, blue]: Rgb): Color3 => new Color3(red, green, blue);
 
-const createStarfield = (scene: Scene, seed: number, starCount: number): Mesh => {
-  const starfield = new Mesh("starfield", scene);
-  const positions: number[] = [];
-  const colors: number[] = [];
-  const indices: number[] = [];
-  let randomState = seed || 1;
+const HOST_STAR_OFFSET = new Vector3(-18, 11, 32);
 
-  const random = (): number => {
-    randomState = (randomState * 1664525 + 1013904223) >>> 0;
-    return randomState / 4294967296;
-  };
-
-  for (let index = 0; index < starCount; index += 1) {
-    const distance = 70 + random() * 45;
-    const theta = random() * Math.PI * 2;
-    const phi = Math.acos(2 * random() - 1);
-    const brightness = 0.35 + random() * 0.65;
-
-    positions.push(
-      distance * Math.sin(phi) * Math.cos(theta),
-      distance * Math.cos(phi),
-      distance * Math.sin(phi) * Math.sin(theta),
-    );
-    colors.push(brightness * 0.78, brightness * 0.9, brightness, 1);
-    indices.push(index);
-  }
-
-  const vertexData = new VertexData();
-  vertexData.positions = positions;
-  vertexData.colors = colors;
-  vertexData.indices = indices;
-  vertexData.applyToMesh(starfield);
-
-  const starMaterial = new StandardMaterial("starMaterial", scene);
-  starMaterial.disableLighting = true;
-  starMaterial.emissiveColor = Color3.White();
-  starMaterial.pointsCloud = true;
-  starMaterial.pointSize = 1.7;
-  starMaterial.disableDepthWrite = true;
-  starMaterial.freeze();
-  starfield.material = starMaterial;
-  starfield.isPickable = false;
-  starfield.alwaysSelectAsActiveMesh = true;
-  starfield.freezeWorldMatrix();
-
-  return starfield;
-};
-
+/**
+ * The planet's own sun, hanging in its sky.
+ *
+ * This used to be a flat emissive sphere with a translucent shell around it, which is a shape lit
+ * from nowhere rather than a light source: it read as a grey ping-pong ball taped to the
+ * background. It is now the same photosphere the star scene draws, at `distant` detail — real
+ * limb darkening and granulation on the disc, and a glare with diffraction spikes carrying the
+ * brightness that the display cannot.
+ */
 const createHostStar = (
   scene: Scene,
   recipe: WorldRecipe,
   profile: RenderQualityProfile,
   parent: TransformNode,
   onSelectHostStar?: () => void,
-): AbstractMesh[] => {
-  const starPosition = PLANET_POSITION.add(new Vector3(-18, 11, 32));
-  const star = MeshBuilder.CreateSphere(
-    "hostStar",
-    {
-      diameter: recipe.star.radiusSceneUnits * 2,
-      segments: profile.tier === "desktop" ? 40 : 24,
-    },
+): StellarSurface => {
+  const surface = createStellarSurface({
+    detail: "distant",
+    diameter: recipe.star.radiusSceneUnits * 2,
+    parent,
+    pickable: Boolean(onSelectHostStar),
+    position: PLANET_POSITION.add(HOST_STAR_OFFSET),
+    profile,
+    recipe: recipe.star,
     scene,
-  );
-  star.parent = parent;
-  star.position.copyFrom(starPosition);
-  star.isPickable = Boolean(onSelectHostStar);
-
-  const starMaterial = new StandardMaterial("hostStarMaterial", scene);
-  starMaterial.disableLighting = true;
-  starMaterial.diffuseColor = toColor3(recipe.star.color);
-  starMaterial.emissiveColor = toColor3(recipe.star.color).scale(recipe.star.intensity);
-  starMaterial.freeze();
-  star.material = starMaterial;
-
-  const corona = MeshBuilder.CreateSphere(
-    "hostStarCorona",
-    {
-      diameter: recipe.star.radiusSceneUnits * 2.7,
-      segments: profile.tier === "desktop" ? 32 : 20,
-    },
-    scene,
-  );
-  corona.parent = parent;
-  corona.position.copyFrom(starPosition);
-  corona.isPickable = Boolean(onSelectHostStar);
-  corona.renderingGroupId = 1;
-  const coronaMaterial = new StandardMaterial("hostStarCoronaMaterial", scene);
-  coronaMaterial.disableLighting = true;
-  coronaMaterial.emissiveColor = toColor3(recipe.star.color).scale(0.85);
-  coronaMaterial.alpha = Math.min(0.38, 0.16 + recipe.star.intensity * 0.065);
-  coronaMaterial.backFaceCulling = false;
-  coronaMaterial.disableDepthWrite = true;
-  coronaMaterial.freeze();
-  corona.material = coronaMaterial;
+    seed: recipe.seed,
+    spotCoverage: recipe.star.spotCoverage,
+  });
 
   if (onSelectHostStar) {
-    for (const target of [star, corona]) {
+    for (const target of surface.meshes) {
       target.actionManager = new ActionManager(scene);
       target.actionManager.registerAction(
         new ExecuteCodeAction(ActionManager.OnPickTrigger, onSelectHostStar),
@@ -1166,7 +1118,7 @@ const createHostStar = (
     }
   }
 
-  return [star, corona];
+  return surface;
 };
 
 /**
@@ -1976,7 +1928,13 @@ const createSurfaceEnvironment = (
   recipe: WorldRecipe,
   profile: RenderQualityProfile,
   onSelectHostStar?: () => void,
-): { cloudLayers: Mesh[]; meshes: AbstractMesh[]; root: TransformNode; sky: ShaderMaterial } => {
+): {
+  cloudLayers: Mesh[];
+  meshes: AbstractMesh[];
+  root: TransformNode;
+  sky: ShaderMaterial;
+  star: StellarSurface;
+} => {
   const root = new TransformNode("surfaceEnvironment", scene);
   const meshes: AbstractMesh[] = [];
   const random = createSeededRandom(recipe.seed ^ 0x9e3779b9);
@@ -2148,50 +2106,28 @@ const createSurfaceEnvironment = (
     meshes.push(haze);
   }
 
-  const surfaceStarDiameter = 1.6 + recipe.star.apparentRadiusRadians * 30;
-  const surfaceStar = MeshBuilder.CreateSphere(
-    "surfaceHostStar",
-    { diameter: surfaceStarDiameter, segments: profile.tier === "desktop" ? 28 : 18 },
+  // The same star as the orbital view, seen from under the planet's air. It keeps the real
+  // photosphere and the glare rather than the flat emissive ball plus alpha shell it used to be —
+  // through an atmosphere the glare is if anything more of the read, not less, since scattering
+  // spreads a bright source out much further than vacuum does.
+  const surfaceStar = createStellarSurface({
+    detail: "distant",
+    diameter: 1.6 + recipe.star.apparentRadiusRadians * 30,
+    parent: root,
+    pickable: Boolean(onSelectHostStar),
+    position: new Vector3(-8, 3.8, 48),
+    profile,
+    recipe: recipe.star,
+    // Group 1 puts the star over the sky dome, which draws in group 0 without a depth write.
+    renderingGroupId: 1,
     scene,
-  );
-  surfaceStar.parent = root;
-  surfaceStar.position.set(-8, 3.8, 48);
-  surfaceStar.isPickable = Boolean(onSelectHostStar);
-  surfaceStar.applyFog = false;
-  surfaceStar.renderingGroupId = 1;
-  const surfaceStarMaterial = new StandardMaterial("surfaceHostStarMaterial", scene);
-  surfaceStarMaterial.disableLighting = true;
-  surfaceStarMaterial.diffuseColor = toColor3(recipe.star.color);
-  surfaceStarMaterial.emissiveColor = toColor3(recipe.star.color).scale(recipe.star.intensity);
-  surfaceStarMaterial.freeze();
-  surfaceStar.material = surfaceStarMaterial;
-  meshes.push(surfaceStar);
-
-  const surfaceStarHalo = MeshBuilder.CreateSphere(
-    "surfaceHostStarHalo",
-    {
-      diameter: surfaceStarDiameter * 1.65,
-      segments: profile.tier === "desktop" ? 24 : 16,
-    },
-    scene,
-  );
-  surfaceStarHalo.parent = root;
-  surfaceStarHalo.position.copyFrom(surfaceStar.position);
-  surfaceStarHalo.isPickable = Boolean(onSelectHostStar);
-  surfaceStarHalo.applyFog = false;
-  surfaceStarHalo.renderingGroupId = 1;
-  const surfaceStarHaloMaterial = new StandardMaterial("surfaceHostStarHaloMaterial", scene);
-  surfaceStarHaloMaterial.disableLighting = true;
-  surfaceStarHaloMaterial.emissiveColor = toColor3(recipe.star.color).scale(0.75);
-  surfaceStarHaloMaterial.alpha = Math.min(0.24, 0.1 + recipe.star.intensity * 0.04);
-  surfaceStarHaloMaterial.backFaceCulling = false;
-  surfaceStarHaloMaterial.disableDepthWrite = true;
-  surfaceStarHaloMaterial.freeze();
-  surfaceStarHalo.material = surfaceStarHaloMaterial;
-  meshes.push(surfaceStarHalo);
+    seed: recipe.seed,
+    spotCoverage: recipe.star.spotCoverage,
+  });
+  meshes.push(...surfaceStar.meshes);
 
   if (onSelectHostStar) {
-    for (const target of [surfaceStar, surfaceStarHalo]) {
+    for (const target of surfaceStar.meshes) {
       target.actionManager = new ActionManager(scene);
       target.actionManager.registerAction(
         new ExecuteCodeAction(ActionManager.OnPickTrigger, onSelectHostStar),
@@ -2204,7 +2140,7 @@ const createSurfaceEnvironment = (
     mesh.setEnabled(false);
   }
   root.setEnabled(false);
-  return { cloudLayers, meshes, root, sky: surfaceSky.material };
+  return { cloudLayers, meshes, root, sky: surfaceSky.material, star: surfaceStar };
 };
 
 const setEnvironmentEnabled = (
@@ -2298,7 +2234,7 @@ export const createPlanetExperience = ({
       }
     : undefined;
 
-  createStarfield(scene, recipe.seed, profile.starCount);
+  const starfield = createStarfield({ count: profile.starCount, scene, seed: recipe.seed });
   const {
     atmosphere,
     cloudLayer,
@@ -2311,7 +2247,13 @@ export const createPlanetExperience = ({
     ringSystem,
     shader,
   } = createPlanet(scene, recipe, profile);
-  orbitalMeshes.push(...createHostStar(scene, recipe, profile, orbitalRoot, travelToHostStar));
+  const hostStar = createHostStar(scene, recipe, profile, orbitalRoot, travelToHostStar);
+  orbitalMeshes.push(...hostStar.meshes);
+  // The deep-space starfield belongs to the orbital view only. Down on the surface the sky shader
+  // owns what the sky contains, and it has to: stars there are seen through an atmosphere that
+  // scatters them out entirely in daylight, so a vacuum starfield shining through a lit sky would
+  // be showing the viewer something no one standing on that planet could see.
+  orbitalMeshes.push(starfield.mesh);
   const surfaceEnvironment = createSurfaceEnvironment(scene, recipe, profile, travelToHostStar);
 
   let elapsedSeconds = 0;
@@ -2473,6 +2415,9 @@ export const createPlanetExperience = ({
     atmosphere.setVector3("cameraPosition", activePosition);
     cloudLayer?.setVector3("cameraPosition", activePosition);
     ringMaterial?.setVector3("cameraPosition", activePosition);
+    hostStar.update(elapsedSeconds, activePosition);
+    surfaceEnvironment.star.update(elapsedSeconds, activePosition);
+    starfield.update(elapsedSeconds, activePosition);
 
     // Locomotion owns the XR rig after entry. Rewriting its position here causes visible
     // snap-backs on room-scale headsets, so only the head-locked console needs a frame update.

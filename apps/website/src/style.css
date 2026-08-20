@@ -2422,44 +2422,61 @@ body[data-xr-status="unavailable"] .status-light {
     radial-gradient(circle, hsl(var(--star-hue) 90% 62% / 10%), transparent 68%), #05080c;
 }
 
+/* Diffraction vanes. Crossed linear gradients rather than a conic sweep: a conic gradient can
+   only make soft wedges radiating from the centre, and what actually reads as a star is a pair of
+   hard, thin, symmetrical spikes running clean through it. */
 .catalog-star-rays {
-  width: 142px;
-  height: 142px;
+  width: 190px;
+  height: 190px;
+  z-index: 2;
   position: absolute;
-  background: conic-gradient(
-    from var(--star-ray),
-    transparent 0 10%,
-    hsl(var(--star-hue) 90% 76% / 14%) 12%,
-    transparent 14% 48%,
-    hsl(var(--star-hue) 90% 76% / 10%) 50%,
-    transparent 52% 100%
+  transform: rotate(var(--star-ray));
+  /* Drawn over the disc, not behind it. A diffraction spike is made in the optics between the
+     star and the eye, so it lies on top of everything the star itself is doing. */
+  background:
+    linear-gradient(
+      to right,
+      transparent 48.4%,
+      hsl(var(--star-hue) 98% 97% / 90%) 50%,
+      transparent 51.6%
+    ),
+    linear-gradient(
+      to bottom,
+      transparent 48.7%,
+      hsl(var(--star-hue) 98% 97% / 72%) 50%,
+      transparent 51.3%
+    );
+  /* Fades the vanes out with distance AND hides the corners of the square they are painted on —
+     without it a rotated element gives the star a visible octagonal outline. */
+  mask-image: radial-gradient(
+    circle closest-side,
+    transparent 0 13%,
+    rgb(0 0 0 / 62%) 30%,
+    transparent 96%
   );
-  filter: blur(4px);
+  filter: blur(1.2px);
 }
 
+/* No inset shadow and no off-centre gradient: both of those shade a sphere, and a shaded sphere
+   is an object being lit rather than the thing doing the lighting. The core clips to white, the
+   colour lives in the darkening limb, and the brightness the screen cannot carry spills outside
+   the disc as glow — the same reading the 3D photosphere is built on. */
 .catalog-star-core {
   width: 108px;
   height: 108px;
   z-index: 1;
   border-radius: 50%;
-  background:
-    radial-gradient(circle at 35% 29%, rgb(255 255 255 / 94%), transparent 9%),
-    radial-gradient(
-      circle at 45% 42%,
-      #fff 0 12%,
-      hsl(var(--star-hue) 96% 82%) 32%,
-      hsl(var(--star-hue) 89% var(--star-bloom)) 66%,
-      hsl(var(--star-hue) 82% 38%) 100%
-    );
+  background: radial-gradient(
+    circle at 50% 50%,
+    #fff 0 26%,
+    hsl(var(--star-hue) 96% 88%) 46%,
+    hsl(var(--star-hue) 92% var(--star-bloom)) 78%,
+    hsl(var(--star-hue) 86% 44%) 100%
+  );
   box-shadow:
-    0 0 18px hsl(var(--star-hue) 94% 74% / 70%),
-    0 0 50px hsl(var(--star-hue) 90% 60% / 28%),
-    inset -9px -6px 17px rgb(70 32 0 / 28%);
-}
-
-.star-catalog-visual .catalog-visual-glint {
-  top: 34px;
-  background: #fff;
+    0 0 12px hsl(var(--star-hue) 96% 84% / 80%),
+    0 0 30px hsl(var(--star-hue) 94% 72% / 38%),
+    0 0 70px hsl(var(--star-hue) 90% 60% / 18%);
 }
 
 .catalog-result:disabled {
@@ -2544,10 +2561,14 @@ body[data-xr-status="unavailable"] .status-light {
   height: 34px;
 }
 
-.list-view .catalog-orbit,
-.list-view .catalog-star-rays {
+.list-view .catalog-orbit {
   width: 44px;
   height: 44px;
+}
+
+.list-view .catalog-star-rays {
+  width: 58px;
+  height: 58px;
 }
 
 .list-view .catalog-orbit {
@@ -3077,10 +3098,14 @@ body[data-xr-status="unavailable"] .status-light {
     height: 84px;
   }
 
-  .catalog-orbit,
-  .catalog-star-rays {
+  .catalog-orbit {
     width: 108px;
     height: 108px;
+  }
+
+  .catalog-star-rays {
+    width: 142px;
+    height: 142px;
   }
 
   .catalog-orbit {
@@ -3120,10 +3145,14 @@ body[data-xr-status="unavailable"] .status-light {
     height: 27px;
   }
 
-  .list-view .catalog-orbit,
-  .list-view .catalog-star-rays {
+  .list-view .catalog-orbit {
     width: 34px;
     height: 34px;
+  }
+
+  .list-view .catalog-star-rays {
+    width: 46px;
+    height: 46px;
   }
 }
 
