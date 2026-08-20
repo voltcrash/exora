@@ -30,6 +30,16 @@ export interface RenderQualityProfile {
   /** Whether the cloud shell samples a second, higher-frequency noise octave group for
    * finer multi-scale structure. Off on fill-rate-constrained tiers. */
   secondaryCloudDetail: boolean;
+  /**
+   * Background stars drawn per scene.
+   *
+   * These are camera-facing billboards with a real point-spread function, four vertices each, so
+   * the cost is fill rate on a few thousand small quads rather than geometry. A desktop can spend
+   * that freely, and a sky needs it: below roughly a thousand the eye reads scattered dots rather
+   * than a starfield. The headset tiers hold near their old counts instead of scaling up, because
+   * a quad with a halo costs orders of magnitude more fill than the one-pixel point sprite this
+   * replaced, and fill is exactly what a Quest has least of.
+   */
   starCount: number;
   /** Whether rocky planets sample the triplanar PBR microdetail textures (normal + roughness).
    * Off on fill-rate-constrained tiers so they keep the cheaper pure-procedural surface. */
@@ -84,7 +94,7 @@ export const deriveRenderQuality = ({
   if (isFirstGenerationQuest) {
     return {
       tier: "quest",
-      starCount: 460,
+      starCount: 420,
       planetSegments: 40,
       planetIcoSubdivisions: 8,
       moonSegments: 14,
@@ -130,7 +140,7 @@ export const deriveRenderQuality = ({
   if (isConstrainedMobile) {
     return {
       tier: "mobile",
-      starCount: 760,
+      starCount: 1_000,
       planetSegments: 52,
       planetIcoSubdivisions: 12,
       moonSegments: 18,
@@ -153,7 +163,7 @@ export const deriveRenderQuality = ({
 
   return {
     tier: "desktop",
-    starCount: 1_100,
+    starCount: 2_400,
     planetSegments: 64,
     planetIcoSubdivisions: 14,
     moonSegments: 24,

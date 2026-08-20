@@ -146,10 +146,21 @@ interface BaseWorldRecipe {
   rotationSpeed: number;
   seed: number;
   star: {
+    /** GENERATED 0-1 magnetic activity tendency: drives plage, spots and coronal density. */
+    activity: number;
     apparentRadiusRadians: number;
     color: Rgb;
+    /** GENERATED 0-1 coronal density, so a host star's halo matches its own activity. */
+    coronalIntensity: number;
+    /** GENERATED convection-cell size and contrast, mirroring StarVisualRecipe so the same
+     * photosphere shader can render a host star and a catalogue star from one set of inputs. */
+    granulationScale: number;
+    granulationStrength: number;
     intensity: number;
     radiusSceneUnits: number;
+    /** GENERATED 0-1 fraction of the disc that can carry starspots. */
+    spotCoverage: number;
+    temperatureKelvin: number;
   };
   summary: string;
 }
@@ -351,8 +362,13 @@ const createRandom = (seed: number): (() => number) => {
 const clamp = (value: number, minimum: number, maximum: number): number =>
   Number.isFinite(value) ? Math.min(maximum, Math.max(minimum, value)) : minimum;
 
-/** Approximate a black-body color from NASA's stellar effective temperature. */
-const temperatureToRgb = (temperatureKelvin: number): Rgb => {
+const clampUnit = (value: number): number =>
+  Number.isFinite(value) ? Math.min(1, Math.max(0, value)) : 0;
+
+/** Approximate a black-body color from NASA's stellar effective temperature. Exported so the
+ * renderer's background starfield tints its stars from the same physical curve the catalogue
+ * stars use, rather than from a second, hand-tuned palette that would drift away from it. */
+export const temperatureToRgb = (temperatureKelvin: number): Rgb => {
   const temperature = clamp(temperatureKelvin, 1_000, 40_000) / 100;
   const red = temperature <= 66 ? 255 : 329.698727446 * (temperature - 60) ** -0.1332047592;
   const green =
@@ -579,12 +595,25 @@ export const deriveHostStar = (planet: ExoplanetProfile): BaseWorldRecipe["star"
       ? Math.asin(clamp((radiusSolar * 0.00465047) / orbitalDistanceAu, 0, 0.95))
       : 0.00465047 * Math.sqrt(radiusSolar);
 
+  // Cooler stars carry deeper convective envelopes and more surface magnetism; hotter ones run
+  // radiative and show comparatively little of either. These are the same generic stellar-physics
+  // tendencies deriveStarRecipe applies, restated here without its per-star randomness so a host
+  // star stays a pure function of the catalogue values NASA reported for it.
+  const convectiveTendency = clampUnit(1 - (temperatureKelvin - 3_000) / 27_000);
+  const activity = clampUnit(0.25 + convectiveTendency * 0.5);
+
   return {
     color: temperatureToRgb(temperatureKelvin),
+    temperatureKelvin,
     radiusSceneUnits: clamp(1.5 + Math.log2(radiusSolar + 0.5) * 1.1, 1.1, 5.5),
     intensity: clamp(1.45 + Math.log10(Math.max(0.001, luminositySolar)) * 0.34, 0.65, 3.2),
     // Preserve the relative apparent sizes while keeping ordinary stars legible in the terrain sky.
     apparentRadiusRadians: clamp(physicalAngularRadius * 2.4, 0.012, 0.09),
+    activity,
+    spotCoverage: clampUnit(activity * 0.3),
+    granulationScale: 0.4 + convectiveTendency * 1.6,
+    granulationStrength: clampUnit(0.2 + convectiveTendency * 0.5),
+    coronalIntensity: clampUnit(0.25 + activity * 0.65),
   };
 };
 
@@ -1130,9 +1159,6 @@ export const deriveWorldRecipe = (planet: ExoplanetProfile): WorldRecipe => {
   if (planet.kind === "ice-giant") return deriveIceGiantRecipe(planet, seed, random);
   return deriveGasGiantRecipe(planet, seed, random);
 };
-
-const clampUnit = (value: number): number =>
-  Number.isFinite(value) ? Math.min(1, Math.max(0, value)) : 0;
 
 const temperatureToSpectralClass = (temperatureKelvin: number): string => {
   if (temperatureKelvin >= 30_000) return "O";
