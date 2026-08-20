@@ -128,7 +128,9 @@ export const deriveRenderQuality = ({
       maxGiantStorms: 2,
       anisotropicFiltering: 4,
       surfaceColorDetail: true,
-      surfaceMicrodetail: false,
+      // KTX2 keeps both selected normal/roughness families GPU-compressed, making the richer
+      // surface affordable on newer Quest hardware without the old uncompressed VRAM spike.
+      surfaceMicrodetail: true,
       secondaryCloudDetail: false,
       maxRenderScale: 1,
       hardwareScalingLevel: roundScale(Math.max(1.2, pixelRatio / 1.35)),

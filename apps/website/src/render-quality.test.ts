@@ -28,6 +28,7 @@ test("selects a Quest-focused rendering budget", () => {
   expect(profile.planetSegments).toBeLessThan(96);
   expect(profile.xrFramebufferScaleFactor).toBeLessThanOrEqual(1);
   expect(profile.xrFixedFoveation).toBeGreaterThanOrEqual(0.4);
+  expect(profile.surfaceMicrodetail).toBe(true);
 });
 
 test("keeps the high-detail profile on capable desktops", () => {
@@ -137,7 +138,7 @@ test("bakes the octave budget into the shader defines", () => {
   ]);
 });
 
-test("only enables triplanar surface microdetail on the desktop tier", () => {
+test("enables triplanar surface microdetail on a capable desktop tier", () => {
   const profile = deriveRenderQuality({
     userAgent: "Mozilla/5.0 (Macintosh; Intel Mac OS X)",
     pixelRatio: 2,

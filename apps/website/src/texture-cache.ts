@@ -73,11 +73,13 @@ export const SURFACE_DETAIL_FAMILIES: readonly SurfaceDetailFamily[] = [
   "ice",
 ];
 
-const detailTexturePath = (family: SurfaceDetailFamily, map: "normal" | "roughness"): string =>
-  `/textures/${family}/${map}.png`;
+export const detailTexturePath = (
+  family: SurfaceDetailFamily,
+  map: "normal" | "roughness",
+): string => `/textures/${family}/${map}.ktx2`;
 
-const chemistryTexturePath = (family: ChemistryDetailFamily): string =>
-  `/textures/chemistry/${family}.png`;
+export const chemistryTexturePath = (family: ChemistryDetailFamily): string =>
+  `/textures/chemistry/${family}.ktx2`;
 
 /** Selects only two high-resolution PBR families per world instead of uploading all five. The
  * chemistry texture supplies the palette-specific grain while these two maps supply physical
@@ -257,7 +259,7 @@ export const getSurfaceDetailTextures = (
           scene,
           path.includes("/chemistry/")
             ? "color"
-            : path.endsWith("normal.png")
+            : path.endsWith("normal.ktx2")
               ? "normal"
               : "roughness",
         ),
