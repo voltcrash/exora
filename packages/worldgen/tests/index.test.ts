@@ -171,6 +171,44 @@ test("rocky terrain changes deterministically between planets", () => {
   expect(first).not.toEqual(second);
 });
 
+test("rocky mineral families survive into visibly distinct rendered palettes", () => {
+  const carbonRichPlanet: ExoplanetProfile = {
+    ...temperateRockyPlanet,
+    id: "low-density-carbon-world",
+    observation: {
+      ...temperateRockyPlanet.observation,
+      radiusEarth: 1.7,
+      massEarth: 1,
+      equilibriumTemperatureKelvin: 360,
+    },
+  };
+  const gallery = [
+    deriveWorldRecipe(carbonRichPlanet),
+    deriveWorldRecipe(massiveSuperEarthPlanet),
+    deriveWorldRecipe(smallHotRockyPlanet),
+    deriveWorldRecipe(coldRockyPlanet),
+  ];
+  const rockyGallery = gallery.map((recipe) => {
+    if (recipe.renderer !== "rocky") throw new Error("Expected a rocky recipe.");
+    return recipe;
+  });
+
+  expect(new Set(rockyGallery.map((recipe) => recipe.inferred.paletteFamily)).size).toBe(4);
+  expect(new Set(rockyGallery.map((recipe) => JSON.stringify(recipe.surface.midColor))).size).toBe(
+    4,
+  );
+  for (const recipe of rockyGallery) {
+    for (const channel of [
+      ...recipe.surface.lowColor,
+      ...recipe.surface.midColor,
+      ...recipe.surface.highColor,
+    ]) {
+      expect(channel).toBeGreaterThanOrEqual(0);
+      expect(channel).toBeLessThanOrEqual(1);
+    }
+  }
+});
+
 test("ice giants produce methane haze and a faint ring system", () => {
   const recipe = deriveWorldRecipe(iceGiantPlanet);
 

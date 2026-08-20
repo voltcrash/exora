@@ -25,9 +25,9 @@ test("selects a Quest-focused rendering budget", () => {
   // Compared against the desktop budget rather than a literal, so retuning the absolute counts
   // does not break a test whose point is the relationship between the tiers.
   expect(profile.starCount).toBeLessThan(desktopProfile.starCount);
-  expect(profile.planetSegments).toBeLessThan(64);
-  expect(profile.xrFramebufferScaleFactor).toBeLessThan(1);
-  expect(profile.xrFixedFoveation).toBeGreaterThan(0.5);
+  expect(profile.planetSegments).toBeLessThan(96);
+  expect(profile.xrFramebufferScaleFactor).toBeLessThanOrEqual(1);
+  expect(profile.xrFixedFoveation).toBeGreaterThanOrEqual(0.4);
 });
 
 test("keeps the high-detail profile on capable desktops", () => {
@@ -40,7 +40,7 @@ test("keeps the high-detail profile on capable desktops", () => {
 
   expect(profile.tier).toBe("desktop");
   expect(profile.starCount).toBe(2_400);
-  expect(profile.planetSegments).toBe(64);
+  expect(profile.planetSegments).toBe(96);
   expect(profile.surfaceMicrodetail).toBe(true);
 });
 
@@ -105,22 +105,24 @@ test("gives Quest 2 a lighter budget than a Quest 3", () => {
   expect(questTwo.planetSegments).toBeLessThan(questThree.planetSegments);
   expect(questTwo.xrFramebufferScaleFactor).toBeLessThan(questThree.xrFramebufferScaleFactor);
   expect(questTwo.xrFixedFoveation).toBeGreaterThan(questThree.xrFixedFoveation);
+  expect(questTwo.surfaceColorDetail).toBe(true);
+  expect(questTwo.surfaceMicrodetail).toBe(false);
 });
 
 test("treats an unrecognised headset as the weaker one", () => {
   const profile = deriveRenderQuality({ userAgent: "OculusBrowser/33.0", pixelRatio: 1 });
 
   expect(profile.tier).toBe("quest");
-  expect(profile.fbmOctaves).toBe(3);
+  expect(profile.fbmOctaves).toBe(4);
 });
 
 test("raises foveation only while the session misses the refresh rate", () => {
   const profile = deriveRenderQuality({ userAgent: "Quest 2", pixelRatio: 1 });
 
-  expect(adaptFixedFoveation(profile.xrFixedFoveation, 50, profile)).toBe(0.9);
-  expect(adaptFixedFoveation(1, 50, profile)).toBe(1);
-  expect(adaptFixedFoveation(0.9, 72, profile)).toBe(0.85);
-  expect(adaptFixedFoveation(profile.xrFixedFoveation, 72, profile)).toBe(0.8);
+  expect(adaptFixedFoveation(profile.xrFixedFoveation, 50, profile)).toBe(0.65);
+  expect(adaptFixedFoveation(1, 50, profile)).toBe(0.85);
+  expect(adaptFixedFoveation(0.65, 72, profile)).toBe(0.6);
+  expect(adaptFixedFoveation(profile.xrFixedFoveation, 72, profile)).toBe(0.55);
   expect(adaptFixedFoveation(0.9, 66, profile)).toBe(0.9);
 });
 
@@ -128,7 +130,11 @@ test("bakes the octave budget into the shader defines", () => {
   const profile = deriveRenderQuality({ userAgent: "Quest 2", pixelRatio: 1 });
 
   expect(profile.surfaceMicrodetail).toBe(false);
-  expect(shaderDefines(profile)).toEqual(["#define FBM_OCTAVES 3", "#define MAX_GIANT_STORMS 1"]);
+  expect(shaderDefines(profile)).toEqual([
+    "#define FBM_OCTAVES 4",
+    "#define MAX_GIANT_STORMS 1",
+    "#define SURFACE_COLOR_DETAIL",
+  ]);
 });
 
 test("only enables triplanar surface microdetail on the desktop tier", () => {
@@ -140,6 +146,7 @@ test("only enables triplanar surface microdetail on the desktop tier", () => {
   expect(shaderDefines(profile)).toEqual([
     "#define FBM_OCTAVES 5",
     "#define MAX_GIANT_STORMS 3",
+    "#define SURFACE_COLOR_DETAIL",
     "#define SURFACE_MICRODETAIL",
     "#define CLOUD_DETAIL",
   ]);

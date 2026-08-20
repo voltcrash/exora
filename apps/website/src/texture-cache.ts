@@ -1,6 +1,7 @@
 import { Texture } from "@babylonjs/core/Materials/Textures/texture.js";
 import { RawTexture } from "@babylonjs/core/Materials/Textures/rawTexture.js";
 import type { Scene } from "@babylonjs/core/scene.js";
+import type { RockyPaletteFamily } from "@exora/worldgen";
 
 /**
  * Generic memoizing cache: the same `path` always resolves to the same created value, so callers
@@ -46,6 +47,24 @@ export interface SurfaceDetailMaps {
   roughness: Texture;
 }
 
+export type ChemistryDetailFamily = "carbon" | "ice" | "oxidized" | "silicate" | "sulfuric";
+
+export interface SurfaceDetailSelection {
+  chemistry: ChemistryDetailFamily;
+  chemistryScale: number;
+  chemistryStrength: number;
+  primary: SurfaceDetailFamily;
+  primaryScale: number;
+  secondary: SurfaceDetailFamily;
+  secondaryScale: number;
+}
+
+export interface SelectedSurfaceDetailMaps {
+  chemistry: Texture;
+  primary: SurfaceDetailMaps;
+  secondary: SurfaceDetailMaps;
+}
+
 export const SURFACE_DETAIL_FAMILIES: readonly SurfaceDetailFamily[] = [
   "granite",
   "basalt",
@@ -55,57 +74,163 @@ export const SURFACE_DETAIL_FAMILIES: readonly SurfaceDetailFamily[] = [
 ];
 
 const detailTexturePath = (family: SurfaceDetailFamily, map: "normal" | "roughness"): string =>
-  map === "normal" ? `/textures/${family}/normal.png` : `/textures/${family}/roughness.jpg`;
+  `/textures/${family}/${map}.png`;
+
+const chemistryTexturePath = (family: ChemistryDetailFamily): string =>
+  `/textures/chemistry/${family}.png`;
+
+/** Selects only two high-resolution PBR families per world instead of uploading all five. The
+ * chemistry texture supplies the palette-specific grain while these two maps supply physical
+ * response, keeping the desktop shader sharper and substantially lighter than the old 30-sample
+ * five-material blend. */
+export const surfaceDetailSelectionForPalette = (
+  palette: RockyPaletteFamily,
+): SurfaceDetailSelection => {
+  switch (palette) {
+    case "basaltic-dark":
+      return {
+        chemistry: "carbon",
+        chemistryScale: 10,
+        chemistryStrength: 0.32,
+        primary: "basalt",
+        primaryScale: 9,
+        secondary: "regolith",
+        secondaryScale: 14,
+      };
+    case "carbon-dark":
+      return {
+        chemistry: "carbon",
+        chemistryScale: 11,
+        chemistryStrength: 0.42,
+        primary: "basalt",
+        primaryScale: 8,
+        secondary: "cracked",
+        secondaryScale: 7,
+      };
+    case "desert-tan":
+      return {
+        chemistry: "oxidized",
+        chemistryScale: 15,
+        chemistryStrength: 0.28,
+        primary: "regolith",
+        primaryScale: 15,
+        secondary: "granite",
+        secondaryScale: 8,
+      };
+    case "ice-blue":
+      return {
+        chemistry: "ice",
+        chemistryScale: 11,
+        chemistryStrength: 0.34,
+        primary: "ice",
+        primaryScale: 11,
+        secondary: "granite",
+        secondaryScale: 8,
+      };
+    case "iron-rich":
+      return {
+        chemistry: "oxidized",
+        chemistryScale: 10,
+        chemistryStrength: 0.3,
+        primary: "basalt",
+        primaryScale: 9,
+        secondary: "granite",
+        secondaryScale: 7,
+      };
+    case "lava-black-red":
+      return {
+        chemistry: "carbon",
+        chemistryScale: 9,
+        chemistryStrength: 0.3,
+        primary: "basalt",
+        primaryScale: 8,
+        secondary: "cracked",
+        secondaryScale: 6,
+      };
+    case "oxidized-red":
+      return {
+        chemistry: "oxidized",
+        chemistryScale: 12,
+        chemistryStrength: 0.4,
+        primary: "regolith",
+        primaryScale: 13,
+        secondary: "cracked",
+        secondaryScale: 7,
+      };
+    case "sulfuric-yellow":
+      return {
+        chemistry: "sulfuric",
+        chemistryScale: 11,
+        chemistryStrength: 0.44,
+        primary: "cracked",
+        primaryScale: 7,
+        secondary: "regolith",
+        secondaryScale: 14,
+      };
+    case "silicate-neutral":
+      return {
+        chemistry: "silicate",
+        chemistryScale: 13,
+        chemistryStrength: 0.25,
+        primary: "granite",
+        primaryScale: 8,
+        secondary: "regolith",
+        secondaryScale: 14,
+      };
+  }
+};
 
 /** Flat-up normal map pixel (128, 128, 255) used when a detail normal map fails to load. */
 const FALLBACK_NORMAL_PIXEL = new Uint8Array([128, 128, 255, 255]);
 /** Mid-gray roughness pixel used when a detail roughness map fails to load. */
 const FALLBACK_ROUGHNESS_PIXEL = new Uint8Array([128, 128, 128, 255]);
+/** Neutral white color detail leaves the procedural palette unchanged on load failure. */
+const FALLBACK_COLOR_PIXEL = new Uint8Array([255, 255, 255, 255]);
 
-let fallbackNormalTexture: RawTexture | undefined;
-let fallbackRoughnessTexture: RawTexture | undefined;
+const fallbackTexturesByScene = new WeakMap<
+  Scene,
+  Partial<Record<"color" | "normal" | "roughness", RawTexture>>
+>();
 
-const getFallbackTexture = (scene: Scene, kind: "normal" | "roughness"): Texture => {
-  if (kind === "normal") {
-    fallbackNormalTexture ??= RawTexture.CreateRGBATexture(
-      FALLBACK_NORMAL_PIXEL,
-      1,
-      1,
-      scene,
-      false,
-      false,
-    );
-    return fallbackNormalTexture;
+const getFallbackTexture = (scene: Scene, kind: "color" | "normal" | "roughness"): Texture => {
+  let textures = fallbackTexturesByScene.get(scene);
+  if (!textures) {
+    textures = {};
+    fallbackTexturesByScene.set(scene, textures);
   }
-  fallbackRoughnessTexture ??= RawTexture.CreateRGBATexture(
-    FALLBACK_ROUGHNESS_PIXEL,
-    1,
-    1,
-    scene,
-    false,
-    false,
-  );
-  return fallbackRoughnessTexture;
+  const existing = textures[kind];
+  if (existing) return existing;
+
+  const pixel =
+    kind === "normal"
+      ? FALLBACK_NORMAL_PIXEL
+      : kind === "roughness"
+        ? FALLBACK_ROUGHNESS_PIXEL
+        : FALLBACK_COLOR_PIXEL;
+  const texture = RawTexture.CreateRGBATexture(pixel, 1, 1, scene, false, false);
+  texture.gammaSpace = kind === "color";
+  textures[kind] = texture;
+  return texture;
 };
 
 const cachesByScene = new WeakMap<Scene, { get: (path: string) => Texture }>();
 
 /**
- * Loads (once per scene) and returns the shared curated set of PBR microdetail textures used by
- * the rocky-planet triplanar shader. Every rocky planet in a scene calls this and gets back the
- * same `Texture` instances for a given family, so the underlying image is only decoded and
- * uploaded to the GPU once no matter how many planets reference it. See
- * THIRD_PARTY_ASSETS.md for provenance of the source images.
+ * Loads only the selected chemistry map and two selected PBR families, then reuses them for the
+ * lifetime of the scene. This avoids decoding/uploading irrelevant material families and makes
+ * the 2K source maps practical on desktop while Quest only requests the 1K chemistry map.
  */
 export const getSurfaceDetailTextures = (
   scene: Scene,
+  selection: SurfaceDetailSelection,
+  includePbrMaps: boolean,
   anisotropicFiltering = 16,
-): Record<SurfaceDetailFamily, SurfaceDetailMaps> => {
+): SelectedSurfaceDetailMaps => {
   let cache = cachesByScene.get(scene);
   if (!cache) {
     cache = createKeyedCache<Texture>(
       (path) => {
-        const isNormal = path.endsWith("normal.png");
+        const isColor = path.includes("/chemistry/");
         const texture = new Texture(
           path,
           scene,
@@ -124,21 +249,37 @@ export const getSurfaceDetailTextures = (
         // These tile across a sphere, so most of the visible surface is viewed at a grazing
         // angle where low anisotropy is exactly where mip selection blurs the detail away.
         texture.anisotropicFilteringLevel = anisotropicFiltering;
-        texture.gammaSpace = false;
-        if (!isNormal) texture.gammaSpace = false;
+        texture.gammaSpace = isColor;
         return texture;
       },
-      (path) => getFallbackTexture(scene, path.endsWith("normal.png") ? "normal" : "roughness"),
+      (path) =>
+        getFallbackTexture(
+          scene,
+          path.includes("/chemistry/")
+            ? "color"
+            : path.endsWith("normal.png")
+              ? "normal"
+              : "roughness",
+        ),
     );
     cachesByScene.set(scene, cache);
   }
 
-  const result = {} as Record<SurfaceDetailFamily, SurfaceDetailMaps>;
-  for (const family of SURFACE_DETAIL_FAMILIES) {
-    result[family] = {
-      normal: cache.get(detailTexturePath(family, "normal")),
-      roughness: cache.get(detailTexturePath(family, "roughness")),
-    };
-  }
-  return result;
+  const fallbackMaps = (): SurfaceDetailMaps => ({
+    normal: getFallbackTexture(scene, "normal"),
+    roughness: getFallbackTexture(scene, "roughness"),
+  });
+  const loadMaps = (family: SurfaceDetailFamily): SurfaceDetailMaps =>
+    includePbrMaps
+      ? {
+          normal: cache.get(detailTexturePath(family, "normal")),
+          roughness: cache.get(detailTexturePath(family, "roughness")),
+        }
+      : fallbackMaps();
+
+  return {
+    chemistry: cache.get(chemistryTexturePath(selection.chemistry)),
+    primary: loadMaps(selection.primary),
+    secondary: loadMaps(selection.secondary),
+  };
 };
