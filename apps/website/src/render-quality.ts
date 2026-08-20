@@ -1,9 +1,20 @@
 export type RenderQualityTier = "desktop" | "mobile" | "quest";
 
 export interface RenderQualityProfile {
+  /** Anisotropic filtering samples for the rocky triplanar detail maps. Grazing-angle terrain is
+   * most of a planet's visible surface, so this is what keeps the detail from smearing there. */
+  anisotropicFiltering: number;
   /** Octaves the fractal-noise shaders spend per pixel, the dominant fragment cost. */
   fbmOctaves: number;
+  /**
+   * Babylon renders at `cssPixels / hardwareScalingLevel`, so a level below 1 renders *above*
+   * CSS resolution — which is what a HiDPI display needs to look sharp rather than upscaled.
+   * Derived from the device pixel ratio and the tier's `maxRenderScale`.
+   */
   hardwareScalingLevel: number;
+  /** Device pixels per CSS pixel this tier is willing to actually render. Caps the cost on a
+   * 3x phone panel without capping a 2x laptop below its native resolution. */
+  maxRenderScale: number;
   maxHardwareScalingLevel: number;
   /** Ceiling for foveation once a struggling immersive session starts trading edge detail. */
   maxXrFixedFoveation: number;
@@ -37,6 +48,21 @@ export interface DeviceCapabilities {
 
 const roundScale = (value: number): number => Math.round(value * 20) / 20;
 
+/**
+ * Converts a device pixel ratio into a Babylon hardware scaling level, rendering at the device's
+ * own pixel density up to the tier's ceiling.
+ *
+ * A HiDPI panel reports pixelRatio 2-3; rendering at CSS resolution there (level 1) means every
+ * frame is upscaled 2-3x before it reaches the glass, which reads as soft, low-detail surfaces no
+ * matter how much detail the shaders generate. Level = 1 / min(pixelRatio, maxRenderScale) makes
+ * the backing store match the display (level 0.5 on a 2x screen) while still refusing to pay for
+ * more than `maxRenderScale` on very dense panels.
+ */
+const scalingLevelForDisplay = (pixelRatio: number, maxRenderScale: number): number => {
+  const ratio = Number.isFinite(pixelRatio) && pixelRatio > 0 ? pixelRatio : 1;
+  return roundScale(1 / Math.min(ratio, maxRenderScale));
+};
+
 export const deriveRenderQuality = ({
   deviceMemory,
   hardwareConcurrency,
@@ -65,8 +91,12 @@ export const deriveRenderQuality = ({
       ringTessellation: 56,
       fbmOctaves: 3,
       maxGiantStorms: 1,
+      anisotropicFiltering: 4,
       surfaceMicrodetail: false,
       secondaryCloudDetail: false,
+      // The headset renders through its own XR framebuffer scale, so the flat-panel scaling
+      // level only applies to the pre-session preview; keep it conservative here.
+      maxRenderScale: 1,
       hardwareScalingLevel: roundScale(Math.max(1.3, pixelRatio / 1.2)),
       maxHardwareScalingLevel: 2,
       xrFramebufferScaleFactor: 0.72,
@@ -85,8 +115,10 @@ export const deriveRenderQuality = ({
       ringTessellation: 72,
       fbmOctaves: 4,
       maxGiantStorms: 2,
+      anisotropicFiltering: 4,
       surfaceMicrodetail: false,
       secondaryCloudDetail: false,
+      maxRenderScale: 1,
       hardwareScalingLevel: roundScale(Math.max(1.2, pixelRatio / 1.35)),
       maxHardwareScalingLevel: 1.9,
       xrFramebufferScaleFactor: 0.82,
@@ -105,9 +137,13 @@ export const deriveRenderQuality = ({
       ringTessellation: 80,
       fbmOctaves: 4,
       maxGiantStorms: 3,
+      anisotropicFiltering: 8,
       surfaceMicrodetail: false,
       secondaryCloudDetail: true,
-      hardwareScalingLevel: roundScale(Math.max(1.1, pixelRatio / 1.5)),
+      // Phone panels report 2-3x; 1.5x keeps text and planet limbs crisp without paying for a
+      // full 3x fill rate on a thermally limited GPU.
+      maxRenderScale: 1.5,
+      hardwareScalingLevel: scalingLevelForDisplay(pixelRatio, 1.5),
       maxHardwareScalingLevel: 1.8,
       xrFramebufferScaleFactor: 0.88,
       xrFixedFoveation: 0.5,
@@ -124,9 +160,13 @@ export const deriveRenderQuality = ({
     ringTessellation: 128,
     fbmOctaves: 5,
     maxGiantStorms: 3,
+    anisotropicFiltering: 16,
     surfaceMicrodetail: true,
     secondaryCloudDetail: true,
-    hardwareScalingLevel: roundScale(Math.max(1, pixelRatio / 1.65)),
+    // Render at the display's native pixel density (level 0.5 on a 2x screen). The adaptive
+    // downscaler below still backs off if a heavy scene cannot hold frame rate.
+    maxRenderScale: 2,
+    hardwareScalingLevel: scalingLevelForDisplay(pixelRatio, 2),
     maxHardwareScalingLevel: 1.65,
     xrFramebufferScaleFactor: 1,
     xrFixedFoveation: 0.35,

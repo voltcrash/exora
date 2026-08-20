@@ -35,6 +35,38 @@ test("keeps the high-detail profile on capable desktops", () => {
   expect(profile.surfaceMicrodetail).toBe(true);
 });
 
+test("renders at the display's native pixel density on a HiDPI desktop", () => {
+  const retina = deriveRenderQuality({
+    userAgent: "Mozilla/5.0 (Macintosh; Intel Mac OS X)",
+    pixelRatio: 2,
+    hardwareConcurrency: 12,
+    deviceMemory: 16,
+  });
+  const standard = deriveRenderQuality({
+    userAgent: "Mozilla/5.0 (Macintosh; Intel Mac OS X)",
+    pixelRatio: 1,
+  });
+  const dense = deriveRenderQuality({
+    userAgent: "Mozilla/5.0 (Macintosh; Intel Mac OS X)",
+    pixelRatio: 3,
+  });
+
+  // Babylon renders at cssPixels / hardwareScalingLevel, so 0.5 on a 2x panel is native.
+  expect(retina.hardwareScalingLevel).toBe(0.5);
+  expect(standard.hardwareScalingLevel).toBe(1);
+  // A 3x panel is capped at the tier's 2x ceiling rather than paying for full density.
+  expect(dense.hardwareScalingLevel).toBe(0.5);
+});
+
+test("never derives a non-finite scaling level from a bogus pixel ratio", () => {
+  for (const pixelRatio of [0, -1, Number.NaN, Number.POSITIVE_INFINITY]) {
+    const profile = deriveRenderQuality({ userAgent: "Desktop", pixelRatio });
+
+    expect(Number.isFinite(profile.hardwareScalingLevel)).toBe(true);
+    expect(profile.hardwareScalingLevel).toBeGreaterThan(0);
+  }
+});
+
 test("reduces desktop resolution after sustained low frame rate", () => {
   const profile = deriveRenderQuality({ userAgent: "Desktop", pixelRatio: 1 });
 

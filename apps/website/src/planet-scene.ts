@@ -408,6 +408,11 @@ void main(void) {
   bands = mix(0.5, bands, clamp(bandContrast, 0.0, 1.0));
 
   // Fewer, subtler storms than a gas giant, each with its own deterministic latitude/phase/tint.
+  // The storm noise field is sampled once outside the loop and each storm reads it at a
+  // different threshold and latitude band -- sampling fbm per storm instead would trip the
+  // per-pixel cost of this shader by itself, and buys no visible variation the offsets below
+  // do not already give.
+  float stormField = fbm(rotateY(surface, -flow * 1.6) * 5.5 + vec3(12.4, 4.2, 8.7));
   float stormMask = 0.0;
   int activeStorms = int(min(stormCount, float(MAX_GIANT_STORMS)));
   for (int i = 0; i < MAX_GIANT_STORMS; i++) {
@@ -415,11 +420,11 @@ void main(void) {
     float fi = float(i);
     float indexHash = hash(vec3(seed * 0.00023 + fi * 6.7, fi * 4.1, fi * 8.3));
     float thisLatitude = clamp(stormLatitude + (indexHash - 0.5) * (0.15 + fi * 0.3), -1.2, 1.2);
-    float stormNoise = fbm(rotateY(surface, -flow * (1.6 + fi * 0.4)) * (5.5 + fi * 1.2) + vec3(12.4 + fi * 3.1, 4.2, 8.7 + fi * 2.0));
     float latitudeMask = 1.0 - smoothstep(0.06, 0.42, abs(latitude - thisLatitude));
     float thisStrength = stormStrength * (1.0 - fi * 0.28);
     float thisShift = fract(stormColorShift + indexHash * 0.6 + fi * 0.21);
-    stormMask += smoothstep(0.62, 0.9, stormNoise) * thisStrength * latitudeMask * (0.7 + thisShift * 0.3);
+    float threshold = 0.62 + indexHash * 0.12;
+    stormMask += smoothstep(threshold, threshold + 0.28, stormField) * thisStrength * latitudeMask * (0.7 + thisShift * 0.3);
   }
   stormMask = clamp(stormMask, 0.0, 1.0);
 
@@ -1567,7 +1572,7 @@ const createPlanet = (
     shader.setColor3("emissiveColor", toColor3(recipe.surface.emissiveColor));
 
     if (profile.surfaceMicrodetail) {
-      const detail = getSurfaceDetailTextures(scene);
+      const detail = getSurfaceDetailTextures(scene, profile.anisotropicFiltering);
       shader.setTexture("graniteNormalMap", detail.granite.normal);
       shader.setTexture("graniteRoughnessMap", detail.granite.roughness);
       shader.setTexture("basaltNormalMap", detail.basalt.normal);
@@ -2282,6 +2287,13 @@ export const createPlanetExperience = ({
   scene.performancePriority = ScenePerformancePriority.Intermediate;
   scene.autoClear = true;
   scene.skipPointerMovePicking = true;
+  // Babylon clears the depth buffer between rendering groups by default. Group 1 holds every
+  // additive shell in the scene (the planet's atmosphere and cloud layers, the host star's
+  // corona, the surface-view star halo), so with the depth buffer wiped they drew over the
+  // opaque planet instead of behind it — which read as the planet being semi-transparent with
+  // the star shining through it. Keeping group 0's depth lets those shells occlude correctly;
+  // they still show around the limb, where no opaque geometry is in front of them.
+  scene.setRenderingAutoClearDepthStencil(1, false, true, true);
 
   const camera = new ArcRotateCamera(
     "explorerCamera",
