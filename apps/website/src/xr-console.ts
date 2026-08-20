@@ -94,7 +94,7 @@ type ForgeTab = "build" | "shape";
 /** Rows a result page can show, derived from the space the tab strips and status line leave. */
 const RESULT_ROWS = rowCapacity(64 + 18 + 64 + 18 + 44 + 18) - 1;
 
-const FOOTER_HINT = "TRIGGER SELECTS · FACE BUTTON OR WRIST PAD HIDES THIS PANEL";
+const FOOTER_HINT = "TRIGGER SELECTS · A/X OPENS · B/Y HIDES · WRIST PAD TOGGLES";
 
 const initialPlanetParameters: CustomPlanetParameters = {
   activity: 0.64,
