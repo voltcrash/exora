@@ -1,5 +1,5 @@
 import type { ExoplanetProfile } from "@exora/contracts";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   discoverPlanets,
   discoverRandomPlanet,
@@ -7,6 +7,7 @@ import {
   searchPlanets,
 } from "../api-client.ts";
 import { formatNumber, hasRenderer, planetKindLabel } from "../planet-utils.tsx";
+import { useTabList } from "../use-tab-list.ts";
 import {
   DEFAULT_PHYSICAL_PLANET_FILTERS,
   filterPlanetsByPhysicalControls,
@@ -24,7 +25,11 @@ interface PlanetCatalogProps {
 
 type SearchState = "idle" | "loading" | "ready" | "error";
 type SurpriseState = "idle" | "loading" | "error";
+type PortalView = "collections" | "categories" | "filters";
 type PhysicalAxis = Exclude<keyof PhysicalPlanetFilters, "habitableZone" | "wellMeasured">;
+
+/** Tab order for the discovery views. Module scope so the tab list keeps a stable identity. */
+const PORTAL_VIEWS: readonly PortalView[] = ["collections", "categories", "filters"];
 
 const physicalAxes: readonly {
   high: string;
@@ -113,9 +118,7 @@ export const PlanetCatalog = ({ onClose, onSelect, open }: PlanetCatalogProps) =
   const [cached, setCached] = useState(false);
   const [searchState, setSearchState] = useState<SearchState>("idle");
   const [activeCategory, setActiveCategory] = useState<string | null>(null);
-  const [portalView, setPortalView] = useState<"collections" | "categories" | "filters">(
-    "collections",
-  );
+  const [portalView, setPortalView] = useState<PortalView>("collections");
   const [resultView, setResultView] = useState<"gallery" | "list">("gallery");
   const [surpriseState, setSurpriseState] = useState<SurpriseState>("idle");
   const [suggestion, setSuggestion] = useState<string | null>(null);
@@ -235,6 +238,24 @@ export const PlanetCatalog = ({ onClose, onSelect, open }: PlanetCatalogProps) =
     [physicalFilters, planets, portalView],
   );
 
+  // The observatory controls read the whole sampled field rather than one collection, so opening
+  // that view clears the category and query the other two views leave behind.
+  const selectPortalView = useCallback((view: PortalView): void => {
+    if (view === "filters") {
+      setActiveCategory(null);
+      setQuery("");
+    }
+    setPortalView(view);
+  }, []);
+
+  const tabs = useTabList({
+    label: "Planet discovery views",
+    list: "planet-discovery",
+    onSelect: selectPortalView,
+    value: portalView,
+    values: PORTAL_VIEWS,
+  });
+
   const activeLabel = [...collections, ...categories].find(
     (category) => category.id === activeCategory,
   )?.label;
@@ -329,38 +350,19 @@ export const PlanetCatalog = ({ onClose, onSelect, open }: PlanetCatalogProps) =
         </span>
         <small>Large targets are designed for gaze, pointer, touch, or mouse</small>
       </div>
-      <div className="discovery-tabs" role="tablist" aria-label="Planet discovery views">
-        <button
-          role="tab"
-          type="button"
-          aria-selected={portalView === "collections"}
-          onClick={() => setPortalView("collections")}
-        >
+      <div className="discovery-tabs" {...tabs.tabListProps}>
+        <button {...tabs.tabProps("collections")} onClick={() => selectPortalView("collections")}>
           Curated collections
         </button>
-        <button
-          role="tab"
-          type="button"
-          aria-selected={portalView === "categories"}
-          onClick={() => setPortalView("categories")}
-        >
+        <button {...tabs.tabProps("categories")} onClick={() => selectPortalView("categories")}>
           World types
         </button>
-        <button
-          role="tab"
-          type="button"
-          aria-selected={portalView === "filters"}
-          onClick={() => {
-            setActiveCategory(null);
-            setQuery("");
-            setPortalView("filters");
-          }}
-        >
+        <button {...tabs.tabProps("filters")} onClick={() => selectPortalView("filters")}>
           Observatory controls
         </button>
       </div>
       {portalView === "collections" ? (
-        <div className="collection-grid" aria-label="Curated planet collections">
+        <div className="collection-grid" {...tabs.panelProps("collections")}>
           {collections.map((collection) => (
             <button
               key={collection.id}
@@ -385,7 +387,7 @@ export const PlanetCatalog = ({ onClose, onSelect, open }: PlanetCatalogProps) =
           ))}
         </div>
       ) : portalView === "categories" ? (
-        <div className="discovery-grid" aria-label="Planet discovery categories">
+        <div className="discovery-grid" {...tabs.panelProps("categories")}>
           {categories.map((category) => (
             <button
               key={category.id}
@@ -411,11 +413,11 @@ export const PlanetCatalog = ({ onClose, onSelect, open }: PlanetCatalogProps) =
           ))}
         </div>
       ) : (
-        <section className="physical-console" aria-labelledby="physical-console-title">
+        <section className="physical-console" {...tabs.panelProps("filters")}>
           <div className="physical-console-heading">
             <span>
               <small>LIVE PLANET FIELD</small>
-              <strong id="physical-console-title">Shape the observatory signal</strong>
+              <strong>Shape the observatory signal</strong>
             </span>
             <button
               type="button"
