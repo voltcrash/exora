@@ -99,6 +99,7 @@ const cachesByScene = new WeakMap<Scene, { get: (path: string) => Texture }>();
  */
 export const getSurfaceDetailTextures = (
   scene: Scene,
+  anisotropicFiltering = 16,
 ): Record<SurfaceDetailFamily, SurfaceDetailMaps> => {
   let cache = cachesByScene.get(scene);
   if (!cache) {
@@ -120,7 +121,9 @@ export const getSurfaceDetailTextures = (
         );
         texture.wrapU = Texture.WRAP_ADDRESSMODE;
         texture.wrapV = Texture.WRAP_ADDRESSMODE;
-        texture.anisotropicFilteringLevel = 4;
+        // These tile across a sphere, so most of the visible surface is viewed at a grazing
+        // angle where low anisotropy is exactly where mip selection blurs the detail away.
+        texture.anisotropicFilteringLevel = anisotropicFiltering;
         texture.gammaSpace = false;
         if (!isNormal) texture.gammaSpace = false;
         return texture;
