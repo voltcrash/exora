@@ -21,11 +21,30 @@ catalog:
   react: ^19.2.8
   react-dom: ^19.2.8
   typescript: ^7.0.2
-  vercel: ^58.10.0
+  vercel: ^59.1.4
   vite: npm:@voidzero-dev/vite-plus-core@0.2.9
   vite-plus: 0.2.9
 overrides:
   vite: "catalog:"
+  # Advisory patches for transitive development tooling. Every entry below is pinned inside the
+  # major its dependents already resolve, so this raises the floor without changing any API the
+  # Vercel CLI or the Vite+ toolchain builds against. Drop an entry once its dependents ship the
+  # fixed version on their own.
+  #
+  # undici stays on the 5.x line because @vercel/node pins it exactly at 5.28.4. The WebSocket and
+  # request-smuggling advisories still open against 5.29.0 were only ever fixed on 6.x, so there is
+  # no in-major patch to move to, and forcing a major on an exact pin would risk the deploy path for
+  # advisories that only reach a CLI we never point at untrusted hosts.
+  "@tootallnate/once@2": ^2.0.1
+  ajv@8: ^8.20.0
+  esbuild@0.27: ^0.28.2
+  js-yaml@4: ^4.3.1
+  minimatch@10: ^10.2.6
+  path-to-regexp@6: ^6.3.0
+  path-to-regexp@8: ^8.4.2
+  smol-toml@1: ^1.8.0
+  tar@7: ^7.5.22
+  undici@5: ^5.29.0
 peerDependencyRules:
   allowAny:
     - vite
