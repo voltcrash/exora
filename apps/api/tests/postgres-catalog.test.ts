@@ -89,7 +89,9 @@ test("serves normalized planet profiles from PostgreSQL", async () => {
 
   const result = await repository.findByName("Kepler-62 f");
 
-  expect(result).toEqual({ cached: true, value: planet });
+  // A live statement against the catalog is not a cached answer: `meta.cached` is what the
+  // archive adapters set when an in-process entry replaces a TAP request.
+  expect(result).toEqual({ cached: false, value: planet });
   expect(database.queries[0]?.parameters).toEqual(["Kepler-62 f"]);
 });
 
@@ -148,4 +150,19 @@ test("refuses incomplete archive payloads before deleting catalog rows", async (
 
   await expect(syncPlanetCatalog(database, [])).rejects.toThrow("suspiciously small");
   expect(database.queries).toHaveLength(0);
+});
+
+test("every database read reports itself as live rather than cached", async () => {
+  const database = new FakeDatabase();
+  const repository = new PostgresPlanetRepository(database);
+
+  const results = await Promise.all([
+    repository.browse(24),
+    repository.discover("earth-like", 12),
+    repository.findByName("Kepler-62 f"),
+    repository.findByHost("Kepler-62", 12),
+    repository.search("kepler", 12),
+  ]);
+
+  expect(results.map(({ cached }) => cached)).toEqual([false, false, false, false, false]);
 });
