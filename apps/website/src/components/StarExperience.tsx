@@ -157,7 +157,12 @@ export const StarExperience = ({
           </span>
         </a>
         <div className="exploration-actions">
-          <button className="catalog-trigger compact-trigger" type="button" onClick={onOpenPlanets}>
+          <button
+            className="catalog-trigger compact-trigger"
+            type="button"
+            aria-label="Open NASA exoplanet catalog"
+            onClick={onOpenPlanets}
+          >
             <span className="catalog-radar" aria-hidden="true" />
             <span>
               <small>NASA CATALOG</small>
@@ -168,6 +173,7 @@ export const StarExperience = ({
             id="open-star-catalog"
             className="star-trigger active"
             type="button"
+            aria-label="Open SIMBAD star catalog"
             onClick={onOpenStars}
           >
             <span className="star-symbol" aria-hidden="true">
@@ -178,7 +184,12 @@ export const StarExperience = ({
               <strong>EXPLORE STARS</strong>
             </span>
           </button>
-          <button className="forge-trigger" type="button" onClick={onOpenBuilder}>
+          <button
+            className="forge-trigger"
+            type="button"
+            aria-label="Open World Forge"
+            onClick={onOpenBuilder}
+          >
             <span aria-hidden="true">＋</span>
             <span>
               <small>WORLD FORGE</small>
