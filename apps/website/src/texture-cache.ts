@@ -2,6 +2,7 @@ import { Texture } from "@babylonjs/core/Materials/Textures/texture.js";
 import { RawTexture } from "@babylonjs/core/Materials/Textures/rawTexture.js";
 import type { Scene } from "@babylonjs/core/scene.js";
 import type { RockyPaletteFamily } from "@exora/worldgen";
+import { configureKtx2Transcoder } from "./ktx2-transcoder.ts";
 
 /**
  * Generic memoizing cache: the same `path` always resolves to the same created value, so callers
@@ -228,6 +229,10 @@ export const getSurfaceDetailTextures = (
   includePbrMaps: boolean,
   anisotropicFiltering = 16,
 ): SelectedSurfaceDetailMaps => {
+  // Babylon reads `URLConfig` when it first builds its decoder worker pool, so the pipeline has
+  // to be pointed at this origin before the first KTX2 texture below is constructed.
+  configureKtx2Transcoder();
+
   let cache = cachesByScene.get(scene);
   if (!cache) {
     cache = createKeyedCache<Texture>(
