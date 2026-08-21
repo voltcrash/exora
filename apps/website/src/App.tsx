@@ -11,6 +11,7 @@ import { PlanetExperience } from "./components/PlanetExperience.tsx";
 import { RecoveryScreen } from "./components/RecoveryScreen.tsx";
 import { featuredPlanet } from "./planet-profile.ts";
 import { hasRenderer } from "./planet-utils.tsx";
+import { canonicalUrlForSearch } from "./canonical-url.ts";
 import { opensSearchShortcut } from "./search-shortcut.ts";
 import { useSceneHost } from "./use-scene-host.ts";
 
@@ -114,6 +115,20 @@ export const App = () => {
     document.addEventListener("keydown", openCatalogWithShortcut);
     return () => document.removeEventListener("keydown", openCatalogWithShortcut);
   }, []);
+
+  // Keeps the canonical link and the shared-link URL on the destination actually being shown.
+  // Travel rewrites the query string through `pushState`, which moves neither on its own, so
+  // without this every world would go on claiming to be the landing page — and `sitemap.xml`
+  // would be offering destinations that each declare themselves a duplicate of the root.
+  useEffect(() => {
+    const canonical = canonicalUrlForSearch(window.location.search);
+    document
+      .querySelector<HTMLLinkElement>('link[rel="canonical"]')
+      ?.setAttribute("href", canonical);
+    document
+      .querySelector<HTMLMetaElement>('meta[property="og:url"]')
+      ?.setAttribute("content", canonical);
+  }, [activeObject]);
 
   // Stable identities: the immersive console hands these to the Babylon scene, and a new
   // function on every render would tear the renderer down and rebuild it mid-session.
