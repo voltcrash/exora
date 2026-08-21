@@ -1,4 +1,5 @@
 import type { ExoplanetProfile, PlanetKind } from "@exora/contracts";
+import { createArchiveCache } from "./archive-cache.ts";
 
 const NASA_TAP_ENDPOINT = "https://exoplanetarchive.ipac.caltech.edu/TAP/sync";
 const NASA_COLUMNS = [
@@ -41,11 +42,6 @@ interface NasaPlanetRow {
   st_mass: number | null;
   st_lum: number | null;
   sy_dist: number | null;
-}
-
-interface CacheEntry<T> {
-  expiresAt: number;
-  value: T;
 }
 
 export interface RepositoryResult<T> {
@@ -230,7 +226,7 @@ const escapeAdqlLiteral = (value: string): string =>
   value.replaceAll("%", "").replaceAll("_", "").replaceAll("'", "''");
 
 export class NasaPlanetRepository implements PlanetRepository {
-  readonly #cache = new Map<string, CacheEntry<ExoplanetProfile[]>>();
+  readonly #cache = createArchiveCache<ExoplanetProfile[]>();
   readonly #cacheTtlMs: number;
   readonly #fetcher: Fetcher;
   readonly #now: () => number;
@@ -298,12 +294,10 @@ export class NasaPlanetRepository implements PlanetRepository {
   }
 
   async #query(adql: string): Promise<RepositoryResult<ExoplanetProfile[]>> {
-    const cached = this.#cache.get(adql);
     const requestTime = this.#now();
+    const cached = this.#cache.get(adql, requestTime);
 
-    if (cached && cached.expiresAt > requestTime) {
-      return { cached: true, value: cached.value };
-    }
+    if (cached) return { cached: true, value: cached };
 
     const url = new URL(NASA_TAP_ENDPOINT);
     url.searchParams.set("query", adql);
@@ -334,10 +328,7 @@ export class NasaPlanetRepository implements PlanetRepository {
         )
         .filter((planet): planet is ExoplanetProfile => planet !== null);
 
-      this.#cache.set(adql, {
-        value: planets,
-        expiresAt: requestTime + this.#cacheTtlMs,
-      });
+      this.#cache.set(adql, planets, requestTime + this.#cacheTtlMs);
 
       return { cached: false, value: planets };
     } catch (error) {

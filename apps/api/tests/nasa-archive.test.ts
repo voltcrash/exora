@@ -1,4 +1,5 @@
 import { expect, test } from "vite-plus/test";
+import { DEFAULT_MAX_ENTRIES } from "../src/archive-cache.ts";
 import { NasaPlanetRepository, normalizeNasaPlanet } from "../src/nasa-archive.ts";
 
 const nasaRow = {
@@ -134,4 +135,35 @@ test("resolves a planet by name whatever casing the caller used", async () => {
   for (const query of requestedQueries) {
     expect(query).toContain("lower(pl_name)=lower(");
   }
+});
+
+test("the query cache is bounded, so arbitrary searches cannot grow it without limit", async () => {
+  let requests = 0;
+  const repository = new NasaPlanetRepository({
+    now: () => 0,
+    fetcher: async () => {
+      requests += 1;
+      return Response.json([nasaRow]);
+    },
+  });
+
+  await repository.search("first", 12);
+  await repository.search("first", 12);
+  expect(requests).toBe(1);
+
+  // Every distinct search term is a distinct cache key, which is exactly how an unbounded map
+  // would grow for the life of the process.
+  for (let index = 0; index < DEFAULT_MAX_ENTRIES; index += 1) {
+    await repository.search(`flood-${index}`, 12);
+  }
+
+  // The newest flood entry is still resident.
+  const beforeResident = requests;
+  await repository.search(`flood-${DEFAULT_MAX_ENTRIES - 1}`, 12);
+  expect(requests).toBe(beforeResident);
+
+  // The oldest one was evicted rather than kept forever, so it costs a fresh request.
+  const beforeEvicted = requests;
+  await repository.search("first", 12);
+  expect(requests).toBe(beforeEvicted + 1);
 });

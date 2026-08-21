@@ -1,4 +1,5 @@
 import type { StarKind, StarProfile } from "@exora/contracts";
+import { createArchiveCache } from "./archive-cache.ts";
 import type { RepositoryResult } from "./nasa-archive.ts";
 
 const SIMBAD_TAP_ENDPOINT = "https://simbad.cds.unistra.fr/simbad/sim-tap/sync";
@@ -55,11 +56,6 @@ interface SimbadStarRow {
 interface SimbadPayload {
   data?: unknown[][];
   metadata?: { name?: string }[];
-}
-
-interface CacheEntry<T> {
-  expiresAt: number;
-  value: T;
 }
 
 export interface StarRepository {
@@ -305,7 +301,7 @@ export const normalizeSimbadStar = (
 };
 
 export class SimbadStarRepository implements StarRepository {
-  readonly #cache = new Map<string, CacheEntry<StarProfile[]>>();
+  readonly #cache = createArchiveCache<StarProfile[]>();
   readonly #cacheTtlMs: number;
   readonly #fetcher: Fetcher;
   readonly #now: () => number;
@@ -364,11 +360,9 @@ export class SimbadStarRepository implements StarRepository {
   }
 
   async #query(adql: string): Promise<RepositoryResult<StarProfile[]>> {
-    const cached = this.#cache.get(adql);
     const requestTime = this.#now();
-    if (cached && cached.expiresAt > requestTime) {
-      return { cached: true, value: cached.value };
-    }
+    const cached = this.#cache.get(adql, requestTime);
+    if (cached) return { cached: true, value: cached };
 
     const url = new URL(SIMBAD_TAP_ENDPOINT);
     url.searchParams.set("request", "doQuery");
@@ -401,10 +395,7 @@ export class SimbadStarRepository implements StarRepository {
         )
         .filter((star): star is StarProfile => star !== null);
 
-      this.#cache.set(adql, {
-        expiresAt: requestTime + this.#cacheTtlMs,
-        value: stars,
-      });
+      this.#cache.set(adql, stars, requestTime + this.#cacheTtlMs);
       return { cached: false, value: stars };
     } catch (error) {
       if (error instanceof SimbadArchiveError) throw error;
