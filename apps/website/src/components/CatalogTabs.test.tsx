@@ -11,7 +11,6 @@ const forgeMarkup = (): string =>
   renderToStaticMarkup(
     <WorldForge
       initialMode="planet"
-      open
       onClose={vi.fn()}
       onGeneratePlanet={vi.fn()}
       onGenerateStar={vi.fn()}

@@ -69,17 +69,6 @@ export interface SearchShortcutEvent {
   target: ShortcutTarget | null;
 }
 
-export interface SearchShortcutState {
-  /**
-   * Whether a modal dialog already owns the page — the catalog itself included.
-   *
-   * A modal makes everything behind it inert, which is the whole point of one. A page-level
-   * shortcut reaching over that to stack a second dialog on top contradicts the mode the wearer
-   * of that dialog is in.
-   */
-  dialogOpen: boolean;
-}
-
 /**
  * Whether this key press should open the catalog.
  *
@@ -87,13 +76,13 @@ export interface SearchShortcutState {
  * so requiring it to be up would make the shortcut unreachable outside US layouts. Ctrl, Meta
  * and Alt are checked, because those combinations belong to the browser and the operating
  * system rather than to Exora.
+ *
+ * Nor is it checked whether a dialog is already open. `/` opens the catalog from anywhere it is
+ * not a character being typed, and asking for the catalog while the star catalog is up is a
+ * request to be answered, not a mistake to be swallowed.
  */
-export const opensSearchShortcut = (
-  event: SearchShortcutEvent,
-  { dialogOpen }: SearchShortcutState,
-): boolean => {
+export const opensSearchShortcut = (event: SearchShortcutEvent): boolean => {
   if (event.key !== "/") return false;
   if (event.altKey || event.ctrlKey || event.metaKey) return false;
-  if (dialogOpen) return false;
   return !isTextEntryTarget(event.target);
 };

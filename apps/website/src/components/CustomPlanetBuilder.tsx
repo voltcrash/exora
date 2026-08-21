@@ -20,7 +20,6 @@ interface WorldForgeProps {
   onClose: () => void;
   onGeneratePlanet: (world: CustomWorld) => void;
   onGenerateStar: (star: CustomStar) => void;
-  open: boolean;
 }
 
 const initialParameters: CustomPlanetParameters = {
@@ -125,26 +124,28 @@ export const WorldForge = ({
   onClose,
   onGeneratePlanet,
   onGenerateStar,
-  open,
 }: WorldForgeProps) => {
   const dialogRef = useRef<HTMLDialogElement>(null);
   const nameRef = useRef<HTMLInputElement>(null);
-  const [mode, setMode] = useState<ForgeMode>("planet");
+  const [mode, setMode] = useState<ForgeMode>(initialMode);
   const [parameters, setParameters] = useState(initialParameters);
   const [starParameters, setStarParameters] = useState(initialStarParameters);
 
+  // The forge is mounted only for as long as it is open, so it opens with the component and
+  // closes when the page takes it away. `initialMode` seeds the mode above rather than being
+  // written back here, which is what it already amounted to: the old effect only ever reached
+  // `setMode` on the pass that opened the dialog.
   useEffect(() => {
     const dialog = dialogRef.current;
-    if (!dialog) return;
+    dialog?.showModal();
+    // Focus has to wait for the dialog to be in the top layer before it will take.
+    const focusName = window.setTimeout(() => nameRef.current?.focus(), 0);
 
-    if (open && !dialog.open) {
-      setMode(initialMode);
-      dialog.showModal();
-      window.setTimeout(() => nameRef.current?.focus(), 0);
-    } else if (!open && dialog.open) {
-      dialog.close();
-    }
-  }, [initialMode, open]);
+    return () => {
+      window.clearTimeout(focusName);
+      dialog?.close();
+    };
+  }, []);
 
   const update = <Key extends keyof CustomPlanetParameters>(
     key: Key,

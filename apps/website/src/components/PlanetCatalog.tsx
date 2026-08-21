@@ -20,7 +20,6 @@ import { PlanetCatalogVisual } from "./CatalogVisual.tsx";
 interface PlanetCatalogProps {
   onClose: () => void;
   onSelect: (planet: ExoplanetProfile, cached: boolean) => void;
-  open: boolean;
 }
 
 type SearchState = "idle" | "loading" | "ready" | "error";
@@ -109,7 +108,7 @@ const collections = [
   },
 ] as const;
 
-export const PlanetCatalog = ({ onClose, onSelect, open }: PlanetCatalogProps) => {
+export const PlanetCatalog = ({ onClose, onSelect }: PlanetCatalogProps) => {
   const dialogRef = useRef<HTMLDialogElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
   const surpriseControllerRef = useRef<AbortController | null>(null);
@@ -126,18 +125,17 @@ export const PlanetCatalog = ({ onClose, onSelect, open }: PlanetCatalogProps) =
     DEFAULT_PHYSICAL_PLANET_FILTERS,
   );
 
+  // The catalog is mounted only for as long as it is open, so there is no closed-but-mounted
+  // state to synchronise: it opens with the component and closes when the page takes it away.
   useEffect(() => {
     const dialog = dialogRef.current;
-    if (!dialog) return;
+    dialog?.showModal();
 
-    if (open && !dialog.open) {
-      dialog.showModal();
-    } else if (!open && dialog.open) {
+    return () => {
       surpriseControllerRef.current?.abort();
-      setSurpriseState("idle");
-      dialog.close();
-    }
-  }, [open]);
+      dialog?.close();
+    };
+  }, []);
 
   useEffect(() => {
     const normalizedQuery = query.trim();

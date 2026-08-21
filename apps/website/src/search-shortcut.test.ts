@@ -22,16 +22,14 @@ const slash = (overrides: Partial<SearchShortcutEvent> = {}): SearchShortcutEven
 });
 
 test("a slash on the page opens the catalog", () => {
-  expect(opensSearchShortcut(slash(), { dialogOpen: false })).toBe(true);
-  expect(opensSearchShortcut(slash({ target: element("BODY") }), { dialogOpen: false })).toBe(true);
-  expect(opensSearchShortcut(slash({ target: element("CANVAS") }), { dialogOpen: false })).toBe(
-    true,
-  );
+  expect(opensSearchShortcut(slash())).toBe(true);
+  expect(opensSearchShortcut(slash({ target: element("BODY") }))).toBe(true);
+  expect(opensSearchShortcut(slash({ target: element("CANVAS") }))).toBe(true);
 });
 
 test("no other key opens the catalog", () => {
   for (const key of ["a", "?", "Enter", "Escape", "ArrowRight", "Slash", " "]) {
-    expect(opensSearchShortcut(slash({ key }), { dialogOpen: false })).toBe(false);
+    expect(opensSearchShortcut(slash({ key }))).toBe(false);
   }
 });
 
@@ -46,7 +44,7 @@ test("a slash typed into a text field stays in the text field", () => {
     element("INPUT", "password"),
     element("TEXTAREA"),
   ]) {
-    expect(opensSearchShortcut(slash({ target }), { dialogOpen: false })).toBe(false);
+    expect(opensSearchShortcut(slash({ target }))).toBe(false);
   }
 });
 
@@ -58,7 +56,7 @@ test("controls that cannot hold typed text still answer the shortcut", () => {
     element("INPUT", "color"),
     element("BUTTON"),
   ]) {
-    expect(opensSearchShortcut(slash({ target }), { dialogOpen: false })).toBe(true);
+    expect(opensSearchShortcut(slash({ target }))).toBe(true);
   }
 });
 
@@ -88,18 +86,11 @@ test("a key press with no target belongs to the page", () => {
 
 test("shift is allowed, because some layouts need it to produce a slash at all", () => {
   // `shiftKey` is not part of the event the rule reads, so a shifted slash is still a slash.
-  expect(opensSearchShortcut(slash(), { dialogOpen: false })).toBe(true);
+  expect(opensSearchShortcut(slash())).toBe(true);
 });
 
 test("browser and system chords are left to the browser and the system", () => {
-  expect(opensSearchShortcut(slash({ ctrlKey: true }), { dialogOpen: false })).toBe(false);
-  expect(opensSearchShortcut(slash({ metaKey: true }), { dialogOpen: false })).toBe(false);
-  expect(opensSearchShortcut(slash({ altKey: true }), { dialogOpen: false })).toBe(false);
-});
-
-test("an open modal keeps the page-level shortcut off the page", () => {
-  expect(opensSearchShortcut(slash(), { dialogOpen: true })).toBe(false);
-  expect(opensSearchShortcut(slash({ target: element("BUTTON") }), { dialogOpen: true })).toBe(
-    false,
-  );
+  expect(opensSearchShortcut(slash({ ctrlKey: true }))).toBe(false);
+  expect(opensSearchShortcut(slash({ metaKey: true }))).toBe(false);
+  expect(opensSearchShortcut(slash({ altKey: true }))).toBe(false);
 });
