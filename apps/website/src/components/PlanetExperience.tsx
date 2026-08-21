@@ -203,7 +203,12 @@ export const PlanetExperience = ({
             </span>
             <kbd>/</kbd>
           </button>
-          <button className="star-trigger" type="button" onClick={onOpenStars}>
+          <button
+            className="star-trigger"
+            type="button"
+            aria-label="Open SIMBAD star catalog"
+            onClick={onOpenStars}
+          >
             <span className="star-symbol" aria-hidden="true">
               ✦
             </span>
@@ -212,7 +217,12 @@ export const PlanetExperience = ({
               <strong>EXPLORE STARS</strong>
             </span>
           </button>
-          <button className="forge-trigger" type="button" onClick={onOpenBuilder}>
+          <button
+            className="forge-trigger"
+            type="button"
+            aria-label="Open World Forge"
+            onClick={onOpenBuilder}
+          >
             <span aria-hidden="true">＋</span>
             <span>
               <small>WORLD FORGE</small>

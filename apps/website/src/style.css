@@ -2833,6 +2833,9 @@ body[data-xr-status="unavailable"] .status-light {
     padding: 8px;
   }
 
+  /* The glyph left behind is aria-hidden, so these buttons have no accessible name of their own
+     once the label goes. Each one carries an aria-label for exactly this reason — removing it
+     leaves an unnamed button on every phone. */
   .forge-trigger > span:last-child,
   .star-trigger > span:last-child {
     display: none;
@@ -2858,6 +2861,8 @@ body[data-xr-status="unavailable"] .status-light {
     display: none;
   }
 
+  /* Same coupling as the triggers above: the radar glyph is decorative, so .catalog-trigger's
+     aria-label is what names it below this width. */
   .brand-copy small,
   .catalog-trigger > span:nth-child(2),
   .catalog-trigger kbd {
