@@ -6,6 +6,7 @@ import type {
   StarResponse,
   StarSearchResponse,
 } from "@exora/contracts";
+import { requestDeadline } from "./request-deadline.ts";
 
 type Fetcher = (input: string | URL | Request, init?: RequestInit) => Promise<Response>;
 
@@ -50,7 +51,7 @@ const requestCollection = async <Payload>(
 ): Promise<Payload> => {
   const response = await fetcher(path, {
     headers: { accept: "application/json" },
-    signal: signal ?? AbortSignal.timeout(timeoutMs),
+    signal: requestDeadline(timeoutMs, signal),
   });
 
   if (!response.ok) throw new Error(`${subject} failed with status ${response.status}.`);
@@ -166,7 +167,7 @@ const requestPlanet = async (
   try {
     const response = await fetcher(path, {
       headers: { accept: "application/json" },
-      signal: signal ?? AbortSignal.timeout(OBJECT_LOOKUP_TIMEOUT_MS),
+      signal: requestDeadline(OBJECT_LOOKUP_TIMEOUT_MS, signal),
     });
 
     if (!response.ok) return null;
@@ -283,7 +284,7 @@ const requestStar = async (
   try {
     const response = await fetcher(path, {
       headers: { accept: "application/json" },
-      signal: signal ?? AbortSignal.timeout(OBJECT_LOOKUP_TIMEOUT_MS),
+      signal: requestDeadline(OBJECT_LOOKUP_TIMEOUT_MS, signal),
     });
     if (!response.ok) return null;
     const payload: unknown = await response.json();

@@ -183,3 +183,46 @@ test("chooses a surprise star from a curated SIMBAD result", async () => {
 
   expect(result).toMatchObject({ cached: false, star: { name: "Sirius" } });
 });
+
+test("a catalog request keeps its deadline when the caller supplies a cancellation", async () => {
+  // Every catalog call site passes its own controller so it can drop a result it no longer wants.
+  // Preferring that signal used to hand it to `fetch` unchanged, discarding the timeout with it,
+  // so a stalled archive left the request outstanding instead of failing and saying so. The
+  // deadline itself is timed in request-deadline.test.ts; what matters here is that the request
+  // is issued under something other than the caller's bare signal.
+  const controller = new AbortController();
+  let issued: AbortSignal | undefined;
+
+  await searchPlanets("wasp", {
+    signal: controller.signal,
+    fetcher: async (_input, init) => {
+      issued = init?.signal ?? undefined;
+      return Response.json({
+        data: [featuredPlanet],
+        meta: { cached: false, count: 1, query: "wasp", source: "NASA Exoplanet Archive" },
+      });
+    },
+  });
+
+  expect(issued).toBeDefined();
+  expect(issued).not.toBe(controller.signal);
+  expect(issued?.aborted).toBe(false);
+});
+
+test("a catalog request the caller cancels reports the cancellation, not the deadline", async () => {
+  const controller = new AbortController();
+
+  const settled = searchStars("sirius", {
+    signal: controller.signal,
+    fetcher: async (_input, init) =>
+      new Promise<Response>((_resolve, reject) => {
+        init?.signal?.addEventListener("abort", () => reject(init.signal?.reason), { once: true });
+      }),
+  }).then(
+    () => "resolved",
+    (error: unknown) => (error as DOMException).name,
+  );
+
+  controller.abort();
+  expect(await settled).toBe("AbortError");
+});
