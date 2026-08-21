@@ -511,7 +511,12 @@ const createSceneHost = (canvas: HTMLCanvasElement): SceneHost => {
     dispose: () => {
       if (disposed) return;
       disposed = true;
+      // Both subscriber sets are released, not just one. A disposed host answers nothing, and
+      // `recreateSceneHost` builds its replacement while React still holds the old subscriptions
+      // until its effects re-run — so anything still reachable from here is a listener that has
+      // already stopped being told the truth.
       rendererStatusListeners.clear();
+      statusListeners.clear();
       window.removeEventListener("resize", resize);
       currentWorld?.dispose();
       currentScope?.dispose();
