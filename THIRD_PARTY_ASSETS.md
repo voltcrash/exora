@@ -20,13 +20,17 @@ palette, so the browser does not decode or upload all five sets.
 
 Source archives were downloaded from
 `https://ambientcg.com/get?file=<AssetId>_2K-PNG.zip`. For each family, Exora keeps the 2K
-OpenGL normal map and lossless roughness map. Source 16-bit normals were converted to 8-bit RGB:
+OpenGL normal map and the roughness map. Source 16-bit normals were converted to 8-bit RGB:
 browser GPU texture sampling is normalized 8-bit in this path, so this removes download weight
 without reducing the precision the shader consumes. Unused color, AO, displacement, scene, and
 material files are not shipped.
 
-`Rock063` is natively 2048×1024; the other four families are 2048×2048. Normal and roughness maps
-remain lossless PNGs and use mipmaps plus tier-specific anisotropic filtering.
+`Rock063` is natively 2048×1024; the other four families are 2048×2048, and the encoded files keep
+those dimensions. The PNGs are the _source_: what ships is KTX2, so the GPU receives a compressed
+format rather than decoding a full-size image. Normals are UASTC with Zstandard supercompression,
+roughness is the smaller ETC1S, and every file carries a complete mip chain — twelve levels at 2K —
+sampled with tier-specific anisotropic filtering. `docs/texture-compression.md` holds the encoder
+commands and the settings behind that split.
 
 Creator: ambientCG / Lennart Demes. Attribution is not legally required under CC0, but provenance
 is retained here.
@@ -34,14 +38,15 @@ is retained here.
 ## Exora chemistry color-detail maps
 
 The five files under `apps/website/public/textures/chemistry/` were generated specifically for
-Exora using OpenAI's built-in image generation tool, then resized to power-of-two 1024×1024 PNGs
-for reliable mipmapping and wrapping:
+Exora using OpenAI's built-in image generation tool, then resized to power-of-two 1024×1024 for
+reliable mipmapping and wrapping. They ship as ETC1S KTX2 with a complete eleven-level mip chain,
+encoded from those PNG sources:
 
-- `carbon.png`
-- `ice.png`
-- `oxidized.png`
-- `silicate.png`
-- `sulfuric.png`
+- `carbon.ktx2`
+- `ice.ktx2`
+- `oxidized.ktx2`
+- `silicate.ktx2`
+- `sulfuric.ktx2`
 
 They are flat-lit, orthographic, texture-only material scans with no text, objects, horizon, or
 baked directional lighting. The exact production prompt set is recorded in
