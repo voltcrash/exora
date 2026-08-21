@@ -20,6 +20,62 @@ type Fetcher = (input: string | URL | Request, init?: RequestInit) => Promise<Re
  */
 const OBJECT_LOOKUP_TIMEOUT_MS = 8_000;
 
+/**
+ * How long a list request waits. Longer than a single-object lookup, because a collection may
+ * cost the API a fresh archive round trip, and longer for SIMBAD than for the planet catalog,
+ * which is usually answered from PostgreSQL.
+ */
+const PLANET_COLLECTION_TIMEOUT_MS = 8_000;
+const STAR_COLLECTION_TIMEOUT_MS = 10_000;
+
+interface CollectionOptions {
+  fetcher?: Fetcher;
+  signal?: AbortSignal;
+}
+
+/**
+ * Fetches and validates one list endpoint.
+ *
+ * Unlike the single-object lookups above, a failure here is raised rather than swallowed: there
+ * is no sensible stand-in for "the collection you asked for", so the caller shows the error.
+ * `subject` names the request in that message, which is the only thing that varied between the
+ * four copies of this that used to exist.
+ */
+const requestCollection = async <Payload>(
+  path: string,
+  { fetcher = fetch, signal }: CollectionOptions,
+  timeoutMs: number,
+  subject: string,
+  isValid: (value: unknown) => value is Payload,
+): Promise<Payload> => {
+  const response = await fetcher(path, {
+    headers: { accept: "application/json" },
+    signal: signal ?? AbortSignal.timeout(timeoutMs),
+  });
+
+  if (!response.ok) throw new Error(`${subject} failed with status ${response.status}.`);
+
+  const payload: unknown = await response.json();
+  if (!isValid(payload)) throw new Error(`${subject} returned an invalid response.`);
+  return payload;
+};
+
+const requestPlanetCollection = (
+  path: string,
+  options: CollectionOptions,
+  subject: string,
+): Promise<PlanetSearchResult> =>
+  requestCollection(path, options, PLANET_COLLECTION_TIMEOUT_MS, subject, isPlanetSearchResponse) //
+    .then(({ data, meta }) => ({ cached: meta.cached, planets: data, query: meta.query }));
+
+const requestStarCollection = (
+  path: string,
+  options: CollectionOptions,
+  subject: string,
+): Promise<StarSearchResult> =>
+  requestCollection(path, options, STAR_COLLECTION_TIMEOUT_MS, subject, isStarSearchResponse) //
+    .then(({ data, meta }) => ({ cached: meta.cached, query: meta.query, stars: data }));
+
 export interface PlanetLoadResult {
   cached: boolean;
   mode: "custom" | "fallback" | "live";
@@ -144,51 +200,48 @@ export const loadPlanetByName = async (
 
 export const searchPlanets = async (
   query: string,
-  options: { fetcher?: Fetcher; signal?: AbortSignal } = {},
+  options: CollectionOptions = {},
 ): Promise<PlanetSearchResult> => {
   const normalizedQuery = query.trim();
   if (normalizedQuery.length < 1) {
     return { cached: false, planets: [], query: normalizedQuery };
   }
 
-  const response = await (options.fetcher ?? fetch)(
+  return requestPlanetCollection(
     `/api/planets?q=${encodeURIComponent(normalizedQuery)}&limit=12`,
-    {
-      headers: { accept: "application/json" },
-      signal: options.signal ?? AbortSignal.timeout(8_000),
-    },
+    options,
+    "Planet search",
   );
-
-  if (!response.ok) throw new Error(`Planet search failed with status ${response.status}.`);
-
-  const payload: unknown = await response.json();
-  if (!isPlanetSearchResponse(payload)) {
-    throw new Error("Planet search returned an invalid response.");
-  }
-
-  return {
-    cached: payload.meta.cached,
-    planets: payload.data,
-    query: payload.meta.query,
-  };
 };
 
 export const discoverPlanets = async (
   category: string,
-  options: { fetcher?: Fetcher; signal?: AbortSignal } = {},
+  options: CollectionOptions = {},
 ): Promise<PlanetSearchResult> =>
-  searchPlanetsRequest(`/api/planets?category=${encodeURIComponent(category)}&limit=12`, options);
+  requestPlanetCollection(
+    `/api/planets?category=${encodeURIComponent(category)}&limit=12`,
+    options,
+    "Planet discovery",
+  );
 
 export const loadPlanetsByHost = async (
   hostStar: string,
-  options: { fetcher?: Fetcher; signal?: AbortSignal } = {},
+  options: CollectionOptions = {},
 ): Promise<PlanetSearchResult> =>
-  searchPlanetsRequest(`/api/planets?host=${encodeURIComponent(hostStar)}&limit=12`, options);
+  requestPlanetCollection(
+    `/api/planets?host=${encodeURIComponent(hostStar)}&limit=12`,
+    options,
+    "Planet discovery",
+  );
 
 export const loadPlanetFilterPool = async (
-  options: { fetcher?: Fetcher; signal?: AbortSignal } = {},
+  options: CollectionOptions = {},
 ): Promise<PlanetSearchResult> =>
-  searchPlanetsRequest("/api/planets?browse=physical-controls&limit=120", options);
+  requestPlanetCollection(
+    "/api/planets?browse=physical-controls&limit=120",
+    options,
+    "Planet discovery",
+  );
 
 const PLANET_SURPRISE_CATEGORIES = [
   "most-earth-like",
@@ -222,21 +275,6 @@ export const discoverRandomPlanet = async (
   throw new Error("No renderable surprise destination is currently available.");
 };
 
-const searchPlanetsRequest = async (
-  path: string,
-  options: { fetcher?: Fetcher; signal?: AbortSignal },
-): Promise<PlanetSearchResult> => {
-  const response = await (options.fetcher ?? fetch)(path, {
-    headers: { accept: "application/json" },
-    signal: options.signal ?? AbortSignal.timeout(8_000),
-  });
-  if (!response.ok) throw new Error(`Planet discovery failed with status ${response.status}.`);
-  const payload: unknown = await response.json();
-  if (!isPlanetSearchResponse(payload))
-    throw new Error("Planet discovery returned an invalid response.");
-  return { cached: payload.meta.cached, planets: payload.data, query: payload.meta.query };
-};
-
 const requestStar = async (
   path: string,
   fetcher: Fetcher,
@@ -265,44 +303,26 @@ export const loadStarByName = async (
 
 export const searchStars = async (
   query: string,
-  options: { fetcher?: Fetcher; signal?: AbortSignal } = {},
+  options: CollectionOptions = {},
 ): Promise<StarSearchResult> => {
   const normalizedQuery = query.trim();
   const path =
     normalizedQuery.length >= 1
       ? `/api/stars?q=${encodeURIComponent(normalizedQuery)}&limit=12`
       : "/api/stars/featured";
-  const response = await (options.fetcher ?? fetch)(path, {
-    headers: { accept: "application/json" },
-    signal: options.signal ?? AbortSignal.timeout(10_000),
-  });
-  if (!response.ok) throw new Error(`Star search failed with status ${response.status}.`);
-  const payload: unknown = await response.json();
-  if (!isStarSearchResponse(payload)) throw new Error("Star search returned an invalid response.");
-  return {
-    cached: payload.meta.cached,
-    query: payload.meta.query,
-    stars: payload.data,
-  };
+
+  return requestStarCollection(path, options, "Star search");
 };
 
 export const discoverStars = async (
   category: string,
-  options: { fetcher?: Fetcher; signal?: AbortSignal } = {},
-): Promise<StarSearchResult> => {
-  const response = await (options.fetcher ?? fetch)(
+  options: CollectionOptions = {},
+): Promise<StarSearchResult> =>
+  requestStarCollection(
     `/api/stars?category=${encodeURIComponent(category)}&limit=12`,
-    {
-      headers: { accept: "application/json" },
-      signal: options.signal ?? AbortSignal.timeout(10_000),
-    },
+    options,
+    "Star discovery",
   );
-  if (!response.ok) throw new Error(`Star discovery failed with status ${response.status}.`);
-  const payload: unknown = await response.json();
-  if (!isStarSearchResponse(payload))
-    throw new Error("Star discovery returned an invalid response.");
-  return { cached: payload.meta.cached, query: payload.meta.query, stars: payload.data };
-};
 
 const STAR_SURPRISE_CATEGORIES = [
   "closest-neighbors",
