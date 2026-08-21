@@ -26,6 +26,12 @@ export interface ArchiveCache<T> {
   size(): number;
 }
 
+export interface RequestCoalescer<T> {
+  /** Shares one unresolved load for a key and forgets it as soon as it settles. */
+  run(key: string, load: () => Promise<T>): Promise<T>;
+  size(): number;
+}
+
 /** How many distinct queries either adapter keeps. Comfortably above the fixed-key working set. */
 export const DEFAULT_MAX_ENTRIES = 256;
 
@@ -64,5 +70,37 @@ export const createArchiveCache = <T>(maxEntries = DEFAULT_MAX_ENTRIES): Archive
     },
 
     size: () => entries.size,
+  };
+};
+
+/**
+ * Coalesces concurrent cache misses without turning failures into cached answers.
+ *
+ * Archive responses live in `createArchiveCache`; this map contains only work that has not settled
+ * yet. A rejected load is removed just like a successful one, so a temporary upstream failure can
+ * be retried by the next request.
+ */
+export const createRequestCoalescer = <T>(): RequestCoalescer<T> => {
+  const active = new Map<string, Promise<T>>();
+
+  return {
+    run(key, load) {
+      const existing = active.get(key);
+      if (existing) return existing;
+
+      const request = Promise.resolve().then(load);
+      active.set(key, request);
+      void request.then(
+        () => {
+          if (active.get(key) === request) active.delete(key);
+        },
+        () => {
+          if (active.get(key) === request) active.delete(key);
+        },
+      );
+      return request;
+    },
+
+    size: () => active.size,
   };
 };

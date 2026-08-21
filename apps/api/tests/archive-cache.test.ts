@@ -1,5 +1,9 @@
-import { expect, test } from "vite-plus/test";
-import { createArchiveCache, DEFAULT_MAX_ENTRIES } from "../src/archive-cache.ts";
+import { expect, test, vi } from "vite-plus/test";
+import {
+  createArchiveCache,
+  createRequestCoalescer,
+  DEFAULT_MAX_ENTRIES,
+} from "../src/archive-cache.ts";
 
 test("serves a value back until its expiry passes", () => {
   const cache = createArchiveCache<string>();
@@ -79,4 +83,38 @@ test("a repeatedly hit fixed key survives a flood of one-off searches", () => {
 test("the default bound leaves ample room above the fixed-key working set", () => {
   // Twelve planet categories, twelve star categories, featured, and the browsing field.
   expect(DEFAULT_MAX_ENTRIES).toBeGreaterThan(26);
+});
+
+test("concurrent work for one key shares a single load", async () => {
+  const requests = createRequestCoalescer<string>();
+  let loads = 0;
+  let release!: (value: string) => void;
+  const pending = new Promise<string>((resolve) => {
+    release = resolve;
+  });
+  const load = () => {
+    loads += 1;
+    return pending;
+  };
+
+  const first = requests.run("same-query", load);
+  const second = requests.run("same-query", load);
+
+  expect(first).toBe(second);
+  expect(loads).toBe(0);
+  expect(requests.size()).toBe(1);
+
+  release("result");
+  await expect(first).resolves.toBe("result");
+  expect(loads).toBe(1);
+  await vi.waitFor(() => expect(requests.size()).toBe(0));
+});
+
+test("a rejected load is forgotten so the key can be retried", async () => {
+  const requests = createRequestCoalescer<string>();
+
+  await expect(
+    requests.run("query", async () => Promise.reject(new Error("offline"))),
+  ).rejects.toThrow("offline");
+  await expect(requests.run("query", async () => "recovered")).resolves.toBe("recovered");
 });
