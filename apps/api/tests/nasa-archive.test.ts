@@ -112,3 +112,26 @@ test("loads the complete normalized catalog for synchronization", async () => {
   expect(query).toContain("from pscomppars order by pl_name");
   expect(query).not.toContain("select top");
 });
+
+test("resolves a planet by name whatever casing the caller used", async () => {
+  const requestedQueries: string[] = [];
+  const repository = new NasaPlanetRepository({
+    fetcher: async (input) => {
+      const href =
+        typeof input === "string" ? input : input instanceof URL ? input.href : input.url;
+      requestedQueries.push(new URL(href).searchParams.get("query") ?? "");
+      return Response.json([nasaRow]);
+    },
+  });
+
+  const exact = await repository.findByName("HIP 65426 b");
+  const lowercased = await repository.findByName("hip 65426 b");
+
+  expect(exact.value?.name).toBe("HIP 65426 b");
+  expect(lowercased.value?.name).toBe("HIP 65426 b");
+  // The PostgreSQL repository behind the same interface matches on `lower(name) = lower($1)`,
+  // so the archive fallback must not answer a shared link differently.
+  for (const query of requestedQueries) {
+    expect(query).toContain("lower(pl_name)=lower(");
+  }
+});
