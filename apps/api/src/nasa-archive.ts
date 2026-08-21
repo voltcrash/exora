@@ -264,7 +264,11 @@ export class NasaPlanetRepository implements PlanetRepository {
   async findByName(name: string): Promise<RepositoryResult<ExoplanetProfile | null>> {
     const normalizedName = name.trim().slice(0, 100);
     const escapedName = escapeAdqlLiteral(normalizedName);
-    const adql = `select top 1 ${NASA_COLUMNS} from pscomppars where pl_name='${escapedName}'`;
+    // Matched case-insensitively, like `findByHost` below and like the PostgreSQL repository
+    // behind the same interface. A shared `?planet=` link carries whatever casing the sender
+    // had, and `/api/planets/kepler-297 b` must not resolve differently depending on which
+    // repository the deployment happens to be running.
+    const adql = `select top 1 ${NASA_COLUMNS} from pscomppars where lower(pl_name)=lower('${escapedName}')`;
     const result = await this.#query(adql);
 
     return { cached: result.cached, value: result.value[0] ?? null };
