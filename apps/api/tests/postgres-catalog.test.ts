@@ -58,8 +58,13 @@ const planetRow = {
   retrieved_on: planet.source.retrievedOn,
 };
 
+/** Columns written per row by the catalog upsert, used to infer a batch size from its parameters. */
+const UPSERT_COLUMN_COUNT = 23;
+
 class FakeDatabase implements DatabaseClient {
   readonly queries: { parameters: readonly unknown[]; statement: string }[] = [];
+  /** How many of the next upsert's rows the database should report as newly inserted. */
+  insertedRows = Number.POSITIVE_INFINITY;
 
   async close(): Promise<void> {}
 
@@ -69,6 +74,12 @@ class FakeDatabase implements DatabaseClient {
   ): Promise<T[]> {
     this.queries.push({ statement, parameters });
 
+    if (statement.includes("INSERT INTO exoplanets")) {
+      const rows = parameters.length / UPSERT_COLUMN_COUNT;
+      return Array.from({ length: rows }, (_, index) => ({
+        inserted: index < this.insertedRows,
+      })) as unknown as T[];
+    }
     if (statement.includes("DELETE FROM exoplanets")) {
       return [{ id: "stale-world" }] as unknown as T[];
     }
@@ -135,7 +146,7 @@ test("synchronizes planets and removes stale rows in one transaction", async () 
     now: new Date("2026-08-13T12:00:00.000Z"),
   });
 
-  expect(result).toEqual({ fetched: 1, upserted: 1, removed: 1 });
+  expect(result).toEqual({ fetched: 1, inserted: 1, removed: 1, updated: 0, upserted: 1 });
   expect(
     database.queries.some(({ statement }) => statement.includes("pg_advisory_xact_lock")),
   ).toBe(true);
@@ -165,4 +176,35 @@ test("every database read reports itself as live rather than cached", async () =
   ]);
 
   expect(results.map(({ cached }) => cached)).toEqual([false, false, false, false, false]);
+});
+
+test("the run counts what the database reported writing, not what was handed to it", async () => {
+  const database = new FakeDatabase();
+  // Two of the three rows already existed, so the database reports one insert and two updates.
+  database.insertedRows = 1;
+
+  const result = await syncPlanetCatalog(
+    database,
+    [planet, { ...planet, id: "b", name: "B" }, { ...planet, id: "c", name: "C" }],
+    { minimumCatalogSize: 1, now: new Date("2026-08-13T12:00:00.000Z") },
+  );
+
+  expect(result).toMatchObject({ fetched: 3, inserted: 1, updated: 2, upserted: 3 });
+  // `fetched` is what NASA returned; `upserted` is what the database acknowledged. Recording the
+  // payload size for both would make a run that wrote nothing indistinguishable from a healthy one.
+  const runLog = database.queries.at(-1);
+  expect(runLog?.statement).toContain("INSERT INTO catalog_sync_runs");
+  expect(runLog?.parameters).toEqual(["2026-08-13T12:00:00.000Z", 3, 3, 1]);
+});
+
+test("the upsert asks the database which rows were new", async () => {
+  const database = new FakeDatabase();
+
+  await syncPlanetCatalog(database, [planet], { minimumCatalogSize: 1 });
+
+  const upsert = database.queries.find(({ statement }) =>
+    statement.includes("INSERT INTO exoplanets"),
+  );
+  // A row that went through DO UPDATE carries the transaction in xmax; a new one leaves it zero.
+  expect(upsert?.statement).toContain("RETURNING (xmax = 0) AS inserted");
 });

@@ -12,7 +12,9 @@ try {
   const result = await nasa.listAll();
   const sync = await syncPlanetCatalog(database, result.value);
   console.log(
-    `Synchronized ${sync.upserted} confirmed planets; removed ${sync.removed} stale records.`,
+    `Synchronized ${sync.upserted} confirmed planets ` +
+      `(${sync.inserted} new, ${sync.updated} refreshed); ` +
+      `removed ${sync.removed} stale records.`,
   );
 } finally {
   await database.close();
