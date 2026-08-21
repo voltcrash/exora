@@ -1,5 +1,5 @@
 import type { ExoplanetProfile, PlanetKind } from "@exora/contracts";
-import { createArchiveCache } from "./archive-cache.ts";
+import { createArchiveCache, createRequestCoalescer } from "./archive-cache.ts";
 import {
   NASA_DIALECT,
   PLANET_DISCOVERY_FILTERS,
@@ -171,6 +171,7 @@ export class NasaPlanetRepository implements PlanetRepository {
   readonly #cacheTtlMs: number;
   readonly #fetcher: Fetcher;
   readonly #now: () => number;
+  readonly #requests = createRequestCoalescer<RepositoryResult<ExoplanetProfile[]>>();
   readonly #timeoutMs: number;
 
   constructor(options: NasaPlanetRepositoryOptions = {}) {
@@ -242,41 +243,43 @@ export class NasaPlanetRepository implements PlanetRepository {
 
     if (cached) return { cached: true, value: cached };
 
-    const url = new URL(NASA_TAP_ENDPOINT);
-    url.searchParams.set("query", adql);
-    url.searchParams.set("format", "json");
+    return this.#requests.run(adql, async () => {
+      const url = new URL(NASA_TAP_ENDPOINT);
+      url.searchParams.set("query", adql);
+      url.searchParams.set("format", "json");
 
-    try {
-      const response = await this.#fetcher(url, {
-        headers: { accept: "application/json" },
-        signal: AbortSignal.timeout(this.#timeoutMs),
-      });
+      try {
+        const response = await this.#fetcher(url, {
+          headers: { accept: "application/json" },
+          signal: AbortSignal.timeout(this.#timeoutMs),
+        });
 
-      if (!response.ok) {
-        throw new NasaArchiveError(`NASA TAP responded with status ${response.status}.`);
+        if (!response.ok) {
+          throw new NasaArchiveError(`NASA TAP responded with status ${response.status}.`);
+        }
+
+        const payload: unknown = await response.json();
+
+        if (!Array.isArray(payload)) {
+          throw new NasaArchiveError("NASA TAP returned an unexpected response shape.");
+        }
+
+        const retrievedOn = new Date(requestTime).toISOString().slice(0, 10);
+        const planets = payload
+          .map((row) =>
+            row && typeof row === "object"
+              ? normalizeNasaPlanet(row as Record<string, unknown>, retrievedOn)
+              : null,
+          )
+          .filter((planet): planet is ExoplanetProfile => planet !== null);
+
+        this.#cache.set(adql, planets, requestTime + this.#cacheTtlMs);
+
+        return { cached: false, value: planets };
+      } catch (error) {
+        if (error instanceof NasaArchiveError) throw error;
+        throw new NasaArchiveError("NASA TAP request failed.", { cause: error });
       }
-
-      const payload: unknown = await response.json();
-
-      if (!Array.isArray(payload)) {
-        throw new NasaArchiveError("NASA TAP returned an unexpected response shape.");
-      }
-
-      const retrievedOn = new Date(requestTime).toISOString().slice(0, 10);
-      const planets = payload
-        .map((row) =>
-          row && typeof row === "object"
-            ? normalizeNasaPlanet(row as Record<string, unknown>, retrievedOn)
-            : null,
-        )
-        .filter((planet): planet is ExoplanetProfile => planet !== null);
-
-      this.#cache.set(adql, planets, requestTime + this.#cacheTtlMs);
-
-      return { cached: false, value: planets };
-    } catch (error) {
-      if (error instanceof NasaArchiveError) throw error;
-      throw new NasaArchiveError("NASA TAP request failed.", { cause: error });
-    }
+    });
   }
 }

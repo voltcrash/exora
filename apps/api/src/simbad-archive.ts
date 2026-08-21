@@ -1,5 +1,5 @@
 import type { StarKind, StarProfile } from "@exora/contracts";
-import { createArchiveCache } from "./archive-cache.ts";
+import { createArchiveCache, createRequestCoalescer } from "./archive-cache.ts";
 import type { RepositoryResult } from "./nasa-archive.ts";
 
 const SIMBAD_TAP_ENDPOINT = "https://simbad.cds.unistra.fr/simbad/sim-tap/sync";
@@ -305,6 +305,7 @@ export class SimbadStarRepository implements StarRepository {
   readonly #cacheTtlMs: number;
   readonly #fetcher: Fetcher;
   readonly #now: () => number;
+  readonly #requests = createRequestCoalescer<RepositoryResult<StarProfile[]>>();
   readonly #timeoutMs: number;
 
   constructor(options: SimbadStarRepositoryOptions = {}) {
@@ -364,42 +365,44 @@ export class SimbadStarRepository implements StarRepository {
     const cached = this.#cache.get(adql, requestTime);
     if (cached) return { cached: true, value: cached };
 
-    const url = new URL(SIMBAD_TAP_ENDPOINT);
-    url.searchParams.set("request", "doQuery");
-    url.searchParams.set("lang", "adql");
-    url.searchParams.set("format", "json");
-    url.searchParams.set("query", adql);
+    return this.#requests.run(adql, async () => {
+      const url = new URL(SIMBAD_TAP_ENDPOINT);
+      url.searchParams.set("request", "doQuery");
+      url.searchParams.set("lang", "adql");
+      url.searchParams.set("format", "json");
+      url.searchParams.set("query", adql);
 
-    try {
-      const response = await this.#fetcher(url, {
-        headers: { accept: "application/json" },
-        signal: AbortSignal.timeout(this.#timeoutMs),
-      });
-      if (!response.ok) {
-        throw new SimbadArchiveError(`SIMBAD TAP responded with status ${response.status}.`);
+      try {
+        const response = await this.#fetcher(url, {
+          headers: { accept: "application/json" },
+          signal: AbortSignal.timeout(this.#timeoutMs),
+        });
+        if (!response.ok) {
+          throw new SimbadArchiveError(`SIMBAD TAP responded with status ${response.status}.`);
+        }
+
+        const payload = (await response.json()) as SimbadPayload;
+        if (!Array.isArray(payload.metadata) || !Array.isArray(payload.data)) {
+          throw new SimbadArchiveError("SIMBAD TAP returned an unexpected response shape.");
+        }
+
+        const columns = payload.metadata.map((column) => column.name ?? "");
+        const retrievedOn = new Date(requestTime).toISOString().slice(0, 10);
+        const stars = payload.data
+          .map((values) =>
+            normalizeSimbadStar(
+              Object.fromEntries(columns.map((column, index) => [column, values[index]])),
+              retrievedOn,
+            ),
+          )
+          .filter((star): star is StarProfile => star !== null);
+
+        this.#cache.set(adql, stars, requestTime + this.#cacheTtlMs);
+        return { cached: false, value: stars };
+      } catch (error) {
+        if (error instanceof SimbadArchiveError) throw error;
+        throw new SimbadArchiveError("SIMBAD TAP request failed.", { cause: error });
       }
-
-      const payload = (await response.json()) as SimbadPayload;
-      if (!Array.isArray(payload.metadata) || !Array.isArray(payload.data)) {
-        throw new SimbadArchiveError("SIMBAD TAP returned an unexpected response shape.");
-      }
-
-      const columns = payload.metadata.map((column) => column.name ?? "");
-      const retrievedOn = new Date(requestTime).toISOString().slice(0, 10);
-      const stars = payload.data
-        .map((values) =>
-          normalizeSimbadStar(
-            Object.fromEntries(columns.map((column, index) => [column, values[index]])),
-            retrievedOn,
-          ),
-        )
-        .filter((star): star is StarProfile => star !== null);
-
-      this.#cache.set(adql, stars, requestTime + this.#cacheTtlMs);
-      return { cached: false, value: stars };
-    } catch (error) {
-      if (error instanceof SimbadArchiveError) throw error;
-      throw new SimbadArchiveError("SIMBAD TAP request failed.", { cause: error });
-    }
+    });
   }
 }

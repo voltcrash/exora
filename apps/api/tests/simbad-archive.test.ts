@@ -98,3 +98,28 @@ test("uses exact alias matching and caches repeated searches", async () => {
   expect(adql).toContain("i.id='NAME Sirius'");
   expect(adql).not.toContain("like");
 });
+
+test("coalesces identical SIMBAD queries while the first request is unresolved", async () => {
+  let requests = 0;
+  let release!: (response: Response) => void;
+  const response = new Promise<Response>((resolve) => {
+    release = resolve;
+  });
+  const repository = new SimbadStarRepository({
+    fetcher: () => {
+      requests += 1;
+      return response;
+    },
+  });
+
+  const first = repository.search("sirius", 12);
+  const second = repository.search("sirius", 12);
+  await Promise.resolve();
+  expect(requests).toBe(1);
+
+  release(Response.json({ metadata, data: [siriusRow] }));
+  const [firstResult, secondResult] = await Promise.all([first, second]);
+  expect(firstResult.value[0]?.name).toBe("Sirius");
+  expect(secondResult.value[0]?.name).toBe("Sirius");
+  expect(requests).toBe(1);
+});

@@ -60,6 +60,31 @@ test("caches identical TAP queries", async () => {
   expect(requests).toBe(1);
 });
 
+test("coalesces identical TAP queries while the first request is unresolved", async () => {
+  let requests = 0;
+  let release!: (response: Response) => void;
+  const response = new Promise<Response>((resolve) => {
+    release = resolve;
+  });
+  const repository = new NasaPlanetRepository({
+    fetcher: () => {
+      requests += 1;
+      return response;
+    },
+  });
+
+  const first = repository.findByName("HIP 65426 b");
+  const second = repository.findByName("HIP 65426 b");
+  await Promise.resolve();
+  expect(requests).toBe(1);
+
+  release(Response.json([nasaRow]));
+  const [firstResult, secondResult] = await Promise.all([first, second]);
+  expect(firstResult.value?.name).toBe("HIP 65426 b");
+  expect(secondResult.value?.name).toBe("HIP 65426 b");
+  expect(requests).toBe(1);
+});
+
 test("queries confirmed worlds by their exact host system", async () => {
   let requestedUrl = "";
   const repository = new NasaPlanetRepository({
