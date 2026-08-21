@@ -1,10 +1,13 @@
 import type { ExoplanetProfile } from "@exora/contracts";
 import type { DatabaseClient } from "./database.ts";
-import type {
-  PlanetDiscoveryCategory,
-  PlanetRepository,
-  RepositoryResult,
-} from "./nasa-archive.ts";
+import {
+  PLANET_DISCOVERY_FILTERS,
+  POSTGRES_DIALECT,
+  renderPlanetOrder,
+  renderPlanetPredicate,
+  type PlanetDiscoveryCategory,
+} from "./discovery-categories.ts";
+import type { PlanetRepository, RepositoryResult } from "./nasa-archive.ts";
 
 interface PlanetRow extends Record<string, unknown> {
   discovery_method: string;
@@ -123,65 +126,12 @@ export class PostgresPlanetRepository implements PlanetRepository {
     category: PlanetDiscoveryCategory,
     limit: number,
   ): Promise<RepositoryResult<ExoplanetProfile[]>> {
-    const filters: Record<PlanetDiscoveryCategory, { order: string; where: string }> = {
-      "earth-like": {
-        where:
-          "radius_earth BETWEEN 0.8 AND 1.6 AND equilibrium_temperature_kelvin BETWEEN 220 AND 320",
-        order: "abs(radius_earth - 1), abs(equilibrium_temperature_kelvin - 255)",
-      },
-      "lava-worlds": {
-        where: "equilibrium_temperature_kelvin >= 1000 AND radius_earth < 3",
-        order: "equilibrium_temperature_kelvin DESC",
-      },
-      "gas-giants": {
-        where: "(radius_jupiter >= 0.45 OR mass_jupiter >= 0.08)",
-        order: "radius_jupiter DESC NULLS LAST",
-      },
-      "ocean-candidates": {
-        where:
-          "radius_earth BETWEEN 1.3 AND 2.6 AND equilibrium_temperature_kelvin BETWEEN 200 AND 350",
-        order: "abs(equilibrium_temperature_kelvin - 275), radius_earth",
-      },
-      "frozen-worlds": {
-        where: "equilibrium_temperature_kelvin < 180",
-        order: "equilibrium_temperature_kelvin",
-      },
-      "extreme-weather": {
-        where:
-          "equilibrium_temperature_kelvin >= 1200 AND (radius_jupiter >= 0.45 OR mass_jupiter >= 0.08)",
-        order: "equilibrium_temperature_kelvin DESC",
-      },
-      "potentially-habitable": {
-        where:
-          "radius_earth BETWEEN 0.5 AND 1.8 AND equilibrium_temperature_kelvin BETWEEN 180 AND 330",
-        order: "abs(radius_earth - 1), abs(equilibrium_temperature_kelvin - 255)",
-      },
-      "recently-discovered": {
-        where: "discovery_year IS NOT NULL",
-        order: "discovery_year DESC, name",
-      },
-      "most-earth-like": {
-        where:
-          "radius_earth BETWEEN 0.75 AND 1.5 AND equilibrium_temperature_kelvin BETWEEN 210 AND 320",
-        order: "abs(radius_earth - 1), abs(equilibrium_temperature_kelvin - 255)",
-      },
-      "nearest-rocky-worlds": {
-        where: "radius_earth <= 2 AND distance_parsecs IS NOT NULL",
-        order: "distance_parsecs, radius_earth",
-      },
-      "recently-confirmed": {
-        where: "discovery_year IS NOT NULL",
-        order: "discovery_year DESC, name",
-      },
-      "record-breakers": {
-        where: "equilibrium_temperature_kelvin >= 1500 OR mass_jupiter >= 5",
-        order: "equilibrium_temperature_kelvin DESC NULLS LAST, mass_jupiter DESC NULLS LAST",
-      },
-    };
-    const filter = filters[category];
+    const filter = PLANET_DISCOVERY_FILTERS[category];
+    const where = renderPlanetPredicate(filter.where, POSTGRES_DIALECT);
+    const order = renderPlanetOrder(filter.order, POSTGRES_DIALECT);
     const safeLimit = Math.max(1, Math.min(Math.trunc(limit), 24));
     const rows = await this.#database.query<PlanetRow>(
-      `SELECT ${PLANET_COLUMNS} FROM exoplanets WHERE ${filter.where} ORDER BY ${filter.order} LIMIT $1`,
+      `SELECT ${PLANET_COLUMNS} FROM exoplanets WHERE ${where} ORDER BY ${order} LIMIT $1`,
       [safeLimit],
     );
     return { cached: false, value: rows.map(toPlanet) };

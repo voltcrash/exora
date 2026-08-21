@@ -1,5 +1,12 @@
 import type { ExoplanetProfile, PlanetKind } from "@exora/contracts";
 import { createArchiveCache } from "./archive-cache.ts";
+import {
+  NASA_DIALECT,
+  PLANET_DISCOVERY_FILTERS,
+  renderPlanetOrder,
+  renderPlanetPredicate,
+  type PlanetDiscoveryCategory,
+} from "./discovery-categories.ts";
 
 const NASA_TAP_ENDPOINT = "https://exoplanetarchive.ipac.caltech.edu/TAP/sync";
 const NASA_COLUMNS = [
@@ -21,6 +28,11 @@ const NASA_COLUMNS = [
   "st_mass",
   "st_lum",
 ].join(",");
+
+export {
+  PLANET_DISCOVERY_CATEGORIES,
+  type PlanetDiscoveryCategory,
+} from "./discovery-categories.ts";
 
 type Fetcher = (input: string | URL | Request, init?: RequestInit) => Promise<Response>;
 
@@ -59,77 +71,6 @@ export interface PlanetRepository {
   findByHost(hostStar: string, limit: number): Promise<RepositoryResult<ExoplanetProfile[]>>;
   search(query: string, limit: number): Promise<RepositoryResult<ExoplanetProfile[]>>;
 }
-
-export type PlanetDiscoveryCategory =
-  | "earth-like"
-  | "lava-worlds"
-  | "gas-giants"
-  | "ocean-candidates"
-  | "frozen-worlds"
-  | "extreme-weather"
-  | "potentially-habitable"
-  | "recently-discovered"
-  | "most-earth-like"
-  | "nearest-rocky-worlds"
-  | "recently-confirmed"
-  | "record-breakers";
-
-export const PLANET_DISCOVERY_CATEGORIES = new Set<PlanetDiscoveryCategory>([
-  "earth-like",
-  "lava-worlds",
-  "gas-giants",
-  "ocean-candidates",
-  "frozen-worlds",
-  "extreme-weather",
-  "potentially-habitable",
-  "recently-discovered",
-  "most-earth-like",
-  "nearest-rocky-worlds",
-  "recently-confirmed",
-  "record-breakers",
-]);
-
-const DISCOVERY_FILTERS: Record<PlanetDiscoveryCategory, { order: string; where: string }> = {
-  "earth-like": {
-    where: "pl_rade between 0.8 and 1.6 and pl_eqt between 220 and 320",
-    order: "abs(pl_rade-1), abs(pl_eqt-255)",
-  },
-  "lava-worlds": { where: "pl_eqt >= 1000 and pl_rade < 3", order: "pl_eqt desc" },
-  "gas-giants": {
-    where: "(pl_radj >= 0.45 or pl_bmassj >= 0.08)",
-    order: "pl_radj desc",
-  },
-  "ocean-candidates": {
-    where: "pl_rade between 1.3 and 2.6 and pl_eqt between 200 and 350",
-    order: "abs(pl_eqt-275), pl_rade",
-  },
-  "frozen-worlds": { where: "pl_eqt < 180", order: "pl_eqt" },
-  "extreme-weather": {
-    where: "pl_eqt >= 1200 and (pl_radj >= 0.45 or pl_bmassj >= 0.08)",
-    order: "pl_eqt desc",
-  },
-  "potentially-habitable": {
-    where: "pl_rade between 0.5 and 1.8 and pl_eqt between 180 and 330",
-    order: "abs(pl_rade-1), abs(pl_eqt-255)",
-  },
-  "recently-discovered": { where: "disc_year is not null", order: "disc_year desc, pl_name" },
-  "most-earth-like": {
-    where: "pl_rade between 0.75 and 1.5 and pl_eqt between 210 and 320",
-    order: "abs(pl_rade-1), abs(pl_eqt-255)",
-  },
-  "nearest-rocky-worlds": {
-    where: "pl_rade <= 2 and sy_dist is not null",
-    order: "sy_dist, pl_rade",
-  },
-  "recently-confirmed": {
-    where: "disc_year is not null",
-    order: "disc_year desc, pl_name",
-  },
-  "record-breakers": {
-    where: "pl_eqt >= 1500 or pl_bmassj >= 5",
-    order: "pl_eqt desc, pl_bmassj desc",
-  },
-};
 
 export interface NasaPlanetRepositoryOptions {
   cacheTtlMs?: number;
@@ -250,10 +191,12 @@ export class NasaPlanetRepository implements PlanetRepository {
     category: PlanetDiscoveryCategory,
     limit: number,
   ): Promise<RepositoryResult<ExoplanetProfile[]>> {
-    const filter = DISCOVERY_FILTERS[category];
+    const filter = PLANET_DISCOVERY_FILTERS[category];
+    const where = renderPlanetPredicate(filter.where, NASA_DIALECT);
+    const order = renderPlanetOrder(filter.order, NASA_DIALECT);
     const safeLimit = Math.max(1, Math.min(Math.trunc(limit), 24));
     return this.#query(
-      `select top ${safeLimit} ${NASA_COLUMNS} from pscomppars where ${filter.where} order by ${filter.order}`,
+      `select top ${safeLimit} ${NASA_COLUMNS} from pscomppars where ${where} order by ${order}`,
     );
   }
 
