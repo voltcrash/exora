@@ -2,6 +2,7 @@ import type { ExoplanetProfile, StarProfile } from "@exora/contracts";
 import { expect, test } from "vite-plus/test";
 import { createApp } from "../src/app.ts";
 import type { PlanetRepository } from "../src/nasa-archive.ts";
+import { createRateLimiter } from "../src/rate-limit.ts";
 import type { StarRepository } from "../src/simbad-archive.ts";
 
 const planet: ExoplanetProfile = {
@@ -164,4 +165,49 @@ test("returns featured and exact SIMBAD star results", async () => {
   });
   expect(await searchResponse.json()).toMatchObject({ meta: { count: 1, query: "sirius" } });
   expect(await detailResponse.json()).toMatchObject({ data: { id: "alf-cma" } });
+});
+
+test("every response carries the caller's remaining request budget", async () => {
+  const response = await createApp({ repository }).request("/api/health");
+
+  expect(response.headers.get("RateLimit-Limit")).toBe("120");
+  expect(Number(response.headers.get("RateLimit-Remaining"))).toBe(119);
+  expect(Number(response.headers.get("RateLimit-Reset"))).toBeGreaterThan(0);
+});
+
+test("a caller past its budget is refused with a wait", async () => {
+  const app = createApp({
+    repository,
+    rateLimiter: createRateLimiter({ limit: 2, windowMs: 60_000 }),
+  });
+  const headers = { "x-forwarded-for": "203.0.113.7" };
+
+  const allowed = await Promise.all([
+    app.request("/api/health", { headers }),
+    app.request("/api/health", { headers }),
+  ]);
+  const refused = await app.request("/api/health", { headers });
+
+  expect(allowed.map((response) => response.status)).toEqual([200, 200]);
+  expect(refused.status).toBe(429);
+  expect(await refused.json()).toMatchObject({ error: { code: "RATE_LIMITED" } });
+  expect(Number(refused.headers.get("Retry-After"))).toBeGreaterThan(0);
+});
+
+test("one caller exhausting its budget does not refuse another", async () => {
+  const app = createApp({
+    repository,
+    rateLimiter: createRateLimiter({ limit: 1, windowMs: 60_000 }),
+  });
+
+  await app.request("/api/health", { headers: { "x-forwarded-for": "203.0.113.7" } });
+  const sameCaller = await app.request("/api/health", {
+    headers: { "x-forwarded-for": "203.0.113.7" },
+  });
+  const otherCaller = await app.request("/api/health", {
+    headers: { "x-forwarded-for": "198.51.100.4" },
+  });
+
+  expect(sameCaller.status).toBe(429);
+  expect(otherCaller.status).toBe(200);
 });

@@ -18,6 +18,12 @@ import {
   type RepositoryResult,
 } from "./nasa-archive.ts";
 import {
+  clientKey,
+  createRateLimiter,
+  DEFAULT_RATE_LIMIT,
+  type RateLimiter,
+} from "./rate-limit.ts";
+import {
   SimbadArchiveError,
   SimbadStarRepository,
   STAR_DISCOVERY_CATEGORIES,
@@ -26,6 +32,8 @@ import {
 } from "./simbad-archive.ts";
 
 interface CreateAppOptions {
+  /** Overridable so a test can exercise the limit without issuing a hundred requests. */
+  rateLimiter?: RateLimiter;
   repository?: PlanetRepository;
   starRepository?: StarRepository;
 }
@@ -96,6 +104,7 @@ const starCollection = (
 };
 
 export const createApp = ({
+  rateLimiter = createRateLimiter(DEFAULT_RATE_LIMIT),
   repository = new NasaPlanetRepository(),
   starRepository = new SimbadStarRepository(),
 }: CreateAppOptions = {}) => {
@@ -104,10 +113,38 @@ export const createApp = ({
   app.use(
     "/api/*",
     cors({
+      // Deliberately open. The responses are public, read-only, unauthenticated astronomy data
+      // with no cookies or credentials attached, and the browser's origin check would not slow
+      // down the abuse this API actually has to worry about — a script calling it server-side
+      // never sends an Origin at all. The request budget below is what bounds that.
       allowMethods: ["GET", "OPTIONS"],
       maxAge: 86_400,
     }),
   );
+
+  app.use("/api/*", async (context, next) => {
+    const decision = rateLimiter.check(
+      clientKey({
+        forwardedFor: context.req.header("x-forwarded-for"),
+        realIp: context.req.header("x-real-ip"),
+      }),
+      Date.now(),
+    );
+
+    context.header("RateLimit-Limit", String(decision.limit));
+    context.header("RateLimit-Remaining", String(decision.remaining));
+    context.header("RateLimit-Reset", String(Math.ceil(decision.resetAt / 1_000)));
+
+    if (!decision.allowed) {
+      context.header("Retry-After", String(decision.retryAfterSeconds));
+      return context.json(
+        apiError("RATE_LIMITED", "Too many requests. Please slow down and try again shortly."),
+        429,
+      );
+    }
+
+    await next();
+  });
 
   app.get("/api/health", (context) =>
     context.json({ service: "exora-api", status: "ok" as const }),
