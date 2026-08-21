@@ -22,3 +22,7 @@ dist-ssr
 *.njsproj
 *.sln
 *.sw?
+
+# Screenshots the browser suite writes when a test fails
+src/__screenshots__
+.vitest-attachments/
