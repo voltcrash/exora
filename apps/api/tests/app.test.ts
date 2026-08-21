@@ -1,9 +1,9 @@
 import type { ExoplanetProfile, StarProfile } from "@exora/contracts";
 import { expect, test } from "vite-plus/test";
 import { createApp } from "../src/app.ts";
-import type { PlanetRepository } from "../src/nasa-archive.ts";
+import { NasaArchiveError, type PlanetRepository } from "../src/nasa-archive.ts";
 import { createRateLimiter } from "../src/rate-limit.ts";
-import type { StarRepository } from "../src/simbad-archive.ts";
+import { SimbadArchiveError, type StarRepository } from "../src/simbad-archive.ts";
 
 const planet: ExoplanetProfile = {
   id: "hip-65426-b",
@@ -210,4 +210,128 @@ test("one caller exhausting its budget does not refuse another", async () => {
 
   expect(sameCaller.status).toBe(429);
   expect(otherCaller.status).toBe(200);
+});
+
+test("an unreachable NASA archive is reported as an upstream failure, not a crash", async () => {
+  const failing: PlanetRepository = {
+    ...repository,
+    search: async () => {
+      throw new NasaArchiveError("NASA TAP request failed.");
+    },
+  };
+
+  const response = await createApp({ repository: failing }).request("/api/planets?q=hip");
+
+  expect(response.status).toBe(502);
+  expect(await response.json()).toMatchObject({
+    error: { code: "UPSTREAM_UNAVAILABLE", message: expect.stringContaining("NASA") },
+  });
+});
+
+test("an unreachable SIMBAD archive is reported as an upstream failure", async () => {
+  const failing: StarRepository = {
+    ...starRepository,
+    featured: async () => {
+      throw new SimbadArchiveError("SIMBAD TAP request failed.");
+    },
+  };
+
+  const response = await createApp({ repository, starRepository: failing }).request(
+    "/api/stars/featured",
+  );
+
+  expect(response.status).toBe(502);
+  expect(await response.json()).toMatchObject({
+    error: { code: "UPSTREAM_UNAVAILABLE", message: expect.stringContaining("SIMBAD") },
+  });
+});
+
+test("an unexpected failure does not leak its message to the caller", async () => {
+  const failing: PlanetRepository = {
+    ...repository,
+    search: async () => {
+      throw new Error("connection string postgres://user:hunter2@host/db refused");
+    },
+  };
+
+  const response = await createApp({ repository: failing }).request("/api/planets?q=hip");
+  const payload = await response.json();
+
+  expect(response.status).toBe(500);
+  expect(JSON.stringify(payload)).not.toContain("hunter2");
+  expect(payload).toMatchObject({ error: { code: "UPSTREAM_UNAVAILABLE" } });
+});
+
+test("an unknown planet is a 404 rather than an empty success", async () => {
+  const empty: PlanetRepository = {
+    ...repository,
+    findByName: async () => ({ cached: false, value: null }),
+  };
+
+  const response = await createApp({ repository: empty }).request("/api/planets/Nowhere%20b");
+
+  expect(response.status).toBe(404);
+  expect(await response.json()).toMatchObject({
+    error: { code: "NOT_FOUND", message: expect.stringContaining("Nowhere b") },
+  });
+});
+
+test("an unknown star is a 404", async () => {
+  const empty: StarRepository = {
+    ...starRepository,
+    findByName: async () => ({ cached: false, value: null }),
+  };
+
+  const response = await createApp({ repository, starRepository: empty }).request(
+    "/api/stars/Nowhere",
+  );
+
+  expect(response.status).toBe(404);
+  expect(await response.json()).toMatchObject({ error: { code: "NOT_FOUND" } });
+});
+
+test("a missing featured planet is a 404 rather than a broken landing page", async () => {
+  const empty: PlanetRepository = {
+    ...repository,
+    findByName: async () => ({ cached: false, value: null }),
+  };
+
+  const response = await createApp({ repository: empty }).request("/api/planets/featured");
+
+  expect(response.status).toBe(404);
+  expect(await response.json()).toMatchObject({ error: { code: "NOT_FOUND" } });
+});
+
+test("names longer than the archives could carry are rejected before any lookup", async () => {
+  const tooLong = "x".repeat(101);
+  const app = createApp({ repository, starRepository });
+
+  for (const path of [
+    `/api/planets/${tooLong}`,
+    `/api/stars/${tooLong}`,
+    `/api/planets?host=${tooLong}`,
+  ]) {
+    const response = await app.request(path);
+    expect(response.status, path).toBe(400);
+    expect(await response.json()).toMatchObject({ error: { code: "INVALID_REQUEST" } });
+  }
+});
+
+test("an unrecognised discovery category is refused rather than silently ignored", async () => {
+  const app = createApp({ repository, starRepository });
+
+  const planets = await app.request("/api/planets?category=not-a-category");
+  const stars = await app.request("/api/stars?category=not-a-category");
+
+  expect(planets.status).toBe(400);
+  expect(stars.status).toBe(400);
+  expect(await planets.json()).toMatchObject({ error: { code: "INVALID_REQUEST" } });
+  expect(await stars.json()).toMatchObject({ error: { code: "INVALID_REQUEST" } });
+});
+
+test("an unknown API route is a structured 404", async () => {
+  const response = await createApp({ repository }).request("/api/does-not-exist");
+
+  expect(response.status).toBe(404);
+  expect(await response.json()).toMatchObject({ error: { code: "NOT_FOUND" } });
 });
