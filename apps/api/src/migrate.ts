@@ -1,6 +1,5 @@
-import { readFile } from "node:fs/promises";
-import { readdir } from "node:fs/promises";
 import { createDatabaseClient } from "./database.ts";
+import { applyMigrations } from "./migrations.ts";
 
 const connectionString = process.env.DATABASE_URL?.trim();
 if (!connectionString) throw new Error("DATABASE_URL is required to run database migrations.");
@@ -10,15 +9,16 @@ if (!connectionString) throw new Error("DATABASE_URL is required to run database
 const database = createDatabaseClient(connectionString, { maxConnections: 1 });
 
 try {
-  const migrationsUrl = new URL("../migrations/", import.meta.url);
-  const migrationFiles = (await readdir(migrationsUrl))
-    .filter((file) => /^\d+_[a-z0-9_]+\.sql$/.test(file))
-    .sort();
+  const run = await applyMigrations(database, new URL("../migrations/", import.meta.url));
 
-  for (const migrationFile of migrationFiles) {
-    const migration = await readFile(new URL(migrationFile, migrationsUrl), "utf8");
-    await database.query(migration);
-    console.log(`Applied PostgreSQL migration ${migrationFile.replace(".sql", "")}.`);
+  for (const version of run.skipped) {
+    console.log(`Skipped PostgreSQL migration ${version}; already applied.`);
+  }
+  for (const version of run.applied) {
+    console.log(`Applied PostgreSQL migration ${version}.`);
+  }
+  if (run.applied.length === 0) {
+    console.log("PostgreSQL schema is already up to date.");
   }
 } finally {
   await database.close();

@@ -44,6 +44,20 @@ class PostgresDatabaseClient implements DatabaseClient {
   }
 }
 
+/**
+ * Notices raised by the `IF NOT EXISTS` guards the migrations are built on.
+ *
+ * Every one of them says the object was already there, which is the outcome those guards exist to
+ * produce — reporting it is noise, and the driver's default is to dump the whole notice object,
+ * which reads like a failure on an otherwise successful run.
+ */
+const ALREADY_EXISTS_NOTICES = new Set([
+  "42P06", // duplicate schema
+  "42P07", // duplicate table, index, or relation
+  "42710", // duplicate object, e.g. an extension
+  "42701", // duplicate column
+]);
+
 export const createDatabaseClient = (
   connectionString: string,
   { maxConnections = 10 }: DatabaseClientOptions = {},
@@ -53,5 +67,10 @@ export const createDatabaseClient = (
       connect_timeout: 10,
       idle_timeout: 20,
       max: maxConnections,
+      onnotice: (notice) => {
+        if (ALREADY_EXISTS_NOTICES.has(notice.code ?? "")) return;
+        // Anything else is worth seeing, but as a line rather than a dumped object.
+        console.warn(`[postgres] ${notice.severity ?? "NOTICE"}: ${notice.message ?? ""}`);
+      },
     }),
   );
