@@ -10,7 +10,6 @@ import { StarCatalogVisual } from "./CatalogVisual.tsx";
 interface StarCatalogProps {
   onClose: () => void;
   onSelect: (star: StarProfile, cached: boolean) => void;
-  open: boolean;
 }
 
 type SearchState = "idle" | "loading" | "ready" | "error";
@@ -62,7 +61,7 @@ const collections = [
   },
 ] as const;
 
-export const StarCatalog = ({ onClose, onSelect, open }: StarCatalogProps) => {
+export const StarCatalog = ({ onClose, onSelect }: StarCatalogProps) => {
   const dialogRef = useRef<HTMLDialogElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
   const surpriseControllerRef = useRef<AbortController | null>(null);
@@ -76,20 +75,19 @@ export const StarCatalog = ({ onClose, onSelect, open }: StarCatalogProps) => {
   const [surpriseState, setSurpriseState] = useState<SurpriseState>("idle");
   const [suggestion, setSuggestion] = useState<string | null>(null);
 
+  // The catalog is mounted only for as long as it is open, so there is no closed-but-mounted
+  // state to synchronise: it opens with the component and closes when the page takes it away.
   useEffect(() => {
     const dialog = dialogRef.current;
-    if (!dialog) return;
-    if (open && !dialog.open) {
-      dialog.showModal();
-    } else if (!open && dialog.open) {
+    dialog?.showModal();
+
+    return () => {
       surpriseControllerRef.current?.abort();
-      setSurpriseState("idle");
-      dialog.close();
-    }
-  }, [open]);
+      dialog?.close();
+    };
+  }, []);
 
   useEffect(() => {
-    if (!open) return;
     if (activeCategory) {
       setSuggestion(null);
       const controller = new AbortController();
@@ -146,7 +144,7 @@ export const StarCatalog = ({ onClose, onSelect, open }: StarCatalogProps) => {
       window.clearTimeout(delay);
       controller.abort();
     };
-  }, [activeCategory, open, query]);
+  }, [activeCategory, query]);
 
   const activeLabel = [...collections, ...categories].find(
     (category) => category.id === activeCategory,

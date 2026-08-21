@@ -89,22 +89,21 @@ export const App = () => {
   //
   // It belongs here rather than inside the catalog, because the catalog is only mounted once it
   // is already open: a listener living there could never see the press that is supposed to open
-  // it. Here the page owns it for its whole life, and the three dialog flags above are the
-  // authority on whether a modal already has the page.
+  // it. Nothing it reads changes over the life of the page, so it is bound once.
   useEffect(() => {
     const openCatalogWithShortcut = (event: KeyboardEvent): void => {
       const target = event.target;
-      const opensCatalog = opensSearchShortcut(
-        {
+      if (
+        !opensSearchShortcut({
           altKey: event.altKey,
           ctrlKey: event.ctrlKey,
           key: event.key,
           metaKey: event.metaKey,
           target: target instanceof HTMLElement ? target : null,
-        },
-        { dialogOpen: builderOpen || catalogOpen || starCatalogOpen },
-      );
-      if (!opensCatalog) return;
+        })
+      ) {
+        return;
+      }
 
       // Only once the press is known to be the shortcut is suppressing the browser's own
       // quick-find the right thing to do.
@@ -114,7 +113,7 @@ export const App = () => {
 
     document.addEventListener("keydown", openCatalogWithShortcut);
     return () => document.removeEventListener("keydown", openCatalogWithShortcut);
-  }, [builderOpen, catalogOpen, starCatalogOpen]);
+  }, []);
 
   // Stable identities: the immersive console hands these to the Babylon scene, and a new
   // function on every render would tear the renderer down and rebuild it mid-session.
@@ -242,19 +241,18 @@ export const App = () => {
       )}
       {catalogOpen ? (
         <Suspense fallback={null}>
-          <PlanetCatalog open onClose={() => setCatalogOpen(false)} onSelect={selectPlanet} />
+          <PlanetCatalog onClose={() => setCatalogOpen(false)} onSelect={selectPlanet} />
         </Suspense>
       ) : null}
       {starCatalogOpen ? (
         <Suspense fallback={null}>
-          <StarCatalog open onClose={() => setStarCatalogOpen(false)} onSelect={selectStar} />
+          <StarCatalog onClose={() => setStarCatalogOpen(false)} onSelect={selectStar} />
         </Suspense>
       ) : null}
       {builderOpen && activeObject ? (
         <Suspense fallback={null}>
           <WorldForge
             initialMode={activeObject.type}
-            open
             onClose={() => setBuilderOpen(false)}
             onGeneratePlanet={generatePlanet}
             onGenerateStar={generateStar}
