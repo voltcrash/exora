@@ -30,7 +30,8 @@ const WorldForge = lazy(() =>
 
 type ActiveObject =
   | { result: PlanetLoadResult; type: "planet" }
-  | { result: StarLoadResult; type: "star" };
+  | { result: StarLoadResult; type: "star" }
+  | { kind: "planet" | "star"; name: string; type: "missing" };
 
 const defaultPlanetObject = (): ActiveObject => ({
   result: { cached: true, mode: "fallback", planet: featuredPlanet },
@@ -43,6 +44,7 @@ const loadRequestedObject = async (): Promise<ActiveObject> => {
   if (starName) {
     const star = await loadStarByName(starName);
     if (star) return { result: star, type: "star" };
+    return { kind: "star", name: starName, type: "missing" };
   }
 
   const name = parameters.get("planet");
@@ -51,7 +53,7 @@ const loadRequestedObject = async (): Promise<ActiveObject> => {
   const requested = await loadPlanetByName(name);
   return requested && hasRenderer(requested.planet)
     ? { result: requested, type: "planet" }
-    : defaultPlanetObject();
+    : { kind: "planet", name, type: "missing" };
 };
 
 export const App = () => {
@@ -177,11 +179,19 @@ export const App = () => {
     });
   }, []);
 
-  const subject = activeObject
-    ? activeObject.type === "planet"
-      ? activeObject.result.planet.name
-      : activeObject.result.star.name
-    : null;
+  const returnHome = useCallback((): void => {
+    window.history.replaceState({}, "", "/");
+    setCustomRecipe(null);
+    setSystemHostName(null);
+    setActiveObject(defaultPlanetObject());
+  }, []);
+
+  const subject =
+    activeObject && activeObject.type !== "missing"
+      ? activeObject.type === "planet"
+        ? activeObject.result.planet.name
+        : activeObject.result.star.name
+      : null;
 
   return (
     <>
@@ -222,6 +232,13 @@ export const App = () => {
           <p>CONTACTING OBSERVATORIES</p>
           <small>RESOLVING CELESTIAL OBJECT</small>
         </div>
+      ) : activeObject.type === "missing" ? (
+        <RecoveryScreen
+          action="RETURN TO FEATURED WORLD"
+          detail={`The ${activeObject.kind} “${activeObject.name}” could not be resolved from its archive or is not yet supported by Exora.`}
+          heading="DESTINATION UNAVAILABLE"
+          onRetry={returnHome}
+        />
       ) : activeObject.type === "planet" ? (
         <PlanetExperience
           key={activeObject.result.planet.id}
@@ -264,7 +281,7 @@ export const App = () => {
           <StarCatalog onClose={() => setStarCatalogOpen(false)} onSelect={selectStar} />
         </Suspense>
       ) : null}
-      {builderOpen && activeObject ? (
+      {builderOpen && activeObject && activeObject.type !== "missing" ? (
         <Suspense fallback={null}>
           <WorldForge
             initialMode={activeObject.type}

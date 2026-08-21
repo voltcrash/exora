@@ -254,6 +254,23 @@ test("a deep link to a named star resolves to that star", async () => {
   await expect.element(page.getByRole("heading", { level: 1 })).toHaveTextContent("Sirius");
 });
 
+test("an unavailable deep link is identified instead of showing a different world", async () => {
+  stubArchive({ missing: ["Withdrawn b"] });
+  mountApp("?planet=Withdrawn%20b");
+
+  await expect
+    .element(page.getByRole("heading", { name: "DESTINATION UNAVAILABLE" }))
+    .toBeVisible();
+  await expect.element(page.getByText(/planet “Withdrawn b”/)).toBeVisible();
+  expect(window.location.search).toBe("?planet=Withdrawn%20b");
+
+  await userEvent.click(page.getByRole("button", { name: "RETURN TO FEATURED WORLD" }));
+
+  await expect.element(page.getByRole("heading", { level: 1 })).toHaveTextContent("Kepler-297");
+  expect(window.location.pathname).toBe("/");
+  expect(window.location.search).toBe("");
+});
+
 test("the catalog opens, searches, and travels to a result", async () => {
   const calls = stubArchive();
   mountApp();
