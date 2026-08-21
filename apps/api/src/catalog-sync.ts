@@ -31,8 +31,13 @@ const BATCH_SIZE = 250;
 
 export interface CatalogSyncResult {
   fetched: number;
+  /** Rows that did not exist before this run. */
+  inserted: number;
   removed: number;
+  /** Rows the database reported writing, counted rather than assumed. */
   upserted: number;
+  /** Rows that already existed and were refreshed. */
+  updated: number;
 }
 
 export interface CatalogSyncOptions {
@@ -66,11 +71,16 @@ const planetValues = (planet: ExoplanetProfile, syncStartedAt: string): unknown[
   syncStartedAt,
 ];
 
+interface UpsertCounts {
+  inserted: number;
+  updated: number;
+}
+
 const upsertBatch = async (
   database: DatabaseClient,
   planets: ExoplanetProfile[],
   syncStartedAt: string,
-): Promise<void> => {
+): Promise<UpsertCounts> => {
   const parameters: unknown[] = [];
   const rows = planets.map((planet) => {
     const values = planetValues(planet, syncStartedAt);
@@ -81,7 +91,7 @@ const upsertBatch = async (
     return `(${placeholders.join(", ")})`;
   });
 
-  await database.query(
+  const written = await database.query<{ inserted: boolean }>(
     `INSERT INTO exoplanets (${UPSERT_COLUMNS.join(", ")})
      VALUES ${rows.join(", ")}
      ON CONFLICT (id) DO UPDATE SET
@@ -107,9 +117,16 @@ const upsertBatch = async (
        source_table = EXCLUDED.source_table,
        retrieved_on = EXCLUDED.retrieved_on,
        last_seen_at = GREATEST(exoplanets.last_seen_at, EXCLUDED.last_seen_at),
-       updated_at = now()`,
+       updated_at = now()
+     RETURNING (xmax = 0) AS inserted`,
     parameters,
   );
+
+  // A row that went through DO UPDATE carries this transaction in `xmax`; a freshly inserted one
+  // leaves it zero. That is the only thing distinguishing the two here, since both come back from
+  // RETURNING identically otherwise.
+  const inserted = written.filter((row) => row.inserted).length;
+  return { inserted, updated: written.length - inserted };
 };
 
 export const syncPlanetCatalog = async (
@@ -128,9 +145,18 @@ export const syncPlanetCatalog = async (
   return database.transaction(async (transaction) => {
     await transaction.query("SELECT pg_advisory_xact_lock(hashtext('exora_catalog_sync'))");
 
+    let inserted = 0;
+    let updated = 0;
     for (let start = 0; start < planets.length; start += BATCH_SIZE) {
-      await upsertBatch(transaction, planets.slice(start, start + BATCH_SIZE), syncStartedAt);
+      const counts = await upsertBatch(
+        transaction,
+        planets.slice(start, start + BATCH_SIZE),
+        syncStartedAt,
+      );
+      inserted += counts.inserted;
+      updated += counts.updated;
     }
+    const upserted = inserted + updated;
 
     const removedRows = await transaction.query<Record<string, unknown>>(
       `DELETE FROM exoplanets
@@ -143,13 +169,9 @@ export const syncPlanetCatalog = async (
       `INSERT INTO catalog_sync_runs (
          started_at, finished_at, fetched_count, upserted_count, removed_count
        ) VALUES ($1, now(), $2, $3, $4)`,
-      [syncStartedAt, planets.length, planets.length, removedRows.length],
+      [syncStartedAt, planets.length, upserted, removedRows.length],
     );
 
-    return {
-      fetched: planets.length,
-      upserted: planets.length,
-      removed: removedRows.length,
-    };
+    return { fetched: planets.length, inserted, removed: removedRows.length, updated, upserted };
   });
 };
