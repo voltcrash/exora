@@ -88,6 +88,15 @@ const toPlanet = (row: PlanetRow): ExoplanetProfile => ({
   },
 });
 
+/**
+ * Reads report `cached: false`.
+ *
+ * `meta.cached` tells a client whether it is looking at a value the API had already, and every
+ * method here issues a live statement against the catalog. The archive adapters are where the
+ * flag becomes true, when an in-process entry answers instead of a TAP request. Reporting a
+ * fresh database read as cached would be the same kind of backfill the rest of Exora refuses:
+ * a field the system does not actually know, filled in with a plausible value.
+ */
 export class PostgresPlanetRepository implements PlanetRepository {
   readonly #database: DatabaseClient;
 
@@ -107,7 +116,7 @@ export class PostgresPlanetRepository implements PlanetRepository {
        LIMIT $1`,
       [safeLimit],
     );
-    return { cached: true, value: rows.map(toPlanet) };
+    return { cached: false, value: rows.map(toPlanet) };
   }
 
   async discover(
@@ -175,7 +184,7 @@ export class PostgresPlanetRepository implements PlanetRepository {
       `SELECT ${PLANET_COLUMNS} FROM exoplanets WHERE ${filter.where} ORDER BY ${filter.order} LIMIT $1`,
       [safeLimit],
     );
-    return { cached: true, value: rows.map(toPlanet) };
+    return { cached: false, value: rows.map(toPlanet) };
   }
 
   async findByName(name: string): Promise<RepositoryResult<ExoplanetProfile | null>> {
@@ -184,7 +193,7 @@ export class PostgresPlanetRepository implements PlanetRepository {
       [name.trim().slice(0, 100)],
     );
 
-    return { cached: true, value: rows[0] ? toPlanet(rows[0]) : null };
+    return { cached: false, value: rows[0] ? toPlanet(rows[0]) : null };
   }
 
   async findByHost(hostStar: string, limit: number): Promise<RepositoryResult<ExoplanetProfile[]>> {
@@ -198,7 +207,7 @@ export class PostgresPlanetRepository implements PlanetRepository {
       [hostStar.trim().slice(0, 100), safeLimit],
     );
 
-    return { cached: true, value: rows.map(toPlanet) };
+    return { cached: false, value: rows.map(toPlanet) };
   }
 
   async search(query: string, limit: number): Promise<RepositoryResult<ExoplanetProfile[]>> {
@@ -218,6 +227,6 @@ export class PostgresPlanetRepository implements PlanetRepository {
       [normalizedQuery, normalizedQuery.toLowerCase().replaceAll(/[^a-z0-9]/g, ""), safeLimit],
     );
 
-    return { cached: true, value: rows.map(toPlanet) };
+    return { cached: false, value: rows.map(toPlanet) };
   }
 }
