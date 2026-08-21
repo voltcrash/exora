@@ -124,7 +124,7 @@ export interface StarSearchResponse {
 
 export interface ApiErrorResponse {
   error: {
-    code: "INVALID_REQUEST" | "NOT_FOUND" | "UPSTREAM_UNAVAILABLE";
+    code: "INVALID_REQUEST" | "NOT_FOUND" | "RATE_LIMITED" | "UPSTREAM_UNAVAILABLE";
     message: string;
   };
 }
