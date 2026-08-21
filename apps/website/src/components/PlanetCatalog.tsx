@@ -140,17 +140,6 @@ export const PlanetCatalog = ({ onClose, onSelect, open }: PlanetCatalogProps) =
   }, [open]);
 
   useEffect(() => {
-    const openWithShortcut = (event: KeyboardEvent): void => {
-      if (event.key === "/" && !open) {
-        event.preventDefault();
-        document.querySelector<HTMLButtonElement>("#open-catalog")?.click();
-      }
-    };
-    document.addEventListener("keydown", openWithShortcut);
-    return () => document.removeEventListener("keydown", openWithShortcut);
-  }, [open]);
-
-  useEffect(() => {
     const normalizedQuery = query.trim();
     if (portalView === "filters") {
       setSuggestion(null);
