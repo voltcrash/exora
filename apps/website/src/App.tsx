@@ -11,6 +11,7 @@ import { PlanetExperience } from "./components/PlanetExperience.tsx";
 import { RecoveryScreen } from "./components/RecoveryScreen.tsx";
 import { featuredPlanet } from "./planet-profile.ts";
 import { hasRenderer } from "./planet-utils.tsx";
+import { opensSearchShortcut } from "./search-shortcut.ts";
 import { useSceneHost } from "./use-scene-host.ts";
 
 const PlanetCatalog = lazy(() =>
@@ -83,6 +84,37 @@ export const App = () => {
     window.addEventListener("popstate", loadFromLocation);
     return () => window.removeEventListener("popstate", loadFromLocation);
   }, [loadFromLocation]);
+
+  // The `/` shortcut the catalog button advertises with its `<kbd>`.
+  //
+  // It belongs here rather than inside the catalog, because the catalog is only mounted once it
+  // is already open: a listener living there could never see the press that is supposed to open
+  // it. Here the page owns it for its whole life, and the three dialog flags above are the
+  // authority on whether a modal already has the page.
+  useEffect(() => {
+    const openCatalogWithShortcut = (event: KeyboardEvent): void => {
+      const target = event.target;
+      const opensCatalog = opensSearchShortcut(
+        {
+          altKey: event.altKey,
+          ctrlKey: event.ctrlKey,
+          key: event.key,
+          metaKey: event.metaKey,
+          target: target instanceof HTMLElement ? target : null,
+        },
+        { dialogOpen: builderOpen || catalogOpen || starCatalogOpen },
+      );
+      if (!opensCatalog) return;
+
+      // Only once the press is known to be the shortcut is suppressing the browser's own
+      // quick-find the right thing to do.
+      event.preventDefault();
+      setCatalogOpen(true);
+    };
+
+    document.addEventListener("keydown", openCatalogWithShortcut);
+    return () => document.removeEventListener("keydown", openCatalogWithShortcut);
+  }, [builderOpen, catalogOpen, starCatalogOpen]);
 
   // Stable identities: the immersive console hands these to the Babylon scene, and a new
   // function on every render would tear the renderer down and rebuild it mid-session.
