@@ -9,6 +9,17 @@ import type {
 
 type Fetcher = (input: string | URL | Request, init?: RequestInit) => Promise<Response>;
 
+/**
+ * How long a single-object lookup waits before giving up.
+ *
+ * Both object lookups fail soft — they resolve to `null` and the caller falls back — so the
+ * budget has to cover the slowest honest answer rather than the typical one. A cold serverless
+ * instance plus a cold database connection clears four seconds without either end being broken,
+ * and the cost of cutting it short is silent and wrong: a shared `?planet=` link quietly lands
+ * on the bundled featured world instead of the world it named.
+ */
+const OBJECT_LOOKUP_TIMEOUT_MS = 8_000;
+
 export interface PlanetLoadResult {
   cached: boolean;
   mode: "custom" | "fallback" | "live";
@@ -99,7 +110,7 @@ const requestPlanet = async (
   try {
     const response = await fetcher(path, {
       headers: { accept: "application/json" },
-      signal: signal ?? AbortSignal.timeout(4_000),
+      signal: signal ?? AbortSignal.timeout(OBJECT_LOOKUP_TIMEOUT_MS),
     });
 
     if (!response.ok) return null;
@@ -234,7 +245,7 @@ const requestStar = async (
   try {
     const response = await fetcher(path, {
       headers: { accept: "application/json" },
-      signal: signal ?? AbortSignal.timeout(8_000),
+      signal: signal ?? AbortSignal.timeout(OBJECT_LOOKUP_TIMEOUT_MS),
     });
     if (!response.ok) return null;
     const payload: unknown = await response.json();
