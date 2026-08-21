@@ -1,11 +1,13 @@
 import type {
   ApiErrorResponse,
+  ExoplanetProfile,
   PlanetResponse,
   PlanetSearchResponse,
+  StarProfile,
   StarResponse,
   StarSearchResponse,
 } from "@exora/contracts";
-import { Hono } from "hono";
+import { Hono, type Context } from "hono";
 import { cors } from "hono/cors";
 import {
   NasaArchiveError,
@@ -13,6 +15,7 @@ import {
   PLANET_DISCOVERY_CATEGORIES,
   type PlanetDiscoveryCategory,
   type PlanetRepository,
+  type RepositoryResult,
 } from "./nasa-archive.ts";
 import {
   SimbadArchiveError,
@@ -30,6 +33,67 @@ interface CreateAppOptions {
 const apiError = (code: ApiErrorResponse["error"]["code"], message: string): ApiErrorResponse => ({
   error: { code, message },
 });
+
+/** The longest a name either archive could plausibly carry; longer is a malformed request. */
+const MAX_NAME_LENGTH = 100;
+
+/**
+ * How long each kind of answer may be reused, and how long a stale one may stand in while it
+ * refreshes behind the request. Curated collections and single objects move on the archives'
+ * schedule rather than ours, so they are held far longer than a free-text search.
+ */
+const CACHE_POLICY = {
+  /** Curated collections, host-system lookups, and single objects. */
+  catalog: "public, max-age=900, stale-while-revalidate=21600",
+  /** Free-text planet search: the most likely thing to be retried with a different spelling. */
+  planetSearch: "public, max-age=300, stale-while-revalidate=3600",
+  /** SIMBAD's curated star collections. */
+  starDiscovery: "public, max-age=1800, stale-while-revalidate=43200",
+  /** The fixed featured set, which only changes when this file does. */
+  starFeatured: "public, max-age=3600, stale-while-revalidate=43200",
+} as const;
+
+/**
+ * The page size the caller asked for, or `fallback` when they did not ask for a usable one.
+ *
+ * Deliberately not a validation step: every repository clamps to its own bounds, so a number out
+ * of range is narrowed rather than refused, and only an unparseable one falls back.
+ */
+const requestedLimit = (context: Context, fallback: number): number => {
+  const parsed = Number.parseInt(context.req.query("limit") ?? "", 10);
+  return Number.isFinite(parsed) ? parsed : fallback;
+};
+
+const planetCollection = (
+  context: Context,
+  result: RepositoryResult<ExoplanetProfile[]>,
+  query: string,
+  cachePolicy: string,
+): Response => {
+  context.header("Cache-Control", cachePolicy);
+  return context.json<PlanetSearchResponse>({
+    data: result.value,
+    meta: {
+      cached: result.cached,
+      count: result.value.length,
+      query,
+      source: "NASA Exoplanet Archive",
+    },
+  });
+};
+
+const starCollection = (
+  context: Context,
+  result: RepositoryResult<StarProfile[]>,
+  query: string,
+  cachePolicy: string,
+): Response => {
+  context.header("Cache-Control", cachePolicy);
+  return context.json<StarSearchResponse>({
+    data: result.value,
+    meta: { cached: result.cached, count: result.value.length, query, source: "SIMBAD" },
+  });
+};
 
 export const createApp = ({
   repository = new NasaPlanetRepository(),
@@ -56,38 +120,16 @@ export const createApp = ({
     const browse = context.req.query("browse")?.trim() ?? "";
 
     if (browse === "physical-controls") {
-      const requestedLimit = Number.parseInt(context.req.query("limit") ?? "120", 10);
-      const limit = Number.isFinite(requestedLimit) ? requestedLimit : 120;
-      const result = await repository.browse(limit);
-      context.header("Cache-Control", "public, max-age=900, stale-while-revalidate=21600");
-      return context.json<PlanetSearchResponse>({
-        data: result.value,
-        meta: {
-          cached: result.cached,
-          count: result.value.length,
-          query: "physical-controls",
-          source: "NASA Exoplanet Archive",
-        },
-      });
+      const result = await repository.browse(requestedLimit(context, 120));
+      return planetCollection(context, result, "physical-controls", CACHE_POLICY.catalog);
     }
 
     if (hostStar) {
-      if (hostStar.length > 100) {
+      if (hostStar.length > MAX_NAME_LENGTH) {
         return context.json(apiError("INVALID_REQUEST", "Host star name is invalid."), 400);
       }
-      const requestedLimit = Number.parseInt(context.req.query("limit") ?? "12", 10);
-      const limit = Number.isFinite(requestedLimit) ? requestedLimit : 12;
-      const result = await repository.findByHost(hostStar, limit);
-      context.header("Cache-Control", "public, max-age=900, stale-while-revalidate=21600");
-      return context.json<PlanetSearchResponse>({
-        data: result.value,
-        meta: {
-          cached: result.cached,
-          count: result.value.length,
-          query: hostStar,
-          source: "NASA Exoplanet Archive",
-        },
-      });
+      const result = await repository.findByHost(hostStar, requestedLimit(context, 12));
+      return planetCollection(context, result, hostStar, CACHE_POLICY.catalog);
     }
 
     if (category) {
@@ -97,19 +139,11 @@ export const createApp = ({
           400,
         );
       }
-      const requestedLimit = Number.parseInt(context.req.query("limit") ?? "12", 10);
-      const limit = Number.isFinite(requestedLimit) ? requestedLimit : 12;
-      const result = await repository.discover(category as PlanetDiscoveryCategory, limit);
-      context.header("Cache-Control", "public, max-age=900, stale-while-revalidate=21600");
-      return context.json<PlanetSearchResponse>({
-        data: result.value,
-        meta: {
-          cached: result.cached,
-          count: result.value.length,
-          query: category,
-          source: "NASA Exoplanet Archive",
-        },
-      });
+      const result = await repository.discover(
+        category as PlanetDiscoveryCategory,
+        requestedLimit(context, 12),
+      );
+      return planetCollection(context, result, category, CACHE_POLICY.catalog);
     }
 
     if (query.length < 1) {
@@ -119,21 +153,8 @@ export const createApp = ({
       );
     }
 
-    const requestedLimit = Number.parseInt(context.req.query("limit") ?? "12", 10);
-    const limit = Number.isFinite(requestedLimit) ? requestedLimit : 12;
-    const result = await repository.search(query, limit);
-
-    context.header("Cache-Control", "public, max-age=300, stale-while-revalidate=3600");
-
-    return context.json<PlanetSearchResponse>({
-      data: result.value,
-      meta: {
-        cached: result.cached,
-        count: result.value.length,
-        query,
-        source: "NASA Exoplanet Archive",
-      },
-    });
+    const result = await repository.search(query, requestedLimit(context, 12));
+    return planetCollection(context, result, query, CACHE_POLICY.planetSearch);
   });
 
   app.get("/api/planets/featured", async (context) => {
@@ -143,7 +164,7 @@ export const createApp = ({
       return context.json(apiError("NOT_FOUND", "Featured planet was not found."), 404);
     }
 
-    context.header("Cache-Control", "public, max-age=900, stale-while-revalidate=21600");
+    context.header("Cache-Control", CACHE_POLICY.catalog);
 
     return context.json<PlanetResponse>({
       data: result.value,
@@ -154,7 +175,7 @@ export const createApp = ({
   app.get("/api/planets/:name", async (context) => {
     const name = context.req.param("name").trim();
 
-    if (!name || name.length > 100) {
+    if (!name || name.length > MAX_NAME_LENGTH) {
       return context.json(apiError("INVALID_REQUEST", "Planet name is invalid."), 400);
     }
 
@@ -167,7 +188,7 @@ export const createApp = ({
       );
     }
 
-    context.header("Cache-Control", "public, max-age=900, stale-while-revalidate=21600");
+    context.header("Cache-Control", CACHE_POLICY.catalog);
 
     return context.json<PlanetResponse>({
       data: result.value,
@@ -177,16 +198,7 @@ export const createApp = ({
 
   app.get("/api/stars/featured", async (context) => {
     const result = await starRepository.featured();
-    context.header("Cache-Control", "public, max-age=3600, stale-while-revalidate=43200");
-    return context.json<StarSearchResponse>({
-      data: result.value,
-      meta: {
-        cached: result.cached,
-        count: result.value.length,
-        query: "",
-        source: "SIMBAD",
-      },
-    });
+    return starCollection(context, result, "", CACHE_POLICY.starFeatured);
   });
 
   app.get("/api/stars", async (context) => {
@@ -199,19 +211,11 @@ export const createApp = ({
           400,
         );
       }
-      const requestedLimit = Number.parseInt(context.req.query("limit") ?? "12", 10);
-      const limit = Number.isFinite(requestedLimit) ? requestedLimit : 12;
-      const result = await starRepository.discover(category as StarDiscoveryCategory, limit);
-      context.header("Cache-Control", "public, max-age=1800, stale-while-revalidate=43200");
-      return context.json<StarSearchResponse>({
-        data: result.value,
-        meta: {
-          cached: result.cached,
-          count: result.value.length,
-          query: category,
-          source: "SIMBAD",
-        },
-      });
+      const result = await starRepository.discover(
+        category as StarDiscoveryCategory,
+        requestedLimit(context, 12),
+      );
+      return starCollection(context, result, category, CACHE_POLICY.starDiscovery);
     }
     if (query.length < 1) {
       return context.json(
@@ -231,36 +235,21 @@ export const createApp = ({
           .startsWith(normalizedQuery),
     );
     if (predictiveStars.length > 0 || query.length <= 2) {
-      context.header("Cache-Control", "public, max-age=3600, stale-while-revalidate=43200");
-      return context.json<StarSearchResponse>({
-        data: predictiveStars,
-        meta: {
-          cached: featuredResult.cached,
-          count: predictiveStars.length,
-          query,
-          source: "SIMBAD",
-        },
-      });
+      return starCollection(
+        context,
+        { cached: featuredResult.cached, value: predictiveStars },
+        query,
+        CACHE_POLICY.starFeatured,
+      );
     }
 
-    const requestedLimit = Number.parseInt(context.req.query("limit") ?? "12", 10);
-    const limit = Number.isFinite(requestedLimit) ? requestedLimit : 12;
-    const result = await starRepository.search(query, limit);
-    context.header("Cache-Control", "public, max-age=900, stale-while-revalidate=21600");
-    return context.json<StarSearchResponse>({
-      data: result.value,
-      meta: {
-        cached: result.cached,
-        count: result.value.length,
-        query,
-        source: "SIMBAD",
-      },
-    });
+    const result = await starRepository.search(query, requestedLimit(context, 12));
+    return starCollection(context, result, query, CACHE_POLICY.catalog);
   });
 
   app.get("/api/stars/:name", async (context) => {
     const name = context.req.param("name").trim();
-    if (!name || name.length > 100) {
+    if (!name || name.length > MAX_NAME_LENGTH) {
       return context.json(apiError("INVALID_REQUEST", "Star name is invalid."), 400);
     }
 
@@ -269,7 +258,7 @@ export const createApp = ({
       return context.json(apiError("NOT_FOUND", `No stellar object named ${name} was found.`), 404);
     }
 
-    context.header("Cache-Control", "public, max-age=900, stale-while-revalidate=21600");
+    context.header("Cache-Control", CACHE_POLICY.catalog);
     return context.json<StarResponse>({
       data: result.value,
       meta: { cached: result.cached, source: "SIMBAD" },
