@@ -29,6 +29,11 @@ test("selects a Quest-focused rendering budget", () => {
   expect(profile.xrFramebufferScaleFactor).toBeLessThanOrEqual(1);
   expect(profile.xrFixedFoveation).toBeGreaterThanOrEqual(0.4);
   expect(profile.surfaceMicrodetail).toBe(true);
+  // A diorama draws a whole system at once, so its bodies are coarser than the one full-detail
+  // world the same tier is sized for.
+  expect(profile.systemBodySegments).toBeLessThan(profile.planetSegments);
+  expect(profile.systemBodySegments).toBeLessThan(desktopProfile.systemBodySegments);
+  expect(profile.systemOrbitSegments).toBeLessThan(desktopProfile.systemOrbitSegments);
 });
 
 test("keeps the high-detail profile on capable desktops", () => {

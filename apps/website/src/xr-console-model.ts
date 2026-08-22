@@ -11,6 +11,12 @@
 import type { ExoplanetProfile, StarProfile } from "@exora/contracts";
 import type { CustomPlanetParameters, CustomStarParameters } from "@exora/worldgen";
 import { formatNumber } from "./planet-utils.tsx";
+import {
+  bodyScaleLabel,
+  orbitMappingLabel,
+  timeScaleLabel,
+  type SystemLayout,
+} from "./system-layout.ts";
 
 export interface XrCatalogEntry {
   id: string;
@@ -352,6 +358,43 @@ export const planetFacts = (planet: ExoplanetProfile): { label: string; value: s
     { label: "Host star", value: planet.hostStar },
     { label: "Discovery", value: observation.discoveryMethod },
   ];
+};
+
+/**
+ * The readout for a whole system, which is mostly a statement of what was compressed.
+ *
+ * A diorama is the one destination whose layout is not a fact about the system, so the two
+ * compressions and the clock rate are given the same standing as the measurements: a reader
+ * inside the headset can see that the orbits are logarithmic and the bodies are hundreds of
+ * times too large before they read anything else off the picture.
+ */
+export const systemFacts = (
+  hostStar: string,
+  layout: SystemLayout,
+): { label: string; value: string }[] => {
+  const facts = [
+    { label: "Host star", value: hostStar },
+    {
+      label: "Worlds drawn",
+      value: `${layout.orbits.length} of ${layout.orbits.length + layout.unplaced.length}`,
+    },
+    { label: "Orbit scale", value: orbitMappingLabel(layout) },
+    { label: "Body scale", value: bodyScaleLabel(layout) },
+    { label: "Clock", value: timeScaleLabel(layout) },
+    {
+      label: "Host radius",
+      value: `${formatNumber(layout.hostRadiusSolar, 2)} R☉ · ${layout.hostRadiusSource}`,
+    },
+  ];
+
+  if (layout.unplaced.length > 0) {
+    facts.push({
+      label: "Not placed",
+      value: layout.unplaced.map(({ name }) => name).join(", "),
+    });
+  }
+
+  return facts;
 };
 
 export const starFacts = (star: StarProfile): { label: string; value: string }[] => {

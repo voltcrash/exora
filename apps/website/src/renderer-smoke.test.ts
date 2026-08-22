@@ -16,6 +16,7 @@ import type { RenderQualityProfile } from "./render-quality.ts";
 import type { SceneHost } from "./scene-host.ts";
 import { resetSkyCatalogForTesting } from "./sky-catalog.ts";
 import { createStarWorld } from "./star-scene.ts";
+import { createSystemWorld } from "./system-scene.ts";
 import { openWorldScope } from "./world-scope.ts";
 
 const testProfile: RenderQualityProfile = {
@@ -33,6 +34,8 @@ const testProfile: RenderQualityProfile = {
   starCount: 12,
   surfaceColorDetail: false,
   surfaceMicrodetail: false,
+  systemBodySegments: 6,
+  systemOrbitSegments: 16,
   tier: "quest",
   xrFixedFoveation: 0,
   xrFramebufferScaleFactor: 1,
@@ -320,3 +323,140 @@ test("world scope preserves host contents while reclaiming every tracked world r
   expect(sceneCounts(scene)).toEqual(before);
   engine.dispose();
 });
+
+/**
+ * A host with three worlds on three different orbits, one of which the archive never placed.
+ *
+ * The diorama has to draw the two it can and hand the third back rather than inventing an orbit
+ * for it, so the fixture carries that case rather than only the happy one.
+ */
+const systemPlanets: readonly ExoplanetProfile[] = [
+  {
+    ...gasGiant,
+    id: "system-inner",
+    name: "System Inner b",
+    kind: "rocky",
+    observation: {
+      ...gasGiant.observation,
+      massEarth: 1.4,
+      massJupiter: null,
+      orbitalEccentricity: 0.31,
+      orbitalInclinationDegrees: 86.9,
+      orbitalPeriodDays: 11.6,
+      radiusEarth: 1.2,
+      radiusJupiter: null,
+      semiMajorAxisAu: 0.09,
+    },
+  },
+  {
+    ...gasGiant,
+    id: "system-outer",
+    name: "System Outer c",
+    observation: { ...gasGiant.observation, orbitalPeriodDays: 402, semiMajorAxisAu: 1.05 },
+  },
+  {
+    ...gasGiant,
+    id: "system-unplaced",
+    name: "System Unplaced d",
+    observation: {
+      ...gasGiant.observation,
+      hostMassSolar: null,
+      orbitalPeriodDays: null,
+      semiMajorAxisAu: null,
+    },
+  },
+];
+
+test("the system diorama renders one headless frame and releases its scene contents", async () => {
+  const { engine, host, scene } = createHarness();
+  const before = sceneCounts(scene);
+  const firstFrame = vi.fn();
+  const travelled: string[] = [];
+  const scope = openWorldScope(scene);
+  const world = createSystemWorld(host, {
+    hostName: "Renderer Prime",
+    onFirstFrame: firstFrame,
+    onSelectHostStar: () => travelled.push("star"),
+    onSelectWorld: (planet) => travelled.push(planet.name),
+    planets: systemPlanets,
+  });
+  scope.seal();
+  await settleSky();
+
+  // Two placed worlds, and the third named rather than given an orbit it does not have.
+  expect(world.layout.orbits.map(({ planet }) => planet.name)).toEqual([
+    "System Inner b",
+    "System Outer c",
+  ]);
+  expect(world.layout.unplaced.map(({ name }) => name)).toEqual(["System Unplaced d"]);
+  expect(sceneCounts(scene).meshes).toBeGreaterThan(before.meshes);
+  // The system's own sky, from the position every planet in it reports.
+  expect(starfieldPointCount(scene)).toBe(testProfile.starCount);
+  expect(() => scene.render()).not.toThrow();
+  expect(firstFrame).toHaveBeenCalledOnce();
+
+  // Pointing at a world is what travels to it, so the pick targets have to be reachable.
+  const target = scene.meshes.find((mesh) => mesh.name === "system-world-system-inner");
+  expect(target?.isPickable).toBe(true);
+
+  world.dispose();
+  scope.dispose();
+  expect(sceneCounts(scene)).toEqual(before);
+  engine.dispose();
+}, 30_000);
+
+test("the diorama keeps its bodies inside the tier's geometry budget", () => {
+  const { engine, host, scene } = createHarness();
+  const scope = openWorldScope(scene);
+  const world = createSystemWorld(host, {
+    hostName: "Renderer Prime",
+    onFirstFrame: () => undefined,
+    planets: systemPlanets,
+  });
+  scope.seal();
+
+  // A whole system is on screen at once, so each body is far coarser than the single full-detail
+  // world the same tier draws. This is the assertion that keeps a future edit from promoting them.
+  const body = scene.meshes.find((mesh) => mesh.name === "system-world-system-outer");
+  const bodyVertices = body?.getTotalVertices() ?? 0;
+  expect(bodyVertices).toBeGreaterThan(0);
+  expect(bodyVertices).toBeLessThan((testProfile.planetSegments + 1) ** 2);
+
+  // Each orbit is a four-sided tube, so its whole cost is four vertices per segment.
+  const orbit = scene.meshes.find((mesh) => mesh.name === "system-orbit-line-system-outer");
+  expect(orbit?.getTotalVertices()).toBe(testProfile.systemOrbitSegments * 4);
+
+  world.dispose();
+  scope.dispose();
+  engine.dispose();
+}, 30_000);
+
+test("a world moves along its orbit as the scene runs, and stays on it", () => {
+  const { engine, host, scene } = createHarness();
+  const scope = openWorldScope(scene);
+  const world = createSystemWorld(host, {
+    hostName: "Renderer Prime",
+    onFirstFrame: () => undefined,
+    planets: systemPlanets,
+  });
+  scope.seal();
+
+  const body = scene.meshes.find((mesh) => mesh.name === "system-world-system-inner");
+  if (!body) throw new Error("Expected the inner world to have been drawn.");
+  const start = body.position.clone();
+
+  // `scene.render()` on its own never opens a frame, so the engine reports a zero delta and no
+  // scene that advances on wall-clock time would move at all. One running headset frame is 16 ms.
+  vi.spyOn(engine, "getDeltaTime").mockReturnValue(16);
+  for (let frame = 0; frame < 30; frame += 1) scene.render();
+
+  expect(body.position.equals(start)).toBe(false);
+  // An eccentric orbit changes its radius as it goes, but never leaves the mapped band entirely.
+  const radius = Math.hypot(body.position.x, body.position.z);
+  expect(radius).toBeGreaterThan(1);
+  expect(radius).toBeLessThan(20);
+
+  world.dispose();
+  scope.dispose();
+  engine.dispose();
+}, 30_000);
