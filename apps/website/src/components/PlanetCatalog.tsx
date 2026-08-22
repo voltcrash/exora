@@ -348,280 +348,282 @@ export const PlanetCatalog = ({ onClose, onSelect }: PlanetCatalogProps) => {
         if (event.target === dialogRef.current) onClose();
       }}
     >
-      <div className="catalog-header">
-        <div>
-          <p>DISCOVERY PORTAL · NASA EXOPLANET ARCHIVE</p>
-          <h2 id="catalog-title">Choose a world to discover</h2>
+      <div className="catalog-scroll-region">
+        <div className="catalog-header">
+          <div>
+            <p>DISCOVERY PORTAL · NASA EXOPLANET ARCHIVE</p>
+            <h2 id="catalog-title">Choose a world to discover</h2>
+          </div>
+          <button
+            className="catalog-close"
+            type="button"
+            aria-label="Close planet catalog"
+            onClick={onClose}
+          >
+            ×
+          </button>
         </div>
         <button
-          className="catalog-close"
+          className="surprise-journey"
           type="button"
-          aria-label="Close planet catalog"
-          onClick={onClose}
+          disabled={surpriseState === "loading"}
+          onClick={takeMeSomewhere}
         >
-          ×
+          <span className="surprise-symbol" aria-hidden="true">
+            ✦
+          </span>
+          <span className="surprise-copy">
+            <small>TAKE ME SOMEWHERE</small>
+            <strong>
+              {surpriseState === "loading"
+                ? "Plotting a surprise course…"
+                : surpriseState === "error"
+                  ? "Signal lost — try another jump"
+                  : "Jump to a random confirmed world"}
+            </strong>
+          </span>
+          <span className="surprise-action">
+            {surpriseState === "loading" ? "SCANNING" : "SURPRISE ME"}{" "}
+            <span aria-hidden="true">↗</span>
+          </span>
         </button>
-      </div>
-      <button
-        className="surprise-journey"
-        type="button"
-        disabled={surpriseState === "loading"}
-        onClick={takeMeSomewhere}
-      >
-        <span className="surprise-symbol" aria-hidden="true">
-          ✦
-        </span>
-        <span className="surprise-copy">
-          <small>TAKE ME SOMEWHERE</small>
-          <strong>
-            {surpriseState === "loading"
-              ? "Plotting a surprise course…"
-              : surpriseState === "error"
-                ? "Signal lost — try another jump"
-                : "Jump to a random confirmed world"}
-          </strong>
-        </span>
-        <span className="surprise-action">
-          {surpriseState === "loading" ? "SCANNING" : "SURPRISE ME"}{" "}
-          <span aria-hidden="true">↗</span>
-        </span>
-      </button>
-      <div className="discovery-intro">
-        <span>
-          {portalView === "collections"
-            ? "CURATED JOURNEYS"
-            : portalView === "categories"
-              ? "EXPLORE BY PHENOMENON"
-              : "HOLOGRAPHIC OBSERVATORY CONSOLE"}
-        </span>
-        <small>Large targets are designed for gaze, pointer, touch, or mouse</small>
-      </div>
-      <div className="discovery-tabs" {...tabs.tabListProps}>
-        <button {...tabs.tabProps("collections")} onClick={() => selectPortalView("collections")}>
-          Curated collections
-        </button>
-        <button {...tabs.tabProps("categories")} onClick={() => selectPortalView("categories")}>
-          World types
-        </button>
-        <button {...tabs.tabProps("filters")} onClick={() => selectPortalView("filters")}>
-          Observatory controls
-        </button>
-      </div>
-      {portalView === "collections" ? (
-        <div className="collection-grid" {...tabs.panelProps("collections")}>
-          {collections.map((collection) => (
-            <button
-              key={collection.id}
-              className={`collection-card${activeCategory === collection.id ? " active" : ""}`}
-              type="button"
-              aria-pressed={activeCategory === collection.id}
-              onClick={() => {
-                setQuery("");
-                setActiveCategory(collection.id);
-              }}
-            >
-              <span className="collection-index">{collection.index}</span>
-              <span className="collection-copy">
-                <small>{collection.tag}</small>
-                <strong>{collection.label}</strong>
-                <span>{collection.note}</span>
-              </span>
-              <span className="collection-launch" aria-hidden="true">
-                EXPLORE ↗
-              </span>
-            </button>
-          ))}
+        <div className="discovery-intro">
+          <span>
+            {portalView === "collections"
+              ? "CURATED JOURNEYS"
+              : portalView === "categories"
+                ? "EXPLORE BY PHENOMENON"
+                : "HOLOGRAPHIC OBSERVATORY CONSOLE"}
+          </span>
+          <small>Large targets are designed for gaze, pointer, touch, or mouse</small>
         </div>
-      ) : portalView === "categories" ? (
-        <div className="discovery-grid" {...tabs.panelProps("categories")}>
-          {categories.map((category) => (
-            <button
-              key={category.id}
-              className={`discovery-card${activeCategory === category.id ? " active" : ""}`}
-              type="button"
-              aria-pressed={activeCategory === category.id}
-              onClick={() => {
-                setQuery("");
-                setActiveCategory(category.id);
-              }}
-            >
-              <span className="discovery-icon" aria-hidden="true">
-                {category.icon}
-              </span>
+        <div className="discovery-tabs" {...tabs.tabListProps}>
+          <button {...tabs.tabProps("collections")} onClick={() => selectPortalView("collections")}>
+            Curated collections
+          </button>
+          <button {...tabs.tabProps("categories")} onClick={() => selectPortalView("categories")}>
+            World types
+          </button>
+          <button {...tabs.tabProps("filters")} onClick={() => selectPortalView("filters")}>
+            Observatory controls
+          </button>
+        </div>
+        {portalView === "collections" ? (
+          <div className="collection-grid" {...tabs.panelProps("collections")}>
+            {collections.map((collection) => (
+              <button
+                key={collection.id}
+                className={`collection-card${activeCategory === collection.id ? " active" : ""}`}
+                type="button"
+                aria-pressed={activeCategory === collection.id}
+                onClick={() => {
+                  setQuery("");
+                  setActiveCategory(collection.id);
+                }}
+              >
+                <span className="collection-index">{collection.index}</span>
+                <span className="collection-copy">
+                  <small>{collection.tag}</small>
+                  <strong>{collection.label}</strong>
+                  <span>{collection.note}</span>
+                </span>
+                <span className="collection-launch" aria-hidden="true">
+                  EXPLORE ↗
+                </span>
+              </button>
+            ))}
+          </div>
+        ) : portalView === "categories" ? (
+          <div className="discovery-grid" {...tabs.panelProps("categories")}>
+            {categories.map((category) => (
+              <button
+                key={category.id}
+                className={`discovery-card${activeCategory === category.id ? " active" : ""}`}
+                type="button"
+                aria-pressed={activeCategory === category.id}
+                onClick={() => {
+                  setQuery("");
+                  setActiveCategory(category.id);
+                }}
+              >
+                <span className="discovery-icon" aria-hidden="true">
+                  {category.icon}
+                </span>
+                <span>
+                  <strong>{category.label}</strong>
+                  <small>{category.note}</small>
+                </span>
+                <span className="discovery-arrow" aria-hidden="true">
+                  ↗
+                </span>
+              </button>
+            ))}
+          </div>
+        ) : (
+          <section className="physical-console" {...tabs.panelProps("filters")}>
+            <div className="physical-console-heading">
               <span>
-                <strong>{category.label}</strong>
-                <small>{category.note}</small>
+                <small>LIVE PLANET FIELD</small>
+                <strong>Shape the observatory signal</strong>
               </span>
-              <span className="discovery-arrow" aria-hidden="true">
-                ↗
-              </span>
-            </button>
-          ))}
+              <button
+                type="button"
+                onClick={() => setPhysicalFilters(DEFAULT_PHYSICAL_PLANET_FILTERS)}
+              >
+                RESET CONSOLE
+              </button>
+            </div>
+            <div className="physical-axis-grid">
+              {physicalAxes.map((axis) => {
+                const value = physicalFilters[axis.key];
+                return (
+                  <label key={axis.key} className="physical-axis">
+                    <span>
+                      <strong>{axis.name}</strong>
+                      <small aria-live="polite">
+                        {axisPositionLabel(value, axis.low, axis.high)}
+                      </small>
+                    </span>
+                    <span className="physical-axis-labels" aria-hidden="true">
+                      <small>{axis.low}</small>
+                      <small>{axis.high}</small>
+                    </span>
+                    <input
+                      type="range"
+                      min="0"
+                      max="100"
+                      step="1"
+                      value={value}
+                      aria-label={`${axis.name}: ${axisPositionLabel(value, axis.low, axis.high)}`}
+                      onChange={(event) =>
+                        setPhysicalFilters((current) => ({
+                          ...current,
+                          [axis.key]: Number(event.target.value),
+                        }))
+                      }
+                    />
+                  </label>
+                );
+              })}
+            </div>
+            <div className="physical-toggles">
+              <label>
+                <input
+                  type="checkbox"
+                  checked={physicalFilters.habitableZone}
+                  onChange={(event) =>
+                    setPhysicalFilters((current) => ({
+                      ...current,
+                      habitableZone: event.target.checked,
+                    }))
+                  }
+                />
+                <span aria-hidden="true" />
+                <strong>Habitable-zone candidates</strong>
+                <small>Rocky · 180–330 K</small>
+              </label>
+              <label>
+                <input
+                  type="checkbox"
+                  checked={physicalFilters.wellMeasured}
+                  onChange={(event) =>
+                    setPhysicalFilters((current) => ({
+                      ...current,
+                      wellMeasured: event.target.checked,
+                    }))
+                  }
+                />
+                <span aria-hidden="true" />
+                <strong>Confirmed data completeness</strong>
+                <small>6+ observed fields</small>
+              </label>
+            </div>
+          </section>
+        )}
+        <div className="discovery-divider">
+          <span>{portalView === "filters" ? "VISIBLE PLANET FIELD" : "OR SEARCH BY NAME"}</span>
         </div>
-      ) : (
-        <section className="physical-console" {...tabs.panelProps("filters")}>
-          <div className="physical-console-heading">
-            <span>
-              <small>LIVE PLANET FIELD</small>
-              <strong>Shape the observatory signal</strong>
-            </span>
+        {portalView !== "filters" ? (
+          <div className="catalog-search">
+            <span className="search-reticle" aria-hidden="true" />
+            <input
+              ref={inputRef}
+              type="search"
+              value={query}
+              onChange={(event) => {
+                setActiveCategory(null);
+                setQuery(event.target.value);
+              }}
+              placeholder="Type a name or catalog ID — misspellings are okay"
+              autoComplete="off"
+              minLength={1}
+              aria-autocomplete="list"
+              aria-controls="planet-search-results"
+              aria-describedby="catalog-status"
+            />
+            <span className="search-key">ESC</span>
+          </div>
+        ) : null}
+        <div className="catalog-meta">
+          <p id="catalog-status" role="status">
+            {status}
+          </p>
+          <div className="catalog-view-toggle" role="group" aria-label="Planet result layout">
             <button
               type="button"
-              onClick={() => setPhysicalFilters(DEFAULT_PHYSICAL_PLANET_FILTERS)}
+              aria-pressed={resultView === "gallery"}
+              onClick={() => setResultView("gallery")}
             >
-              RESET CONSOLE
+              ▦ Gallery
+            </button>
+            <button
+              type="button"
+              aria-pressed={resultView === "list"}
+              onClick={() => setResultView("list")}
+            >
+              ☰ List
             </button>
           </div>
-          <div className="physical-axis-grid">
-            {physicalAxes.map((axis) => {
-              const value = physicalFilters[axis.key];
-              return (
-                <label key={axis.key} className="physical-axis">
-                  <span>
-                    <strong>{axis.name}</strong>
-                    <small aria-live="polite">
-                      {axisPositionLabel(value, axis.low, axis.high)}
-                    </small>
-                  </span>
-                  <span className="physical-axis-labels" aria-hidden="true">
-                    <small>{axis.low}</small>
-                    <small>{axis.high}</small>
-                  </span>
-                  <input
-                    type="range"
-                    min="0"
-                    max="100"
-                    step="1"
-                    value={value}
-                    aria-label={`${axis.name}: ${axisPositionLabel(value, axis.low, axis.high)}`}
-                    onChange={(event) =>
-                      setPhysicalFilters((current) => ({
-                        ...current,
-                        [axis.key]: Number(event.target.value),
-                      }))
-                    }
-                  />
-                </label>
-              );
-            })}
-          </div>
-          <div className="physical-toggles">
-            <label>
-              <input
-                type="checkbox"
-                checked={physicalFilters.habitableZone}
-                onChange={(event) =>
-                  setPhysicalFilters((current) => ({
-                    ...current,
-                    habitableZone: event.target.checked,
-                  }))
-                }
-              />
-              <span aria-hidden="true" />
-              <strong>Habitable-zone candidates</strong>
-              <small>Rocky · 180–330 K</small>
-            </label>
-            <label>
-              <input
-                type="checkbox"
-                checked={physicalFilters.wellMeasured}
-                onChange={(event) =>
-                  setPhysicalFilters((current) => ({
-                    ...current,
-                    wellMeasured: event.target.checked,
-                  }))
-                }
-              />
-              <span aria-hidden="true" />
-              <strong>Confirmed data completeness</strong>
-              <small>6+ observed fields</small>
-            </label>
-          </div>
-        </section>
-      )}
-      <div className="discovery-divider">
-        <span>{portalView === "filters" ? "VISIBLE PLANET FIELD" : "OR SEARCH BY NAME"}</span>
-      </div>
-      {portalView !== "filters" ? (
-        <div className="catalog-search">
-          <span className="search-reticle" aria-hidden="true" />
-          <input
-            ref={inputRef}
-            type="search"
-            value={query}
-            onChange={(event) => {
-              setActiveCategory(null);
-              setQuery(event.target.value);
+        </div>
+        {suggestion && (
+          <button
+            className="did-you-mean"
+            type="button"
+            onClick={() => {
+              setSuggestion(null);
+              setQuery(suggestion);
             }}
-            placeholder="Type a name or catalog ID — misspellings are okay"
-            autoComplete="off"
-            minLength={1}
-            aria-autocomplete="list"
-            aria-controls="planet-search-results"
-            aria-describedby="catalog-status"
-          />
-          <span className="search-key">ESC</span>
-        </div>
-      ) : null}
-      <div className="catalog-meta">
-        <p id="catalog-status" role="status">
-          {status}
-        </p>
-        <div className="catalog-view-toggle" role="group" aria-label="Planet result layout">
-          <button
-            type="button"
-            aria-pressed={resultView === "gallery"}
-            onClick={() => setResultView("gallery")}
           >
-            ▦ Gallery
+            <span>DID YOU MEAN</span>
+            <strong>{suggestion}</strong>
+            <span aria-hidden="true">↗</span>
           </button>
-          <button
-            type="button"
-            aria-pressed={resultView === "list"}
-            onClick={() => setResultView("list")}
-          >
-            ☰ List
-          </button>
-        </div>
-      </div>
-      {suggestion && (
-        <button
-          className="did-you-mean"
-          type="button"
-          onClick={() => {
-            setSuggestion(null);
-            setQuery(suggestion);
-          }}
+        )}
+        <ol
+          id="planet-search-results"
+          className={`catalog-results ${resultView}-view${searchState === "idle" ? " is-idle" : ""}`}
         >
-          <span>DID YOU MEAN</span>
-          <strong>{suggestion}</strong>
-          <span aria-hidden="true">↗</span>
-        </button>
-      )}
-      <ol
-        id="planet-search-results"
-        className={`catalog-results ${resultView}-view${searchState === "idle" ? " is-idle" : ""}`}
-      >
-        {searchState === "loading" && (
-          <li className="catalog-loading">
-            <span /> Resolving confirmed worlds
-          </li>
-        )}
-        {searchState === "error" && (
-          <li className="catalog-empty">NASA search could not be completed.</li>
-        )}
-        {searchState === "ready" && visiblePlanets.length === 0 && (
-          <li className="catalog-empty">
-            {portalView === "filters"
-              ? "No sampled worlds match this console configuration. Widen one or more controls."
-              : "No confirmed planets matched this signal or its nearest aliases."}
-          </li>
-        )}
-        {searchState === "ready" &&
-          visiblePlanets.map((planet) => (
-            <PlanetResult key={planet.id} cached={cached} onSelect={onSelect} planet={planet} />
-          ))}
-      </ol>
+          {searchState === "loading" && (
+            <li className="catalog-loading">
+              <span /> Resolving confirmed worlds
+            </li>
+          )}
+          {searchState === "error" && (
+            <li className="catalog-empty">NASA search could not be completed.</li>
+          )}
+          {searchState === "ready" && visiblePlanets.length === 0 && (
+            <li className="catalog-empty">
+              {portalView === "filters"
+                ? "No sampled worlds match this console configuration. Widen one or more controls."
+                : "No confirmed planets matched this signal or its nearest aliases."}
+            </li>
+          )}
+          {searchState === "ready" &&
+            visiblePlanets.map((planet) => (
+              <PlanetResult key={planet.id} cached={cached} onSelect={onSelect} planet={planet} />
+            ))}
+        </ol>
+      </div>
     </dialog>
   );
 };

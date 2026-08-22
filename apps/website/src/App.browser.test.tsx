@@ -394,6 +394,28 @@ test("an open overlay parks the renderer, and closing it starts the loop again",
   expect(stubbedHost().renderSuspensions).toBe(0);
 });
 
+test("overlay scrolling stays inside a contained surface without a viewport blur", async () => {
+  stubArchive();
+  mountApp();
+  await expect.element(page.getByRole("heading", { level: 1 })).toBeVisible();
+
+  await userEvent.click(page.getByRole("button", { name: "Open NASA exoplanet catalog" }));
+  const catalog = document.querySelector<HTMLDialogElement>(".planet-catalog");
+  const catalogScroller = catalog?.querySelector<HTMLElement>(".catalog-scroll-region");
+  expect(getComputedStyle(catalog!).overflowY).toBe("hidden");
+  expect(getComputedStyle(catalogScroller!).overflowY).toBe("auto");
+  expect(getComputedStyle(catalogScroller!).contain).toContain("paint");
+  expect(getComputedStyle(catalog!, "::backdrop").backdropFilter).toBe("none");
+
+  await userEvent.click(page.getByRole("button", { name: "Close planet catalog" }));
+  await userEvent.click(page.getByRole("button", { name: "Open World Forge" }));
+  const forge = document.querySelector<HTMLDialogElement>(".planet-builder");
+  const forgeScroller = forge?.querySelector<HTMLFormElement>("form");
+  expect(getComputedStyle(forge!).overflowY).toBe("hidden");
+  expect(getComputedStyle(forgeScroller!).overflowY).toBe("auto");
+  expect(getComputedStyle(forge!, "::backdrop").backdropFilter).toBe("none");
+});
+
 test("nothing overflows the viewport horizontally", async () => {
   stubArchive();
   mountApp();
