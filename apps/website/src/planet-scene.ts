@@ -8,6 +8,7 @@ import { Vector2, Vector3 } from "@babylonjs/core/Maths/math.vector.js";
 import { Effect } from "@babylonjs/core/Materials/effect.js";
 import { ShaderMaterial } from "@babylonjs/core/Materials/shaderMaterial.js";
 import { StandardMaterial } from "@babylonjs/core/Materials/standardMaterial.js";
+import type { FloatArray } from "@babylonjs/core/types.js";
 import type { AbstractMesh } from "@babylonjs/core/Meshes/abstractMesh.js";
 import { Mesh } from "@babylonjs/core/Meshes/mesh.js";
 import { MeshBuilder } from "@babylonjs/core/Meshes/meshBuilder.js";
@@ -1212,6 +1213,56 @@ const createRingSystem = (
 const TERRAIN_DISPLAY_EXAGGERATION = 0.5;
 
 /**
+ * Averages computed normals across vertices that share a position.
+ *
+ * Babylon's icosphere emits an unshared vertex per triangle corner — 19,440 vertices over 6,480
+ * triangles at subdivision 18, three per face, for only 3,242 distinct positions — and gets its
+ * smooth look from `normal = normalize(position)` rather than from shared topology. Recomputing
+ * normals from that index buffer therefore hands every vertex the normal of the single face it
+ * belongs to, which flat-shades the planet: the terrain reads as a lattice of hard-edged facets
+ * instead of a surface. Merging the per-face normals back together by position gives each corner
+ * the average of the faces actually meeting there, which is the smooth normal the displaced
+ * surface has.
+ *
+ * Coincident vertices are exact duplicates of the same source floats and the displacement above
+ * is a pure function of the vertex direction, so equality on the position triple is a safe key —
+ * no epsilon needed.
+ */
+const weldNormals = (positions: FloatArray, normals: Float32Array): void => {
+  const vertexCount = normals.length / 3;
+  const representatives = new Map<string, number>();
+  const representativeOf = new Int32Array(vertexCount);
+  const sums = new Float32Array(normals.length);
+
+  for (let vertex = 0; vertex < vertexCount; vertex += 1) {
+    const offset = vertex * 3;
+    const key = `${positions[offset]!},${positions[offset + 1]!},${positions[offset + 2]!}`;
+    let representative = representatives.get(key);
+    if (representative === undefined) {
+      representative = vertex;
+      representatives.set(key, vertex);
+    }
+    representativeOf[vertex] = representative;
+    const target = representative * 3;
+    sums[target] += normals[offset]!;
+    sums[target + 1] += normals[offset + 1]!;
+    sums[target + 2] += normals[offset + 2]!;
+  }
+
+  for (let vertex = 0; vertex < vertexCount; vertex += 1) {
+    const source = representativeOf[vertex]! * 3;
+    const x = sums[source]!;
+    const y = sums[source + 1]!;
+    const z = sums[source + 2]!;
+    const length = Math.hypot(x, y, z) || 1;
+    const offset = vertex * 3;
+    normals[offset] = x / length;
+    normals[offset + 1] = y / length;
+    normals[offset + 2] = z / length;
+  }
+};
+
+/**
  * Displaces a rocky planet's icosphere vertices with multi-scale procedural terrain (continents,
  * mountains, ridges, roughness, craters — see planet-terrain.ts) and recomputes normals from the
  * displaced geometry so directional lighting responds to the actual shape instead of the
@@ -1249,6 +1300,7 @@ const displaceRockyPlanet = (planet: Mesh, recipe: RockyWorldRecipe): void => {
 
   const normals = new Float32Array(positions.length);
   VertexData.ComputeNormals(positions, indices, normals);
+  weldNormals(positions, normals);
   planet.updateVerticesData(VertexBuffer.PositionKind, positions);
   planet.setVerticesData(VertexBuffer.NormalKind, normals);
 };

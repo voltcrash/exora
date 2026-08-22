@@ -252,6 +252,90 @@ test.each(planets)(
   30_000,
 );
 
+/**
+ * A displaced rocky world used to light up as a lattice of hard-edged facets.
+ *
+ * Babylon's icosphere emits an unshared vertex per triangle corner and gets its smooth look from
+ * `normal = normalize(position)`, not from shared topology. Recomputing normals from the displaced
+ * geometry over that index buffer therefore gave every vertex the normal of the one face it
+ * belongs to, flat-shading the planet — a visible grid over every rocky surface. The normals are
+ * merged back together by position, so this asserts the property that was broken: corners sitting
+ * at the same point carry the same normal, and it is not that face's own flat normal.
+ */
+test("a displaced rocky world keeps one shared normal per position instead of flat-shading", async () => {
+  vi.stubGlobal("window", new EventTarget());
+  const { engine, host, scene } = createHarness();
+  const scope = openWorldScope(scene);
+  const planet = planets[0]!;
+  const world = createPlanetWorld(host, {
+    onFirstFrame: vi.fn(),
+    onViewModeChange: () => undefined,
+    planet,
+    recipe: deriveWorldRecipe(planet),
+  });
+  scope.seal();
+  await settleSky();
+
+  const mesh = scene.meshes.find((candidate) => candidate.name === "planet")!;
+  const positions = mesh.getVerticesData("position")!;
+  const normals = mesh.getVerticesData("normal")!;
+  const indices = mesh.getIndices()!;
+
+  // The premise: this mesh really does carry unshared corners, so welding is load-bearing.
+  const shared = new Map<string, number[]>();
+  for (let vertex = 0; vertex < positions.length; vertex += 3) {
+    const key = `${positions[vertex]!},${positions[vertex + 1]!},${positions[vertex + 2]!}`;
+    (shared.get(key) ?? shared.set(key, []).get(key)!).push(vertex / 3);
+  }
+  expect(positions.length / 3).toBe(indices.length);
+  expect(shared.size).toBeLessThan(positions.length / 3);
+
+  for (const corners of shared.values()) {
+    const first = corners[0]! * 3;
+    for (const corner of corners) {
+      const offset = corner * 3;
+      expect(normals[offset]).toBeCloseTo(normals[first]!, 5);
+      expect(normals[offset + 1]).toBeCloseTo(normals[first + 1]!, 5);
+      expect(normals[offset + 2]).toBeCloseTo(normals[first + 2]!, 5);
+    }
+  }
+
+  // Flat shading would leave every corner exactly perpendicular to its own triangle. A welded
+  // normal is the average of the faces meeting there, so it leans off at least some of them.
+  let offFace = 0;
+  for (let triangle = 0; triangle < indices.length; triangle += 3) {
+    const [a, b, c] = [
+      indices[triangle]! * 3,
+      indices[triangle + 1]! * 3,
+      indices[triangle + 2]! * 3,
+    ];
+    const edge1 = [
+      positions[b]! - positions[a]!,
+      positions[b + 1]! - positions[a + 1]!,
+      positions[b + 2]! - positions[a + 2]!,
+    ];
+    const edge2 = [
+      positions[c]! - positions[a]!,
+      positions[c + 1]! - positions[a + 1]!,
+      positions[c + 2]! - positions[a + 2]!,
+    ];
+    const face = [
+      edge1[1]! * edge2[2]! - edge1[2]! * edge2[1]!,
+      edge1[2]! * edge2[0]! - edge1[0]! * edge2[2]!,
+      edge1[0]! * edge2[1]! - edge1[1]! * edge2[0]!,
+    ];
+    const length = Math.hypot(face[0]!, face[1]!, face[2]!) || 1;
+    const alignment =
+      (face[0]! * normals[a]! + face[1]! * normals[a + 1]! + face[2]! * normals[a + 2]!) / length;
+    if (Math.abs(alignment) < 0.9999) offFace += 1;
+  }
+  expect(offFace).toBeGreaterThan(indices.length / 3 / 2);
+
+  world.dispose();
+  scope.dispose();
+  engine.dispose();
+}, 30_000);
+
 test("star world renders one headless frame and releases its glow layer and scene contents", async () => {
   const { engine, host, scene } = createHarness();
   const before = sceneCounts(scene);
