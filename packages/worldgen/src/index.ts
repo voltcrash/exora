@@ -1433,6 +1433,8 @@ export const generateCustomWorld = (parameters: CustomPlanetParameters): CustomW
       hostLuminosityLogSolar: 0,
       massEarth,
       massJupiter: parameters.kind === "gas-giant" ? massEarth / 317.83 : null,
+      orbitalEccentricity: null,
+      orbitalInclinationDegrees: null,
       orbitalPeriodDays: null,
       radiusEarth,
       radiusJupiter: parameters.kind === "gas-giant" ? radiusEarth / 11.209 : null,

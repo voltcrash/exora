@@ -16,6 +16,8 @@ const planet: ExoplanetProfile = {
     radiusEarth: 16.8,
     massEarth: 2860.4,
     equilibriumTemperatureKelvin: 1500,
+    orbitalEccentricity: null,
+    orbitalInclinationDegrees: null,
     orbitalPeriodDays: null,
     semiMajorAxisAu: 92,
     distanceParsecs: 108.875,

@@ -12,6 +12,8 @@ const nasaRow = {
   pl_eqt: 1500,
   pl_orbper: null,
   pl_orbsmax: 92,
+  pl_orbeccen: 0.06,
+  pl_orbincl: 88.4,
   sy_dist: 108.875,
   ra: 201.1501727,
   dec: -51.5045384,
@@ -35,6 +37,9 @@ test("normalizes NASA columns into the Exora contract", () => {
       equilibriumTemperatureKelvin: 1500,
       massJupiter: 9,
       radiusJupiter: 1.5,
+      // The orbit itself, which is what a system diorama draws rather than infers.
+      orbitalEccentricity: 0.06,
+      orbitalInclinationDegrees: 88.4,
       hostTemperatureKelvin: 8840,
       hostRadiusSolar: 1.77,
       hostMassSolar: 1.96,
@@ -45,6 +50,15 @@ test("normalizes NASA columns into the Exora contract", () => {
       rightAscensionDegrees: 201.1501727,
       declinationDegrees: -51.5045384,
     },
+  });
+});
+
+test("a row with no solved orbit shape reports none rather than a circle in a shared plane", () => {
+  const planet = normalizeNasaPlanet({ ...nasaRow, pl_orbeccen: null, pl_orbincl: null });
+
+  expect(planet?.observation).toMatchObject({
+    orbitalEccentricity: null,
+    orbitalInclinationDegrees: null,
   });
 });
 
@@ -70,6 +84,7 @@ test("the TAP query asks for the sky position every destination needs", async ()
   await repository.findByName("HIP 65426 b");
 
   expect(query).toContain("ra,dec");
+  expect(query).toContain("pl_orbeccen,pl_orbincl");
 });
 
 test("caches identical TAP queries", async () => {

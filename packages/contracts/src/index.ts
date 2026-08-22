@@ -20,6 +20,23 @@ export interface ExoplanetObservation {
   hostTemperatureKelvin: number | null;
   massEarth: number | null;
   massJupiter: number | null;
+  /**
+   * Orbital eccentricity, dimensionless, as the archive reports it.
+   *
+   * Zero is a circle and a genuine measurement; null is the archive not having solved for one at
+   * all, which is the common case for a transit detection. The two must never be conflated — a
+   * renderer that needs a shape has to say out loud that it assumed the circle.
+   */
+  orbitalEccentricity: number | null;
+  /**
+   * Orbital inclination in degrees, measured from the plane of the sky: 90° is an orbit seen
+   * edge-on, which is what a transiting planet has.
+   *
+   * The longitude of the ascending node is not catalogued alongside it, so this fixes how far an
+   * orbit is tilted out of the sky plane but not which way it is turned. Null wherever the
+   * archive did not solve for it.
+   */
+  orbitalInclinationDegrees: number | null;
   orbitalPeriodDays: number | null;
   radiusEarth: number | null;
   radiusJupiter: number | null;

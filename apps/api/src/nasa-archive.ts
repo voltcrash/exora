@@ -19,6 +19,11 @@ const NASA_COLUMNS = [
   "pl_eqt",
   "pl_orbper",
   "pl_orbsmax",
+  // The orbit's shape and tilt, which is what turns a list of sibling worlds into a system that
+  // can be drawn. Both are frequently null — a transit solution usually fixes neither — and stay
+  // that way rather than being filled in with a circle in a shared plane.
+  "pl_orbeccen",
+  "pl_orbincl",
   "sy_dist",
   // The host system's place on the sky. With `sy_dist` this fixes where in the galaxy the system
   // actually is, which is what the renderer needs to draw the real sky as seen from it.
@@ -49,6 +54,8 @@ interface NasaPlanetRow {
   pl_bmassj: number | null;
   pl_eqt: number | null;
   pl_name: string | null;
+  pl_orbeccen: number | null;
+  pl_orbincl: number | null;
   pl_orbper: number | null;
   pl_orbsmax: number | null;
   pl_rade: number | null;
@@ -150,6 +157,8 @@ export const normalizeNasaPlanet = (
       radiusEarth: numberOrNull(row.pl_rade),
       massEarth: numberOrNull(row.pl_bmasse),
       equilibriumTemperatureKelvin: numberOrNull(row.pl_eqt),
+      orbitalEccentricity: numberOrNull(row.pl_orbeccen),
+      orbitalInclinationDegrees: numberOrNull(row.pl_orbincl),
       orbitalPeriodDays: numberOrNull(row.pl_orbper),
       semiMajorAxisAu: numberOrNull(row.pl_orbsmax),
       distanceParsecs: numberOrNull(row.sy_dist),
