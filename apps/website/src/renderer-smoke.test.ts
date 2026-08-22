@@ -275,6 +275,54 @@ test("star world renders one headless frame and releases its glow layer and scen
   engine.dispose();
 }, 30_000);
 
+/**
+ * The star view used to draw this system itself, on orbits nothing measured.
+ *
+ * Ring spacing came from the world's index in the list, the tilt from that index modulo three,
+ * the body size from a two-way guess at the planet's kind, and the rate of turn from the index
+ * again. The measured orbits belong to the diorama, which places every world from its own
+ * semi-major axis, eccentricity, inclination and period, so this scene draws none of it — and
+ * this is the test that keeps a future edit from putting the invented version back.
+ */
+test("the star world adds no geometry for the system's known worlds, and still routes to them", async () => {
+  const { engine, host, scene } = createHarness();
+  const empty = sceneCounts(scene);
+  const scope = openWorldScope(scene);
+  const travelled: string[] = [];
+  const world = createStarWorld(host, {
+    onFirstFrame: vi.fn(),
+    onSelectSystem: () => travelled.push("system"),
+    star,
+  });
+  scope.seal();
+  await settleSky();
+
+  // The star, its corona and glare, and the sky — and that is still all of it once a system with
+  // three worlds in it has been handed over.
+  const starAlone = sceneCounts(scene);
+  world.setSystemWorlds(planets, (planet) => travelled.push(planet.name));
+  expect(sceneCounts(scene)).toEqual(starAlone);
+
+  // What a system does reach the wearer as: entries on the console, alongside the route to the
+  // diorama where the orbits the archive actually reports are drawn.
+  const actions = world.console.sceneActions();
+  expect(actions.map(({ label }) => label)).toEqual([
+    "Recentre me",
+    "View the whole system",
+    ...planets.map(({ name }) => name),
+  ]);
+  actions.find(({ id }) => id === "host-system")?.onSelect?.();
+  actions.find(({ id }) => id === `planet-${gasGiant.id}`)?.onSelect?.();
+  expect(travelled).toEqual(["system", gasGiant.name]);
+
+  expect(() => scene.render()).not.toThrow();
+
+  world.dispose();
+  scope.dispose();
+  expect(sceneCounts(scene)).toEqual(empty);
+  engine.dispose();
+}, 30_000);
+
 test("a world with no measured sky position falls back to the seeded starfield", async () => {
   const { engine, host, scene } = createHarness();
   const scope = openWorldScope(scene);

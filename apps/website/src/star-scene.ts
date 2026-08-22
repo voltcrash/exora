@@ -1,12 +1,6 @@
-import { ActionManager } from "@babylonjs/core/Actions/actionManager.js";
-import "@babylonjs/core/Culling/ray.js";
-import { ExecuteCodeAction } from "@babylonjs/core/Actions/directActions.js";
 import { GlowLayer } from "@babylonjs/core/Layers/glowLayer.js";
-import { Color3, Color4 } from "@babylonjs/core/Maths/math.color.js";
+import { Color4 } from "@babylonjs/core/Maths/math.color.js";
 import { Vector3 } from "@babylonjs/core/Maths/math.vector.js";
-import { StandardMaterial } from "@babylonjs/core/Materials/standardMaterial.js";
-import { MeshBuilder } from "@babylonjs/core/Meshes/meshBuilder.js";
-import { TransformNode } from "@babylonjs/core/Meshes/transformNode.js";
 import "@babylonjs/core/Meshes/instancedMesh.js";
 import type { ExoplanetProfile, StarProfile } from "@exora/contracts";
 import { deriveStarRecipe, type CustomStar, type CustomWorld } from "@exora/worldgen";
@@ -19,11 +13,17 @@ import { starFacts } from "./xr-console-model.ts";
 import type { XrCell } from "./xr-panel-layout.ts";
 
 const STAR_POSITION = new Vector3(0, 0.8, 7.5);
-/** Initial immersive viewpoint, parked outside the widest planetary orbit in the system. */
+/** Initial immersive viewpoint, far enough out that the star reads as a body rather than a wall. */
 const XR_STAR_STAND = new Vector3(0, 0, -9);
 
 export interface StarWorld extends MountedWorld {
-  setPlanetTargets: (
+  /**
+   * Hands this view the worlds the archive links to the star, once it has answered.
+   *
+   * They become console entries, not scene objects: somewhere a wearer can travel to without
+   * taking the headset off. Nothing is drawn for them here — see the note above `createStarWorld`.
+   */
+  setSystemWorlds: (
     planets: readonly ExoplanetProfile[],
     onSelectPlanet: (planet: ExoplanetProfile) => void,
   ) => void;
@@ -44,9 +44,23 @@ interface StarWorldOptions {
 /**
  * Builds a star into the shared scene.
  *
+ * What this scene deliberately does not draw is the star's planets. It used to: one ring per
+ * known world, spaced by the world's position in the list, tilted by that position modulo three,
+ * given one of two body sizes by planet kind, and turned at a rate picked the same way. None of
+ * that came from the archive — not the spacing, not the tilts, not the sizes, not the speeds —
+ * and nothing on screen said so, which made a diagram of nothing look like a measurement.
+ *
+ * The measured orbits do exist, and are drawn: `system-scene.ts` places every world of a host on
+ * the semi-major axis, eccentricity, inclination and period the archive reports for it, through
+ * the stated mapping in `system-layout.ts`. "View the whole system" on the console here, and the
+ * matching entry on the page, are the route there. So this view is about the star — its
+ * photosphere, its corona, and the real sky seen from where it stands — and its system reaches a
+ * visitor as a list of places to go rather than as invented geometry.
+ *
  * Like the planet world, everything here is built synchronously so the host's world scope can
- * tell precisely what was added. The system's known worlds arrive later over the network, so
- * those orbits are the one part this module has to take back out itself.
+ * tell precisely what was added. The system's known worlds arrive later over the network, but
+ * they add nothing to the scene, so there is nothing left for this module to take back out by
+ * hand beyond the glow layer, which lives outside the scene graph.
  */
 export const createStarWorld = (
   host: SceneHost,
@@ -112,122 +126,32 @@ export const createStarWorld = (
   glow.intensity = 0.75 + activity * 0.35;
   glow.addIncludedOnlyMesh(starMesh);
 
-  let planetTargetRoots: TransformNode[] = [];
-  let planetTargetManagers: ActionManager[] = [];
   let menuPlanets: readonly ExoplanetProfile[] = [];
   let selectPlanet: ((planet: ExoplanetProfile) => void) | null = null;
 
-  /**
-   * The system's known worlds, drawn as orbits around the star.
-   *
-   * These land after the host's world scope has closed, because the archive query that finds
-   * them is a network round trip, so this is the one part of the star world that has to be
-   * disposed by hand rather than swept up with the rest.
-   */
-  const clearPlanetTargets = (): void => {
-    for (const manager of planetTargetManagers) manager.dispose();
-    for (const root of planetTargetRoots) root.dispose(false, true);
-    planetTargetManagers = [];
-    planetTargetRoots = [];
-  };
-
-  const setPlanetTargets = (
+  const setSystemWorlds = (
     planets: readonly ExoplanetProfile[],
     onSelect: (planet: ExoplanetProfile) => void,
   ): void => {
     menuPlanets = planets;
     selectPlanet = onSelect;
+    // The archive answers after the console has already been painted from an empty system, so the
+    // panel has to be told to repaint rather than waiting for the wearer to reopen it.
     host.refreshConsole();
-    clearPlanetTargets();
-    planetTargetRoots = planets.slice(0, 8).map((planet, index) => {
-      const root = new TransformNode(`system-world-orbit-${planet.id}`, scene);
-      root.position.copyFrom(starMesh.position);
-      root.rotation.x = -0.08 + (index % 3) * 0.07;
-      root.rotation.z = ((index % 2 === 0 ? -1 : 1) * Math.PI) / 34;
-
-      const orbitRadius = diameter * 0.68 + 1.1 + index * 0.48;
-      const orbit = MeshBuilder.CreateTorus(
-        `system-world-guide-${planet.id}`,
-        { diameter: orbitRadius * 2, thickness: 0.012, tessellation: 96 },
-        scene,
-      );
-      orbit.parent = root;
-      orbit.isPickable = false;
-      const orbitMaterial = new StandardMaterial(`system-world-guide-material-${planet.id}`, scene);
-      orbitMaterial.disableLighting = true;
-      orbitMaterial.emissiveColor = new Color3(0.24, 0.48, 0.52);
-      orbitMaterial.alpha = 0.22;
-      orbitMaterial.disableDepthWrite = true;
-      orbit.material = orbitMaterial;
-
-      const world = MeshBuilder.CreateSphere(
-        `system-world-${planet.id}`,
-        { diameter: planet.kind === "gas-giant" ? 0.72 : 0.5, segments: 24 },
-        scene,
-      );
-      world.parent = root;
-      world.position.x = orbitRadius;
-      world.isPickable = true;
-      const worldMaterial = new StandardMaterial(`system-world-material-${planet.id}`, scene);
-      worldMaterial.disableLighting = true;
-      const worldColor =
-        planet.kind === "gas-giant"
-          ? new Color3(0.9, 0.58, 0.3)
-          : planet.kind === "ice-giant"
-            ? new Color3(0.34, 0.72, 0.92)
-            : new Color3(0.36, 0.82, 0.7);
-      worldMaterial.diffuseColor = worldColor;
-      worldMaterial.emissiveColor = worldColor.scale(0.45);
-      world.material = worldMaterial;
-
-      const pointerTarget = MeshBuilder.CreateSphere(
-        `system-world-pointer-${planet.id}`,
-        { diameter: 1.05, segments: 16 },
-        scene,
-      );
-      pointerTarget.parent = root;
-      pointerTarget.position.copyFrom(world.position);
-      pointerTarget.isPickable = true;
-      const pointerMaterial = new StandardMaterial(
-        `system-world-pointer-material-${planet.id}`,
-        scene,
-      );
-      pointerMaterial.disableLighting = true;
-      pointerMaterial.emissiveColor = worldColor;
-      pointerMaterial.alpha = 0.055;
-      pointerMaterial.disableDepthWrite = true;
-      pointerTarget.material = pointerMaterial;
-
-      for (const target of [world, pointerTarget]) {
-        const manager = new ActionManager(scene);
-        manager.registerAction(
-          new ExecuteCodeAction(ActionManager.OnPickTrigger, () => selectPlanet?.(planet)),
-        );
-        target.actionManager = manager;
-        planetTargetManagers.push(manager);
-      }
-      root.rotation.y = (index / Math.max(1, planets.length)) * Math.PI * 2;
-      return root;
-    });
   };
 
   let elapsed = 0;
   const renderObserver = scene.onBeforeRenderObservable.add(() => {
-    const deltaSeconds = Math.min(engine.getDeltaTime() / 1_000, 0.05);
-    elapsed += deltaSeconds;
+    elapsed += Math.min(engine.getDeltaTime() / 1_000, 0.05);
     const activeCameraPosition = scene.activeCamera?.globalPosition ?? camera.globalPosition;
     stellarSurface.update(elapsed, activeCameraPosition);
     starfield.update(elapsed, activeCameraPosition);
-    for (let index = 0; index < planetTargetRoots.length; index += 1) {
-      const root = planetTargetRoots[index];
-      if (root) root.rotation.y += (0.025 + index * 0.004) * deltaSeconds;
-    }
   });
 
   const firstFrameObserver = scene.onAfterRenderObservable.addOnce(onFirstFrame);
 
   /**
-   * Puts the wearer at the initial orbital viewpoint facing the star.
+   * Puts the wearer at the initial viewpoint facing the star.
    *
    * The rig otherwise starts wherever the headset happened to be pointing, which in a scene this
    * sparse means staring at empty starfield with no clue that anything rendered at all.
@@ -290,13 +214,12 @@ export const createStarWorld = (
 
   return {
     console: consoleContributions,
-    setPlanetTargets,
+    setSystemWorlds,
     focusXrRig: placeXrCamera,
     restoreDesktopView: () => camera.attachControl(canvas, true),
     dispose: () => {
       scene.onBeforeRenderObservable.remove(renderObserver);
       scene.onAfterRenderObservable.remove(firstFrameObserver);
-      clearPlanetTargets();
       // The glow layer owns render targets rather than scene nodes, so the world scope that
       // sweeps up the meshes cannot see it.
       glow.dispose();

@@ -90,7 +90,7 @@ vi.mock("./planet-scene.ts", () => ({
 vi.mock("./star-scene.ts", () => ({
   createStarWorld: (_host: unknown, options: { onFirstFrame: () => void }) => {
     options.onFirstFrame();
-    return { ...mountedWorld(), setPlanetTargets: () => undefined };
+    return { ...mountedWorld(), setSystemWorlds: () => undefined };
   },
 }));
 
