@@ -6,6 +6,7 @@ import type { StarWorld } from "../star-scene.ts";
 import { formatNumber } from "../planet-utils.tsx";
 import type { SceneHost, XrStatus } from "../scene-host.ts";
 import { deriveStarVisual, starKindLabel, starSummary } from "../star-utils.ts";
+import type { TravelPhase } from "../travel-transition.ts";
 import { isXrEmulated } from "../xr-emulator.ts";
 
 interface StarExperienceProps {
@@ -20,6 +21,7 @@ interface StarExperienceProps {
   onSelectSystem: (hostStar: string) => Promise<boolean>;
   result: StarLoadResult;
   systemHostName: string | null;
+  travelPhase: TravelPhase;
 }
 
 const xrCopy: Record<XrStatus, { button: string; label: string }> = {
@@ -42,6 +44,7 @@ export const StarExperience = ({
   onSelectSystem,
   result,
   systemHostName,
+  travelPhase,
 }: StarExperienceProps) => {
   const worldRef = useRef<StarWorld | null>(null);
   const [fps, setFps] = useState("--");
@@ -56,6 +59,10 @@ export const StarExperience = ({
   const observation = star.observation;
   const visual = deriveStarVisual(star);
   const custom = result.mode === "custom";
+  // A jump in the air owns the screen: this view's panels go with the world being left, and its
+  // loading card stays down, because the flight is what stands in for it now.
+  const travelling = travelPhase === "departing" || travelPhase === "crossing";
+  const settled = sceneState !== "loading" || travelPhase !== "idle";
 
   /**
    * The name the archive files this system under.
@@ -73,7 +80,13 @@ export const StarExperience = ({
   const openSystem = async (): Promise<void> => {
     if (dioramaState === "loading") return;
     setDioramaState("loading");
-    const found = await onSelectSystem(dioramaHostRef.current);
+    // The pull-away and the archive request go out together, so the click reads immediately
+    // rather than after however long the answer takes.
+    host?.beginTravel();
+    // A lookup that fails outright is a destination that is not there: it has to reach the
+    // `cancelTravel` below, or the flight would hang pulled back with no world to return to.
+    const found = await onSelectSystem(dioramaHostRef.current).catch(() => false);
+    if (!found) host?.cancelTravel();
     setDioramaState(found ? "idle" : "error");
   };
 
@@ -167,7 +180,7 @@ export const StarExperience = ({
 
   return (
     <div
-      className={`experience-shell star-experience ${sceneState !== "loading" ? "scene-ready" : ""} ${sceneState === "error" ? "scene-error" : ""}`}
+      className={`experience-shell star-experience ${settled ? "scene-ready" : ""} ${sceneState === "error" ? "scene-error" : ""} ${travelling ? "travelling" : ""}`}
     >
       <div className="space-haze" aria-hidden="true" />
       <div className="viewport-grid" aria-hidden="true" />
