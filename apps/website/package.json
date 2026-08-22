@@ -6,6 +6,7 @@
   "scripts": {
     "dev": "vp dev",
     "build": "tsc && vp build",
+    "star-catalog": "node scripts/build-star-catalog.ts",
     "preview": "vp preview",
     "test": "vp test --project unit",
     "test:browser": "vp test --project browser"

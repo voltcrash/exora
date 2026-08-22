@@ -19,6 +19,8 @@ const planet: ExoplanetProfile = {
     orbitalPeriodDays: null,
     semiMajorAxisAu: 92,
     distanceParsecs: 108.875,
+    rightAscensionDegrees: 201.1501727,
+    declinationDegrees: -51.5045384,
     discoveryYear: 2017,
     discoveryMethod: "Imaging",
     hostSpectralType: "A2 V",

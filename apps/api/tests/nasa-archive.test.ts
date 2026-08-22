@@ -13,6 +13,8 @@ const nasaRow = {
   pl_orbper: null,
   pl_orbsmax: 92,
   sy_dist: 108.875,
+  ra: 201.1501727,
+  dec: -51.5045384,
   disc_year: 2017,
   discoverymethod: "Imaging",
   st_spectype: "A2 V",
@@ -37,8 +39,37 @@ test("normalizes NASA columns into the Exora contract", () => {
       hostRadiusSolar: 1.77,
       hostMassSolar: 1.96,
       hostLuminosityLogSolar: 1.02,
+      // With the distance, these place the system in the galaxy rather than only on the sky,
+      // which is what lets the renderer draw the stars a visitor there would actually see.
+      distanceParsecs: 108.875,
+      rightAscensionDegrees: 201.1501727,
+      declinationDegrees: -51.5045384,
     },
   });
+});
+
+test("a row with no sky position reports none rather than a placeholder", () => {
+  const planet = normalizeNasaPlanet({ ...nasaRow, ra: null, dec: null, sy_dist: null });
+
+  expect(planet?.observation).toMatchObject({
+    declinationDegrees: null,
+    distanceParsecs: null,
+    rightAscensionDegrees: null,
+  });
+});
+
+test("the TAP query asks for the sky position every destination needs", async () => {
+  let query = "";
+  const repository = new NasaPlanetRepository({
+    fetcher: async (input) => {
+      query = new URL(input as string).searchParams.get("query") ?? "";
+      return Response.json([nasaRow]);
+    },
+  });
+
+  await repository.findByName("HIP 65426 b");
+
+  expect(query).toContain("ra,dec");
 });
 
 test("caches identical TAP queries", async () => {

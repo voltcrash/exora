@@ -20,6 +20,10 @@ const NASA_COLUMNS = [
   "pl_orbper",
   "pl_orbsmax",
   "sy_dist",
+  // The host system's place on the sky. With `sy_dist` this fixes where in the galaxy the system
+  // actually is, which is what the renderer needs to draw the real sky as seen from it.
+  "ra",
+  "dec",
   "disc_year",
   "discoverymethod",
   "st_spectype",
@@ -37,6 +41,7 @@ export {
 type Fetcher = (input: string | URL | Request, init?: RequestInit) => Promise<Response>;
 
 interface NasaPlanetRow {
+  dec: number | null;
   disc_year: number | null;
   discoverymethod: string | null;
   hostname: string | null;
@@ -48,6 +53,7 @@ interface NasaPlanetRow {
   pl_orbsmax: number | null;
   pl_rade: number | null;
   pl_radj: number | null;
+  ra: number | null;
   st_spectype: string | null;
   st_teff: number | null;
   st_rad: number | null;
@@ -147,6 +153,8 @@ export const normalizeNasaPlanet = (
       orbitalPeriodDays: numberOrNull(row.pl_orbper),
       semiMajorAxisAu: numberOrNull(row.pl_orbsmax),
       distanceParsecs: numberOrNull(row.sy_dist),
+      rightAscensionDegrees: numberOrNull(row.ra),
+      declinationDegrees: numberOrNull(row.dec),
       discoveryYear: numberOrNull(row.disc_year),
       discoveryMethod: stringOrNull(row.discoverymethod) ?? "Unknown",
       hostSpectralType: stringOrNull(row.st_spectype),

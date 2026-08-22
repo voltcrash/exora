@@ -28,6 +28,7 @@ import type {
 import { type RenderQualityProfile, shaderDefines } from "./render-quality.ts";
 import { buildCraterField, sampleTerrainHeight } from "./planet-terrain.ts";
 import type { MountedWorld, SceneHost, WorldConsole } from "./scene-host.ts";
+import { skyViewpointFrom } from "./sky-catalog.ts";
 import { createStellarSurface, type StellarSurface } from "./star-surface.ts";
 import { createStarfield } from "./star-visuals.ts";
 import { getSurfaceDetailTextures, surfaceDetailSelectionForPalette } from "./texture-cache.ts";
@@ -2141,7 +2142,15 @@ export const createPlanetWorld = (
   keyLight.diffuse = toColor3(recipe.star.color);
   keyLight.intensity = 2.2 * recipe.star.intensity;
 
-  const starfield = createStarfield({ count: profile.starCount, scene, seed: recipe.seed });
+  // The archive reports where this planet's host system is on the sky and how far away it is, so
+  // the orbital view can be given the sky that system actually has. A procedural world, or a
+  // catalogue row missing any of the three, falls back to the seeded field.
+  const starfield = createStarfield({
+    count: profile.starCount,
+    scene,
+    seed: recipe.seed,
+    viewpoint: skyViewpointFrom(planetProfile.observation),
+  });
   const {
     atmosphere,
     cloudLayer,

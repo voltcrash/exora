@@ -1,3 +1,4 @@
+import { readFile } from "node:fs/promises";
 import { ActionManager } from "@babylonjs/core/Actions/actionManager.js";
 import { ArcRotateCamera } from "@babylonjs/core/Cameras/arcRotateCamera.js";
 import { NullEngine } from "@babylonjs/core/Engines/nullEngine.js";
@@ -9,10 +10,11 @@ import { TransformNode } from "@babylonjs/core/Meshes/transformNode.js";
 import { Scene } from "@babylonjs/core/scene.js";
 import type { ExoplanetProfile, StarProfile } from "@exora/contracts";
 import { deriveWorldRecipe } from "@exora/worldgen";
-import { afterEach, expect, test, vi } from "vite-plus/test";
+import { afterEach, beforeEach, expect, test, vi } from "vite-plus/test";
 import { createPlanetWorld } from "./planet-scene.ts";
 import type { RenderQualityProfile } from "./render-quality.ts";
 import type { SceneHost } from "./scene-host.ts";
+import { resetSkyCatalogForTesting } from "./sky-catalog.ts";
 import { createStarWorld } from "./star-scene.ts";
 import { openWorldScope } from "./world-scope.ts";
 
@@ -50,6 +52,8 @@ const gasGiant: ExoplanetProfile = {
     orbitalPeriodDays: null,
     semiMajorAxisAu: 92,
     distanceParsecs: 108.875,
+    rightAscensionDegrees: 201.1501727,
+    declinationDegrees: -51.5045384,
     discoveryYear: 2017,
     discoveryMethod: "Imaging",
     hostSpectralType: "A2 V",
@@ -164,6 +168,12 @@ const createHarness = (): Harness => {
   return { engine, host, scene };
 };
 
+/** How many stars the background field ended up submitting, catalogue or seeded. */
+const starfieldPointCount = (scene: Scene): number => {
+  const starfield = scene.meshes.find((mesh) => mesh.name === "starfield");
+  return starfield?.getTotalVertices() ?? 0;
+};
+
 const sceneCounts = (scene: Scene) => ({
   actionManagers: scene.actionManagers.length,
   effectLayers: scene.effectLayers?.length ?? 0,
@@ -173,13 +183,41 @@ const sceneCounts = (scene: Scene) => ({
   transformNodes: scene.transformNodes.length,
 });
 
+/**
+ * The bundled sky, served the way the browser would.
+ *
+ * Every fixture below carries a real right ascension, declination and distance, so each world
+ * asks for the catalogue on the way up. Serving the committed asset here is what makes these
+ * smoke tests cover the sky the renderer actually draws, rather than only the seeded fallback
+ * it keeps for World Forge.
+ */
+const serveBundledSky = async (): Promise<void> => {
+  const file = await readFile(new URL("../public/sky/hyg-v44-vmag65.bin", import.meta.url));
+  const asset = file.buffer.slice(
+    file.byteOffset,
+    file.byteOffset + file.byteLength,
+  ) as ArrayBuffer;
+  vi.stubGlobal("fetch", () => Promise.resolve(new Response(asset)));
+};
+
+/** Lets the memoized download and the microtask that fills the starfield both settle. */
+const settleSky = async (): Promise<void> => {
+  await new Promise((resolve) => setTimeout(resolve, 0));
+};
+
+beforeEach(async () => {
+  resetSkyCatalogForTesting();
+  await serveBundledSky();
+});
+
 afterEach(() => {
+  resetSkyCatalogForTesting();
   vi.unstubAllGlobals();
 });
 
 test.each(planets)(
   "$kind world renders one headless frame and releases its scene contents",
-  (planet) => {
+  async (planet) => {
     vi.stubGlobal("window", new EventTarget());
     const { engine, host, scene } = createHarness();
     const before = sceneCounts(scene);
@@ -193,8 +231,10 @@ test.each(planets)(
       recipe,
     });
     scope.seal();
+    await settleSky();
 
     expect(sceneCounts(scene).meshes).toBeGreaterThan(before.meshes);
+    expect(starfieldPointCount(scene)).toBeGreaterThan(0);
     expect(() => scene.render()).not.toThrow();
     expect(firstFrame).toHaveBeenCalledOnce();
 
@@ -206,22 +246,54 @@ test.each(planets)(
   30_000,
 );
 
-test("star world renders one headless frame and releases its glow layer and scene contents", () => {
+test("star world renders one headless frame and releases its glow layer and scene contents", async () => {
   const { engine, host, scene } = createHarness();
   const before = sceneCounts(scene);
   const firstFrame = vi.fn();
   const scope = openWorldScope(scene);
   const world = createStarWorld(host, { onFirstFrame: firstFrame, star });
   scope.seal();
+  await settleSky();
 
   expect(sceneCounts(scene).meshes).toBeGreaterThan(before.meshes);
   expect(sceneCounts(scene).effectLayers).toBe(before.effectLayers + 1);
+  // This star has a measured position and distance, so its sky comes from the catalogue and is
+  // capped by the tier's budget rather than by how many stars happen to be visible.
+  expect(starfieldPointCount(scene)).toBe(testProfile.starCount);
   expect(() => scene.render()).not.toThrow();
   expect(firstFrame).toHaveBeenCalledOnce();
 
   world.dispose();
   scope.dispose();
   expect(sceneCounts(scene)).toEqual(before);
+  engine.dispose();
+}, 30_000);
+
+test("a world with no measured sky position falls back to the seeded starfield", async () => {
+  const { engine, host, scene } = createHarness();
+  const scope = openWorldScope(scene);
+  const forged: StarProfile = {
+    ...star,
+    id: "custom-star-1234",
+    observation: {
+      ...star.observation,
+      declinationDegrees: null,
+      distanceParsecs: null,
+      rightAscensionDegrees: null,
+    },
+  };
+  const world = createStarWorld(host, { onFirstFrame: vi.fn(), star: forged });
+  scope.seal();
+
+  // Seeded geometry is applied during the build itself, with no catalogue and no download: a
+  // World Forge object has no place among the real stars to be looked at from.
+  expect(starfieldPointCount(scene)).toBe(testProfile.starCount);
+  await settleSky();
+  expect(starfieldPointCount(scene)).toBe(testProfile.starCount);
+  expect(() => scene.render()).not.toThrow();
+
+  world.dispose();
+  scope.dispose();
   engine.dispose();
 }, 30_000);
 

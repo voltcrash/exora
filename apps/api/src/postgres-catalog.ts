@@ -10,6 +10,7 @@ import {
 import type { PlanetRepository, RepositoryResult } from "./nasa-archive.ts";
 
 interface PlanetRow extends Record<string, unknown> {
+  declination_degrees: number | null;
   discovery_method: string;
   discovery_year: number | null;
   distance_parsecs: number | null;
@@ -29,6 +30,7 @@ interface PlanetRow extends Record<string, unknown> {
   radius_earth: number | null;
   radius_jupiter: number | null;
   retrieved_on: string | Date;
+  right_ascension_degrees: number | null;
   semi_major_axis_au: number | null;
   source_archive: "NASA Exoplanet Archive";
   source_table: "pscomppars";
@@ -47,6 +49,8 @@ const PLANET_COLUMNS = `
   orbital_period_days,
   semi_major_axis_au,
   distance_parsecs,
+  right_ascension_degrees,
+  declination_degrees,
   discovery_year,
   discovery_method,
   host_spectral_type,
@@ -76,6 +80,8 @@ const toPlanet = (row: PlanetRow): ExoplanetProfile => ({
     orbitalPeriodDays: row.orbital_period_days,
     semiMajorAxisAu: row.semi_major_axis_au,
     distanceParsecs: row.distance_parsecs,
+    rightAscensionDegrees: row.right_ascension_degrees,
+    declinationDegrees: row.declination_degrees,
     discoveryYear: row.discovery_year,
     discoveryMethod: row.discovery_method,
     hostSpectralType: row.host_spectral_type,

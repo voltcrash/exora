@@ -7,6 +7,7 @@ import { Mesh } from "@babylonjs/core/Meshes/mesh.js";
 import { VertexData } from "@babylonjs/core/Meshes/mesh.vertexData.js";
 import type { TransformNode } from "@babylonjs/core/Meshes/transformNode.js";
 import type { Scene } from "@babylonjs/core/scene.js";
+import { loadSkyCatalog, projectSky, type SkyViewpoint } from "./sky-catalog.ts";
 
 /**
  * How a star reads as a light source rather than as a lit ball.
@@ -155,40 +156,59 @@ const registerStarShaders = (): void => {
 const QUAD_CORNERS = [-1, -1, 1, -1, -1, 1, 1, 1] as const;
 
 export interface StarfieldOptions {
-  /** How many stars to place. Overwhelmingly faint ones, so this is cheap to raise. */
+  /**
+   * Ceiling on the points drawn. The seeded field below always draws exactly this many; a
+   * catalogue sky draws the brightest this many of however many are visible from the viewpoint,
+   * which is often fewer.
+   */
   count: number;
   /**
-   * Distance the whole shell sits at. Only sets the scale the billboards are sized against —
-   * the shell rides with the camera, so nothing ever parallaxes against it or flies through it.
+   * Radius the whole shell sits at. Sets scale only — the shell rides with the camera, so nothing
+   * ever parallaxes against it or flies through it.
    */
   distance?: number;
   scene: Scene;
   seed: number;
+  /**
+   * Where in the galaxy this destination actually is, if anyone knows.
+   *
+   * Given one, the field is the real sky re-observed from that point. Left null — a World Forge
+   * object, or a catalogue entry with no measured position or distance — it is the seeded field
+   * below, because a made-up viewpoint would produce a confidently wrong sky.
+   */
+  viewpoint?: SkyViewpoint | null;
 }
+
+/** Which of the two skies is on screen. `catalog` only ever means real, projected stars. */
+export type StarfieldSource = "catalog" | "seeded";
 
 export interface Starfield {
   dispose: () => void;
   mesh: Mesh;
+  /** What the field is currently drawing. Starts `seeded`, or `pending` until the asset lands. */
+  source: () => StarfieldSource | "pending";
   /** Keeps the effectively infinite shell centred on the viewer. */
   update: (elapsedSeconds: number, viewerPosition: Vector3) => void;
 }
 
+/** Radius the shell sits at when the caller does not pick one. */
+const DEFAULT_SHELL_RADIUS = 90;
+
 /**
- * Builds the subdued point-star background used before the PSF billboard experiment. Background
- * stars provide scale and depth; resolved stars own the glare treatment and remain the focal
- * light sources. Keeping this as a single point cloud also avoids bright alpha-blended crosses
- * overwhelming planets in the foreground.
+ * The fallback sky: a seeded, isotropic scatter of points.
+ *
+ * This is what a World Forge object gets, because a world that was invented five seconds ago has
+ * no place among the real stars to be looked at from. It is deliberately not dressed up as
+ * anything else — the scatter is uniform on the sphere and the brightness ramp is random, which
+ * is exactly what "we do not know where you are" looks like.
  */
-export const createStarfield = ({
-  count,
-  distance = 90,
-  scene,
-  seed,
-}: StarfieldOptions): Starfield => {
-  const mesh = new Mesh("starfield", scene);
-  const positions: number[] = [];
-  const colors: number[] = [];
-  const indices: number[] = [];
+const seededSky = (
+  count: number,
+  distance: number,
+  seed: number,
+): { colors: Float32Array; positions: Float32Array } => {
+  const positions = new Float32Array(count * 3);
+  const colors = new Float32Array(count * 4);
 
   let state = seed >>> 0 || 1;
   const random = (): number => {
@@ -201,20 +221,41 @@ export const createStarfield = ({
     const theta = random() * Math.PI * 2;
     const phi = Math.acos(2 * random() - 1);
     const brightness = 0.25 + random() * 0.75;
-    positions.push(
-      radius * Math.sin(phi) * Math.cos(theta),
-      radius * Math.cos(phi),
-      radius * Math.sin(phi) * Math.sin(theta),
-    );
-    colors.push(brightness * 0.72, brightness * 0.85, brightness, 1);
-    indices.push(index);
+    positions[index * 3] = radius * Math.sin(phi) * Math.cos(theta);
+    positions[index * 3 + 1] = radius * Math.cos(phi);
+    positions[index * 3 + 2] = radius * Math.sin(phi) * Math.sin(theta);
+    colors[index * 4] = brightness * 0.72;
+    colors[index * 4 + 1] = brightness * 0.85;
+    colors[index * 4 + 2] = brightness;
+    colors[index * 4 + 3] = 1;
   }
 
-  const vertexData = new VertexData();
-  vertexData.positions = positions;
-  vertexData.colors = colors;
-  vertexData.indices = indices;
-  vertexData.applyToMesh(mesh);
+  return { colors, positions };
+};
+
+/**
+ * Builds the background starfield.
+ *
+ * Background stars provide scale and depth; resolved stars own the glare treatment and remain the
+ * focal light sources. Keeping this as a single point cloud also avoids bright alpha-blended
+ * crosses overwhelming planets in the foreground — and it is what makes a real sky affordable,
+ * because swapping a seeded scatter for a catalogue changes which points are submitted and
+ * nothing at all about the one draw call that submits them.
+ *
+ * With a viewpoint, the geometry arrives on the microtask that resolves the catalogue rather than
+ * during this call. That is deliberate: the download is memoized for the life of the page, so
+ * every destination after the first has it in hand before its first frame is drawn, and the one
+ * destination that might not is better off showing nothing for a moment than showing an invented
+ * sky it would then have to take back.
+ */
+export const createStarfield = ({
+  count,
+  distance = DEFAULT_SHELL_RADIUS,
+  scene,
+  seed,
+  viewpoint = null,
+}: StarfieldOptions): Starfield => {
+  const mesh = new Mesh("starfield", scene);
 
   const material = new StandardMaterial("starfield-material", scene);
   material.disableLighting = true;
@@ -227,14 +268,58 @@ export const createStarfield = ({
   mesh.isPickable = false;
   mesh.alwaysSelectAsActiveMesh = true;
 
+  let disposed = false;
+  let source: StarfieldSource | "pending" = viewpoint ? "pending" : "seeded";
+
+  const applyPoints = (positions: Float32Array, colors: Float32Array): void => {
+    const drawn = positions.length / 3;
+    const indices = new Uint32Array(drawn);
+    for (let index = 0; index < drawn; index += 1) indices[index] = index;
+
+    const vertexData = new VertexData();
+    vertexData.positions = positions;
+    vertexData.colors = colors;
+    vertexData.indices = indices;
+    vertexData.applyToMesh(mesh);
+  };
+
+  const applySeeded = (): void => {
+    const { colors, positions } = seededSky(count, distance, seed);
+    applyPoints(positions, colors);
+    source = "seeded";
+  };
+
+  if (viewpoint) {
+    void loadSkyCatalog().then((catalog) => {
+      // The world may already be gone: a visitor can travel again before the first download
+      // lands, and `world-scope.ts` disposes the mesh without this closure hearing about it.
+      if (disposed || mesh.isDisposed()) return;
+      if (!catalog) {
+        applySeeded();
+        return;
+      }
+      const projected = projectSky(catalog, viewpoint, {
+        shellRadius: distance,
+        starLimit: count,
+      });
+      applyPoints(projected.positions, projected.colors);
+      source = "catalog";
+    });
+  } else {
+    applySeeded();
+  }
+
   return {
     mesh,
+    source: () => source,
     update: (_elapsedSeconds: number, viewerPosition: Vector3): void => {
-      // Stars are effectively at infinity, so the shell rides with the viewer: no parallax as the
-      // camera orbits, and no way to walk out through it during a long immersive session.
+      // The whole shell rides with the viewer. Every star on it is at least a parsec away and the
+      // scene is a few tens of units across, so there is no parallax to be had inside it — and no
+      // way to walk out through it during a long immersive session.
       mesh.position.copyFrom(viewerPosition);
     },
     dispose: (): void => {
+      disposed = true;
       mesh.dispose(false, true);
     },
   };
