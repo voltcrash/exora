@@ -1056,7 +1056,7 @@ body[data-xr-status="unavailable"] .status-light {
   max-height: min(780px, calc(100vh - 32px));
   margin: auto;
   padding: 0;
-  overflow: hidden auto;
+  overflow: hidden;
   border: 1px solid rgb(255 137 91 / 22%);
   border-radius: 24px;
   color: var(--ink);
@@ -1068,8 +1068,7 @@ body[data-xr-status="unavailable"] .status-light {
 }
 
 .planet-builder::backdrop {
-  background: rgb(0 2 3 / 78%);
-  backdrop-filter: blur(14px);
+  background: rgb(0 2 3 / 90%);
 }
 
 .planet-builder[open] {
@@ -1078,6 +1077,9 @@ body[data-xr-status="unavailable"] .status-light {
 
 .planet-builder form {
   min-height: 100%;
+  max-height: inherit;
+  overflow-y: auto;
+  overscroll-behavior: contain;
 }
 
 .builder-header {
@@ -1414,8 +1416,7 @@ body[data-xr-status="unavailable"] .status-light {
   max-height: min(920px, calc(100vh - 32px));
   margin: auto;
   padding: 0;
-  overflow-x: hidden;
-  overflow-y: auto;
+  overflow: hidden;
   border: 1px solid rgb(229 244 247 / 16%);
   border-radius: 24px;
   color: var(--ink);
@@ -1424,12 +1425,23 @@ body[data-xr-status="unavailable"] .status-light {
 }
 
 .planet-catalog::backdrop {
-  background: rgb(0 2 3 / 74%);
-  backdrop-filter: blur(12px);
+  background: rgb(0 2 3 / 88%);
 }
 
 .planet-catalog[open] {
   animation: catalog-in 180ms ease-out;
+}
+
+/* Keep the rounded dialog, its shadow and its full-viewport scrim on static compositor layers.
+   Scrolling the dialog element itself invalidates that entire decorated surface; scrolling this
+   contained child limits layout and paint to the content that actually moves. */
+.catalog-scroll-region {
+  max-height: inherit;
+  overflow-x: hidden;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  scrollbar-color: rgb(139 230 234 / 25%) transparent;
+  contain: layout paint;
 }
 
 .star-catalog {
