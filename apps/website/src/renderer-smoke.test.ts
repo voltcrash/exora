@@ -5,6 +5,7 @@ import { NullEngine } from "@babylonjs/core/Engines/nullEngine.js";
 import { HemisphericLight } from "@babylonjs/core/Lights/hemisphericLight.js";
 import { StandardMaterial } from "@babylonjs/core/Materials/standardMaterial.js";
 import { Vector3 } from "@babylonjs/core/Maths/math.vector.js";
+import type { AbstractMesh } from "@babylonjs/core/Meshes/abstractMesh.js";
 import { MeshBuilder } from "@babylonjs/core/Meshes/meshBuilder.js";
 import { TransformNode } from "@babylonjs/core/Meshes/transformNode.js";
 import { Scene } from "@babylonjs/core/scene.js";
@@ -356,6 +357,77 @@ test("star world renders one headless frame and releases its glow layer and scen
   world.dispose();
   scope.dispose();
   expect(sceneCounts(scene)).toEqual(before);
+  engine.dispose();
+}, 30_000);
+
+/**
+ * The star's halo used to go out as a visitor flew towards it.
+ *
+ * The corona is a shell reaching 2.6 stellar radii out, shaded from the impact parameter of the
+ * view ray rather than from anything about the surface that ray happens to hit, and it used to be
+ * drawn on whichever of its two surfaces faced the camera — the near one. Zoomed all the way in,
+ * the star view stands closer to that surface than the near clip plane sits, so its fragments were
+ * thrown away before they were ever shaded: the halo tightened as a visitor approached and then
+ * went out altogether, leaving the disc cut hard against black. The diorama's camera comes closer
+ * still and ends up inside the shell, where a near-side draw has no fragments left at all.
+ *
+ * Drawing the far surface instead cannot change the picture — for the same reason the shading does
+ * not care which surface it runs on — and no approach can clip it. This asserts the property that
+ * makes that true: the shell winds inward, the opposite way round to an ordinary sphere.
+ */
+test("the corona shell winds inward, so approaching a star cannot clip its halo away", async () => {
+  const { engine, host, scene } = createHarness();
+  const scope = openWorldScope(scene);
+  const world = createStarWorld(host, { onFirstFrame: vi.fn(), star });
+  scope.seal();
+  await settleSky();
+
+  /** How each triangle of a mesh is turned relative to the mesh's own centre. */
+  const facings = (mesh: AbstractMesh): number[] => {
+    const positions = mesh.getVerticesData("position")!;
+    const indices = mesh.getIndices()!;
+    const corner = (index: number): Vector3 =>
+      new Vector3(positions[index * 3]!, positions[index * 3 + 1]!, positions[index * 3 + 2]!);
+
+    const turned: number[] = [];
+    for (let triangle = 0; triangle < indices.length; triangle += 3) {
+      const first = corner(indices[triangle]!);
+      const second = corner(indices[triangle + 1]!);
+      const third = corner(indices[triangle + 2]!);
+      const face = Vector3.Cross(second.subtract(first), third.subtract(first));
+      // A UV sphere is stitched at the poles with slivers that face nowhere at all.
+      if (face.length() < 1e-6) continue;
+      turned.push(Vector3.Dot(face, first.add(second).add(third)));
+    }
+    return turned;
+  };
+
+  // Which sign means "outward" is Babylon's business rather than this test's, so it is read off an
+  // ordinary sphere instead of derived from a handedness convention that could quietly change.
+  const control = MeshBuilder.CreateSphere("corona-winding-control", { segments: 8 }, scene);
+  const outward = facings(control);
+  const outwardSign = Math.sign(outward[0]!);
+  expect(outward.length).toBeGreaterThan(0);
+  expect(outward.every((facing) => Math.sign(facing) === outwardSign)).toBe(true);
+  control.dispose();
+
+  const corona = scene.meshes.find((mesh) => mesh.name === "star-corona")!;
+  const shell = facings(corona);
+  expect(shell.length).toBeGreaterThan(0);
+  expect(shell.every((facing) => Math.sign(facing) === -outwardSign)).toBe(true);
+
+  // The premise: at its closest the view really does stand nearer the shell than the near clip
+  // plane, so the near surface is not one the renderer had any way of keeping.
+  const positions = corona.getVerticesData("position")!;
+  let shellRadius = 0;
+  for (let vertex = 0; vertex < positions.length; vertex += 3) {
+    const distance = Math.hypot(positions[vertex]!, positions[vertex + 1]!, positions[vertex + 2]!);
+    if (distance > shellRadius) shellRadius = distance;
+  }
+  expect(host.camera.lowerRadiusLimit! - shellRadius).toBeLessThan(host.camera.minZ);
+
+  world.dispose();
+  scope.dispose();
   engine.dispose();
 }, 30_000);
 
