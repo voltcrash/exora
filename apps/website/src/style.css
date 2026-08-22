@@ -1534,6 +1534,94 @@ body[data-xr-status="unavailable"] .status-light {
   box-shadow: 0 0 10px rgb(255 190 80 / 65%);
 }
 
+/*
+ * The system diorama.
+ *
+ * It reads in the cyan of the orbit guides rather than the star view's gold, because the subject
+ * is the set of orbits rather than the light at the middle of them. The one structural difference
+ * from the other two views is the scale panel: a diorama has compressed two scales and picked a
+ * clock rate to fit a system into a room, and none of that is a fact about the system, so it is
+ * given the same standing on the page as the measurements rather than left for the picture to
+ * imply.
+ */
+.system-experience .world-tags span:first-child {
+  border-color: rgb(139 230 234 / 30%);
+  color: #b7f2f6;
+  background: rgb(94 214 220 / 10%);
+}
+
+.system-experience .visual-note span {
+  background: var(--cyan);
+  box-shadow: 0 0 10px rgb(139 230 234 / 65%);
+}
+
+.system-experience .known-worlds h2 {
+  color: #d3f5f8;
+}
+
+.system-experience .known-world-list {
+  grid-template-columns: minmax(0, 1fr);
+}
+
+.system-experience .known-world-list button {
+  border-color: rgb(139 230 234 / 18%);
+}
+
+.system-experience .known-world-list button:hover {
+  border-color: rgb(139 230 234 / 48%);
+  background: rgb(94 214 220 / 8%);
+}
+
+/* One long, unpunctuated line per world naming exactly what had to be assumed to draw its orbit. */
+.orbit-provenance {
+  overflow: hidden;
+  color: #6f8f95 !important;
+  font-size: 6px !important;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.orbit-unplaced {
+  padding: 7px 9px;
+  border: 1px solid rgb(255 156 121 / 22%);
+  border-radius: 9px;
+  color: #ffb08e !important;
+  background: rgb(255 120 80 / 6%);
+  line-height: 1.5;
+}
+
+/* The scale readouts are prose, not quantities, so they drop the big numeric face `dd` carries. */
+.telemetry dl.system-scale {
+  grid-template-columns: minmax(0, 1fr);
+}
+
+.system-scale div {
+  min-height: 0;
+}
+
+.system-scale dd {
+  overflow: hidden;
+  font-size: 11px;
+  letter-spacing: 0.02em;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.scale-note {
+  margin: 0 2px 12px;
+  line-height: 1.5;
+}
+
+.diorama-jump {
+  border-color: rgb(139 230 234 / 22%) !important;
+}
+
+.diorama-jump:hover,
+.diorama-jump:focus-visible {
+  border-color: rgb(139 230 234 / 52%) !important;
+  background: rgb(94 214 220 / 8%) !important;
+}
+
 .catalog-header {
   min-height: 104px;
   display: flex;

@@ -36,6 +36,8 @@ interface StarWorldOptions {
   onForgeWorld?: (world: CustomWorld) => void;
   onSelectPlanet?: (planet: ExoplanetProfile) => void;
   onSelectStar?: (star: StarProfile) => void;
+  /** Pull back to the whole host system this star sits at the middle of. */
+  onSelectSystem?: () => void;
   star: StarProfile;
 }
 
@@ -48,7 +50,15 @@ interface StarWorldOptions {
  */
 export const createStarWorld = (
   host: SceneHost,
-  { onFirstFrame, onForgeStar, onForgeWorld, onSelectPlanet, onSelectStar, star }: StarWorldOptions,
+  {
+    onFirstFrame,
+    onForgeStar,
+    onForgeWorld,
+    onSelectPlanet,
+    onSelectStar,
+    onSelectSystem,
+    star,
+  }: StarWorldOptions,
 ): StarWorld => {
   const { camera, canvas, engine, profile, scene } = host;
 
@@ -239,6 +249,15 @@ export const createStarWorld = (
         onSelect: () => placeXrCamera(false),
       },
     ];
+
+    if (onSelectSystem) {
+      actions.push({
+        detail: "Stand among the measured orbits",
+        id: "host-system",
+        label: "View the whole system",
+        onSelect: onSelectSystem,
+      });
+    }
 
     const travel = selectPlanet;
     if (travel) {

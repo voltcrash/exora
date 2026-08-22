@@ -101,6 +101,19 @@ export interface StarSearchResult {
   stars: StarProfile[];
 }
 
+/**
+ * A whole host system: its name, and every confirmed world the archive links to it.
+ *
+ * Deliberately not a star lookup. Each planet row already carries its host's temperature, radius,
+ * mass and luminosity, which is what the diorama draws the star from, so a system resolves out of
+ * one planet query and stays reachable for the many hosts SIMBAD cannot name.
+ */
+export interface SystemLoadResult {
+  cached: boolean;
+  hostStar: string;
+  planets: ExoplanetProfile[];
+}
+
 export interface RandomPlanetResult {
   cached: boolean;
   planet: ExoplanetProfile;

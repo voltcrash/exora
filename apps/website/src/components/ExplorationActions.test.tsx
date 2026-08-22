@@ -47,6 +47,7 @@ const planetMarkup = (): string =>
       onSelectHostStar={vi.fn()}
       onSelectPlanet={vi.fn()}
       onSelectStar={vi.fn()}
+      onSelectSystem={vi.fn()}
       recipeOverride={null}
       result={{ cached: false, mode: "live", planet: featuredPlanet }}
     />,
@@ -63,6 +64,7 @@ const starMarkup = (): string =>
       onOpenStars={vi.fn()}
       onSelectPlanet={vi.fn()}
       onSelectStar={vi.fn()}
+      onSelectSystem={vi.fn()}
       result={{ cached: false, mode: "live", star: sirius }}
       systemHostName={null}
     />,
