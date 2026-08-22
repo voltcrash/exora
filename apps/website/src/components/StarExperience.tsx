@@ -108,7 +108,7 @@ export const StarExperience = ({
   }, [custom, star.catalogName, star.name, systemHostName]);
 
   useEffect(() => {
-    worldRef.current?.setPlanetTargets(systemPlanets, (planet) =>
+    worldRef.current?.setSystemWorlds(systemPlanets, (planet) =>
       onSelectPlanet(planet, systemCached),
     );
   }, [onSelectPlanet, sceneState, systemCached, systemPlanets]);
@@ -154,7 +154,7 @@ export const StarExperience = ({
       .then((world) => {
         if (!world) return;
         worldRef.current = world;
-        world.setPlanetTargets(systemPlanets, (planet) => onSelectPlanet(planet, systemCached));
+        world.setSystemWorlds(systemPlanets, (planet) => onSelectPlanet(planet, systemCached));
       })
       .catch((error: unknown) => {
         console.error(error);
