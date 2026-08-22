@@ -30,14 +30,16 @@ export interface RenderQualityProfile {
    * finer multi-scale structure. Off on fill-rate-constrained tiers. */
   secondaryCloudDetail: boolean;
   /**
-   * Background stars drawn per scene.
+   * Ceiling on the background stars drawn per scene.
    *
-   * These are camera-facing billboards with a real point-spread function, four vertices each, so
-   * the cost is fill rate on a few thousand small quads rather than geometry. A desktop can spend
-   * that freely, and a sky needs it: below roughly a thousand the eye reads scattered dots rather
-   * than a starfield. The headset tiers hold near their old counts instead of scaling up, because
-   * a quad with a halo costs orders of magnitude more fill than the one-pixel point sprite this
-   * replaced, and fill is exactly what a Quest has least of.
+   * A budget rather than a target. The sky is a real catalogue re-observed from wherever the
+   * visitor is standing, so how many stars are visible at all is a fact about that place; this
+   * caps how many of them a device is asked to draw, brightest first, and a viewpoint with fewer
+   * naked-eye stars than the budget simply gets fewer. Only the seeded fallback, which has no
+   * such fact to answer to, always draws exactly this many.
+   *
+   * The cost is one point per star in a single draw call, so a desktop can spend freely here. The
+   * headset tiers stay low because their fill rate is the scarcest thing in the renderer.
    */
   starCount: number;
   /** Whether rocky planets sample the triplanar PBR microdetail textures (normal + roughness).

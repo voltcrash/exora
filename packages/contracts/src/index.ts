@@ -1,6 +1,14 @@
 export type PlanetKind = "gas-giant" | "ice-giant" | "rocky" | "unknown";
 
 export interface ExoplanetObservation {
+  /**
+   * Where the host system sits on the sky, in ICRS degrees, as the archive reports it.
+   *
+   * Paired with `distanceParsecs` this is the system's actual place in the galaxy, which is what
+   * lets the renderer draw the real sky as seen from there rather than a generated one. Null for
+   * a procedural world, which has no place among the real stars to be looked at from.
+   */
+  declinationDegrees: number | null;
   distanceParsecs: number | null;
   discoveryMethod: string;
   discoveryYear: number | null;
@@ -15,6 +23,8 @@ export interface ExoplanetObservation {
   orbitalPeriodDays: number | null;
   radiusEarth: number | null;
   radiusJupiter: number | null;
+  /** ICRS right ascension of the host system in degrees. See `declinationDegrees`. */
+  rightAscensionDegrees: number | null;
   semiMajorAxisAu: number | null;
 }
 

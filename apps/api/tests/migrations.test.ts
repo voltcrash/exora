@@ -41,17 +41,29 @@ test("a fresh database applies every migration in filename order", async () => {
 
   const run = await applyMigrations(database, MIGRATIONS);
 
-  expect(run.applied).toEqual(["0001_exoplanet_catalog", "0002_host_star_parameters"]);
+  expect(run.applied).toEqual([
+    "0001_exoplanet_catalog",
+    "0002_host_star_parameters",
+    "0003_planet_sky_position",
+  ]);
   expect(run.skipped).toEqual([]);
 });
 
 test("an already-migrated database applies nothing", async () => {
-  const database = new FakeDatabase(["0001_exoplanet_catalog", "0002_host_star_parameters"]);
+  const database = new FakeDatabase([
+    "0001_exoplanet_catalog",
+    "0002_host_star_parameters",
+    "0003_planet_sky_position",
+  ]);
 
   const run = await applyMigrations(database, MIGRATIONS);
 
   expect(run.applied).toEqual([]);
-  expect(run.skipped).toEqual(["0001_exoplanet_catalog", "0002_host_star_parameters"]);
+  expect(run.skipped).toEqual([
+    "0001_exoplanet_catalog",
+    "0002_host_star_parameters",
+    "0003_planet_sky_position",
+  ]);
   // The point of the change: no migration file's SQL reaches the database a second time. The
   // runner's own ledger DDL is expected and is deliberately not what this looks for.
   const migrationSql = database.statements.filter(
@@ -67,7 +79,7 @@ test("only the migrations missing from the ledger are applied", async () => {
 
   const run = await applyMigrations(database, MIGRATIONS);
 
-  expect(run.applied).toEqual(["0002_host_star_parameters"]);
+  expect(run.applied).toEqual(["0002_host_star_parameters", "0003_planet_sky_position"]);
   expect(run.skipped).toEqual(["0001_exoplanet_catalog"]);
 });
 
@@ -77,7 +89,7 @@ test("running twice in a row is a no-op the second time", async () => {
   const first = await applyMigrations(database, MIGRATIONS);
   const second = await applyMigrations(database, MIGRATIONS);
 
-  expect(first.applied).toHaveLength(2);
+  expect(first.applied).toHaveLength(3);
   expect(second.applied).toEqual([]);
   expect(second.skipped).toEqual(first.applied);
 });
@@ -107,5 +119,6 @@ test("an applied migration is recorded even if its own file forgot to", async ()
   expect([...database.recorded].sort()).toEqual([
     "0001_exoplanet_catalog",
     "0002_host_star_parameters",
+    "0003_planet_sky_position",
   ]);
 });

@@ -18,6 +18,8 @@ const planet: ExoplanetProfile = {
     orbitalPeriodDays: 267.3,
     semiMajorAxisAu: 0.718,
     distanceParsecs: 300,
+    rightAscensionDegrees: 283.2125621,
+    declinationDegrees: 45.3496992,
     discoveryYear: 2013,
     discoveryMethod: "Transit",
     hostSpectralType: "K2V",
@@ -46,6 +48,8 @@ const planetRow = {
   orbital_period_days: planet.observation.orbitalPeriodDays,
   semi_major_axis_au: planet.observation.semiMajorAxisAu,
   distance_parsecs: planet.observation.distanceParsecs,
+  right_ascension_degrees: planet.observation.rightAscensionDegrees,
+  declination_degrees: planet.observation.declinationDegrees,
   discovery_year: planet.observation.discoveryYear,
   discovery_method: planet.observation.discoveryMethod,
   host_spectral_type: planet.observation.hostSpectralType,
@@ -59,7 +63,7 @@ const planetRow = {
 };
 
 /** Columns written per row by the catalog upsert, used to infer a batch size from its parameters. */
-const UPSERT_COLUMN_COUNT = 23;
+const UPSERT_COLUMN_COUNT = 25;
 
 class FakeDatabase implements DatabaseClient {
   readonly queries: { parameters: readonly unknown[]; statement: string }[] = [];

@@ -26,6 +26,8 @@ const featuredPlanet: ExoplanetProfile = {
     orbitalPeriodDays: null,
     semiMajorAxisAu: 92,
     distanceParsecs: 108.875,
+    rightAscensionDegrees: 201.1501727,
+    declinationDegrees: -51.5045384,
     discoveryYear: 2017,
     discoveryMethod: "Imaging",
     hostSpectralType: "A2 V",
@@ -539,6 +541,7 @@ const unknownIncompletePlanet: ExoplanetProfile = {
   name: "Unknown Incomplete Object",
   kind: "unknown",
   observation: {
+    declinationDegrees: null,
     distanceParsecs: null,
     discoveryMethod: "Unknown",
     discoveryYear: null,
@@ -553,6 +556,7 @@ const unknownIncompletePlanet: ExoplanetProfile = {
     orbitalPeriodDays: null,
     radiusEarth: null,
     radiusJupiter: null,
+    rightAscensionDegrees: null,
     semiMajorAxisAu: null,
   },
 };

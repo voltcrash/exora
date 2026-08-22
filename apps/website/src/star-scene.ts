@@ -12,6 +12,7 @@ import type { ExoplanetProfile, StarProfile } from "@exora/contracts";
 import { deriveStarRecipe, type CustomStar, type CustomWorld } from "@exora/worldgen";
 import type { MountedWorld, SceneHost, WorldConsole } from "./scene-host.ts";
 import { createStellarSurface } from "./star-surface.ts";
+import { skyViewpointFrom } from "./sky-catalog.ts";
 import { starKindLabel, starSummary } from "./star-utils.ts";
 import { createStarfield } from "./star-visuals.ts";
 import { starFacts } from "./xr-console-model.ts";
@@ -68,7 +69,16 @@ export const createStarWorld = (
   const activity = recipe.activity;
   const diameter = recipe.radiusSceneUnits;
 
-  const starfield = createStarfield({ count: profile.starCount, scene, seed });
+  // SIMBAD gives this star a right ascension, a declination and a parallax, which is everything
+  // needed to stand at it and look out: the background is then the real sky from there, with the
+  // near stars swung out of the places Earth sees them in. A star with any of the three missing —
+  // and every World Forge star — falls back to the seeded field inside `createStarfield`.
+  const starfield = createStarfield({
+    count: profile.starCount,
+    scene,
+    seed,
+    viewpoint: skyViewpointFrom(star.observation),
+  });
 
   const stellarSurface = createStellarSurface({
     detail: "subject",

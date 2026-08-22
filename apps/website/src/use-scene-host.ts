@@ -34,6 +34,11 @@ export const useSceneHost = (canvas: HTMLCanvasElement | null): SceneHostControl
     let cancelled = false;
     let unsubscribe = (): void => undefined;
     setStatus("initializing");
+    // Started alongside the renderer, not with the first world that wants it. The star catalogue
+    // is one memoized download for the life of the page, and a destination builds its sky on the
+    // microtask that resolves it — so getting the request out now is what keeps the very first
+    // arrival from rendering a frame or two of empty space before its stars appear.
+    void import("./sky-catalog.ts").then(({ loadSkyCatalog }) => loadSkyCatalog());
     void import("./scene-host.ts")
       .then(({ acquireSceneHost, recreateSceneHost }) => {
         if (cancelled) return;

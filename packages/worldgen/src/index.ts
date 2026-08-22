@@ -1419,6 +1419,10 @@ export const generateCustomWorld = (parameters: CustomPlanetParameters): CustomW
     kind: parameters.kind,
     observation: {
       distanceParsecs: null,
+      // A world that did not exist a moment ago has no place among the real stars, so the
+      // renderer gets no viewpoint from it and falls back to the seeded starfield.
+      rightAscensionDegrees: null,
+      declinationDegrees: null,
       discoveryMethod: "Procedural synthesis",
       discoveryYear: null,
       equilibriumTemperatureKelvin: temperatureKelvin,

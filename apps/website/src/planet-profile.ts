@@ -20,6 +20,8 @@ export const featuredPlanet: ExoplanetProfile = {
     orbitalPeriodDays: 38.871826,
     semiMajorAxisAu: 0.217,
     distanceParsecs: 692.14,
+    rightAscensionDegrees: 283.2091605,
+    declinationDegrees: 48.7776156,
     discoveryYear: 2014,
     discoveryMethod: "Transit",
     hostSpectralType: null,
