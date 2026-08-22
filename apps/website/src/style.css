@@ -2236,6 +2236,12 @@ body[data-xr-status="unavailable"] .status-light {
   margin: 0;
   padding: 0 26px 26px;
   overflow-y: auto;
+  /* The results are a scroller inside a scroller: this list sits in a dialog that scrolls too.
+     Left to chain, a flick that runs the list out of worlds does not stop there — it carries on
+     into the dialog and drags the whole panel up underneath the pointer, so reaching the end of
+     the results throws the header, the console and the search field off the screen. Reading a
+     list should not be able to move the thing containing it. */
+  overscroll-behavior: contain;
   list-style: none;
   scrollbar-color: rgb(139 230 234 / 25%) transparent;
   scrollbar-width: thin;
@@ -2420,15 +2426,31 @@ body[data-xr-status="unavailable"] .status-light {
 }
 
 .catalog-visual-glint {
-  width: 18px;
-  height: 18px;
+  width: 46px;
+  height: 46px;
   z-index: 2;
   position: absolute;
-  top: 29px;
-  left: calc(50% - 37px);
+  top: 15px;
+  left: calc(50% - 51px);
   border-radius: 50%;
-  background: rgb(255 255 255 / 25%);
-  filter: blur(7px);
+  /* The same soft highlight, drawn rather than computed. `filter: blur()` is not a paint
+     instruction but a render surface: the browser allocates a buffer per card, draws the disc
+     into it, convolves it, then composites the result — and it redoes that as each card crosses
+     the scroller, so the cost lands on exactly the frames a flick can least afford. A blurred
+     white disc is only a radial falloff, and a gradient states it directly, in the card's own
+     layer, with nothing to allocate. The box grew from 18px to 46px and moved to match, because
+     the spill the blur used to throw beyond the element now has to live inside it: the original
+     reaches 14.5% white at its centre and vanishes 23px out, so the stops below are that measured
+     falloff read back off the rendered pixels rather than a guess at the Gaussian. */
+  background: radial-gradient(
+    circle closest-side,
+    rgb(255 255 255 / 14.5%) 0%,
+    rgb(255 255 255 / 13.1%) 18%,
+    rgb(255 255 255 / 8.4%) 40%,
+    rgb(255 255 255 / 3.3%) 64%,
+    rgb(255 255 255 / 1%) 82%,
+    transparent 100%
+  );
 }
 
 .star-catalog-visual {
