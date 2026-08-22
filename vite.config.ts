@@ -10,6 +10,19 @@ import { defineConfig } from "vite-plus";
 const VENDORED_PATTERNS = ["apps/website/public/ktx2/**"];
 
 export default defineConfig({
+  // The root command is the fast, non-browser test entry point across every workspace. Browser
+  // journeys need the website's Playwright-backed `browser` project; if the default root glob
+  // discovers them, Vitest tries to import `vite-plus/test/browser/context` in its forks pool and
+  // fails before collecting a test. Keep those files exclusively behind `website#test:browser`.
+  test: {
+    include: [
+      "apps/*/src/**/*.test.{ts,tsx}",
+      "apps/*/tests/**/*.test.{ts,tsx}",
+      "packages/*/src/**/*.test.{ts,tsx}",
+      "packages/*/tests/**/*.test.{ts,tsx}",
+    ],
+    exclude: ["apps/*/src/**/*.browser.test.{ts,tsx}"],
+  },
   staged: {
     "*": "vp check --fix",
   },
