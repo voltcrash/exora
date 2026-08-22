@@ -26,6 +26,8 @@ interface PlanetRow extends Record<string, unknown> {
   mass_earth: number | null;
   mass_jupiter: number | null;
   name: string;
+  orbital_eccentricity: number | null;
+  orbital_inclination_degrees: number | null;
   orbital_period_days: number | null;
   radius_earth: number | null;
   radius_jupiter: number | null;
@@ -46,6 +48,8 @@ const PLANET_COLUMNS = `
   radius_earth,
   mass_earth,
   equilibrium_temperature_kelvin,
+  orbital_eccentricity,
+  orbital_inclination_degrees,
   orbital_period_days,
   semi_major_axis_au,
   distance_parsecs,
@@ -77,6 +81,8 @@ const toPlanet = (row: PlanetRow): ExoplanetProfile => ({
     radiusEarth: row.radius_earth,
     massEarth: row.mass_earth,
     equilibriumTemperatureKelvin: row.equilibrium_temperature_kelvin,
+    orbitalEccentricity: row.orbital_eccentricity,
+    orbitalInclinationDegrees: row.orbital_inclination_degrees,
     orbitalPeriodDays: row.orbital_period_days,
     semiMajorAxisAu: row.semi_major_axis_au,
     distanceParsecs: row.distance_parsecs,

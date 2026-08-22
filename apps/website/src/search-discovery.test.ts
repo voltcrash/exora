@@ -54,6 +54,8 @@ test("data-completeness control excludes sparsely observed worlds", () => {
       ...featuredPlanet.observation,
       massEarth: null,
       massJupiter: null,
+      orbitalEccentricity: null,
+      orbitalInclinationDegrees: null,
       orbitalPeriodDays: null,
       semiMajorAxisAu: null,
       hostTemperatureKelvin: null,

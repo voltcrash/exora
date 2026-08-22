@@ -15,6 +15,8 @@ const planet: ExoplanetProfile = {
     radiusEarth: 1.41,
     massEarth: 2.8,
     equilibriumTemperatureKelvin: 208,
+    orbitalEccentricity: 0.0,
+    orbitalInclinationDegrees: 89.9,
     orbitalPeriodDays: 267.3,
     semiMajorAxisAu: 0.718,
     distanceParsecs: 300,
@@ -45,6 +47,8 @@ const planetRow = {
   radius_earth: planet.observation.radiusEarth,
   mass_earth: planet.observation.massEarth,
   equilibrium_temperature_kelvin: planet.observation.equilibriumTemperatureKelvin,
+  orbital_eccentricity: planet.observation.orbitalEccentricity,
+  orbital_inclination_degrees: planet.observation.orbitalInclinationDegrees,
   orbital_period_days: planet.observation.orbitalPeriodDays,
   semi_major_axis_au: planet.observation.semiMajorAxisAu,
   distance_parsecs: planet.observation.distanceParsecs,
@@ -63,7 +67,7 @@ const planetRow = {
 };
 
 /** Columns written per row by the catalog upsert, used to infer a batch size from its parameters. */
-const UPSERT_COLUMN_COUNT = 25;
+const UPSERT_COLUMN_COUNT = 27;
 
 class FakeDatabase implements DatabaseClient {
   readonly queries: { parameters: readonly unknown[]; statement: string }[] = [];

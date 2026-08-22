@@ -17,6 +17,8 @@ export const featuredPlanet: ExoplanetProfile = {
     radiusEarth: 2.87,
     massEarth: 48.5,
     equilibriumTemperatureKelvin: 509,
+    orbitalEccentricity: null,
+    orbitalInclinationDegrees: null,
     orbitalPeriodDays: 38.871826,
     semiMajorAxisAu: 0.217,
     distanceParsecs: 692.14,
