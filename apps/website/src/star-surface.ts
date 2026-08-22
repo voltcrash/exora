@@ -4,7 +4,7 @@ import { Effect } from "@babylonjs/core/Materials/effect.js";
 import { ShaderMaterial } from "@babylonjs/core/Materials/shaderMaterial.js";
 import { StandardMaterial } from "@babylonjs/core/Materials/standardMaterial.js";
 import type { AbstractMesh } from "@babylonjs/core/Meshes/abstractMesh.js";
-import type { Mesh } from "@babylonjs/core/Meshes/mesh.js";
+import { Mesh } from "@babylonjs/core/Meshes/mesh.js";
 import { MeshBuilder } from "@babylonjs/core/Meshes/meshBuilder.js";
 import type { TransformNode } from "@babylonjs/core/Meshes/transformNode.js";
 import type { Scene } from "@babylonjs/core/scene.js";
@@ -389,6 +389,33 @@ void main(void) {
   float along = dot(toStar, rayDirection);
   float impact = length(toStar - rayDirection * along);
   float radii = impact / max(starRadius, 0.0001);
+  // Only the half of the sky the star is actually in. The impact parameter is measured on the
+  // infinite view line, so a ray pointing away from the star reports exactly what its mirror image
+  // reports, and would hang a second corona behind the viewer. Nothing could see that while the
+  // shell was only ever drawn from outside; a camera that ends up inside one sees all of it.
+  float ahead = smoothstep(0.0, starRadius, along);
+
+  // Two falloffs, because a corona is not one exponential. A tight, bright inner rim hugs the limb
+  // where the chromosphere and low corona are dense; a much shallower halo reaches out several
+  // radii. A single exponential can be one or the other and never both, which is why a one-term
+  // corona always ends up either a hard ring or a featureless fog.
+  float rim = exp(-(radii - 1.0) * 13.0);
+  float halo = exp(-(radii - 1.0) * 1.9) * 0.5;
+  // The rim is weighted well below its own peak on purpose. This shell composites with ordinary
+  // alpha blending, so an alpha approaching 1 does not add plasma over the limb — it *replaces*
+  // the limb, painting a tinted ring straight over the brightest part of the star.
+  // Cut off inside the disc so the photosphere stays crisp under its own corona, and fade out
+  // before the shell's own silhouette so the shell never shows up as geometry.
+  float density = (rim * 0.34 + halo)
+    * ahead
+    * smoothstep(0.985, 1.02, radii)
+    * (1.0 - smoothstep(shellRadii * 0.82, shellRadii, radii));
+
+  // Resolved before the noise below, and dropped here rather than at the end, because density is
+  // the cheap term and the streamers are the whole cost of this shader. The shell covers the
+  // frame from close in and most of that is the star's own disc, where the corona is cut off
+  // anyway — shading it would be paying the fractal for pixels that composite to nothing.
+  if (density <= 0.0005) discard;
 
   // Structure sampled in a frame that varies only with DIRECTION from the star, so the pattern is
   // fixed to the corona's own geometry and stretches radially outward the way a helmet streamer
@@ -405,21 +432,6 @@ void main(void) {
   // Real coronae are strongly flattened toward the equator outside of solar maximum: field lines
   // over the poles open into the wind and carry little bright closed-loop plasma with them.
   shape *= mix(1.0, 0.52, smoothstep(0.42, 0.96, abs(direction.y)));
-
-  // Two falloffs, because a corona is not one exponential. A tight, bright inner rim hugs the limb
-  // where the chromosphere and low corona are dense; a much shallower halo reaches out several
-  // radii. A single exponential can be one or the other and never both, which is why a one-term
-  // corona always ends up either a hard ring or a featureless fog.
-  float rim = exp(-(radii - 1.0) * 13.0);
-  float halo = exp(-(radii - 1.0) * 1.9) * 0.5;
-  // The rim is weighted well below its own peak on purpose. This shell composites with ordinary
-  // alpha blending, so an alpha approaching 1 does not add plasma over the limb — it *replaces*
-  // the limb, painting a tinted ring straight over the brightest part of the star.
-  // Cut off inside the disc so the photosphere stays crisp under its own corona, and fade out
-  // before the shell's own silhouette so the shell never shows up as geometry.
-  float density = (rim * 0.34 + halo)
-    * smoothstep(0.985, 1.02, radii)
-    * (1.0 - smoothstep(shellRadii * 0.82, shellRadii, radii));
 
   // The inner rim runs hotter and pinker than the pearly outer halo, the way the chromosphere
   // sits colour-separated against the white corona in an eclipse photograph.
@@ -575,16 +587,24 @@ export const createStellarSurface = ({
   // structure is unresolvable, the extra alpha-blended sphere is pure fill cost, and a shell three
   // times the star's diameter is large enough to intersect nearby geometry — the glare billboard
   // carries the halo far more cheaply and reads better at that size.
-  // Only the subject star gets a corona shell. On a star a few pixels across the streamer
-  // structure is unresolvable, the extra alpha-blended sphere is pure fill cost, and a shell three
-  // times the star's diameter is large enough to intersect nearby geometry — the glare billboard
-  // carries the halo far more cheaply and reads better at that size.
   const buildCorona = (): { material: ShaderMaterial; mesh: Mesh } => {
     const mesh = MeshBuilder.CreateSphere(
       "star-corona",
       {
         diameter: diameter * coronaShellRadii,
         segments: profile.tier === "desktop" ? 64 : 40,
+        // Drawn on the shell's FAR side rather than the near one. The shader resolves the corona
+        // from the view ray's impact parameter, so which of the two surfaces a fragment lands on
+        // cannot change the picture — but it decides whether there is a fragment at all, and the
+        // near side is the one an approaching viewer runs into. The shell stands 2.6 stellar radii
+        // off, which for the star view is 9.36 scene units against a camera that comes in to 9.5:
+        // fully zoomed the near surface sat inside the one-unit near clip plane and was discarded,
+        // so the halo shrank as a visitor approached and then went out altogether, leaving the
+        // disc cut hard against black. The far surface is a whole chord further along every ray —
+        // on the rays that carry any corona at all it is never within several units of the viewer —
+        // and it still wraps a camera that ends up inside the shell, which the diorama's does at
+        // 3.5 units against a shell reaching 3.9.
+        sideOrientation: Mesh.BACKSIDE,
       },
       scene,
     );
