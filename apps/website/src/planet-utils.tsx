@@ -1,8 +1,27 @@
 import type { ExoplanetProfile } from "@exora/contracts";
 import type { ReactNode } from "react";
 
+/**
+ * Number formatters, kept rather than rebuilt.
+ *
+ * `new Intl.NumberFormat` is one of the most expensive constructors in the language — it resolves
+ * a locale and builds a pattern each time — and a catalog row asks for two. Dragging an
+ * observatory slider re-rendered two dozen rows per input event, which meant tens of formatters
+ * built and thrown away between one frame and the next. There are only ever a couple of distinct
+ * shapes, so they are built once and looked up by the only option that varies.
+ */
+const numberFormatters = new Map<number, Intl.NumberFormat>();
+
+const numberFormatter = (maximumFractionDigits: number): Intl.NumberFormat => {
+  const existing = numberFormatters.get(maximumFractionDigits);
+  if (existing) return existing;
+  const created = new Intl.NumberFormat("en", { maximumFractionDigits });
+  numberFormatters.set(maximumFractionDigits, created);
+  return created;
+};
+
 export const formatNumber = (value: number | null, maximumFractionDigits = 1): string =>
-  value === null ? "—" : new Intl.NumberFormat("en", { maximumFractionDigits }).format(value);
+  value === null ? "—" : numberFormatter(maximumFractionDigits).format(value);
 
 export const formatPlanetName = (name: string): ReactNode => {
   const segments = name.split(" ");

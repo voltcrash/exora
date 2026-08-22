@@ -2249,6 +2249,20 @@ body[data-xr-status="unavailable"] .status-light {
   margin-top: 8px;
 }
 
+/* Each row carries a hand-drawn CSS planet: half a dozen stacked gradients, three shadows and a
+   soft highlight, all of it 174px tall in the gallery. The list scrolls inside 310-500px, so most
+   of that is being painted where nobody is looking. `content-visibility` lets the browser skip
+   style, layout and paint for the rows outside the scroller, and the intrinsic sizes keep the
+   scrollbar honest about how long the list is while it does. */
+.catalog-results li {
+  content-visibility: auto;
+  contain-intrinsic-size: auto 74px;
+}
+
+.catalog-results.gallery-view li {
+  contain-intrinsic-size: auto 296px;
+}
+
 .result-preview {
   display: none;
 }
@@ -2347,6 +2361,10 @@ body[data-xr-status="unavailable"] .status-light {
   place-items: center;
   overflow: hidden;
   position: relative;
+  /* The visual already clips to its own rounded box, so paint containment states a fact rather
+     than imposing one — and it lets the browser repaint a single card, rather than re-examining
+     the whole scroller, when a filter change reshuffles the list under a moving slider. */
+  contain: paint;
   border: 1px solid rgb(229 244 247 / 8%);
   border-radius: 12px;
   background:

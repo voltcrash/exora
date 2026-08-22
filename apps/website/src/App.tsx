@@ -76,6 +76,15 @@ export const App = () => {
   const [customRecipe, setCustomRecipe] = useState<WorldRecipe | null>(null);
   const [systemHostName, setSystemHostName] = useState<string | null>(null);
 
+  // Every one of these covers the canvas with a modal dialog, so for as long as one is open the
+  // scene behind it is being rendered for nobody — and worse, keeping it moving forces the
+  // browser to rebuild the scrim's backdrop blur every frame. Parking the loop reclaims both.
+  const overlayOpen = builderOpen || catalogOpen || starCatalogOpen;
+  useEffect(() => {
+    if (!sceneHost || !overlayOpen) return;
+    return sceneHost.suspendRendering();
+  }, [overlayOpen, sceneHost]);
+
   const loadFromLocation = useCallback(() => {
     setCustomRecipe(null);
     setSystemHostName(null);

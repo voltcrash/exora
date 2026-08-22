@@ -1,5 +1,6 @@
 import type { StarProfile } from "@exora/contracts";
 import { deriveStarRecipe } from "@exora/worldgen";
+import { formatNumber } from "./planet-utils.tsx";
 
 export interface StarVisualProfile {
   color: readonly [number, number, number];
@@ -28,5 +29,5 @@ export const starSummary = (star: StarProfile): string => {
     ? `Its ${star.observation.spectralType} spectrum suggests a ${visual.label.toLowerCase()}`
     : `SIMBAD classifies it as ${star.objectType.toLowerCase()}`;
   const distance = star.observation.distanceParsecs;
-  return `${spectrum}${distance === null ? "." : `, observed from roughly ${new Intl.NumberFormat("en", { maximumFractionDigits: 1 }).format(distance)} parsecs away.`}`;
+  return `${spectrum}${distance === null ? "." : `, observed from roughly ${formatNumber(distance, 1)} parsecs away.`}`;
 };

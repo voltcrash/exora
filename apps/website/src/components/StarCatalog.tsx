@@ -1,5 +1,5 @@
 import type { StarProfile } from "@exora/contracts";
-import { useEffect, useRef, useState } from "react";
+import { memo, useEffect, useRef, useState } from "react";
 import { discoverRandomStar, discoverStars, searchStars } from "../api-client.ts";
 import { formatNumber } from "../planet-utils.tsx";
 import { starKindLabel } from "../star-utils.ts";
@@ -60,6 +60,48 @@ const collections = [
     tag: "COSMIC TITANS",
   },
 ] as const;
+
+/**
+ * One star in the result list.
+ *
+ * Memoised for the same reason as its planetary counterpart: a keystroke in the search field
+ * re-renders the dialog, and every row carries a layered CSS star that costs real paint. Stars
+ * that survive a re-render should not be rebuilt for it.
+ */
+const StarResult = memo(
+  ({
+    cached,
+    onSelect,
+    star,
+  }: {
+    cached: boolean;
+    onSelect: (star: StarProfile, cached: boolean) => void;
+    star: StarProfile;
+  }) => (
+    <li>
+      <button className="catalog-result" type="button" onClick={() => onSelect(star, cached)}>
+        <span className="result-preview">
+          <StarCatalogVisual star={star} />
+        </span>
+        <span className="result-marker star-result-marker" aria-hidden="true" />
+        <span className="result-identity">
+          <strong>{star.name}</strong>
+          <small>
+            {star.catalogName} · {star.objectType}
+          </small>
+          <span className="result-trait">{starNotableTrait(star)}</span>
+        </span>
+        <span className="result-metrics">
+          <small>{starKindLabel(star)}</small>
+          <strong>{star.observation.spectralType ?? "SPECTRUM UNKNOWN"}</strong>
+        </span>
+        <span className="result-state">
+          {formatNumber(star.observation.distanceParsecs, 1)} PC · EXPLORE
+        </span>
+      </button>
+    </li>
+  ),
+);
 
 export const StarCatalog = ({ onClose, onSelect }: StarCatalogProps) => {
   const dialogRef = useRef<HTMLDialogElement>(null);
@@ -379,32 +421,7 @@ export const StarCatalog = ({ onClose, onSelect }: StarCatalogProps) => {
         )}
         {searchState === "ready" &&
           stars.map((star) => (
-            <li key={star.id}>
-              <button
-                className="catalog-result"
-                type="button"
-                onClick={() => onSelect(star, cached)}
-              >
-                <span className="result-preview">
-                  <StarCatalogVisual star={star} />
-                </span>
-                <span className="result-marker star-result-marker" aria-hidden="true" />
-                <span className="result-identity">
-                  <strong>{star.name}</strong>
-                  <small>
-                    {star.catalogName} · {star.objectType}
-                  </small>
-                  <span className="result-trait">{starNotableTrait(star)}</span>
-                </span>
-                <span className="result-metrics">
-                  <small>{starKindLabel(star)}</small>
-                  <strong>{star.observation.spectralType ?? "SPECTRUM UNKNOWN"}</strong>
-                </span>
-                <span className="result-state">
-                  {formatNumber(star.observation.distanceParsecs, 1)} PC · EXPLORE
-                </span>
-              </button>
-            </li>
+            <StarResult key={star.id} cached={cached} onSelect={onSelect} star={star} />
           ))}
       </ol>
     </dialog>
