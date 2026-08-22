@@ -45,6 +45,17 @@ import {
   type RendererEvent,
   type RendererStatus,
 } from "./renderer-recovery.ts";
+import {
+  departureRadius,
+  easeAway,
+  easeSettle,
+  travelStep,
+  TRAVEL_ARRIVE_MS,
+  TRAVEL_CROSS_MS,
+  TRAVEL_DEPART_MS,
+  TRAVEL_RECALL_MS,
+  type TravelPhase,
+} from "./travel-transition.ts";
 import { createXrConsole, type XrConsole, type XrConsoleHost } from "./xr-console.ts";
 import { openWorldScope, type WorldScope } from "./world-scope.ts";
 
@@ -62,6 +73,17 @@ export type WorldConsole = Omit<XrConsoleHost, "onExit">;
 /** A destination occupying the shared scene. */
 export interface MountedWorld {
   console: WorldConsole;
+  /**
+   * The farthest the camera may be pulled back before this world stops holding up, if it has a
+   * limit at all.
+   *
+   * A jump begins by flying away from what is being left, and how far that can go is the world's
+   * own business. An orbital view has nothing behind it but a sky that follows the camera, so it
+   * can be left from any distance; a surface vista is a finite patch of ground under a dome, and
+   * pulling back past its edge would show the visitor where the world stops. Answering nothing
+   * lets the flight simply scale the distance the visitor was already watching from.
+   */
+  farthestView?: () => number | undefined;
   /** Releases anything the world holds outside the scene: listeners, observers, effect layers. */
   dispose: () => void;
   /**
@@ -82,11 +104,31 @@ export interface SceneHost {
   readonly profile: RenderQualityProfile;
   readonly qualityTier: RenderQualityTier;
   readonly scene: Scene;
+  /**
+   * Starts flying away from the world on screen, before the destination is even known.
+   *
+   * A jump that has to ask an archive for its destination first would otherwise sit perfectly
+   * still until the answer came back, and then move — so the click reads as having done nothing.
+   * Calling this the moment the visitor asks puts the flight and the request in the air together;
+   * `mountWorld` picks the flight up wherever it has got to. Harmless to call twice, and does
+   * nothing inside an immersive session, where the in-headset veil covers the jump instead.
+   */
+  beginTravel: () => void;
+  /** Flies back to the view a jump left from, for a destination that turned out not to exist. */
+  cancelTravel: () => void;
   dispose: () => void;
   enterVr: () => Promise<void>;
   getFps: () => number;
   isInXr: () => boolean;
   isVrSupported: () => boolean;
+  /**
+   * Subscribes to where a jump has got to, called immediately with the current phase.
+   *
+   * The page above the canvas has its own half of the flight to play — panels belonging to the
+   * world being left have to go with it, and the dark that hides the swap is a DOM layer — so the
+   * renderer says where it is rather than reaching up into the interface itself.
+   */
+  onTravelPhase: (listener: (phase: TravelPhase) => void) => () => void;
   /**
    * Replaces the world in the shared scene, without touching a running session.
    *
@@ -403,12 +445,184 @@ const createSceneHost = (canvas: HTMLCanvasElement): SceneHost => {
     scene.setRenderingAutoClearDepthStencil(1, true, true, true);
   };
 
+  let travelPhase: TravelPhase = "idle";
+  const travelListeners = new Set<(phase: TravelPhase) => void>();
+  const setTravelPhase = (next: TravelPhase): void => {
+    if (next === travelPhase) return;
+    travelPhase = next;
+    for (const listener of travelListeners) listener(next);
+  };
+
+  /** The view a jump left from, kept so one that finds nothing to travel to can be flown back. */
+  let travelOrigin: { lower: number | null; radius: number; upper: number | null } | null = null;
+  /** The outbound flight in progress, shared by whoever started it and whoever lands on it. */
+  let departure: Promise<boolean> | null = null;
+  let glideFrame = 0;
+  let glideDeadline = 0;
+  let landGlide: ((landed: boolean) => void) | null = null;
+
+  const prefersReducedMotion = (): boolean =>
+    window.matchMedia?.("(prefers-reduced-motion: reduce)").matches === true;
+
+  /**
+   * How far out a flight to or from the world on screen reaches.
+   *
+   * A visitor who has asked for less movement gets no flight at all: the distance collapses to
+   * the one they are already watching from, and a jump becomes the dark fading across the swap
+   * and nothing else. That part stays, because it is covering a stalled frame loop rather than
+   * decorating one — it is the honest picture of what the page is doing.
+   */
+  const flightRadius = (resting: number): number =>
+    prefersReducedMotion() ? resting : departureRadius(resting, currentWorld?.farthestView?.());
+
+  /**
+   * Makes room for a flight that leaves the distances the current view was built around.
+   *
+   * The camera clamps its own radius to those limits on every frame it updates, so the room has
+   * to be re-made each step rather than once: the world being left is entitled to reset its own
+   * limits underneath the flight, and does exactly that when a surface approach lands mid-jump.
+   */
+  const widenCameraReach = (from: number, to: number): void => {
+    camera.lowerRadiusLimit = Math.min(camera.lowerRadiusLimit ?? from, from, to);
+    camera.upperRadiusLimit = Math.max(camera.upperRadiusLimit ?? to, from, to);
+  };
+
+  /**
+   * Ends the flight in progress, saying whether it got where it was going.
+   *
+   * A flight that was cut short — overtaken by the next jump, or by the host being disposed —
+   * still has to resolve, or whatever is awaiting it waits for ever. It must not *land*, though:
+   * landing puts the camera's limits back and hands control to the visitor, and doing that
+   * underneath the flight that replaced it would clamp it mid-air and let the wheel fight it.
+   */
+  const endGlide = (snapTo: number | null, landed: boolean): void => {
+    if (glideFrame) window.cancelAnimationFrame(glideFrame);
+    if (glideDeadline) window.clearTimeout(glideDeadline);
+    glideFrame = 0;
+    glideDeadline = 0;
+    if (snapTo !== null) camera.radius = snapTo;
+    const land = landGlide;
+    landGlide = null;
+    land?.(landed);
+  };
+
+  /**
+   * Flies the shared camera to a distance, resolving once it is there.
+   *
+   * Driven from `requestAnimationFrame` rather than from the scene's own frame observer, because
+   * a jump can begin while a dialog has the render loop parked — and a flight waiting on frames
+   * nobody is drawing would leave the destination behind it never built at all. The timer is the
+   * same guarantee for a tab that gets backgrounded mid-flight, where frames stop entirely.
+   */
+  const glideCamera = (
+    to: number,
+    durationMs: number,
+    ease: (progress: number) => number,
+  ): Promise<boolean> => {
+    endGlide(null, false);
+    const from = camera.radius;
+    widenCameraReach(from, to);
+    if (prefersReducedMotion()) {
+      camera.radius = to;
+      return Promise.resolve(true);
+    }
+
+    // Nothing else may drive the camera while the flight has it: a wheel notch part-way through
+    // would otherwise fight the flight for the same value, frame by frame.
+    camera.detachControl();
+    const startedAt = performance.now();
+    return new Promise<boolean>((resolve) => {
+      landGlide = resolve;
+      const step = (): void => {
+        const flown = travelStep(from, to, performance.now() - startedAt, durationMs, ease);
+        widenCameraReach(from, to);
+        camera.radius = flown.radius;
+        if (flown.settled) {
+          endGlide(null, true);
+          return;
+        }
+        glideFrame = window.requestAnimationFrame(step);
+      };
+      glideFrame = window.requestAnimationFrame(step);
+      glideDeadline = window.setTimeout(() => endGlide(to, true), durationMs + 600);
+    });
+  };
+
+  const beginTravel = (): void => {
+    if (disposed || isInXr || !currentWorld || departure) return;
+    travelOrigin = {
+      lower: camera.lowerRadiusLimit,
+      radius: camera.radius,
+      upper: camera.upperRadiusLimit,
+    };
+    setTravelPhase("departing");
+    departure = glideCamera(flightRadius(camera.radius), TRAVEL_DEPART_MS, easeAway);
+  };
+
+  const cancelTravel = (): void => {
+    const origin = travelOrigin;
+    // Once the screen has gone dark there is nothing left to fly back to: the world that was
+    // being left is already being taken apart behind it.
+    if (!origin || travelPhase !== "departing") return;
+    departure = null;
+    travelOrigin = null;
+    setTravelPhase("arriving");
+    void glideCamera(origin.radius, TRAVEL_RECALL_MS, easeSettle).then((landed) => {
+      if (!landed || disposed) return;
+      camera.lowerRadiusLimit = origin.lower;
+      camera.upperRadiusLimit = origin.upper;
+      if (!isInXr) camera.attachControl(canvas, true);
+      setTravelPhase("idle");
+    });
+  };
+
+  /** The outbound half of a jump: finish pulling away, then darken over the swap itself. */
+  const departFromWorld = async (): Promise<void> => {
+    if (isInXr) return;
+    if (!departure) beginTravel();
+    await departure;
+    setTravelPhase("crossing");
+    await new Promise<void>((resolve) => window.setTimeout(resolve, TRAVEL_CROSS_MS));
+  };
+
+  /** The inbound half: the destination starts distant, and the camera falls in and settles on it. */
+  const arriveAtWorld = (): void => {
+    departure = null;
+    travelOrigin = null;
+    if (isInXr) {
+      setTravelPhase("idle");
+      return;
+    }
+
+    // Whatever the world put the camera at as it was built is where this flight is going.
+    const resting = camera.radius;
+    const lower = camera.lowerRadiusLimit;
+    const upper = camera.upperRadiusLimit;
+    const far = flightRadius(resting);
+    widenCameraReach(resting, far);
+    camera.radius = far;
+    setTravelPhase("arriving");
+    void glideCamera(resting, TRAVEL_ARRIVE_MS, easeSettle).then((landed) => {
+      // A flight overtaken by the next jump, or one whose host was disposed out from under it,
+      // has nothing to hand back: the limits and the controls belong to whatever replaced it.
+      if (!landed || disposed) return;
+      camera.lowerRadiusLimit = lower;
+      camera.upperRadiusLimit = upper;
+      if (!isInXr) camera.attachControl(canvas, true);
+      setTravelPhase("idle");
+    });
+  };
+
   const mountWorld = async <World extends MountedWorld>(
     build: () => World,
   ): Promise<World | null> => {
     const token = (mountToken += 1);
-    // The outgoing world keeps rendering through the fade, so the jump never shows an empty sky.
-    if (currentWorld) await fadeVeil(1);
+    // The outgoing world keeps rendering through the flight, so the jump never shows an empty
+    // sky: it is watched receding, and only the swap itself happens behind the dark.
+    if (currentWorld) {
+      await fadeVeil(1);
+      await departFromWorld();
+    }
     if (token !== mountToken || disposed) return null;
 
     currentWorld?.dispose();
@@ -430,6 +644,12 @@ const createSceneHost = (canvas: HTMLCanvasElement): SceneHost => {
       scope.dispose();
       xrConsole?.refresh();
       void fadeVeil(0);
+      // There is no destination to fly in to, so the flight is abandoned rather than landed: the
+      // recovery screen that answers this has to be visible, not behind a jump that never ends.
+      endGlide(null, false);
+      departure = null;
+      travelOrigin = null;
+      setTravelPhase("idle");
       dispatchRendererEvent("render-failed");
       throw error;
     }
@@ -440,6 +660,7 @@ const createSceneHost = (canvas: HTMLCanvasElement): SceneHost => {
     rigAwaitingWorld = isInXr;
     xrConsole?.refresh();
     void fadeVeil(0);
+    arriveAtWorld();
     // A destination can be chosen from a dialog that is still open over the canvas — the catalog
     // closes and the world mounts in the same commit, and nothing says which lands first. One
     // frame here means the scrim is never left blurring the world the visitor just left.
@@ -550,6 +771,8 @@ const createSceneHost = (canvas: HTMLCanvasElement): SceneHost => {
     profile,
     scene,
     qualityTier: profile.tier,
+    beginTravel,
+    cancelTravel,
     getFps: () => engine.getFps(),
     isInXr: () => isInXr,
     isVrSupported: () => isVrSupported,
@@ -567,6 +790,11 @@ const createSceneHost = (canvas: HTMLCanvasElement): SceneHost => {
       listener(rendererStatus);
       return () => rendererStatusListeners.delete(listener);
     },
+    onTravelPhase: (listener) => {
+      travelListeners.add(listener);
+      listener(travelPhase);
+      return () => travelListeners.delete(listener);
+    },
     enterVr: async () => {
       if (!xr || !isVrSupported) return;
       // Babylon appends the reference space and every enabled optional feature (including
@@ -582,6 +810,8 @@ const createSceneHost = (canvas: HTMLCanvasElement): SceneHost => {
       // already stopped being told the truth.
       rendererStatusListeners.clear();
       statusListeners.clear();
+      travelListeners.clear();
+      endGlide(null, false);
       window.removeEventListener("resize", resize);
       currentWorld?.dispose();
       currentScope?.dispose();

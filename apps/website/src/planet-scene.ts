@@ -42,6 +42,17 @@ const LIGHT_DIRECTION = new Vector3(-0.82, 0.3, -0.38).normalize();
 const DESKTOP_MOVE_SPEED = 5.2;
 const SURFACE_GROUND_ORIGIN_Z = 18;
 const SURFACE_GROUND_BASE_Y = -1.6;
+/** How far out the wheel reaches in a surface excursion, before the ground runs out under it. */
+const SURFACE_FAR_LIMIT = 18.4;
+/** Scrolling back past this inside a surface excursion is what asks to return to orbit. */
+const SURFACE_RETURN_RADIUS = 18.1;
+/**
+ * Where a jump out of a surface excursion stops pulling back.
+ *
+ * Short of the radius that asks for orbit, so that leaving the *world* is never read by the view
+ * as a request to leave the vista — the return would animate the same camera the flight is on.
+ */
+const SURFACE_DEPARTURE_RADIUS = 17.6;
 /** Where the wearer stands when the immersive session drops onto the terrain. */
 const XR_SURFACE_STAND = new Vector3(0, 0, 12);
 
@@ -2183,6 +2194,11 @@ export const createPlanetWorld = (
   // they still show around the limb, where no opaque geometry is in front of them.
   scene.setRenderingAutoClearDepthStencil(1, false, true, true);
 
+  // The target moves first, and everything else after it. `setTarget` rebuilds alpha, beta and
+  // radius from wherever the camera was left standing by the previous destination, so angles and
+  // distances assigned before it are silently thrown away — which framed every arriving world
+  // from the last one's viewpoint rather than from its own.
+  camera.setTarget(PLANET_POSITION.clone());
   camera.lowerRadiusLimit = 10.5;
   camera.upperRadiusLimit = 25;
   camera.lowerBetaLimit = 0.58;
@@ -2190,7 +2206,6 @@ export const createPlanetWorld = (
   camera.alpha = -Math.PI / 2;
   camera.beta = Math.PI / 2.13;
   camera.radius = 17.2;
-  camera.setTarget(PLANET_POSITION.clone());
   if (!host.isInXr()) camera.attachControl(canvas, true);
 
   const keyLight = new DirectionalLight("stellarLight", LIGHT_DIRECTION.scale(-1), scene);
@@ -2332,7 +2347,8 @@ export const createPlanetWorld = (
     }
 
     if (!isInXr && viewState === "orbit" && camera.radius <= 10.62) beginViewTransition("entering");
-    if (!isInXr && viewState === "surface" && camera.radius >= 18.1) beginViewTransition("leaving");
+    if (!isInXr && viewState === "surface" && camera.radius >= SURFACE_RETURN_RADIUS)
+      beginViewTransition("leaving");
 
     if (viewState === "entering" || viewState === "leaving") {
       viewTransitionSeconds += deltaSeconds;
@@ -2351,7 +2367,7 @@ export const createPlanetWorld = (
         viewState = entering ? "surface" : "orbit";
         applyViewEnvironment(entering);
         camera.lowerRadiusLimit = entering ? 7.5 : 10.5;
-        camera.upperRadiusLimit = entering ? 18.4 : 25;
+        camera.upperRadiusLimit = entering ? SURFACE_FAR_LIMIT : 25;
         camera.lowerBetaLimit = entering ? 1.02 : 0.58;
         camera.upperBetaLimit = entering ? 1.48 : Math.PI - 0.58;
         camera.attachControl(canvas, true);
@@ -2414,7 +2430,7 @@ export const createPlanetWorld = (
   /** Restores the desktop camera so leaving the headset lands on the view the wearer left in. */
   const syncDesktopCamera = (surface: boolean): void => {
     camera.lowerRadiusLimit = surface ? 7.5 : 10.5;
-    camera.upperRadiusLimit = surface ? 18.4 : 25;
+    camera.upperRadiusLimit = surface ? SURFACE_FAR_LIMIT : 25;
     camera.lowerBetaLimit = surface ? 1.02 : 0.58;
     camera.upperBetaLimit = surface ? 1.48 : Math.PI - 0.58;
     camera.target.copyFrom(surface ? surfaceTarget : orbitTarget);
@@ -2495,6 +2511,15 @@ export const createPlanetWorld = (
 
   return {
     console: consoleContributions,
+    /**
+     * How far a jump may pull back from this world before it stops holding up.
+     *
+     * In orbit there is nothing behind the camera but a sky that follows it, so a departure can
+     * be flown as far as it likes. A surface excursion stands on a ground patch 72 by 82 units
+     * across under a dome half that wide again: pull back past the far limit the view already
+     * keeps for the wheel, and the visitor is shown the edge of the world instead of leaving it.
+     */
+    farthestView: () => (viewState === "surface" ? SURFACE_DEPARTURE_RADIUS : undefined),
     focusXrRig: (initial) => applyXrView(viewState === "surface", initial),
     restoreDesktopView: () => syncDesktopCamera(viewState === "surface"),
     // Meshes, materials and the key light are removed by the world scope the host opened around

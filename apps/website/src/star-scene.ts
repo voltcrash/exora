@@ -78,6 +78,11 @@ export const createStarWorld = (
 
   scene.clearColor = new Color4(0.001, 0.002, 0.006, 1);
 
+  // The target moves first, and everything else after it. `setTarget` rebuilds alpha, beta and
+  // radius from wherever the camera was left standing by the previous destination, so angles and
+  // distances assigned before it are silently thrown away — which framed an arriving star from
+  // the last world's viewpoint rather than from its own.
+  camera.setTarget(STAR_POSITION.clone());
   camera.lowerRadiusLimit = 9.5;
   camera.upperRadiusLimit = 24;
   camera.lowerBetaLimit = 0.45;
@@ -85,7 +90,6 @@ export const createStarWorld = (
   camera.alpha = -Math.PI / 2;
   camera.beta = Math.PI / 2.08;
   camera.radius = 15.5;
-  camera.setTarget(STAR_POSITION.clone());
   if (!host.isInXr()) camera.attachControl(canvas, true);
 
   const recipe = deriveStarRecipe(star);

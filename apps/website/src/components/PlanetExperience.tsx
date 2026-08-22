@@ -10,6 +10,7 @@ import type { PlanetLoadResult } from "../api-client.ts";
 import type { ViewMode } from "../planet-scene.ts";
 import { formatNumber, formatPlanetName } from "../planet-utils.tsx";
 import type { SceneHost, XrStatus } from "../scene-host.ts";
+import type { TravelPhase } from "../travel-transition.ts";
 import { isXrEmulated } from "../xr-emulator.ts";
 
 interface PlanetExperienceProps {
@@ -25,6 +26,7 @@ interface PlanetExperienceProps {
   onSelectSystem: (hostStar: string) => Promise<boolean>;
   recipeOverride: WorldRecipe | null;
   result: PlanetLoadResult;
+  travelPhase: TravelPhase;
 }
 
 const xrCopy: Record<XrStatus, { button: string; label: string }> = {
@@ -48,6 +50,7 @@ export const PlanetExperience = ({
   onSelectSystem,
   recipeOverride,
   result,
+  travelPhase,
 }: PlanetExperienceProps) => {
   const [fps, setFps] = useState("--");
   const [qualityTier, setQualityTier] = useState("AUTO");
@@ -63,18 +66,34 @@ export const PlanetExperience = ({
     [planet, recipeOverride],
   );
 
+  // Whether the page is between destinations, and whether this view's own panels belong to the
+  // world being left. The flight replaces the loading card entirely: while one is in the air the
+  // card must never appear, or it would cover the very thing it used to stand in for.
+  const travelling = travelPhase === "departing" || travelPhase === "crossing";
+  const settled = sceneState !== "loading" || travelPhase !== "idle";
+
   const openHostStar = async (): Promise<void> => {
     if (result.mode === "custom" || hostJumpState === "loading") return;
     setHostJumpState("loading");
-    const found = await onSelectHostStar(planet.hostStar);
-    if (!found) setHostJumpState("error");
+    // The camera starts pulling away while the archive is still being asked, so the click reads
+    // as having done something long before the answer decides where it is going.
+    host?.beginTravel();
+    // A lookup that fails outright is a destination that is not there: it has to reach the
+    // `cancelTravel` below, or the flight would hang pulled back with no world to return to.
+    const found = await onSelectHostStar(planet.hostStar).catch(() => false);
+    if (!found) {
+      host?.cancelTravel();
+      setHostJumpState("error");
+    }
   };
 
   /** The counterpart of travelling in to the host star: pull back to the whole system. */
   const openHostSystem = async (): Promise<void> => {
     if (result.mode === "custom" || systemJumpState === "loading") return;
     setSystemJumpState("loading");
-    const found = await onSelectSystem(planet.hostStar);
+    host?.beginTravel();
+    const found = await onSelectSystem(planet.hostStar).catch(() => false);
+    if (!found) host?.cancelTravel();
     setSystemJumpState(found ? "idle" : "error");
   };
 
@@ -171,7 +190,7 @@ export const PlanetExperience = ({
 
   return (
     <div
-      className={`experience-shell view-${viewMode} ${sceneState === "ready" || sceneState === "error" ? "scene-ready" : ""} ${sceneState === "error" ? "scene-error" : ""}`}
+      className={`experience-shell view-${viewMode} ${settled ? "scene-ready" : ""} ${sceneState === "error" ? "scene-error" : ""} ${travelling ? "travelling" : ""}`}
     >
       <div className="space-haze" aria-hidden="true" />
       <div className="viewport-grid" aria-hidden="true" />

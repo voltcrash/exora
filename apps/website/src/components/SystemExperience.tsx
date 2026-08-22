@@ -12,6 +12,7 @@ import {
   type SystemLayout,
 } from "../system-layout.ts";
 import type { SystemWorld } from "../system-scene.ts";
+import type { TravelPhase } from "../travel-transition.ts";
 import { isXrEmulated } from "../xr-emulator.ts";
 
 interface SystemExperienceProps {
@@ -25,6 +26,7 @@ interface SystemExperienceProps {
   onSelectPlanet: (planet: ExoplanetProfile, cached: boolean) => void;
   onSelectStar: (star: StarProfile, cached: boolean) => void;
   result: SystemLoadResult;
+  travelPhase: TravelPhase;
 }
 
 const xrCopy: Record<XrStatus, { button: string; label: string }> = {
@@ -55,6 +57,7 @@ export const SystemExperience = ({
   onSelectPlanet,
   onSelectStar,
   result,
+  travelPhase,
 }: SystemExperienceProps) => {
   const [fps, setFps] = useState("--");
   const [qualityTier, setQualityTier] = useState("AUTO");
@@ -63,11 +66,21 @@ export const SystemExperience = ({
   const [xrStatus, setXrStatus] = useState<XrStatus>("checking");
   const [starJumpState, setStarJumpState] = useState<"error" | "idle" | "loading">("idle");
   const { cached, hostStar, planets } = result;
+  // A jump in the air owns the screen: this view's panels go with the world being left, and its
+  // loading card stays down, because the flight is what stands in for it now.
+  const travelling = travelPhase === "departing" || travelPhase === "crossing";
+  const settled = sceneState !== "loading" || travelPhase !== "idle";
 
   const openHostStar = async (): Promise<void> => {
     if (starJumpState === "loading") return;
     setStarJumpState("loading");
-    const found = await onSelectHostStar(hostStar);
+    // The pull-away and the archive request go out together, so the click reads immediately
+    // rather than after however long the answer takes.
+    host?.beginTravel();
+    // A lookup that fails outright is a destination that is not there: it has to reach the
+    // `cancelTravel` below, or the flight would hang pulled back with no world to return to.
+    const found = await onSelectHostStar(hostStar).catch(() => false);
+    if (!found) host?.cancelTravel();
     setStarJumpState(found ? "idle" : "error");
   };
 
@@ -141,7 +154,7 @@ export const SystemExperience = ({
 
   return (
     <div
-      className={`experience-shell system-experience ${sceneState !== "loading" ? "scene-ready" : ""} ${sceneState === "error" ? "scene-error" : ""}`}
+      className={`experience-shell system-experience ${settled ? "scene-ready" : ""} ${sceneState === "error" ? "scene-error" : ""} ${travelling ? "travelling" : ""}`}
     >
       <div className="space-haze" aria-hidden="true" />
       <div className="viewport-grid" aria-hidden="true" />

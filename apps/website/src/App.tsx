@@ -1,6 +1,6 @@
 import type { ExoplanetProfile, StarProfile } from "@exora/contracts";
 import type { CustomStar, CustomWorld, WorldRecipe } from "@exora/worldgen";
-import { lazy, Suspense, useCallback, useEffect, useState } from "react";
+import { lazy, Suspense, useCallback, useEffect, useState, type CSSProperties } from "react";
 import {
   loadPlanetByName,
   loadPlanetsByHost,
@@ -15,6 +15,7 @@ import { featuredPlanet } from "./planet-profile.ts";
 import { hasRenderer } from "./planet-utils.tsx";
 import { canonicalUrlForSearch } from "./canonical-url.ts";
 import { opensSearchShortcut } from "./search-shortcut.ts";
+import { TRAVEL_CROSS_MS, TRAVEL_REVEAL_MS, type TravelPhase } from "./travel-transition.ts";
 import { useSceneHost } from "./use-scene-host.ts";
 
 const PlanetCatalog = lazy(() =>
@@ -106,6 +107,12 @@ export const App = () => {
   });
   const [customRecipe, setCustomRecipe] = useState<WorldRecipe | null>(null);
   const [systemHostName, setSystemHostName] = useState<string | null>(null);
+
+  // Held here rather than inside each view, because the point of the phase is that it outlives
+  // the swap: the destination arriving has to be mounted already knowing a jump is in the air,
+  // or it paints its own loading card over the flight for the frame before it finds out.
+  const [travelPhase, setTravelPhase] = useState<TravelPhase>("idle");
+  useEffect(() => sceneHost?.onTravelPhase(setTravelPhase), [sceneHost]);
 
   // Every one of these covers the canvas with a modal dialog, so for as long as one is open the
   // scene behind it is being rendered for nobody — and worse, keeping it moving forces the
@@ -261,6 +268,22 @@ export const App = () => {
         }
         tabIndex={0}
       />
+      {/*
+        The dark a jump crosses in. It covers the swap itself — the one moment of travel that
+        cannot be flown through, because building a destination stalls the frame loop while it
+        runs — and belongs to the page rather than to either view, so that it survives the two of
+        them being exchanged underneath it. The renderer times the flight by the same constants.
+      */}
+      <div
+        className={`travel-veil ${travelPhase === "crossing" ? "crossing" : ""}`}
+        aria-hidden="true"
+        style={
+          {
+            "--travel-cross": `${TRAVEL_CROSS_MS}ms`,
+            "--travel-reveal": `${TRAVEL_REVEAL_MS}ms`,
+          } as CSSProperties
+        }
+      />
       {sceneHostStatus === "context-lost" || sceneHostStatus === "recovering" ? (
         <RecoveryScreen
           action="RESTART NOW"
@@ -312,6 +335,7 @@ export const App = () => {
           onSelectStar={selectStar}
           onSelectSystem={selectSystem}
           recipeOverride={customRecipe}
+          travelPhase={travelPhase}
         />
       ) : activeObject.type === "system" ? (
         <Suspense fallback={null}>
@@ -327,6 +351,7 @@ export const App = () => {
             onOpenBuilder={() => setBuilderOpen(true)}
             onOpenPlanets={() => setCatalogOpen(true)}
             onOpenStars={() => setStarCatalogOpen(true)}
+            travelPhase={travelPhase}
           />
         </Suspense>
       ) : (
@@ -344,6 +369,7 @@ export const App = () => {
             onOpenPlanets={() => setCatalogOpen(true)}
             onOpenStars={() => setStarCatalogOpen(true)}
             onOpenBuilder={() => setBuilderOpen(true)}
+            travelPhase={travelPhase}
           />
         </Suspense>
       )}

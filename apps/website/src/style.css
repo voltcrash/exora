@@ -80,6 +80,32 @@ button {
   opacity: 0.78;
 }
 
+/*
+ * The dark a jump crosses in.
+ *
+ * The flight itself is flown by the camera — the world being left is watched receding, and the
+ * destination is fallen in toward — so this covers only the moment between them, where the scene's
+ * contents are swapped and the frame loop stalls for as long as that takes. It darkens quickly
+ * into the swap and clears more slowly out of it, so the jump ends on the new world rather than on
+ * a curtain going up. Both durations are set from `travel-transition.ts`, which is also what the
+ * renderer times the flight by; the fallbacks here are only for a frame rendered before React has
+ * put the properties on the element.
+ */
+.travel-veil {
+  position: fixed;
+  z-index: 9;
+  inset: 0;
+  background: #010203;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity var(--travel-reveal, 300ms) ease-out;
+}
+
+.travel-veil.crossing {
+  opacity: 1;
+  transition: opacity var(--travel-cross, 190ms) ease-in;
+}
+
 .approach-status {
   position: fixed;
   z-index: 3;
@@ -204,6 +230,21 @@ button {
   position: fixed;
   z-index: 2;
   pointer-events: none;
+  transition:
+    opacity 360ms ease,
+    visibility 360ms ease;
+}
+
+/*
+ * The panels read the world they are over, so they go with it when a jump flies away from it and
+ * come back with whatever the flight lands on. Hidden rather than merely transparent: every
+ * control in here sets its own `pointer-events`, and a faded-out button is still a button.
+ */
+.travelling .topbar,
+.travelling .hud,
+.travelling .mission-control {
+  visibility: hidden;
+  opacity: 0;
 }
 
 .topbar {
@@ -3421,7 +3462,11 @@ body[data-xr-status="unavailable"] .status-light {
   .enter-vr,
   .loading-screen,
   .approach-status,
-  .surface-veil {
+  .surface-veil,
+  .travel-veil,
+  .topbar,
+  .hud,
+  .mission-control {
     transition: none;
   }
 }

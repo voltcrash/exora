@@ -38,6 +38,11 @@ const mountedWorld = () => ({
 
 vi.mock("./scene-host.ts", () => {
   const host = {
+    // Travel is flown by the real renderer's camera, which this suite does not have one of. The
+    // page's own half of a jump — panels leaving with the world, the dark over the swap — is
+    // driven by the phase, so the stub reports a page that is never between destinations.
+    beginTravel: () => undefined,
+    cancelTravel: () => undefined,
     camera: null,
     canvas: null,
     dispose: () => undefined,
@@ -49,6 +54,10 @@ vi.mock("./scene-host.ts", () => {
     mountWorld: async (build: () => unknown) => build(),
     onRendererStatus: (listener: (status: string) => void) => {
       listener("ready");
+      return () => undefined;
+    },
+    onTravelPhase: (listener: (phase: string) => void) => {
+      listener("idle");
       return () => undefined;
     },
     onXrStatus: (listener: (status: string) => void) => {

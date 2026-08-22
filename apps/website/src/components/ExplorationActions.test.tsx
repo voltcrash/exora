@@ -50,6 +50,7 @@ const planetMarkup = (): string =>
       onSelectSystem={vi.fn()}
       recipeOverride={null}
       result={{ cached: false, mode: "live", planet: featuredPlanet }}
+      travelPhase="idle"
     />,
   );
 
@@ -67,6 +68,7 @@ const starMarkup = (): string =>
       onSelectSystem={vi.fn()}
       result={{ cached: false, mode: "live", star: sirius }}
       systemHostName={null}
+      travelPhase="idle"
     />,
   );
 
