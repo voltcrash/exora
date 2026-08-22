@@ -3,6 +3,7 @@ import { page, userEvent } from "vite-plus/test/browser/context";
 import { createRoot, type Root } from "react-dom/client";
 import { afterEach, beforeEach, expect, test, vi } from "vite-plus/test";
 import { App } from "./App.tsx";
+import { acquireSceneHost } from "./scene-host.ts";
 import { featuredPlanet } from "./planet-profile.ts";
 import "./style.css";
 
@@ -57,12 +58,27 @@ vi.mock("./scene-host.ts", () => {
     profile: { hardwareScalingLevel: 1, tier: "desktop" },
     qualityTier: "desktop",
     refreshConsole: () => undefined,
+    /** How many overlays are currently holding the loop parked, for the assertions below. */
+    renderSuspensions: 0,
+    suspendRendering: () => {
+      host.renderSuspensions += 1;
+      let released = false;
+      return () => {
+        if (released) return;
+        released = true;
+        host.renderSuspensions -= 1;
+      };
+    },
     scene: null,
     xrCamera: () => null,
   };
 
   return { acquireSceneHost: () => host, recreateSceneHost: () => host };
 });
+
+/** The stub above, reached through the module the app imports it from. */
+const stubbedHost = (): { renderSuspensions: number } =>
+  acquireSceneHost(document.createElement("canvas")) as unknown as { renderSuspensions: number };
 
 vi.mock("./planet-scene.ts", () => ({
   createPlanetWorld: (_host: unknown, options: { onFirstFrame: () => void }) => {
@@ -346,6 +362,36 @@ test("the `/` shortcut opens the catalog", async () => {
 
   await userEvent.keyboard("/");
   await expect.element(page.getByRole("dialog")).toBeVisible();
+});
+
+test("an open overlay parks the renderer, and closing it starts the loop again", async () => {
+  stubArchive();
+  mountApp();
+  await expect.element(page.getByRole("heading", { level: 1 })).toBeVisible();
+
+  // The reason this matters is not the wasted GPU time on its own. A modal covers the canvas
+  // with a blurred scrim, and a canvas that keeps changing underneath one forces the browser to
+  // rebuild that blur over the entire viewport every frame — which is what made the catalog and
+  // the forge drop frames while a reader was only scrolling a list or dragging a slider.
+  expect(stubbedHost().renderSuspensions).toBe(0);
+
+  await userEvent.click(page.getByRole("button", { name: "Open NASA exoplanet catalog" }));
+  await expect.element(page.getByRole("dialog")).toBeVisible();
+  expect(stubbedHost().renderSuspensions).toBe(1);
+
+  await userEvent.click(page.getByRole("button", { name: "Close planet catalog" }));
+  await expect.element(page.getByRole("dialog")).not.toBeInTheDocument();
+  expect(stubbedHost().renderSuspensions).toBe(0);
+
+  // The forge is a separate overlay over the same canvas and has to hold the loop just as the
+  // catalog did — the release is per-overlay, not a single global flag someone can leave set.
+  await userEvent.click(page.getByRole("button", { name: "Open World Forge" }));
+  await expect.element(page.getByRole("dialog")).toBeVisible();
+  expect(stubbedHost().renderSuspensions).toBe(1);
+
+  await userEvent.click(page.getByRole("button", { name: "Close world forge" }));
+  await expect.element(page.getByRole("dialog")).not.toBeInTheDocument();
+  expect(stubbedHost().renderSuspensions).toBe(0);
 });
 
 test("nothing overflows the viewport horizontally", async () => {

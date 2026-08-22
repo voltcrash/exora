@@ -1,5 +1,5 @@
 import type { ExoplanetProfile } from "@exora/contracts";
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { memo, useCallback, useDeferredValue, useEffect, useMemo, useRef, useState } from "react";
 import {
   discoverPlanets,
   discoverRandomPlanet,
@@ -107,6 +107,61 @@ const collections = [
     tag: "EXTREME WORLDS",
   },
 ] as const;
+
+/**
+ * One world in the result list.
+ *
+ * Its own component, and memoised, because of what the observatory sliders do: every input event
+ * re-runs the filter over the whole sampled field, and what comes back is mostly the same worlds
+ * in the same order. Rebuilding two dozen rows — each a layered CSS planet, a handful of formatted
+ * numbers and a dozen elements — for a result that did not change was the whole cost of dragging
+ * a slider. Identity-stable planets mean React can now skip every row the move did not disturb.
+ */
+const PlanetResult = memo(
+  ({
+    cached,
+    onSelect,
+    planet,
+  }: {
+    cached: boolean;
+    onSelect: (planet: ExoplanetProfile, cached: boolean) => void;
+    planet: ExoplanetProfile;
+  }) => {
+    const supported = hasRenderer(planet);
+    const temperature = planet.observation.equilibriumTemperatureKelvin;
+
+    return (
+      <li>
+        <button
+          className="catalog-result"
+          type="button"
+          disabled={!supported}
+          onClick={() => onSelect(planet, cached)}
+        >
+          <span className="result-preview">
+            <PlanetCatalogVisual planet={planet} />
+          </span>
+          <span className="result-marker" aria-hidden="true" />
+          <span className="result-identity">
+            <strong>{planet.name}</strong>
+            <small>
+              {planet.hostStar} · {planet.observation.discoveryMethod}
+            </small>
+            <span className="result-trait">{planetNotableTrait(planet)}</span>
+          </span>
+          <span className="result-metrics">
+            <small>{planetKindLabel(planet)}</small>
+            <strong>
+              {formatNumber(planet.observation.distanceParsecs, 1)} PC ·{" "}
+              {temperature === null ? "TEMP UNKNOWN" : `${formatNumber(temperature, 0)} K`}
+            </strong>
+          </span>
+          <span className="result-state">{supported ? "EXPLORE" : "RENDERER PENDING"}</span>
+        </button>
+      </li>
+    );
+  },
+);
 
 export const PlanetCatalog = ({ onClose, onSelect }: PlanetCatalogProps) => {
   const dialogRef = useRef<HTMLDialogElement>(null);
@@ -217,12 +272,16 @@ export const PlanetCatalog = ({ onClose, onSelect }: PlanetCatalogProps) => {
     };
   }, [activeCategory, portalView, query]);
 
+  // The sliders and the list they drive move at different speeds on purpose. A control has to
+  // track the pointer to feel connected to it, but re-sampling the field is a whole list rebuild
+  // and there is no value in doing that at pointer rate — a reader reads the result once the
+  // slider stops. Deferring the field lets React paint the thumb immediately and abandon any
+  // list pass the next input event has already made obsolete.
+  const settledFilters = useDeferredValue(physicalFilters);
   const visiblePlanets = useMemo(
     () =>
-      portalView === "filters"
-        ? filterPlanetsByPhysicalControls(planets, physicalFilters)
-        : planets,
-    [physicalFilters, planets, portalView],
+      portalView === "filters" ? filterPlanetsByPhysicalControls(planets, settledFilters) : planets,
+    [planets, portalView, settledFilters],
   );
 
   // The observatory controls read the whole sampled field rather than one collection, so opening
@@ -559,40 +618,9 @@ export const PlanetCatalog = ({ onClose, onSelect }: PlanetCatalogProps) => {
           </li>
         )}
         {searchState === "ready" &&
-          visiblePlanets.map((planet) => {
-            const supported = hasRenderer(planet);
-            const temperature = planet.observation.equilibriumTemperatureKelvin;
-            return (
-              <li key={planet.id}>
-                <button
-                  className="catalog-result"
-                  type="button"
-                  disabled={!supported}
-                  onClick={() => onSelect(planet, cached)}
-                >
-                  <span className="result-preview">
-                    <PlanetCatalogVisual planet={planet} />
-                  </span>
-                  <span className="result-marker" aria-hidden="true" />
-                  <span className="result-identity">
-                    <strong>{planet.name}</strong>
-                    <small>
-                      {planet.hostStar} · {planet.observation.discoveryMethod}
-                    </small>
-                    <span className="result-trait">{planetNotableTrait(planet)}</span>
-                  </span>
-                  <span className="result-metrics">
-                    <small>{planetKindLabel(planet)}</small>
-                    <strong>
-                      {formatNumber(planet.observation.distanceParsecs, 1)} PC ·{" "}
-                      {temperature === null ? "TEMP UNKNOWN" : `${formatNumber(temperature, 0)} K`}
-                    </strong>
-                  </span>
-                  <span className="result-state">{supported ? "EXPLORE" : "RENDERER PENDING"}</span>
-                </button>
-              </li>
-            );
-          })}
+          visiblePlanets.map((planet) => (
+            <PlanetResult key={planet.id} cached={cached} onSelect={onSelect} planet={planet} />
+          ))}
       </ol>
     </dialog>
   );

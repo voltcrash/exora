@@ -100,6 +100,20 @@ export interface SceneHost {
   onXrStatus: (listener: (status: XrStatus) => void) => () => void;
   /** Subscribes to WebGL availability and recovery, called immediately with the current state. */
   onRendererStatus: (listener: (status: RendererStatus) => void) => () => void;
+  /**
+   * Parks the render loop while something else owns the screen, returning the release.
+   *
+   * A modal dialog covers the scene with a blurred, three-quarters-opaque scrim, and the frames
+   * still being drawn underneath it are paid for twice: once by the GPU rendering a full-detail
+   * planet at the display's native density, and again by the compositor, which has to re-run the
+   * `backdrop-filter` blur over the whole viewport every time the canvas changes. Neither buys
+   * anything a reader can see. Stopping the loop makes the canvas static, which lets the browser
+   * cache the blurred backdrop instead of rebuilding it per frame, so the saving is both halves.
+   *
+   * Calls nest: the loop restarts once the last holder releases. Never applies inside an
+   * immersive session, where the loop belongs to the headset's frame callback rather than to us.
+   */
+  suspendRendering: () => () => void;
   xrCamera: () => WebXRCamera | null;
 }
 
@@ -307,7 +321,11 @@ const createSceneHost = (canvas: HTMLCanvasElement): SceneHost => {
     }
   });
 
-  engine.runRenderLoop(() => {
+  let looping = false;
+  /** How many overlays are currently claiming the screen. Zero means the loop should be running. */
+  let suspensions = 0;
+
+  const renderFrame = (): void => {
     try {
       scene.render();
       dispatchRendererEvent("frame-rendered");
@@ -315,10 +333,47 @@ const createSceneHost = (canvas: HTMLCanvasElement): SceneHost => {
       console.error("[renderer] frame failed", error);
       dispatchRendererEvent("render-failed");
       engine.stopRenderLoop();
+      looping = false;
     }
-  });
+  };
 
-  const resize = (): void => engine.resize();
+  const startRenderLoop = (): void => {
+    if (looping || disposed) return;
+    looping = true;
+    // Babylon's frame-time average is a rolling window that knows nothing about the pause, so
+    // without this the first frame back reports the whole suspension as one enormous frame and
+    // the heads-up display spends a second claiming single-digit FPS.
+    engine.performanceMonitor.reset();
+    engine.runRenderLoop(renderFrame);
+  };
+
+  const stopRenderLoop = (): void => {
+    if (!looping) return;
+    looping = false;
+    engine.stopRenderLoop(renderFrame);
+  };
+
+  const suspendRendering = (): (() => void) => {
+    suspensions += 1;
+    if (suspensions === 1 && !isInXr) stopRenderLoop();
+
+    let released = false;
+    return () => {
+      if (released) return;
+      released = true;
+      suspensions -= 1;
+      if (suspensions === 0) startRenderLoop();
+    };
+  };
+
+  startRenderLoop();
+
+  const resize = (): void => {
+    engine.resize();
+    // A resized canvas gets a fresh, empty drawing buffer. While the loop is parked nothing
+    // would ever fill it, so the scrim would be blurring a blank rectangle: draw the one frame.
+    if (!looping && !disposed) renderFrame();
+  };
   window.addEventListener("resize", resize);
 
   /**
@@ -385,6 +440,10 @@ const createSceneHost = (canvas: HTMLCanvasElement): SceneHost => {
     rigAwaitingWorld = isInXr;
     xrConsole?.refresh();
     void fadeVeil(0);
+    // A destination can be chosen from a dialog that is still open over the canvas — the catalog
+    // closes and the world mounts in the same commit, and nothing says which lands first. One
+    // frame here means the scrim is never left blurring the world the visitor just left.
+    if (!looping) renderFrame();
     return world;
   };
 
@@ -443,6 +502,9 @@ const createSceneHost = (canvas: HTMLCanvasElement): SceneHost => {
         }
         if (state === WebXRState.IN_XR) {
           isInXr = true;
+          // Inside a session the loop is the headset's frame callback, and a wearer cannot see
+          // the flat dialog that parked it. Whatever suspensions are outstanding, run.
+          startRenderLoop();
           sessionFoveation = profile.xrFixedFoveation;
           if (createdXr.baseExperience.sessionManager.isFixedFoveationSupported) {
             createdXr.baseExperience.sessionManager.fixedFoveation = sessionFoveation;
@@ -452,6 +514,8 @@ const createSceneHost = (canvas: HTMLCanvasElement): SceneHost => {
         }
         if (state === WebXRState.NOT_IN_XR) {
           isInXr = false;
+          // Back on the flat page, an overlay that outlived the session owns the screen again.
+          if (suspensions > 0) stopRenderLoop();
           rigAwaitingWorld = false;
           xrConsole?.setVisible(false);
           // A session ending mid-jump would otherwise leave a fade waiting for frames that only
@@ -491,6 +555,7 @@ const createSceneHost = (canvas: HTMLCanvasElement): SceneHost => {
     isVrSupported: () => isVrSupported,
     mountWorld,
     refreshConsole: () => xrConsole?.refresh(),
+    suspendRendering,
     xrCamera: () => xr?.baseExperience.camera ?? null,
     onXrStatus: (listener) => {
       statusListeners.add(listener);
@@ -526,6 +591,7 @@ const createSceneHost = (canvas: HTMLCanvasElement): SceneHost => {
       xrConsole = null;
       xr?.dispose();
       xr = null;
+      looping = false;
       engine.stopRenderLoop();
       scene.dispose();
       engine.dispose();
