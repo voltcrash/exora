@@ -94,6 +94,26 @@ vi.mock("./star-scene.ts", () => ({
   },
 }));
 
+/**
+ * The one scene stub that keeps a piece of the real thing.
+ *
+ * Babylon is stubbed out as everywhere else here, but the layout is not: the system view's whole
+ * job is printing what the diorama did to the numbers, and a fabricated layout would let those
+ * readouts be wrong in exactly the way this test exists to catch.
+ */
+vi.mock("./system-scene.ts", async () => {
+  const { deriveSystemLayout } = await import("./system-layout.ts");
+  return {
+    createSystemWorld: (
+      _host: unknown,
+      options: { onFirstFrame: () => void; planets: readonly ExoplanetProfile[] },
+    ) => {
+      options.onFirstFrame();
+      return { ...mountedWorld(), layout: deriveSystemLayout(options.planets) };
+    },
+  };
+});
+
 const sirius: StarProfile = {
   catalogName: "* alf CMa",
   id: "alf-cma",
@@ -158,6 +178,24 @@ const stubArchive = ({ missing = [] as string[] } = {}) => {
     }
 
     if (url.pathname === "/api/planets") {
+      const host = url.searchParams.get("host");
+      if (host) {
+        // A host answers with its own system, which is what the diorama is built from.
+        return planetList(
+          host,
+          missing.includes(host)
+            ? []
+            : ["b", "c"].map((letter) => ({
+                ...namedPlanet(`${host} ${letter}`),
+                hostStar: host,
+                observation: {
+                  ...featuredPlanet.observation,
+                  orbitalPeriodDays: letter === "b" ? 12 : 90,
+                  semiMajorAxisAu: letter === "b" ? 0.09 : 0.4,
+                },
+              })),
+        );
+      }
       const query = url.searchParams.get("q") ?? url.searchParams.get("category") ?? "";
       return planetList(query, [namedPlanet(query || "Kepler-186 f")]);
     }
@@ -268,6 +306,52 @@ test("a deep link to a named star resolves to that star", async () => {
   mountApp("?star=Sirius");
 
   await expect.element(page.getByRole("heading", { level: 1 })).toHaveTextContent("Sirius");
+});
+
+test("a deep link to a system resolves to the diorama, and says what it compressed", async () => {
+  stubArchive();
+  mountApp("?system=Kepler-90");
+
+  await expect.element(page.getByRole("heading", { level: 1 })).toHaveTextContent("Kepler-90");
+  expect(document.querySelector('link[rel="canonical"]')?.getAttribute("href")).toContain(
+    "?system=Kepler-90",
+  );
+
+  // The three compressions are the reason this view exists in its own right: a diorama that did
+  // not state them would be a picture claiming a linear layout it does not have.
+  await expect.element(page.getByText(/LOG · .+ AU → .+ m/)).toBeVisible();
+  await expect.element(page.getByText(/EARTH ×/)).toBeVisible();
+  await expect.element(page.getByText(/^1 s = /)).toBeVisible();
+});
+
+test("a world in the diorama is reachable, and offers the way back to the system", async () => {
+  stubArchive();
+  mountApp("?system=Kepler-90");
+
+  await userEvent.click(page.getByRole("button", { name: /Kepler-90 c/ }));
+
+  await expect.element(page.getByRole("heading", { level: 1 })).toHaveTextContent("Kepler-90 c");
+  expect(window.location.search).toBe("?planet=Kepler-90%20c");
+
+  // The return leg rides in the telemetry panel's detail rows, which this stylesheet has always
+  // hidden below 960px — the same rule that hides "visit star" there. So the assertion holds
+  // where the control exists, and the mobile instance is left asserting the outward leg only.
+  if (window.innerWidth < 960) return;
+
+  await userEvent.click(page.getByRole("button", { name: /Whole system/ }));
+
+  await expect.element(page.getByRole("heading", { level: 1 })).toHaveTextContent("Kepler-90");
+  expect(window.location.search).toBe("?system=Kepler-90");
+});
+
+test("a system the archive links no worlds to is identified rather than shown empty", async () => {
+  stubArchive({ missing: ["Barren"] });
+  mountApp("?system=Barren");
+
+  await expect
+    .element(page.getByRole("heading", { name: "DESTINATION UNAVAILABLE" }))
+    .toBeVisible();
+  await expect.element(page.getByText(/system “Barren”/)).toBeVisible();
 });
 
 test("an unavailable deep link is identified instead of showing a different world", async () => {

@@ -1041,6 +1041,8 @@ interface PlanetWorldOptions {
   onSelectHostStar?: () => void;
   onSelectPlanet?: (planet: ExoplanetProfile) => void;
   onSelectStar?: (star: StarProfile) => void;
+  /** Pull back to the whole host system, the counterpart of travelling in to the host star. */
+  onSelectSystem?: () => void;
   onViewModeChange: (mode: ViewMode) => void;
   planet: ExoplanetProfile;
   recipe: WorldRecipe;
@@ -2113,6 +2115,7 @@ export const createPlanetWorld = (
     onSelectHostStar,
     onSelectPlanet,
     onSelectStar,
+    onSelectSystem,
     onViewModeChange,
     planet: planetProfile,
     recipe,
@@ -2409,6 +2412,15 @@ export const createPlanetWorld = (
         id: "host-star",
         label: "Travel to the host star",
         onSelect: onSelectHostStar,
+      });
+    }
+
+    if (onSelectSystem) {
+      actions.push({
+        detail: `See every world of ${planetProfile.hostStar}`,
+        id: "host-system",
+        label: "View the whole system",
+        onSelect: onSelectSystem,
       });
     }
 

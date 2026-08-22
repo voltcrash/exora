@@ -257,17 +257,17 @@ const buildWorld = (
   const recipe = deriveWorldRecipe(planet);
   const color = dioramaBodyColor(recipe);
 
-  const plane = new TransformNode(`system-orbit-${planet.id}`, scene);
+  const plane = new TransformNode(`diorama-plane-${planet.id}`, scene);
   plane.parent = root;
   plane.rotation.x = orbit.tiltRadians;
 
   const ribbon = buildOrbitRibbon(
     scene,
-    `system-orbit-line-${planet.id}`,
+    `diorama-orbit-${planet.id}`,
     buildOrbitPath(layout.mapping, orbit.elements, profile.systemOrbitSegments),
   );
   ribbon.parent = plane;
-  const ribbonMaterial = new StandardMaterial(`system-orbit-material-${planet.id}`, scene);
+  const ribbonMaterial = new StandardMaterial(`diorama-orbit-material-${planet.id}`, scene);
   ribbonMaterial.disableLighting = true;
   ribbonMaterial.emissiveColor = Color3.Lerp(color, new Color3(0.42, 0.68, 0.78), 0.55);
   ribbonMaterial.alpha = 0.42;
@@ -279,14 +279,14 @@ const buildWorld = (
   ribbon.material = ribbonMaterial;
 
   const body = MeshBuilder.CreateSphere(
-    `system-world-${planet.id}`,
+    `diorama-world-${planet.id}`,
     { diameter: orbit.bodyRadiusSceneUnits * 2, segments: profile.systemBodySegments },
     scene,
   );
   body.parent = plane;
   body.applyFog = false;
   body.isPickable = true;
-  const bodyMaterial = new StandardMaterial(`system-world-material-${planet.id}`, scene);
+  const bodyMaterial = new StandardMaterial(`diorama-world-material-${planet.id}`, scene);
   bodyMaterial.diffuseColor = color;
   // A lit sphere with a specular highlight reads as a billiard ball; a planet does not have one.
   bodyMaterial.specularColor = Color3.Black();
@@ -299,14 +299,14 @@ const buildWorld = (
 
   // The bodies are small on purpose, and a controller ray has to be able to find one anyway.
   const pickTarget = MeshBuilder.CreateSphere(
-    `system-world-target-${planet.id}`,
+    `diorama-world-target-${planet.id}`,
     { diameter: Math.max(0.62, orbit.bodyRadiusSceneUnits * 4.4), segments: 10 },
     scene,
   );
   pickTarget.parent = body;
   pickTarget.applyFog = false;
   pickTarget.isPickable = true;
-  const targetMaterial = new StandardMaterial(`system-world-target-material-${planet.id}`, scene);
+  const targetMaterial = new StandardMaterial(`diorama-world-target-material-${planet.id}`, scene);
   targetMaterial.disableLighting = true;
   targetMaterial.emissiveColor = color;
   targetMaterial.alpha = 0.05;
@@ -352,6 +352,11 @@ export const createSystemWorld = (
     layout.mapping.outerSceneUnits,
     ...layout.orbits.map((orbit) => orbit.semiMajorAxisSceneUnits),
   );
+  // The target moves first, and everything else after it. `setTarget` rebuilds alpha, beta and
+  // radius from wherever the camera was left standing by the previous destination, so angles
+  // assigned before it are silently thrown away — which lands a diorama exactly edge-on, as a
+  // flat line, depending only on where the visitor happened to travel from.
+  camera.setTarget(SYSTEM_CENTRE.clone());
   camera.lowerRadiusLimit = 3.5;
   camera.upperRadiusLimit = outerReach * 3.6;
   camera.lowerBetaLimit = 0.16;
@@ -361,10 +366,9 @@ export const createSystemWorld = (
   // still read as rings in perspective rather than as a flat chart.
   camera.beta = 1.02;
   camera.radius = outerReach * 1.9;
-  camera.setTarget(SYSTEM_CENTRE.clone());
   if (!host.isInXr()) camera.attachControl(canvas, true);
 
-  const root = new TransformNode("system-root", scene);
+  const root = new TransformNode("diorama-root", scene);
   root.position.copyFrom(SYSTEM_CENTRE);
 
   // Every planet of a host shares its sky, so the diorama gets the real one: this is the view out
@@ -410,7 +414,7 @@ export const createSystemWorld = (
    * term — which would be meaningless here anyway, since the distances it would fall off over
    * are logarithmically compressed rather than real.
    */
-  const starLight = new PointLight("system-star-light", SYSTEM_CENTRE.clone(), scene);
+  const starLight = new PointLight("diorama-star-light", SYSTEM_CENTRE.clone(), scene);
   starLight.diffuse = starRecipe ? toColor3(starRecipe.color) : Color3.White();
   starLight.specular = Color3.Black();
   starLight.intensity = 1.45;

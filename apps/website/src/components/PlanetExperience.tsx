@@ -22,6 +22,7 @@ interface PlanetExperienceProps {
   onSelectHostStar: (hostStar: string) => Promise<boolean>;
   onSelectPlanet: (planet: ExoplanetProfile, cached: boolean) => void;
   onSelectStar: (star: StarProfile, cached: boolean) => void;
+  onSelectSystem: (hostStar: string) => Promise<boolean>;
   recipeOverride: WorldRecipe | null;
   result: PlanetLoadResult;
 }
@@ -44,6 +45,7 @@ export const PlanetExperience = ({
   onSelectHostStar,
   onSelectPlanet,
   onSelectStar,
+  onSelectSystem,
   recipeOverride,
   result,
 }: PlanetExperienceProps) => {
@@ -53,6 +55,7 @@ export const PlanetExperience = ({
   const [viewMode, setViewMode] = useState<ViewMode>("orbit");
   const [xrStatus, setXrStatus] = useState<XrStatus>("checking");
   const [hostJumpState, setHostJumpState] = useState<"idle" | "loading" | "error">("idle");
+  const [systemJumpState, setSystemJumpState] = useState<"idle" | "loading" | "error">("idle");
   const planet = result.planet;
   const observation = planet.observation;
   const recipe = useMemo(
@@ -65,6 +68,14 @@ export const PlanetExperience = ({
     setHostJumpState("loading");
     const found = await onSelectHostStar(planet.hostStar);
     if (!found) setHostJumpState("error");
+  };
+
+  /** The counterpart of travelling in to the host star: pull back to the whole system. */
+  const openHostSystem = async (): Promise<void> => {
+    if (result.mode === "custom" || systemJumpState === "loading") return;
+    setSystemJumpState("loading");
+    const found = await onSelectSystem(planet.hostStar);
+    setSystemJumpState(found ? "idle" : "error");
   };
 
   useEffect(() => {
@@ -101,6 +112,7 @@ export const PlanetExperience = ({
             recipe,
             onViewModeChange: setViewMode,
             onSelectHostStar: result.mode === "custom" ? undefined : () => void openHostStar(),
+            onSelectSystem: result.mode === "custom" ? undefined : () => void openHostSystem(),
             // The console inside the headset can travel anywhere the browser catalog can, so the
             // same selection handlers the DOM dialogs use are handed to the scene.
             onSelectPlanet: (destination) => onSelectPlanet(destination, false),
@@ -128,6 +140,7 @@ export const PlanetExperience = ({
     onSelectHostStar,
     onSelectPlanet,
     onSelectStar,
+    onSelectSystem,
     planet,
     recipe,
     result.mode,
@@ -301,16 +314,30 @@ export const PlanetExperience = ({
             {result.mode === "custom" ? (
               <strong>USER DEFINED</strong>
             ) : (
-              <button
-                className="system-jump"
-                type="button"
-                disabled={hostJumpState === "loading"}
-                onClick={() => void openHostStar()}
-              >
-                <span aria-hidden="true">☀</span>
-                <strong>{planet.hostStar}</strong>
-                <small>{hostJumpState === "loading" ? "RESOLVING…" : "VISIT STAR ↗"}</small>
-              </button>
+              <>
+                <button
+                  className="system-jump"
+                  type="button"
+                  disabled={hostJumpState === "loading"}
+                  onClick={() => void openHostStar()}
+                >
+                  <span aria-hidden="true">☀</span>
+                  <strong>{planet.hostStar}</strong>
+                  <small>{hostJumpState === "loading" ? "RESOLVING…" : "VISIT STAR ↗"}</small>
+                </button>
+                <button
+                  className="system-jump diorama-jump"
+                  type="button"
+                  disabled={systemJumpState === "loading"}
+                  onClick={() => void openHostSystem()}
+                >
+                  <span aria-hidden="true">◎</span>
+                  <strong>Whole system</strong>
+                  <small>
+                    {systemJumpState === "loading" ? "PLACING ORBITS…" : "VIEW EVERY ORBIT ↗"}
+                  </small>
+                </button>
+              </>
             )}
             <small>
               {observation.hostSpectralType ?? "Spectrum unavailable"}
@@ -324,6 +351,11 @@ export const PlanetExperience = ({
             {hostJumpState === "error" ? (
               <small className="system-jump-error" role="status">
                 SIMBAD could not resolve this host name.
+              </small>
+            ) : null}
+            {systemJumpState === "error" ? (
+              <small className="system-jump-error" role="status">
+                The archive links no placeable orbits to this host.
               </small>
             ) : null}
           </div>

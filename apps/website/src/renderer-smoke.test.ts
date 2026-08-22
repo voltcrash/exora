@@ -17,6 +17,7 @@ import type { SceneHost } from "./scene-host.ts";
 import { resetSkyCatalogForTesting } from "./sky-catalog.ts";
 import { createStarWorld } from "./star-scene.ts";
 import { createSystemWorld } from "./system-scene.ts";
+import { deriveRenderQuality } from "./render-quality.ts";
 import { openWorldScope } from "./world-scope.ts";
 
 const testProfile: RenderQualityProfile = {
@@ -137,7 +138,7 @@ interface Harness {
   scene: Scene;
 }
 
-const createHarness = (): Harness => {
+const createHarness = (profile: RenderQualityProfile = testProfile): Harness => {
   const engine = new NullEngine({
     deterministicLockstep: false,
     lockstepMaxSteps: 4,
@@ -160,8 +161,8 @@ const createHarness = (): Harness => {
     camera,
     canvas: new EventTarget(),
     engine,
-    profile: testProfile,
-    qualityTier: testProfile.tier,
+    profile,
+    qualityTier: profile.tier,
     scene,
     getFps: () => 60,
     isInXr: () => true,
@@ -396,7 +397,7 @@ test("the system diorama renders one headless frame and releases its scene conte
   expect(firstFrame).toHaveBeenCalledOnce();
 
   // Pointing at a world is what travels to it, so the pick targets have to be reachable.
-  const target = scene.meshes.find((mesh) => mesh.name === "system-world-system-inner");
+  const target = scene.meshes.find((mesh) => mesh.name === "diorama-world-system-inner");
   expect(target?.isPickable).toBe(true);
 
   world.dispose();
@@ -417,13 +418,13 @@ test("the diorama keeps its bodies inside the tier's geometry budget", () => {
 
   // A whole system is on screen at once, so each body is far coarser than the single full-detail
   // world the same tier draws. This is the assertion that keeps a future edit from promoting them.
-  const body = scene.meshes.find((mesh) => mesh.name === "system-world-system-outer");
+  const body = scene.meshes.find((mesh) => mesh.name === "diorama-world-system-outer");
   const bodyVertices = body?.getTotalVertices() ?? 0;
   expect(bodyVertices).toBeGreaterThan(0);
   expect(bodyVertices).toBeLessThan((testProfile.planetSegments + 1) ** 2);
 
   // Each orbit is a four-sided tube, so its whole cost is four vertices per segment.
-  const orbit = scene.meshes.find((mesh) => mesh.name === "system-orbit-line-system-outer");
+  const orbit = scene.meshes.find((mesh) => mesh.name === "diorama-orbit-system-outer");
   expect(orbit?.getTotalVertices()).toBe(testProfile.systemOrbitSegments * 4);
 
   world.dispose();
@@ -441,7 +442,7 @@ test("a world moves along its orbit as the scene runs, and stays on it", () => {
   });
   scope.seal();
 
-  const body = scene.meshes.find((mesh) => mesh.name === "system-world-system-inner");
+  const body = scene.meshes.find((mesh) => mesh.name === "diorama-world-system-inner");
   if (!body) throw new Error("Expected the inner world to have been drawn.");
   const start = body.position.clone();
 
@@ -458,5 +459,77 @@ test("a world moves along its orbit as the scene runs, and stays on it", () => {
 
   world.dispose();
   scope.dispose();
+  engine.dispose();
+}, 30_000);
+
+/** Every vertex the scene's own meshes hold, which is what a frame has to transform and submit. */
+const sceneVertexCount = (scene: Scene): number =>
+  scene.meshes.reduce((total, mesh) => total + mesh.getTotalVertices(), 0);
+
+/** The budget an actual Quest 2 gets, rather than the deliberately tiny one the suite runs on. */
+const questProfile = deriveRenderQuality({
+  userAgent: "Mozilla/5.0 (Linux; Android 12; Quest 2) OculusBrowser/33.0",
+  pixelRatio: 2,
+  hardwareConcurrency: 8,
+  deviceMemory: 6,
+});
+
+test("a seven-world diorama costs less than the one world it travels to", () => {
+  // The claim requirement the whole budget rests on: a system is affordable precisely because
+  // none of it is drawn at the detail a single arrived-at world gets. Asserted against the planet
+  // world at the same tier rather than against a literal, so retuning a tier cannot quietly
+  // invert it — and measured on the real Quest budget, not the deliberately tiny suite profile.
+  //
+  // At the time of writing: 19,906 vertices across 25 meshes for seven worlds, their orbits, the
+  // resolved host star and the sky, against 32,293 across 42 for one rocky world on its own.
+  vi.stubGlobal("window", new EventTarget());
+  const planetHarness = createHarness(questProfile);
+  const planetScope = openWorldScope(planetHarness.scene);
+  const rocky = planets[0];
+  if (!rocky) throw new Error("Expected a rocky fixture.");
+  const planetWorld = createPlanetWorld(planetHarness.host, {
+    onFirstFrame: () => undefined,
+    onViewModeChange: () => undefined,
+    planet: rocky,
+    recipe: deriveWorldRecipe(rocky),
+  });
+  planetScope.seal();
+  const planetCost = {
+    meshes: planetHarness.scene.meshes.length,
+    vertices: sceneVertexCount(planetHarness.scene),
+  };
+  planetWorld.dispose();
+  planetScope.dispose();
+  planetHarness.engine.dispose();
+
+  const sevenWorlds = Array.from({ length: 7 }, (_, index) => ({
+    ...gasGiant,
+    id: `crowded-${index}`,
+    name: `Crowded ${index}`,
+    observation: {
+      ...gasGiant.observation,
+      orbitalPeriodDays: 4 * (index + 1) ** 1.5,
+      semiMajorAxisAu: 0.04 * (index + 1) ** 1.6,
+    },
+  }));
+
+  const { engine, host, scene } = createHarness(questProfile);
+  const scope = openWorldScope(scene);
+  const before = scene.meshes.length;
+  const world = createSystemWorld(host, {
+    hostName: "Crowded Prime",
+    onFirstFrame: () => undefined,
+    planets: sevenWorlds,
+  });
+  scope.seal();
+
+  expect(world.layout.orbits).toHaveLength(7);
+  expect(sceneVertexCount(scene)).toBeLessThan(planetCost.vertices);
+  // Draw calls are the other half of the cost, and the half a per-body addition shows up in first.
+  expect(scene.meshes.length).toBeLessThan(planetCost.meshes);
+
+  world.dispose();
+  scope.dispose();
+  expect(scene.meshes.length).toBe(before);
   engine.dispose();
 }, 30_000);

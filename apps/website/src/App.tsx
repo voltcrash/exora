@@ -3,9 +3,11 @@ import type { CustomStar, CustomWorld, WorldRecipe } from "@exora/worldgen";
 import { lazy, Suspense, useCallback, useEffect, useState } from "react";
 import {
   loadPlanetByName,
+  loadPlanetsByHost,
   loadStarByName,
   type PlanetLoadResult,
   type StarLoadResult,
+  type SystemLoadResult,
 } from "./api-client.ts";
 import { PlanetExperience } from "./components/PlanetExperience.tsx";
 import { RecoveryScreen } from "./components/RecoveryScreen.tsx";
@@ -24,6 +26,11 @@ const StarCatalog = lazy(() =>
 const StarExperience = lazy(() =>
   import("./components/StarExperience.tsx").then((module) => ({ default: module.StarExperience })),
 );
+const SystemExperience = lazy(() =>
+  import("./components/SystemExperience.tsx").then((module) => ({
+    default: module.SystemExperience,
+  })),
+);
 const WorldForge = lazy(() =>
   import("./components/CustomPlanetBuilder.tsx").then((module) => ({ default: module.WorldForge })),
 );
@@ -31,12 +38,27 @@ const WorldForge = lazy(() =>
 type ActiveObject =
   | { result: PlanetLoadResult; type: "planet" }
   | { result: StarLoadResult; type: "star" }
-  | { kind: "planet" | "star"; name: string; type: "missing" };
+  | { result: SystemLoadResult; type: "system" }
+  | { kind: "planet" | "star" | "system"; name: string; type: "missing" };
 
 const defaultPlanetObject = (): ActiveObject => ({
   result: { cached: true, mode: "fallback", planet: featuredPlanet },
   type: "planet",
 });
+
+/**
+ * Resolves a whole host system from the archive.
+ *
+ * A system needs no SIMBAD lookup: every planet row carries its host star's temperature, radius,
+ * mass and luminosity, which is everything the diorama draws the star from. So a system is
+ * reachable even where the host name is one SIMBAD cannot resolve, which is most of the Kepler
+ * and TOI catalogue.
+ */
+const loadSystem = async (hostStar: string): Promise<SystemLoadResult | null> => {
+  const result = await loadPlanetsByHost(hostStar).catch(() => null);
+  if (!result || result.planets.length === 0) return null;
+  return { cached: result.cached, hostStar, planets: result.planets };
+};
 
 const loadRequestedObject = async (): Promise<ActiveObject> => {
   const parameters = new URLSearchParams(window.location.search);
@@ -45,6 +67,13 @@ const loadRequestedObject = async (): Promise<ActiveObject> => {
     const star = await loadStarByName(starName);
     if (star) return { result: star, type: "star" };
     return { kind: "star", name: starName, type: "missing" };
+  }
+
+  const systemName = parameters.get("system");
+  if (systemName) {
+    const system = await loadSystem(systemName);
+    if (system) return { result: system, type: "system" };
+    return { kind: "system", name: systemName, type: "missing" };
   }
 
   const name = parameters.get("planet");
@@ -71,7 +100,9 @@ export const App = () => {
   const [builderOpen, setBuilderOpen] = useState(false);
   const [activeObject, setActiveObject] = useState<ActiveObject | null>(() => {
     const parameters = new URLSearchParams(window.location.search);
-    return parameters.has("planet") || parameters.has("star") ? null : defaultPlanetObject();
+    return parameters.has("planet") || parameters.has("star") || parameters.has("system")
+      ? null
+      : defaultPlanetObject();
   });
   const [customRecipe, setCustomRecipe] = useState<WorldRecipe | null>(null);
   const [systemHostName, setSystemHostName] = useState<string | null>(null);
@@ -158,6 +189,22 @@ export const App = () => {
     setActiveObject({ result: { cached, mode: "live", star }, type: "star" });
   }, []);
 
+  /**
+   * Travel to a whole host system, from a world in it, from its star, or from the console.
+   *
+   * Reports back whether the archive had anything to place, the way `selectHostStar` does, so
+   * the view that asked can say so rather than the page going somewhere empty.
+   */
+  const selectSystem = useCallback(async (hostStar: string): Promise<boolean> => {
+    const system = await loadSystem(hostStar);
+    if (!system) return false;
+    window.history.pushState({}, "", `?system=${encodeURIComponent(hostStar)}`);
+    setCustomRecipe(null);
+    setSystemHostName(hostStar);
+    setActiveObject({ result: system, type: "system" });
+    return true;
+  }, []);
+
   const selectHostStar = useCallback(async (hostStar: string): Promise<boolean> => {
     const result = await loadStarByName(hostStar);
     if (!result) return false;
@@ -199,7 +246,9 @@ export const App = () => {
     activeObject && activeObject.type !== "missing"
       ? activeObject.type === "planet"
         ? activeObject.result.planet.name
-        : activeObject.result.star.name
+        : activeObject.type === "system"
+          ? `the ${activeObject.result.hostStar} system`
+          : activeObject.result.star.name
       : null;
 
   return (
@@ -261,8 +310,25 @@ export const App = () => {
           onSelectHostStar={selectHostStar}
           onSelectPlanet={selectPlanet}
           onSelectStar={selectStar}
+          onSelectSystem={selectSystem}
           recipeOverride={customRecipe}
         />
+      ) : activeObject.type === "system" ? (
+        <Suspense fallback={null}>
+          <SystemExperience
+            key={activeObject.result.hostStar}
+            host={sceneHost}
+            result={activeObject.result}
+            onGeneratePlanet={generatePlanet}
+            onGenerateStar={generateStar}
+            onSelectHostStar={selectHostStar}
+            onSelectPlanet={selectPlanet}
+            onSelectStar={selectStar}
+            onOpenBuilder={() => setBuilderOpen(true)}
+            onOpenPlanets={() => setCatalogOpen(true)}
+            onOpenStars={() => setStarCatalogOpen(true)}
+          />
+        </Suspense>
       ) : (
         <Suspense fallback={null}>
           <StarExperience
@@ -274,6 +340,7 @@ export const App = () => {
             onGenerateStar={generateStar}
             onSelectPlanet={selectPlanet}
             onSelectStar={selectStar}
+            onSelectSystem={selectSystem}
             onOpenPlanets={() => setCatalogOpen(true)}
             onOpenStars={() => setStarCatalogOpen(true)}
             onOpenBuilder={() => setBuilderOpen(true)}
@@ -293,7 +360,7 @@ export const App = () => {
       {builderOpen && activeObject && activeObject.type !== "missing" ? (
         <Suspense fallback={null}>
           <WorldForge
-            initialMode={activeObject.type}
+            initialMode={activeObject.type === "star" ? "star" : "planet"}
             onClose={() => setBuilderOpen(false)}
             onGeneratePlanet={generatePlanet}
             onGenerateStar={generateStar}

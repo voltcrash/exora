@@ -13,6 +13,7 @@ test("a catalogued destination is canonical to its own URL", () => {
     `${SITE_ORIGIN}/?planet=Kepler-22%20b`,
   );
   expect(canonicalUrlForSearch("?star=Sirius")).toBe(`${SITE_ORIGIN}/?star=Sirius`);
+  expect(canonicalUrlForSearch("?system=TRAPPIST-1")).toBe(`${SITE_ORIGIN}/?system=TRAPPIST-1`);
 });
 
 test("names with characters that need escaping survive the round trip", () => {
@@ -35,9 +36,15 @@ test("tracking parameters cannot mint a distinct canonical for the same page", (
   );
 });
 
-test("a star wins when both are somehow present, matching what the app renders", () => {
-  // `loadRequestedObject` checks `star` first, so the canonical has to agree with it.
+test("the destinations resolve in the order the app resolves them", () => {
+  // `loadRequestedObject` checks star, then system, then planet, so the canonical has to agree.
   expect(canonicalUrlForSearch("?planet=Kepler-22%20b&star=Sirius")).toBe(
+    `${SITE_ORIGIN}/?star=Sirius`,
+  );
+  expect(canonicalUrlForSearch("?planet=Kepler-22%20b&system=Kepler-22")).toBe(
+    `${SITE_ORIGIN}/?system=Kepler-22`,
+  );
+  expect(canonicalUrlForSearch("?star=Sirius&system=Kepler-22")).toBe(
     `${SITE_ORIGIN}/?star=Sirius`,
   );
 });
@@ -45,4 +52,5 @@ test("a star wins when both are somehow present, matching what the app renders",
 test("an empty or blank destination is not treated as one", () => {
   expect(canonicalUrlForSearch("?planet=")).toBe(`${SITE_ORIGIN}/`);
   expect(canonicalUrlForSearch("?star=%20%20")).toBe(`${SITE_ORIGIN}/`);
+  expect(canonicalUrlForSearch("?system=")).toBe(`${SITE_ORIGIN}/`);
 });

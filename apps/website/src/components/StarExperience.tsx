@@ -17,6 +17,7 @@ interface StarExperienceProps {
   onOpenStars: () => void;
   onSelectPlanet: (planet: ExoplanetProfile, cached: boolean) => void;
   onSelectStar: (star: StarProfile, cached: boolean) => void;
+  onSelectSystem: (hostStar: string) => Promise<boolean>;
   result: StarLoadResult;
   systemHostName: string | null;
 }
@@ -38,6 +39,7 @@ export const StarExperience = ({
   onOpenStars,
   onSelectPlanet,
   onSelectStar,
+  onSelectSystem,
   result,
   systemHostName,
 }: StarExperienceProps) => {
@@ -49,10 +51,31 @@ export const StarExperience = ({
   const [systemPlanets, setSystemPlanets] = useState<ExoplanetProfile[]>([]);
   const [systemCached, setSystemCached] = useState(false);
   const [systemState, setSystemState] = useState<"idle" | "loading" | "ready" | "error">("idle");
+  const [dioramaState, setDioramaState] = useState<"error" | "idle" | "loading">("idle");
   const star = result.star;
   const observation = star.observation;
   const visual = deriveStarVisual(star);
   const custom = result.mode === "custom";
+
+  /**
+   * The name the archive files this system under.
+   *
+   * SIMBAD and NASA rarely spell a host the same way, so the diorama is asked for under whichever
+   * alias actually returned worlds, falling back to the star's own name. Held in a ref because
+   * the console entry inside the headset is handed to the scene at mount, before the archive has
+   * answered — reading the state directly would leave it travelling to whatever was known then.
+   */
+  const dioramaHostRef = useRef(star.name);
+  useEffect(() => {
+    dioramaHostRef.current = systemHostName ?? systemPlanets[0]?.hostStar ?? star.name;
+  }, [star.name, systemHostName, systemPlanets]);
+
+  const openSystem = async (): Promise<void> => {
+    if (dioramaState === "loading") return;
+    setDioramaState("loading");
+    const found = await onSelectSystem(dioramaHostRef.current);
+    setDioramaState(found ? "idle" : "error");
+  };
 
   useEffect(() => {
     if (custom) {
@@ -119,6 +142,7 @@ export const StarExperience = ({
             // same selection handlers the DOM dialogs use are handed to the scene.
             onSelectPlanet: (destination) => onSelectPlanet(destination, false),
             onSelectStar: (destination) => onSelectStar(destination, false),
+            onSelectSystem: custom ? undefined : () => void openSystem(),
             onForgeWorld: onGeneratePlanet,
             onForgeStar: onGenerateStar,
             onFirstFrame: () => {
@@ -139,7 +163,7 @@ export const StarExperience = ({
     return () => {
       abandoned = true;
     };
-  }, [host, onGeneratePlanet, onGenerateStar, onSelectPlanet, onSelectStar, star]);
+  }, [custom, host, onGeneratePlanet, onGenerateStar, onSelectPlanet, onSelectStar, star]);
 
   return (
     <div
@@ -235,6 +259,25 @@ export const StarExperience = ({
               ) : null}
               {systemState === "ready" && systemPlanets.length === 0 ? (
                 <small>NO CONFIRMED WORLDS LINKED</small>
+              ) : null}
+              {systemPlanets.length > 0 ? (
+                <button
+                  className="system-jump diorama-jump"
+                  type="button"
+                  disabled={dioramaState === "loading"}
+                  onClick={() => void openSystem()}
+                >
+                  <span aria-hidden="true">◎</span>
+                  <strong>Whole system</strong>
+                  <small>
+                    {dioramaState === "loading" ? "PLACING ORBITS…" : "STAND AMONG THE ORBITS ↗"}
+                  </small>
+                </button>
+              ) : null}
+              {dioramaState === "error" ? (
+                <small className="system-jump-error" role="status">
+                  The archive links no placeable orbits to this host.
+                </small>
               ) : null}
               {systemPlanets.length > 0 ? (
                 <div className="known-world-list">
