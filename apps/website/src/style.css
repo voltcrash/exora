@@ -1599,12 +1599,19 @@ body[data-xr-status="unavailable"] .status-light {
   min-height: 0;
 }
 
+/*
+ * Wrapped rather than ellipsized, unlike every other value in the telemetry panel.
+ *
+ * These three lines are the only reason the diorama can be read at all — a truncated "LOG ·
+ * 0.015-..." tells a phone reader that something was compressed while withholding what. Two short
+ * lines are worth more than one tidy one here.
+ */
 .system-scale dd {
-  overflow: hidden;
   font-size: 11px;
   letter-spacing: 0.02em;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+  line-height: 1.45;
+  overflow-wrap: anywhere;
+  white-space: normal;
 }
 
 .scale-note {
