@@ -42,6 +42,18 @@ export interface RenderQualityProfile {
    * headset tiers stay low because their fill rate is the scarcest thing in the renderer.
    */
   starCount: number;
+  /**
+   * Sphere segments for a body in the system diorama.
+   *
+   * A diorama draws every confirmed world in a host system at once, so its geometry budget is
+   * per-system rather than per-planet: seven bodies at `planetSegments` would cost more than the
+   * single full-detail world the same tier is sized for, to draw spheres a few dozen pixels
+   * across. They stay coarse here and are only promoted to the full procedural surface on
+   * arrival, when one of them becomes the subject of its own scene.
+   */
+  systemBodySegments: number;
+  /** Segments around one drawn orbit. Each is a thin four-sided tube, so this is its whole cost. */
+  systemOrbitSegments: number;
   /** Whether rocky planets sample the triplanar PBR microdetail textures (normal + roughness).
    * Off on fill-rate-constrained tiers so they keep the cheaper pure-procedural surface. */
   surfaceMicrodetail: boolean;
@@ -102,6 +114,8 @@ export const deriveRenderQuality = ({
       planetSegments: 48,
       planetIcoSubdivisions: 12,
       ringTessellation: 56,
+      systemBodySegments: 12,
+      systemOrbitSegments: 72,
       fbmOctaves: 4,
       maxGiantStorms: 1,
       anisotropicFiltering: 4,
@@ -126,6 +140,8 @@ export const deriveRenderQuality = ({
       planetSegments: 60,
       planetIcoSubdivisions: 14,
       ringTessellation: 72,
+      systemBodySegments: 14,
+      systemOrbitSegments: 96,
       fbmOctaves: 5,
       maxGiantStorms: 2,
       anisotropicFiltering: 4,
@@ -150,6 +166,8 @@ export const deriveRenderQuality = ({
       planetSegments: 52,
       planetIcoSubdivisions: 12,
       ringTessellation: 80,
+      systemBodySegments: 14,
+      systemOrbitSegments: 96,
       fbmOctaves: 4,
       maxGiantStorms: 3,
       anisotropicFiltering: 8,
@@ -173,6 +191,8 @@ export const deriveRenderQuality = ({
     planetSegments: 96,
     planetIcoSubdivisions: 18,
     ringTessellation: 128,
+    systemBodySegments: 24,
+    systemOrbitSegments: 160,
     fbmOctaves: 5,
     maxGiantStorms: 3,
     anisotropicFiltering: 16,
