@@ -11,12 +11,13 @@ import type { ViewMode } from "../planet-scene.ts";
 import { formatNumber, formatPlanetName } from "../planet-utils.tsx";
 import type { SceneHost, XrStatus } from "../scene-host.ts";
 import type { TravelPhase } from "../travel-transition.ts";
-import { isXrEmulated } from "../xr-emulator.ts";
 
 interface PlanetExperienceProps {
+  chromeHidden: boolean;
   host: SceneHost | null;
   onGeneratePlanet: (world: CustomWorld) => void;
   onGenerateStar: (star: CustomStar) => void;
+  onHideChrome: () => void;
   onOpenCatalog: () => void;
   onOpenBuilder: () => void;
   onOpenStars: () => void;
@@ -29,18 +30,20 @@ interface PlanetExperienceProps {
   travelPhase: TravelPhase;
 }
 
-const xrCopy: Record<XrStatus, { button: string; label: string }> = {
-  checking: { button: "CHECKING HEADSET", label: "CHECKING WEBXR" },
-  entering: { button: "ENTERING SESSION", label: "OPENING IMMERSIVE VR" },
-  "in-xr": { button: "SESSION ACTIVE", label: "IMMERSIVE VR ACTIVE" },
-  ready: { button: "ENTER IMMERSIVE VR", label: "WEBXR READY" },
-  unavailable: { button: "VR UNAVAILABLE", label: "DESKTOP EXPLORATION" },
+const xrButtonCopy: Record<XrStatus, string> = {
+  checking: "CHECKING HEADSET",
+  entering: "ENTERING SESSION",
+  "in-xr": "SESSION ACTIVE",
+  ready: "ENTER IMMERSIVE VR",
+  unavailable: "VR UNAVAILABLE",
 };
 
 export const PlanetExperience = ({
+  chromeHidden,
   host,
   onGeneratePlanet,
   onGenerateStar,
+  onHideChrome,
   onOpenBuilder,
   onOpenCatalog,
   onOpenStars,
@@ -96,10 +99,6 @@ export const PlanetExperience = ({
     if (!found) host?.cancelTravel();
     setSystemJumpState(found ? "idle" : "error");
   };
-
-  useEffect(() => {
-    document.body.dataset.xrStatus = xrStatus;
-  }, [xrStatus]);
 
   useEffect(() => host?.onXrStatus(setXrStatus), [host]);
 
@@ -190,7 +189,7 @@ export const PlanetExperience = ({
 
   return (
     <div
-      className={`experience-shell view-${viewMode} ${settled ? "scene-ready" : ""} ${sceneState === "error" ? "scene-error" : ""} ${travelling ? "travelling" : ""}`}
+      className={`experience-shell view-${viewMode} ${settled ? "scene-ready" : ""} ${sceneState === "error" ? "scene-error" : ""} ${travelling ? "travelling" : ""} ${chromeHidden ? "chrome-hidden" : ""}`}
     >
       <div className="space-haze" aria-hidden="true" />
       <div className="viewport-grid" aria-hidden="true" />
@@ -390,17 +389,25 @@ export const PlanetExperience = ({
       </main>
 
       <footer className="mission-control">
-        <div className="system-status" aria-live="polite">
-          <span className="status-light" aria-hidden="true" />
-          <span>
-            <small>SESSION STATUS</small>
-            <strong>
-              {sceneState === "error"
-                ? "RENDERER UNAVAILABLE"
-                : `${xrCopy[xrStatus].label}${isXrEmulated() ? " · EMULATED" : ""}`}
-            </strong>
-          </span>
-        </div>
+        {sceneState === "error" ? (
+          <p className="scene-alert" role="status">
+            RENDERER UNAVAILABLE
+          </p>
+        ) : (
+          <button
+            className="clear-view"
+            type="button"
+            aria-label="Hide the interface"
+            onClick={onHideChrome}
+          >
+            <span className="clear-view-mark" aria-hidden="true" />
+            <span>
+              <small>CLEAR VIEW</small>
+              <strong>HIDE INTERFACE</strong>
+            </span>
+            <kbd>ESC</kbd>
+          </button>
+        )}
         <div className="interaction-hint" aria-label="Desktop controls">
           <span>
             <kbd>WASD</kbd>
@@ -428,7 +435,7 @@ export const PlanetExperience = ({
           <span className="button-orbit" aria-hidden="true" />
           <span>
             <small>IMMERSIVE MODE</small>
-            <strong>{xrCopy[xrStatus].button}</strong>
+            <strong>{xrButtonCopy[xrStatus]}</strong>
           </span>
           <span className="button-arrow" aria-hidden="true">
             ↗

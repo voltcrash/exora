@@ -38,9 +38,11 @@ const sirius: StarProfile = {
 const planetMarkup = (): string =>
   renderToStaticMarkup(
     <PlanetExperience
+      chromeHidden={false}
       host={null}
       onGeneratePlanet={vi.fn()}
       onGenerateStar={vi.fn()}
+      onHideChrome={vi.fn()}
       onOpenBuilder={vi.fn()}
       onOpenCatalog={vi.fn()}
       onOpenStars={vi.fn()}
@@ -57,9 +59,11 @@ const planetMarkup = (): string =>
 const starMarkup = (): string =>
   renderToStaticMarkup(
     <StarExperience
+      chromeHidden={false}
       host={null}
       onGeneratePlanet={vi.fn()}
       onGenerateStar={vi.fn()}
+      onHideChrome={vi.fn()}
       onOpenBuilder={vi.fn()}
       onOpenPlanets={vi.fn()}
       onOpenStars={vi.fn()}

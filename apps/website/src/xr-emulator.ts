@@ -79,9 +79,6 @@ export const isXrEmulatorRequested = (): boolean => EMULATOR_AVAILABLE && reques
 
 let state: XrEmulatorState = "off";
 
-/** True once the emulated runtime is serving `navigator.xr`. */
-export const isXrEmulated = (): boolean => state === "installed";
-
 /**
  * Installs the emulated runtime. Must resolve before Babylon inspects `navigator.xr`,
  * so callers await it ahead of the first render.

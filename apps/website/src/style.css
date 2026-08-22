@@ -217,6 +217,9 @@ button {
 
 .viewport-grid {
   opacity: 0.06;
+  transition:
+    opacity 360ms ease,
+    visibility 360ms ease;
   background-image:
     linear-gradient(rgb(180 235 239 / 18%) 1px, transparent 1px),
     linear-gradient(90deg, rgb(180 235 239 / 18%) 1px, transparent 1px);
@@ -243,6 +246,23 @@ button {
 .travelling .topbar,
 .travelling .hud,
 .travelling .mission-control {
+  visibility: hidden;
+  opacity: 0;
+}
+
+/*
+ * A cleared view: every panel, readout and control put away at once, leaving the world and the
+ * space around it. Hidden the same way travel hides them, and for the same reason — a faded-out
+ * button is still a button, and this state has nothing that should still be clickable.
+ *
+ * The grid over the canvas goes too. It is decoration rather than a control, but it is drawn in
+ * the interface's own hand, and a view is not cleared while it is still ruled.
+ */
+.chrome-hidden .topbar,
+.chrome-hidden .hud,
+.chrome-hidden .mission-control,
+.chrome-hidden .approach-status,
+.chrome-hidden .viewport-grid {
   visibility: hidden;
   opacity: 0;
 }
@@ -502,15 +522,6 @@ button {
 .catalog-radar::after {
   width: 100%;
   height: 1px;
-}
-
-.status-light {
-  width: 6px;
-  height: 6px;
-  flex: 0 0 auto;
-  border-radius: 50%;
-  background: var(--cyan);
-  box-shadow: 0 0 12px rgb(139 230 234 / 70%);
 }
 
 .hud {
@@ -917,7 +928,27 @@ h1 em {
   gap: 16px;
 }
 
-.system-status,
+/*
+ * Each control holds its own end of the row, rather than taking whichever column auto-placement
+ * hands it. Two of the three drop out at some width or other — the hints below 960px, the button
+ * on the left where there is no Escape key to press — and without this the survivors slide left
+ * into the vacated slots. `-2` is the last column either layout has.
+ */
+.clear-view,
+.scene-alert {
+  grid-column: 1;
+}
+
+.interaction-hint {
+  grid-column: 2;
+}
+
+.enter-vr {
+  grid-column: -2;
+}
+
+.clear-view,
+.scene-alert,
 .interaction-hint,
 .enter-vr {
   border: 1px solid var(--line);
@@ -926,22 +957,44 @@ h1 em {
   box-shadow: 0 8px 30px rgb(0 0 0 / 22%);
 }
 
-.system-status {
+/*
+ * The way to put the interface away and be left with the sky.
+ *
+ * It advertises Escape with a `<kbd>` the way the catalog trigger advertises `/`, and that chip is
+ * the whole affordance: pressing it hides this button along with everything else, so the key has
+ * to have been read before the click. See `.chrome-hidden` for what goes.
+ */
+.clear-view {
   justify-self: start;
-  display: flex;
+  min-height: 48px;
+  display: grid;
+  grid-template-columns: 26px 1fr auto;
   align-items: center;
   gap: 10px;
-  min-height: 48px;
-  padding: 8px 13px;
+  padding: 8px 11px;
   border-radius: 14px;
+  color: #dfeaec;
+  cursor: pointer;
+  pointer-events: auto;
+  text-align: left;
+  transition:
+    border-color 160ms ease,
+    background 160ms ease,
+    transform 160ms ease;
 }
 
-.system-status > span:last-child {
+.clear-view:hover {
+  border-color: rgb(139 230 234 / 45%);
+  background: rgb(18 40 43 / 84%);
+  transform: translateY(-1px);
+}
+
+.clear-view > span:nth-child(2) {
   display: grid;
   gap: 2px;
 }
 
-.system-status small,
+.clear-view small,
 .enter-vr small {
   color: var(--faint);
   font-family: var(--mono);
@@ -949,15 +1002,71 @@ h1 em {
   letter-spacing: 0.08em;
 }
 
-.system-status strong {
+.clear-view strong {
   color: #c8d4d7;
   font-size: 9px;
   font-weight: 500;
 }
 
-body[data-xr-status="unavailable"] .status-light {
-  background: #738086;
-  box-shadow: none;
+.clear-view kbd {
+  min-width: 24px;
+  padding: 4px;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  color: var(--muted);
+  font-family: var(--mono);
+  font-size: 8px;
+  text-align: center;
+}
+
+/* A frame with nothing left in it. */
+.clear-view-mark {
+  width: 26px;
+  height: 26px;
+  border: 1px solid currentcolor;
+  border-radius: 8px;
+  position: relative;
+  opacity: 0.7;
+}
+
+.clear-view-mark::after {
+  content: "";
+  position: absolute;
+  inset: 50% 3px auto;
+  border-top: 1px solid currentcolor;
+  transform: rotate(-38deg);
+}
+
+/*
+ * Takes the same corner when a world fails to build.
+ *
+ * Nothing else says so: the loading card stands down as soon as the attempt settles either way,
+ * and the page-level recovery screens answer for the renderer itself, not for one scene that
+ * could not be assembled on it.
+ */
+.scene-alert {
+  justify-self: start;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-height: 48px;
+  margin: 0;
+  padding: 8px 13px;
+  border-radius: 14px;
+  color: #c8d4d7;
+  font-family: var(--mono);
+  font-size: 9px;
+  letter-spacing: 0.06em;
+}
+
+.scene-alert::before {
+  content: "";
+  width: 6px;
+  height: 6px;
+  flex: 0 0 auto;
+  border-radius: 50%;
+  background: var(--accent);
+  box-shadow: 0 0 12px rgb(255 107 50 / 70%);
 }
 
 .interaction-hint {
@@ -1079,6 +1188,7 @@ body[data-xr-status="unavailable"] .status-light {
 .star-trigger:focus-visible,
 .catalog-close:focus-visible,
 .catalog-result:focus-visible,
+.clear-view:focus-visible,
 .enter-vr:focus-visible,
 .generate-world:focus-visible,
 .planet-builder input:focus-visible,
@@ -3187,19 +3297,24 @@ body[data-xr-status="unavailable"] .status-light {
     gap: 8px;
   }
 
-  .system-status {
+  /* Same coupling as the top-bar triggers: the mark is decorative, so .clear-view's aria-label
+     is what names the button once the copy beside it is gone. */
+  .clear-view {
     min-width: 46px;
     width: 46px;
-    justify-content: center;
+    grid-template-columns: 1fr;
+    place-items: center;
     padding: 8px;
   }
 
-  .system-status > span:last-child {
-    position: absolute;
-    width: 1px;
-    height: 1px;
-    overflow: hidden;
-    clip-path: inset(50%);
+  .clear-view > span:nth-child(2),
+  .clear-view kbd {
+    display: none;
+  }
+
+  .scene-alert {
+    padding: 8px 11px;
+    font-size: 8px;
   }
 
   .enter-vr {
@@ -3459,14 +3574,27 @@ body[data-xr-status="unavailable"] .status-light {
   .discovery-card,
   .collection-card,
   .surprise-journey,
+  .clear-view,
   .enter-vr,
   .loading-screen,
   .approach-status,
+  .viewport-grid,
   .surface-veil,
   .travel-veil,
   .topbar,
   .hud,
   .mission-control {
     transition: none;
+  }
+}
+
+/*
+ * Escape is the only way back out of a cleared view, so the button that clears it is not offered
+ * where there is no key to press. A touch-only device would be left holding a hidden interface
+ * with nothing on screen to restore it, and the way out would be reloading the page.
+ */
+@media (pointer: coarse) and (hover: none) {
+  .clear-view {
+    display: none;
   }
 }

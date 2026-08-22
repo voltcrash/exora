@@ -108,6 +108,11 @@ export const App = () => {
   const [customRecipe, setCustomRecipe] = useState<WorldRecipe | null>(null);
   const [systemHostName, setSystemHostName] = useState<string | null>(null);
 
+  // Whether the interface has been put away, leaving the world on its own. Held here rather than
+  // in the view showing it, for the same reason the travel phase is: it is a property of the page
+  // and has to survive one destination being exchanged for another.
+  const [chromeHidden, setChromeHidden] = useState(false);
+
   // Held here rather than inside each view, because the point of the phase is that it outlives
   // the swap: the destination arriving has to be mounted already knowing a jump is in the air,
   // or it paints its own loading card over the flight for the frame before it finds out.
@@ -139,8 +144,11 @@ export const App = () => {
   //
   // It belongs here rather than inside the catalog, because the catalog is only mounted once it
   // is already open: a listener living there could never see the press that is supposed to open
-  // it. Nothing it reads changes over the life of the page, so it is bound once.
+  // it. It stands down for as long as the interface is hidden — a cleared view opening a dialog
+  // over itself would be no kind of clearing, and it leaves Escape below unambiguous.
   useEffect(() => {
+    if (chromeHidden) return;
+
     const openCatalogWithShortcut = (event: KeyboardEvent): void => {
       const target = event.target;
       if (
@@ -163,7 +171,22 @@ export const App = () => {
 
     document.addEventListener("keydown", openCatalogWithShortcut);
     return () => document.removeEventListener("keydown", openCatalogWithShortcut);
-  }, []);
+  }, [chromeHidden]);
+
+  // Escape brings the interface back, and is the only thing that can: hiding it hides the button
+  // that did the hiding, which is why that button wears the key on its face. Nothing competes for
+  // the press — every control that opens a dialog is hidden along with the rest, and the one
+  // shortcut that could have opened one from the keyboard is stood down above.
+  useEffect(() => {
+    if (!chromeHidden) return;
+
+    const restoreChrome = (event: KeyboardEvent): void => {
+      if (event.key === "Escape") setChromeHidden(false);
+    };
+
+    document.addEventListener("keydown", restoreChrome);
+    return () => document.removeEventListener("keydown", restoreChrome);
+  }, [chromeHidden]);
 
   // Keeps the canonical link and the shared-link URL on the destination actually being shown.
   // Travel rewrites the query string through `pushState`, which moves neither on its own, so
@@ -323,10 +346,12 @@ export const App = () => {
       ) : activeObject.type === "planet" ? (
         <PlanetExperience
           key={activeObject.result.planet.id}
+          chromeHidden={chromeHidden}
           host={sceneHost}
           result={activeObject.result}
           onGeneratePlanet={generatePlanet}
           onGenerateStar={generateStar}
+          onHideChrome={() => setChromeHidden(true)}
           onOpenCatalog={() => setCatalogOpen(true)}
           onOpenBuilder={() => setBuilderOpen(true)}
           onOpenStars={() => setStarCatalogOpen(true)}
@@ -341,10 +366,12 @@ export const App = () => {
         <Suspense fallback={null}>
           <SystemExperience
             key={activeObject.result.hostStar}
+            chromeHidden={chromeHidden}
             host={sceneHost}
             result={activeObject.result}
             onGeneratePlanet={generatePlanet}
             onGenerateStar={generateStar}
+            onHideChrome={() => setChromeHidden(true)}
             onSelectHostStar={selectHostStar}
             onSelectPlanet={selectPlanet}
             onSelectStar={selectStar}
@@ -358,11 +385,13 @@ export const App = () => {
         <Suspense fallback={null}>
           <StarExperience
             key={activeObject.result.star.id}
+            chromeHidden={chromeHidden}
             host={sceneHost}
             result={activeObject.result}
             systemHostName={systemHostName}
             onGeneratePlanet={generatePlanet}
             onGenerateStar={generateStar}
+            onHideChrome={() => setChromeHidden(true)}
             onSelectPlanet={selectPlanet}
             onSelectStar={selectStar}
             onSelectSystem={selectSystem}

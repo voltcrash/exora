@@ -457,6 +457,41 @@ test("the `/` shortcut opens the catalog", async () => {
   await expect.element(page.getByRole("dialog")).toBeVisible();
 });
 
+test("clearing the view puts every panel away, and Escape brings them back", async () => {
+  stubArchive();
+  mountApp();
+  await expect.element(page.getByRole("heading", { level: 1 })).toBeVisible();
+
+  // Both instances offer the control: only a touch-only device is refused it, and neither of
+  // these emulates one. What the phone instance adds is that the button loses its copy at that
+  // width, so it resolves by name here only because it carries an aria-label.
+  const clearView = page.getByRole("button", { name: "Hide the interface" });
+  await expect.element(clearView).toBeVisible();
+
+  // Held as nodes rather than queried again after the click. Panels are hidden rather than faded,
+  // which takes them out of the accessibility tree as well as off the screen — so a role query
+  // would stop finding the very elements the assertions below are about.
+  const panels = [".topbar", ".hud", ".mission-control"].map((selector) => {
+    const panel = document.querySelector<HTMLElement>(selector);
+    expect(panel, selector).not.toBeNull();
+    return panel!;
+  });
+
+  await userEvent.click(clearView);
+
+  for (const panel of panels) await expect.element(panel).not.toBeVisible();
+
+  // The shortcut stands down while the view is cleared, so the one key that could still have
+  // opened a dialog over it does nothing, and Escape below is left unambiguous.
+  await userEvent.keyboard("/");
+  expect(document.querySelector("dialog")).toBeNull();
+
+  await userEvent.keyboard("{Escape}");
+
+  for (const panel of panels) await expect.element(panel).toBeVisible();
+  await expect.element(clearView).toBeVisible();
+});
+
 test("an open overlay parks the renderer, and closing it starts the loop again", async () => {
   stubArchive();
   mountApp();
