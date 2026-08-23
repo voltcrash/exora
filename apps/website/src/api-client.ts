@@ -79,7 +79,7 @@ const requestStarCollection = (
 
 export interface PlanetLoadResult {
   cached: boolean;
-  mode: "custom" | "fallback" | "live";
+  mode: "custom" | "fallback" | "live" | "solar";
   planet: ExoplanetProfile;
 }
 
@@ -91,7 +91,7 @@ export interface PlanetSearchResult {
 
 export interface StarLoadResult {
   cached: boolean;
-  mode: "custom" | "live";
+  mode: "custom" | "live" | "solar";
   star: StarProfile;
 }
 

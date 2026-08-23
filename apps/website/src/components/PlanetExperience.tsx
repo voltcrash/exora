@@ -22,6 +22,7 @@ interface PlanetExperienceProps {
   onOpenCatalog: () => void;
   onOpenBuilder: () => void;
   onOpenStars: () => void;
+  onOpenSolarSystem?: () => void;
   onSelectHostStar: (hostStar: string) => Promise<boolean>;
   onSelectPlanet: (planet: ExoplanetProfile, cached: boolean) => void;
   onSelectStar: (star: StarProfile, cached: boolean) => void;
@@ -48,6 +49,7 @@ export const PlanetExperience = ({
   onOpenBuilder,
   onOpenCatalog,
   onOpenStars,
+  onOpenSolarSystem,
   onSelectHostStar,
   onSelectPlanet,
   onSelectStar,
@@ -232,6 +234,20 @@ export const PlanetExperience = ({
           </span>
         </a>
         <div className="exploration-actions">
+          <button
+            className="solar-trigger"
+            type="button"
+            aria-label="Open our Solar System"
+            onClick={onOpenSolarSystem}
+          >
+            <span className="solar-symbol" aria-hidden="true">
+              ☉
+            </span>
+            <span>
+              <small>HOME SYSTEM</small>
+              <strong>SOLAR SYSTEM</strong>
+            </span>
+          </button>
           <button
             id="open-catalog"
             className="catalog-trigger"

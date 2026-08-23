@@ -18,6 +18,7 @@ interface StarExperienceProps {
   onOpenBuilder: () => void;
   onOpenPlanets: () => void;
   onOpenStars: () => void;
+  onOpenSolarSystem?: () => void;
   onSelectPlanet: (planet: ExoplanetProfile, cached: boolean) => void;
   onSelectStar: (star: StarProfile, cached: boolean) => void;
   onSelectSystem: (hostStar: string) => Promise<boolean>;
@@ -43,6 +44,7 @@ export const StarExperience = ({
   onOpenBuilder,
   onOpenPlanets,
   onOpenStars,
+  onOpenSolarSystem,
   onSelectPlanet,
   onSelectStar,
   onSelectSystem,
@@ -63,6 +65,7 @@ export const StarExperience = ({
   const observation = star.observation;
   const visual = deriveStarVisual(star);
   const custom = result.mode === "custom";
+  const solar = result.mode === "solar";
   // A jump in the air owns the screen: this view's panels go with the world being left, and its
   // loading card stays down, because the flight is what stands in for it now.
   const travelling = travelPhase === "departing" || travelPhase === "crossing";
@@ -95,7 +98,7 @@ export const StarExperience = ({
   };
 
   useEffect(() => {
-    if (custom) {
+    if (custom || solar) {
       setSystemPlanets([]);
       setSystemState("idle");
       return;
@@ -124,7 +127,7 @@ export const StarExperience = ({
         if (!controller.signal.aborted) setSystemState("error");
       });
     return () => controller.abort();
-  }, [custom, star.catalogName, star.name, systemHostName]);
+  }, [custom, solar, star.catalogName, star.name, systemHostName]);
 
   useEffect(() => {
     worldRef.current?.setSystemWorlds(systemPlanets, (planet) =>
@@ -197,6 +200,20 @@ export const StarExperience = ({
         </a>
         <div className="exploration-actions">
           <button
+            className={`solar-trigger${solar ? " active" : ""}`}
+            type="button"
+            aria-label="Open our Solar System"
+            onClick={onOpenSolarSystem}
+          >
+            <span className="solar-symbol" aria-hidden="true">
+              ☉
+            </span>
+            <span>
+              <small>HOME SYSTEM</small>
+              <strong>SOLAR SYSTEM</strong>
+            </span>
+          </button>
+          <button
             className="catalog-trigger compact-trigger"
             type="button"
             aria-label="Open NASA exoplanet catalog"
@@ -241,7 +258,7 @@ export const StarExperience = ({
       <main className="hud">
         <section className="world-intro" aria-labelledby="star-name">
           <p className="eyebrow">
-            <span>{custom ? "GENERATED STAR" : "OBSERVED STAR"}</span>
+            <span>{custom ? "GENERATED STAR" : solar ? "OUR STAR" : "OBSERVED STAR"}</span>
             <span>{starKindLabel(star)}</span>
           </p>
           <h1 id="star-name">{star.name}</h1>
@@ -258,7 +275,9 @@ export const StarExperience = ({
             <span aria-hidden="true" />{" "}
             {custom
               ? "USER-DESIGNED PROCEDURAL STAR"
-              : "STELLAR APPEARANCE INFERRED FROM SPECTRAL CLASS"}
+              : solar
+                ? "NASA/JPL MEASUREMENTS · EXORA STELLAR SURFACE"
+                : "STELLAR APPEARANCE INFERRED FROM SPECTRAL CLASS"}
           </p>
           {!custom ? (
             <section className="known-worlds" aria-labelledby="known-worlds-title">
@@ -321,8 +340,12 @@ export const StarExperience = ({
         >
           <div className="telemetry-heading">
             <span>
-              <small>{custom ? "WORLD FORGE" : "SIMBAD ARCHIVE"}</small>
-              {custom ? "Chosen properties" : "Observed properties"}
+              <small>{custom ? "WORLD FORGE" : solar ? "NASA/JPL" : "SIMBAD ARCHIVE"}</small>
+              {custom
+                ? "Chosen properties"
+                : solar
+                  ? "Home-star parameters"
+                  : "Observed properties"}
             </span>
             <span className="signal-bars" aria-hidden="true">
               <i />
@@ -410,7 +433,11 @@ export const StarExperience = ({
             </small>
           </div>
           <p className="source-note">
-            {custom ? "EXORA CUSTOM GENERATOR · PROCEDURAL" : "SIMBAD · BASIC + IDENT + ALLFLUXES"}{" "}
+            {custom
+              ? "EXORA CUSTOM GENERATOR · PROCEDURAL"
+              : solar
+                ? "NASA/JPL SOLAR SYSTEM DYNAMICS · PLANETARY PHYSICAL PARAMETERS"
+                : "SIMBAD · BASIC + IDENT + ALLFLUXES"}{" "}
             · {star.source.retrievedOn}
           </p>
         </aside>

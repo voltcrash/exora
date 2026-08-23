@@ -1,5 +1,31 @@
 export type PlanetKind = "gas-giant" | "ice-giant" | "rocky" | "unknown";
 
+export interface SolarSystemIdentity {
+  /** IAU class of this object inside our own planetary system. */
+  bodyType: "dwarf-planet" | "moon" | "planet" | "star";
+  /** NAIF's permanent numeric body code, shared by JPL Horizons and SPICE. */
+  naifId: number;
+  /** The body this object directly orbits; null only for the Sun. */
+  parent: string | null;
+  /** Sidereal rotation, signed so retrograde rotation remains observable. */
+  rotationPeriodHours: number | null;
+  /** A known body's factual one-line description, not an inferred visual summary. */
+  summary: string;
+  /** Obliquity to the body's orbital plane. */
+  axialTiltDegrees: number | null;
+  texture?: {
+    credit: string;
+    path: string;
+    sourceUrl: string;
+  };
+}
+
+export interface SolarSystemSource {
+  archive: "NASA/JPL Solar System Dynamics";
+  retrievedOn: string;
+  table: "planetary-physical-parameters" | "planetary-satellite-physical-parameters";
+}
+
 export interface ExoplanetObservation {
   /**
    * Where the host system sits on the sky, in ICRS degrees, as the archive reports it.
@@ -51,6 +77,7 @@ export interface ExoplanetProfile {
   kind: PlanetKind;
   name: string;
   observation: ExoplanetObservation;
+  solarSystem?: SolarSystemIdentity;
   source:
     | {
         archive: "NASA Exoplanet Archive";
@@ -61,7 +88,8 @@ export interface ExoplanetProfile {
         archive: "Exora Custom Generator";
         retrievedOn: string;
         table: "procedural";
-      };
+      }
+    | SolarSystemSource;
 }
 
 export interface ApiMetadata {
@@ -118,6 +146,7 @@ export interface StarProfile {
   name: string;
   objectType: string;
   observation: StarObservation;
+  solarSystem?: SolarSystemIdentity;
   source:
     | {
         archive: "SIMBAD";
@@ -128,7 +157,8 @@ export interface StarProfile {
         archive: "Exora Custom Generator";
         retrievedOn: string;
         table: "procedural";
-      };
+      }
+    | SolarSystemSource;
 }
 
 export interface StarApiMetadata {

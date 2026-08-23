@@ -17,12 +17,18 @@ import { togglesClearView } from "./clear-view-shortcut.ts";
 import { opensSearchShortcut } from "./search-shortcut.ts";
 import { TRAVEL_CROSS_MS, TRAVEL_REVEAL_MS, type TravelPhase } from "./travel-transition.ts";
 import { useSceneHost } from "./use-scene-host.ts";
+import { findSolarStar, findSolarWorld } from "./solar-system.ts";
 
 const PlanetCatalog = lazy(() =>
   import("./components/PlanetCatalog.tsx").then((module) => ({ default: module.PlanetCatalog })),
 );
 const StarCatalog = lazy(() =>
   import("./components/StarCatalog.tsx").then((module) => ({ default: module.StarCatalog })),
+);
+const SolarSystemCatalog = lazy(() =>
+  import("./components/SolarSystemCatalog.tsx").then((module) => ({
+    default: module.SolarSystemCatalog,
+  })),
 );
 const StarExperience = lazy(() =>
   import("./components/StarExperience.tsx").then((module) => ({ default: module.StarExperience })),
@@ -51,6 +57,9 @@ const loadRequestedObject = async (): Promise<ActiveObject> => {
   const parameters = new URLSearchParams(window.location.search);
   const starName = parameters.get("star");
   if (starName) {
+    const localStar = findSolarStar(starName);
+    if (localStar)
+      return { result: { cached: true, mode: "solar", star: localStar }, type: "star" };
     const star = await reachStar(starName);
     if (star) return { result: star, type: "star" };
     return { kind: "star", name: starName, type: "missing" };
@@ -65,6 +74,11 @@ const loadRequestedObject = async (): Promise<ActiveObject> => {
 
   const name = parameters.get("planet");
   if (!name) return defaultPlanetObject();
+
+  const localWorld = findSolarWorld(name);
+  if (localWorld) {
+    return { result: { cached: true, mode: "solar", planet: localWorld }, type: "planet" };
+  }
 
   const requested = await loadPlanetByName(name);
   return requested && hasRenderer(requested.planet)
@@ -84,6 +98,7 @@ export const App = () => {
   } = useSceneHost(canvas);
   const [catalogOpen, setCatalogOpen] = useState(false);
   const [starCatalogOpen, setStarCatalogOpen] = useState(false);
+  const [solarSystemCatalogOpen, setSolarSystemCatalogOpen] = useState(false);
   const [builderOpen, setBuilderOpen] = useState(false);
   const [activeObject, setActiveObject] = useState<ActiveObject | null>(() => {
     const parameters = new URLSearchParams(window.location.search);
@@ -108,7 +123,7 @@ export const App = () => {
   // Every one of these covers the canvas with a modal dialog, so for as long as one is open the
   // scene behind it is being rendered for nobody — and worse, keeping it moving forces the
   // browser to rebuild the scrim's backdrop blur every frame. Parking the loop reclaims both.
-  const overlayOpen = builderOpen || catalogOpen || starCatalogOpen;
+  const overlayOpen = builderOpen || catalogOpen || starCatalogOpen || solarSystemCatalogOpen;
   useEffect(() => {
     if (!sceneHost || !overlayOpen) return;
     return sceneHost.suspendRendering();
@@ -222,15 +237,23 @@ export const App = () => {
     window.history.pushState({}, "", `?planet=${encodeURIComponent(planet.name)}`);
     setCatalogOpen(false);
     setCustomRecipe(null);
-    setActiveObject({ result: { cached, mode: "live", planet }, type: "planet" });
+    setSolarSystemCatalogOpen(false);
+    setActiveObject({
+      result: { cached, mode: planet.solarSystem ? "solar" : "live", planet },
+      type: "planet",
+    });
   }, []);
 
   const selectStar = useCallback((star: StarProfile, cached: boolean): void => {
     window.history.pushState({}, "", `?star=${encodeURIComponent(star.name)}`);
     setStarCatalogOpen(false);
+    setSolarSystemCatalogOpen(false);
     setCustomRecipe(null);
     setSystemHostName(null);
-    setActiveObject({ result: { cached, mode: "live", star }, type: "star" });
+    setActiveObject({
+      result: { cached, mode: star.solarSystem ? "solar" : "live", star },
+      type: "star",
+    });
   }, []);
 
   /**
@@ -369,6 +392,7 @@ export const App = () => {
           onOpenCatalog={() => setCatalogOpen(true)}
           onOpenBuilder={() => setBuilderOpen(true)}
           onOpenStars={() => setStarCatalogOpen(true)}
+          onOpenSolarSystem={() => setSolarSystemCatalogOpen(true)}
           onSelectHostStar={selectHostStar}
           onSelectPlanet={selectPlanet}
           onSelectStar={selectStar}
@@ -392,6 +416,7 @@ export const App = () => {
             onOpenBuilder={() => setBuilderOpen(true)}
             onOpenPlanets={() => setCatalogOpen(true)}
             onOpenStars={() => setStarCatalogOpen(true)}
+            onOpenSolarSystem={() => setSolarSystemCatalogOpen(true)}
             travelPhase={travelPhase}
           />
         </Suspense>
@@ -412,6 +437,7 @@ export const App = () => {
             onOpenPlanets={() => setCatalogOpen(true)}
             onOpenStars={() => setStarCatalogOpen(true)}
             onOpenBuilder={() => setBuilderOpen(true)}
+            onOpenSolarSystem={() => setSolarSystemCatalogOpen(true)}
             travelPhase={travelPhase}
           />
         </Suspense>
@@ -424,6 +450,15 @@ export const App = () => {
       {starCatalogOpen ? (
         <Suspense fallback={null}>
           <StarCatalog onClose={() => setStarCatalogOpen(false)} onSelect={selectStar} />
+        </Suspense>
+      ) : null}
+      {solarSystemCatalogOpen ? (
+        <Suspense fallback={null}>
+          <SolarSystemCatalog
+            onClose={() => setSolarSystemCatalogOpen(false)}
+            onSelectPlanet={selectPlanet}
+            onSelectStar={selectStar}
+          />
         </Suspense>
       ) : null}
       {builderOpen && activeObject && activeObject.type !== "missing" ? (

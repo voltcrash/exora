@@ -25,6 +25,7 @@ export const starSummary = (star: StarProfile): string => {
   if (star.source.archive === "Exora Custom Generator") {
     return `A user-designed ${visual.label.toLowerCase()} synthesized from its chosen stellar family, temperature, scale, activity, rotation, and generation seed.`;
   }
+  if (star.solarSystem) return star.solarSystem.summary;
   const spectrum = star.observation.spectralType
     ? `Its ${star.observation.spectralType} spectrum suggests a ${visual.label.toLowerCase()}`
     : `SIMBAD classifies it as ${star.objectType.toLowerCase()}`;

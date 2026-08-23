@@ -87,10 +87,11 @@ const explorationActions = (markup: string): string[] => {
 test("every top-bar destination on the world view names itself", () => {
   const buttons = explorationActions(planetMarkup());
 
-  expect(buttons).toHaveLength(3);
+  expect(buttons).toHaveLength(4);
   for (const button of buttons) expect(button).toMatch(/aria-label="[^"]+"/);
 
   expect(buttons.join("")).toContain('aria-label="Open NASA exoplanet catalog"');
+  expect(buttons.join("")).toContain('aria-label="Open our Solar System"');
   expect(buttons.join("")).toContain('aria-label="Open SIMBAD star catalog"');
   expect(buttons.join("")).toContain('aria-label="Open World Forge"');
 });
@@ -98,12 +99,13 @@ test("every top-bar destination on the world view names itself", () => {
 test("every top-bar destination on the star view names itself", () => {
   const buttons = explorationActions(starMarkup());
 
-  expect(buttons).toHaveLength(3);
+  expect(buttons).toHaveLength(4);
   for (const button of buttons) expect(button).toMatch(/aria-label="[^"]+"/);
 
   // The planet button loses its text at 640px rather than 760px, so it was unnamed on a narrower
   // phone than the other two but unnamed all the same.
   expect(buttons.join("")).toContain('aria-label="Open NASA exoplanet catalog"');
+  expect(buttons.join("")).toContain('aria-label="Open our Solar System"');
   expect(buttons.join("")).toContain('aria-label="Open SIMBAD star catalog"');
   expect(buttons.join("")).toContain('aria-label="Open World Forge"');
 });
