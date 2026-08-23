@@ -152,6 +152,9 @@ importers:
       '@iwer/devui':
         specifier: 'catalog:'
         version: 2.3.0(@types/react@19.2.18)(iwer@2.3.0)(use-sync-external-store@1.6.0(react@19.2.8))
+      '@types/node':
+        specifier: ^26.2.0
+        version: 26.2.0
       '@types/react':
         specifier: 'catalog:'
         version: 19.2.18
@@ -3567,7 +3570,6 @@ snapshots:
   '@types/node@26.2.0':
     dependencies:
       undici-types: 8.3.0
-    optional: true
 
   '@types/react-dom@19.2.4(@types/react@19.2.18)':
     dependencies:
@@ -5273,8 +5275,7 @@ snapshots:
 
   undici-types@7.18.2: {}
 
-  undici-types@8.3.0:
-    optional: true
+  undici-types@8.3.0: {}
 
   undici@5.29.0:
     dependencies:

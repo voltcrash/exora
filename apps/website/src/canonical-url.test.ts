@@ -14,6 +14,9 @@ test("a catalogued destination is canonical to its own URL", () => {
   );
   expect(canonicalUrlForSearch("?star=Sirius")).toBe(`${SITE_ORIGIN}/?star=Sirius`);
   expect(canonicalUrlForSearch("?system=TRAPPIST-1")).toBe(`${SITE_ORIGIN}/?system=TRAPPIST-1`);
+  expect(canonicalUrlForSearch("?asteroid=101955%20Bennu")).toBe(
+    `${SITE_ORIGIN}/?asteroid=101955%20Bennu`,
+  );
 });
 
 test("names with characters that need escaping survive the round trip", () => {

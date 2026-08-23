@@ -35,7 +35,7 @@ export interface DskConversionRecord {
 
 export interface IrregularShapeAsset {
   /** Browser-ready shape format. DSK plates are stored as a lossless GLB conversion. */
-  format: "glb" | "obj";
+  format: "glb" | "obj" | "stl";
   path: string;
   provenance: ScientificAssetProvenance;
   sha256: string;
@@ -47,7 +47,12 @@ export interface IrregularShapeAsset {
 export interface IrregularShapeModel {
   /** Highest fidelity first is conventional but not required; selection is triangle-budget based. */
   lods: readonly IrregularShapeAsset[];
-  sourceKind: "mission-glb" | "mission-obj" | "naif-dsk-conversion";
+  sourceKind:
+    | "derived-mission-grid"
+    | "mission-glb"
+    | "mission-obj"
+    | "mission-stl"
+    | "naif-dsk-conversion";
 }
 
 export interface IrregularSurfaceMaterial {
@@ -188,6 +193,12 @@ const createNeutralMaterial = (
   material.environmentIntensity = 0;
   material.directIntensity = 1;
   material.emissiveColor = Color3.Black();
+  // Mission archives are split between right-handed and left-handed body frames. Babylon's OBJ
+  // and STL loaders preserve the archived plate winding, so treating one winding as universally
+  // front-facing can cull an otherwise valid closed model in its entirety. Lighting remains
+  // directional; only visibility is two-sided at the plate level.
+  material.backFaceCulling = false;
+  material.twoSidedLighting = true;
 
   if (descriptor.surface.albedoTexture) {
     const albedo = new Texture(descriptor.surface.albedoTexture.path, scene, true, false);
@@ -209,7 +220,7 @@ const loadMeasuredShape = async (
   asset: IrregularShapeAsset,
 ): Promise<readonly AbstractMesh[]> => {
   const imported = await ImportMeshAsync(asset.path, scene, {
-    pluginExtension: asset.format === "obj" ? ".obj" : ".glb",
+    pluginExtension: `.${asset.format}`,
   });
   return imported.meshes;
 };
@@ -233,10 +244,15 @@ export const createIrregularBody = async (
   const geometryRoot = new TransformNode(`${descriptor.name}-measured-geometry`, scene);
   spinRoot.parent = orientationRoot;
   geometryRoot.parent = spinRoot;
-  orientationRoot.rotation.z =
+  const spinAxis = descriptor.rotation.spinAxis ?? "y";
+  const axialTiltRadians =
     descriptor.rotation.axialTiltDegrees === null
       ? 0
       : (descriptor.rotation.axialTiltDegrees * Math.PI) / 180;
+  // Tilt around an axis perpendicular to the declared spin axis. Rotating a z-spin model around
+  // z would merely change its prime meridian while leaving the pole untilted.
+  if (spinAxis === "z") orientationRoot.rotation.x = axialTiltRadians;
+  else orientationRoot.rotation.z = axialTiltRadians;
 
   let meshes: readonly AbstractMesh[] = [];
   let geometryStatus: MountedIrregularBody["geometryStatus"] = "dimensions-only";
@@ -304,11 +320,13 @@ export const createIrregularBody = async (
   light.autoCalcShadowZBounds = true;
   const shadows = new ShadowGenerator(profile.irregularBodyShadowMapSize, light);
   shadows.usePercentageCloserFiltering = true;
-  shadows.bias = 0.0004;
-  shadows.normalBias = 0.018;
+  // Plate models carry sharp, unsmoothed face transitions. A planetary-sphere bias leaves those
+  // faces shadowing themselves into black triangular pits; scene-scale offsets retain real cast
+  // shadows while keeping the measured surface readable at grazing light.
+  shadows.bias = 0.003;
+  shadows.normalBias = 0.055;
   for (const mesh of meshes) shadows.addShadowCaster(mesh, true);
 
-  const spinAxis = descriptor.rotation.spinAxis ?? "y";
   const advanceRotation = (elapsedSeconds: number, timeScale = 1): void => {
     const periodHours = descriptor.rotation.periodHours;
     if (periodHours === null || periodHours === 0) return;

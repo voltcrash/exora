@@ -65,7 +65,7 @@ vi.mock("./scene-host.ts", () => {
       listener("unavailable");
       return () => undefined;
     },
-    profile: { hardwareScalingLevel: 1, tier: "desktop" },
+    profile: { hardwareScalingLevel: 1, maxIrregularBodyTriangles: 900_000, tier: "desktop" },
     qualityTier: "desktop",
     refreshConsole: () => undefined,
     /** How many overlays are currently holding the loop parked, for the assertions below. */
@@ -101,6 +101,13 @@ vi.mock("./star-scene.ts", () => ({
   createStarWorld: (_host: unknown, options: { onFirstFrame: () => void }) => {
     options.onFirstFrame();
     return { ...mountedWorld(), setSystemWorlds: () => undefined };
+  },
+}));
+
+vi.mock("./small-body-scene.ts", () => ({
+  createSmallBodyWorld: (_host: unknown, options: { onFirstFrame: () => void }) => {
+    options.onFirstFrame();
+    return mountedWorld();
   },
 }));
 
@@ -420,6 +427,27 @@ test("the star catalog opens and travels to a star", async () => {
 
   await expect.element(page.getByRole("heading", { level: 1 })).toHaveTextContent("Sirius");
   expect(window.location.search).toBe("?star=Sirius");
+});
+
+test("the Home System catalog filters mission asteroids and opens measured geometry", async () => {
+  stubArchive();
+  mountApp();
+
+  await userEvent.click(page.getByRole("button", { name: "Open our Solar System" }));
+  await expect.element(page.getByRole("heading", { name: "It’s time to go home" })).toBeVisible();
+
+  await userEvent.click(page.getByRole("button", { name: "ASTEROIDS" }));
+  await userEvent.fill(page.getByPlaceholder("Name, designation, or SPK ID"), "20101955");
+  const bennu = page.getByRole("button", { name: /101955 Bennu/ });
+  await expect.element(bennu).toBeVisible();
+  await userEvent.click(bennu);
+
+  await expect.element(page.getByRole("heading", { level: 1 })).toHaveTextContent("101955 Bennu");
+  await expect.element(page.getByText("MEASURED GEOMETRY", { exact: true })).toBeVisible();
+  await expect
+    .element(page.getByLabelText("Permanent identifiers"))
+    .toHaveTextContent("SPK 20101955");
+  expect(window.location.search).toBe("?asteroid=101955%20Bennu");
 });
 
 test("a dialog closes on Escape and returns the page", async () => {

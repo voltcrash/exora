@@ -1,5 +1,7 @@
 import type { ExoplanetProfile, StarProfile } from "@exora/contracts";
-import { useEffect, useRef } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
+import type { AsteroidProfile } from "../solar-asteroids.ts";
+import { SOLAR_SYSTEM_ASTEROIDS } from "../solar-asteroids.ts";
 import {
   SOLAR_SYSTEM_CATALOG_GROUPS,
   SOLAR_SYSTEM_DWARF_MOONS,
@@ -8,16 +10,52 @@ import {
 
 interface SolarSystemCatalogProps {
   onClose: () => void;
+  onSelectAsteroid: (asteroid: AsteroidProfile) => void;
   onSelectPlanet: (planet: ExoplanetProfile, cached: boolean) => void;
   onSelectStar: (star: StarProfile, cached: boolean) => void;
 }
 
 export const SolarSystemCatalog = ({
   onClose,
+  onSelectAsteroid,
   onSelectPlanet,
   onSelectStar,
 }: SolarSystemCatalogProps) => {
   const dialogRef = useRef<HTMLDialogElement>(null);
+  const [filter, setFilter] = useState<"all" | "asteroids" | "dwarfs" | "moons" | "planets">("all");
+  const [query, setQuery] = useState("");
+  const normalizedQuery = query.trim().toLocaleLowerCase();
+
+  const visibleGroups = useMemo(
+    () =>
+      SOLAR_SYSTEM_CATALOG_GROUPS.map((group) => ({
+        ...group,
+        entries: group.entries.filter((entry) => {
+          const bodyType = entry.profile.solarSystem?.bodyType;
+          const category =
+            bodyType === "moon" ? "moons" : bodyType === "dwarf-planet" ? "dwarfs" : "planets";
+          return (
+            (filter === "all" || filter === category) &&
+            (normalizedQuery.length === 0 ||
+              entry.profile.name.toLocaleLowerCase().includes(normalizedQuery) ||
+              entry.profile.solarSystem?.spkId?.includes(normalizedQuery))
+          );
+        }),
+      })).filter((group) => group.entries.length > 0),
+    [filter, normalizedQuery],
+  );
+
+  const visibleAsteroids = useMemo(
+    () =>
+      SOLAR_SYSTEM_ASTEROIDS.filter(
+        (asteroid) =>
+          (filter === "all" || filter === "asteroids") &&
+          (normalizedQuery.length === 0 ||
+            asteroid.aliases.some((alias) => alias.toLocaleLowerCase().includes(normalizedQuery)) ||
+            asteroid.spkId.includes(normalizedQuery)),
+      ),
+    [filter, normalizedQuery],
+  );
 
   useEffect(() => {
     const dialog = dialogRef.current;
@@ -59,7 +97,30 @@ export const SolarSystemCatalog = ({
             mission-mapped moons · {SOLAR_SYSTEM_DWARF_MOONS.length} unresolved dwarf-planet moons
           </small>
         </div>
-        {SOLAR_SYSTEM_CATALOG_GROUPS.map((group) => (
+        <div className="solar-catalog-tools" role="search">
+          <label>
+            <span>SEARCH HOME SYSTEM</span>
+            <input
+              type="search"
+              value={query}
+              placeholder="Name, designation, or SPK ID"
+              onChange={(event) => setQuery(event.target.value)}
+            />
+          </label>
+          <div className="solar-catalog-filters" aria-label="Filter Solar System catalog">
+            {(["all", "planets", "dwarfs", "moons", "asteroids"] as const).map((option) => (
+              <button
+                className={filter === option ? "active" : ""}
+                key={option}
+                type="button"
+                onClick={() => setFilter(option)}
+              >
+                {option.toUpperCase()}
+              </button>
+            ))}
+          </div>
+        </div>
+        {visibleGroups.map((group) => (
           <section className="solar-catalog-section" key={group.label}>
             <h3>{group.label}</h3>
             <ol className="solar-body-grid">
@@ -113,6 +174,41 @@ export const SolarSystemCatalog = ({
             </ol>
           </section>
         ))}
+        {visibleAsteroids.length > 0 ? (
+          <section className="solar-catalog-section" key="mission-asteroids">
+            <h3>Asteroids · mission encounters and targets</h3>
+            <ol className="solar-body-grid">
+              {visibleAsteroids.map((asteroid) => (
+                <li key={asteroid.id}>
+                  <button type="button" onClick={() => onSelectAsteroid(asteroid)}>
+                    <span className="solar-body-portrait asteroid-portrait" aria-hidden="true">
+                      ◇
+                    </span>
+                    <span className="solar-body-copy">
+                      <small>ASTEROID · {asteroid.parent}</small>
+                      <strong>{asteroid.name}</strong>
+                      <span>{asteroid.summary}</span>
+                      <em className={`science-status science-status-${asteroid.evidence.geometry}`}>
+                        {asteroid.descriptor.shapeModel
+                          ? "MEASURED MISSION SHAPE · NEUTRAL SURFACE"
+                          : "MEASURED DIMENSIONS · UNRESOLVED SURFACE"}
+                      </em>
+                    </span>
+                    <span className="solar-body-meta">
+                      <small>SPK {asteroid.spkId}</small>
+                      <strong>TRAVEL ↗</strong>
+                    </span>
+                  </button>
+                </li>
+              ))}
+            </ol>
+          </section>
+        ) : null}
+        {visibleGroups.length === 0 && visibleAsteroids.length === 0 ? (
+          <p className="solar-catalog-empty" role="status">
+            NO HOME-SYSTEM OBJECTS MATCH THIS FILTER
+          </p>
+        ) : null}
       </div>
     </dialog>
   );

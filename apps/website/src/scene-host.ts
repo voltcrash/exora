@@ -139,7 +139,9 @@ export interface SceneHost {
    * Resolves with the mounted world, or with null when a later travel request overtook this one
    * while the screen was fading — in that case nothing was built and nothing needs releasing.
    */
-  mountWorld: <World extends MountedWorld>(build: () => World) => Promise<World | null>;
+  mountWorld: <World extends MountedWorld>(
+    build: () => Promise<World> | World,
+  ) => Promise<World | null>;
   /** Repaints the console, for when a world's own entries change after it was mounted. */
   refreshConsole: () => void;
   /** Subscribes to immersive status, called immediately with the current one. */
@@ -285,6 +287,7 @@ const createSceneHost = (canvas: HTMLCanvasElement): SceneHost => {
   let currentWorld: MountedWorld | null = null;
   let currentScope: WorldScope | null = null;
   let mountToken = 0;
+  let worldBuildGate = Promise.resolve();
   let sessionFoveation = profile.xrFixedFoveation;
   let qualitySampleSeconds = 0;
 
@@ -669,7 +672,7 @@ const createSceneHost = (canvas: HTMLCanvasElement): SceneHost => {
   };
 
   const mountWorld = async <World extends MountedWorld>(
-    build: () => World,
+    build: () => Promise<World> | World,
   ): Promise<World | null> => {
     const token = (mountToken += 1);
     // The outgoing world keeps rendering through the flight, so the jump never shows an empty
@@ -680,54 +683,80 @@ const createSceneHost = (canvas: HTMLCanvasElement): SceneHost => {
     }
     if (token !== mountToken || disposed) return null;
 
-    currentWorld?.dispose();
-    currentScope?.dispose();
-    currentWorld = null;
-    currentScope = null;
-    resetSceneDefaults();
+    // Asset-backed destinations can yield while Babylon fetches a model. Serialize that interval:
+    // a second mount must never open another world scope while the first scope is still observing
+    // additions to the shared scene.
+    const precedingBuild = worldBuildGate;
+    let releaseBuildGate = (): void => undefined;
+    worldBuildGate = new Promise<void>((resolve) => {
+      releaseBuildGate = resolve;
+    });
+    await precedingBuild;
 
-    // Nothing may interleave between opening the scope and sealing it: the scope's reading of
-    // what the world added depends on the build being uninterrupted. See `world-scope.ts`.
-    const scope = openWorldScope(scene);
-    let world: World;
     try {
-      world = build();
-    } catch (error) {
-      // A build that failed part-way still left geometry in a scene that is not thrown away any
-      // more, so the half-built world is swept out before the failure is reported.
+      if (token !== mountToken || disposed) return null;
+
+      currentWorld?.dispose();
+      currentScope?.dispose();
+      currentWorld = null;
+      currentScope = null;
+      resetSceneDefaults();
+
+      // Nothing may interleave between opening the scope and sealing it: the scope's reading of
+      // what the world added depends on the build being uninterrupted. See `world-scope.ts`.
+      const scope = openWorldScope(scene);
+      let world: World;
+      try {
+        world = await build();
+      } catch (error) {
+        // A build that failed part-way still left geometry in a scene that is not thrown away any
+        // more, so the half-built world is swept out before the failure is reported.
+        scope.seal();
+        scope.dispose();
+        xrConsole?.refresh();
+        void fadeVeil(0);
+        // There is no destination to fly in to, so the flight is abandoned rather than landed:
+        // the recovery screen that answers this has to be visible, not behind a jump that never
+        // ends.
+        endGlide(null, false);
+        departure = null;
+        travelOrigin = null;
+        setTravelPhase("idle");
+        dispatchRendererEvent("render-failed");
+        throw error;
+      }
       scope.seal();
-      scope.dispose();
+
+      // A newer request may have arrived while the model was in flight. The completed scene is
+      // scientifically valid but no longer the requested destination, so release it unseen.
+      if (token !== mountToken || disposed) {
+        world.dispose();
+        scope.dispose();
+        return null;
+      }
+
+      currentScope = scope;
+      currentWorld = world;
+      rigAwaitingWorld = isInXr;
       xrConsole?.refresh();
       void fadeVeil(0);
-      // There is no destination to fly in to, so the flight is abandoned rather than landed: the
-      // recovery screen that answers this has to be visible, not behind a jump that never ends.
-      endGlide(null, false);
-      departure = null;
-      travelOrigin = null;
-      setTravelPhase("idle");
-      dispatchRendererEvent("render-failed");
-      throw error;
+      arriveAtWorld(token);
+      // A destination can be chosen from a dialog that is still open over the canvas — the
+      // catalog closes and the world mounts in the same commit, and nothing says which lands
+      // first. One frame here means the scrim is never left blurring the world the visitor just
+      // left.
+      if (!looping) renderFrame();
+      // Building a world stalls the frame loop, and the rolling average knows nothing about why:
+      // left alone it reports the stall as a run of enormous frames for seconds afterwards, which
+      // shows up as a heads-up display insisting on single digits and — worse — as the quality
+      // adapter deciding the machine cannot keep up and dropping the render scale, which
+      // reallocates the framebuffer and hitches the arrival it was supposed to be helping.
+      engine.performanceMonitor.reset();
+      qualitySampleSeconds = 0;
+      return world;
+    } finally {
+      releaseBuildGate();
     }
-    scope.seal();
-
-    currentScope = scope;
-    currentWorld = world;
-    rigAwaitingWorld = isInXr;
-    xrConsole?.refresh();
-    void fadeVeil(0);
-    arriveAtWorld(token);
-    // A destination can be chosen from a dialog that is still open over the canvas — the catalog
-    // closes and the world mounts in the same commit, and nothing says which lands first. One
-    // frame here means the scrim is never left blurring the world the visitor just left.
-    if (!looping) renderFrame();
-    // Building a world stalls the frame loop, and the rolling average knows nothing about why:
-    // left alone it reports the stall as a run of enormous frames for seconds afterwards, which
-    // shows up as a heads-up display insisting on single digits and — worse — as the quality
-    // adapter deciding the machine cannot keep up and dropping the render scale, which
-    // reallocates the framebuffer and hitches the arrival it was supposed to be helping.
-    engine.performanceMonitor.reset();
-    qualitySampleSeconds = 0;
-    return world;
   };
 
   setXrStatus("checking");

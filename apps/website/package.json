@@ -23,6 +23,7 @@
   },
   "devDependencies": {
     "@iwer/devui": "catalog:",
+    "@types/node": "^26.2.0",
     "@types/react": "catalog:",
     "@types/react-dom": "catalog:",
     "@vitejs/plugin-react": "catalog:",

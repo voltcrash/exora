@@ -9,6 +9,7 @@ import {
 } from "./api-client.ts";
 import { reachStar, reachSystem } from "./destination-cache.ts";
 import { PlanetExperience } from "./components/PlanetExperience.tsx";
+import { SmallBodyExperience } from "./components/SmallBodyExperience.tsx";
 import { RecoveryScreen } from "./components/RecoveryScreen.tsx";
 import { featuredPlanet } from "./planet-profile.ts";
 import { hasRenderer } from "./planet-utils.tsx";
@@ -18,6 +19,7 @@ import { opensSearchShortcut } from "./search-shortcut.ts";
 import { TRAVEL_CROSS_MS, TRAVEL_REVEAL_MS, type TravelPhase } from "./travel-transition.ts";
 import { useSceneHost } from "./use-scene-host.ts";
 import { findSolarStar, findSolarWorld } from "./solar-system.ts";
+import { findSolarAsteroid, type AsteroidProfile } from "./solar-asteroids.ts";
 
 const PlanetCatalog = lazy(() =>
   import("./components/PlanetCatalog.tsx").then((module) => ({ default: module.PlanetCatalog })),
@@ -43,10 +45,11 @@ const WorldForge = lazy(() =>
 );
 
 type ActiveObject =
+  | { asteroid: AsteroidProfile; type: "asteroid" }
   | { result: PlanetLoadResult; type: "planet" }
   | { result: StarLoadResult; type: "star" }
   | { result: SystemLoadResult; type: "system" }
-  | { kind: "planet" | "star" | "system"; name: string; type: "missing" };
+  | { kind: "asteroid" | "planet" | "star" | "system"; name: string; type: "missing" };
 
 const defaultPlanetObject = (): ActiveObject => ({
   result: { cached: true, mode: "fallback", planet: featuredPlanet },
@@ -55,6 +58,14 @@ const defaultPlanetObject = (): ActiveObject => ({
 
 const loadRequestedObject = async (): Promise<ActiveObject> => {
   const parameters = new URLSearchParams(window.location.search);
+  const asteroidName = parameters.get("asteroid");
+  if (asteroidName) {
+    const asteroid = findSolarAsteroid(asteroidName);
+    return asteroid
+      ? { asteroid, type: "asteroid" }
+      : { kind: "asteroid", name: asteroidName, type: "missing" };
+  }
+
   const starName = parameters.get("star");
   if (starName) {
     const localStar = findSolarStar(starName);
@@ -102,7 +113,10 @@ export const App = () => {
   const [builderOpen, setBuilderOpen] = useState(false);
   const [activeObject, setActiveObject] = useState<ActiveObject | null>(() => {
     const parameters = new URLSearchParams(window.location.search);
-    return parameters.has("planet") || parameters.has("star") || parameters.has("system")
+    return parameters.has("asteroid") ||
+      parameters.has("planet") ||
+      parameters.has("star") ||
+      parameters.has("system")
       ? null
       : defaultPlanetObject();
   });
@@ -256,6 +270,14 @@ export const App = () => {
     });
   }, []);
 
+  const selectAsteroid = useCallback((asteroid: AsteroidProfile): void => {
+    window.history.pushState({}, "", `?asteroid=${encodeURIComponent(asteroid.name)}`);
+    setSolarSystemCatalogOpen(false);
+    setCustomRecipe(null);
+    setSystemHostName(null);
+    setActiveObject({ asteroid, type: "asteroid" });
+  }, []);
+
   /**
    * Travel to a whole host system, from a world in it, from its star, or from the console.
    *
@@ -311,11 +333,13 @@ export const App = () => {
 
   const subject =
     activeObject && activeObject.type !== "missing"
-      ? activeObject.type === "planet"
-        ? activeObject.result.planet.name
-        : activeObject.type === "system"
-          ? `the ${activeObject.result.hostStar} system`
-          : activeObject.result.star.name
+      ? activeObject.type === "asteroid"
+        ? activeObject.asteroid.name
+        : activeObject.type === "planet"
+          ? activeObject.result.planet.name
+          : activeObject.type === "system"
+            ? `the ${activeObject.result.hostStar} system`
+            : activeObject.result.star.name
       : null;
 
   return (
@@ -379,6 +403,18 @@ export const App = () => {
           detail={`The ${activeObject.kind} “${activeObject.name}” could not be resolved from its archive or is not yet supported by Exora.`}
           heading="DESTINATION UNAVAILABLE"
           onRetry={returnHome}
+        />
+      ) : activeObject.type === "asteroid" ? (
+        <SmallBodyExperience
+          key={activeObject.asteroid.id}
+          asteroid={activeObject.asteroid}
+          chromeHidden={chromeHidden}
+          host={sceneHost}
+          onHideChrome={() => setChromeHidden(true)}
+          onOpenSolarSystem={() => setSolarSystemCatalogOpen(true)}
+          onSelectAsteroid={selectAsteroid}
+          onSelectStar={selectStar}
+          travelPhase={travelPhase}
         />
       ) : activeObject.type === "planet" ? (
         <PlanetExperience
@@ -456,6 +492,7 @@ export const App = () => {
         <Suspense fallback={null}>
           <SolarSystemCatalog
             onClose={() => setSolarSystemCatalogOpen(false)}
+            onSelectAsteroid={selectAsteroid}
             onSelectPlanet={selectPlanet}
             onSelectStar={selectStar}
           />

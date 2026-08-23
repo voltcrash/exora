@@ -2,6 +2,7 @@ import { defineConfig, type Plugin } from "vite-plus";
 import react from "@vitejs/plugin-react";
 import { playwright } from "vite-plus/test/browser-playwright";
 import { NOTABLE_PLANET_NAMES, NOTABLE_STAR_NAMES } from "./src/search-discovery.ts";
+import { FEATURED_ASTEROID_NAMES } from "./src/solar-asteroids.ts";
 
 /**
  * Drops Babylon's WGSL shader sources from the bundle.
@@ -77,6 +78,7 @@ const SITE_ORIGIN = "https://exora.voltcrash.com";
 const buildSitemap = (): string => {
   const destinations = [
     "/",
+    ...FEATURED_ASTEROID_NAMES.map((name) => `/?asteroid=${encodeURIComponent(name)}`),
     ...NOTABLE_PLANET_NAMES.map((name) => `/?planet=${encodeURIComponent(name)}`),
     ...NOTABLE_STAR_NAMES.map((name) => `/?star=${encodeURIComponent(name)}`),
   ];
@@ -127,6 +129,17 @@ const enforceJavaScriptBudget = (): Plugin => ({
 });
 
 export default defineConfig({
+  optimizeDeps: {
+    // The irregular-body route is lazy, but browser journeys open it after the dev server has
+    // already started. Pre-bundling its loader/material modules prevents Vite from reloading the
+    // entire test page halfway through a journey when that route is first visited.
+    include: [
+      "@babylonjs/core/Lights/Shadows/shadowGenerator.js",
+      "@babylonjs/core/Loading/sceneLoader.js",
+      "@babylonjs/core/Materials/PBR/pbrMaterial.js",
+      "@babylonjs/loaders/dynamic.js",
+    ],
+  },
   /**
    * The two suites this package runs, kept as separate projects so neither pays for the other.
    *

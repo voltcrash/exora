@@ -78,6 +78,51 @@ global surfaces. Haumea's occultation-constrained proportions are measured, but 
 material is still only a neutral water-ice treatment. The UI labels all of these limitations at
 the point of use.
 
+## Mission asteroids
+
+Retrieved 2026-08-23. Physical and osculating orbital parameters for the authored collection come
+from the NASA/JPL Small-Body Database API **1.3**, requested with `phys-par=1` and full precision.
+The permanent JPL SPK identifiers stored with each record are `20000004` (Vesta), `20101955`
+(Bennu), `20162173` (Ryugu), `20000433` (Eros), `20025143` (Itokawa), `20000243` (Ida),
+`20065803` (Didymos system barycenter), `20000016` (Psyche), and `20099942` (Apophis). The
+exceptional Galileo-era NAIF identifiers `2431010` and `2431011` identify Ida and Dactyl;
+Didymos-body and Dimorphos identifiers are `920065803` and `120065803`. Source endpoint:
+https://ssd-api.jpl.nasa.gov/sbdb.api.
+
+| Shipped asset             | Source / mission                                                                          | Credit                                                                 | Permanent identity                          | License / citation                                                        | SHA-256                                                            | Original URL                                                                                                                                                        |
+| ------------------------- | ----------------------------------------------------------------------------------------- | ---------------------------------------------------------------------- | ------------------------------------------- | ------------------------------------------------------------------------- | ------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `vesta-dawn-a.stl`        | NASA 3D Resources, Dawn-derived Vesta shape, 800,000 plates                               | NASA/JPL-Caltech/UCLA/MPS/DLR/IDA                                      | NAIF `2000004`; SPK `20000004`              | NASA media guidelines; U.S. Government work, free of copyright            | `a20fbfc9378398fd157ad0421ceead4dff277f5d545aa7c86d7e14eaa160fe46` | https://github.com/nasa/NASA-3D-Resources/blob/master/3D%20Printing/Asteroid%204%20Vesta%20(A)/Asteroid%204%20Vesta%20(A).stl                                       |
+| `bennu-spo-v54.obj`       | NASA PDS OSIRIS-REx Altimetry, combined SPC/OLA global model v54, 12,288 plates           | M. Daly, O. Barnouin, R. Espiritu, D. Lauretta and the OSIRIS-REx team | NAIF `2101955`; SPK `20101955`              | NASA PDS public data; cite DOI `10.26033/pzcf-qs69`                       | `16bfb2cb054efce787800f544468ba01e4d4ab005d015989fb5396a8d58307b4` | https://sbnarchive.psi.edu/pds4/orex/orex.altimetry/data_derived_altimetry_global_models/global_digital_terrain_models/SPOv54/g_12620mm_spo_obj_0000n00000_v054.obj |
+| `bennu-spo-v54-49k.obj`   | NASA PDS OSIRIS-REx Altimetry, combined SPC/OLA global model v54, 49,152 plates           | M. Daly, O. Barnouin, R. Espiritu, D. Lauretta and the OSIRIS-REx team | NAIF `2101955`; SPK `20101955`              | NASA PDS public data; cite DOI `10.26033/pzcf-qs69`                       | `7f7d91d049874d76e81c350e3567a141d54f58f68d4516684176fbf7bb64b2e2` | https://sbnarchive.psi.edu/pds4/orex/orex.altimetry/data_derived_altimetry_global_models/global_digital_terrain_models/SPOv54/g_06320mm_spo_obj_0000n00000_v054.obj |
+| `ryugu-sfm-49k.obj`       | JAXA DARTS Hayabusa2 SFM v20180804, 49,152 plates                                         | JAXA, University of Aizu, Kobe University; Watanabe et al. (2019)      | NAIF `2162173`; SPK `20162173`              | JAXA DARTS scientific data, provided as-is; publication citation required | `7d66c54b3e68253b27918a82e32c4b8bffc0702e016e036bc5d0eb334c8d9962` | https://data.darts.isas.jaxa.jp/pub/hayabusa2/paper/Watanabe_2019/SHAPE_SFM_49k_v20180804.obj                                                                       |
+| `eros-near.obj`           | NASA PDS Gaskell Eros V1.1, NEAR MSI 64q vertex/plate model, 49,152 plates                | Robert Gaskell; NEAR MSI; lossless OBJ conversion by Exora             | NAIF `2000433`; SPK `20000433`              | NASA PDS public data; cite `urn:nasa:pds:gaskell.ast-eros.shape-model`    | `da31d242d836a8c175a8e141aed7e07ed2e76635e2f6b2aaa6851edb11598b9f` | https://sbnarchive.psi.edu/pds4/non_mission/gaskell.ast-eros.shape-model_V1_1/data/vertex/ver64q.tab                                                                |
+| `itokawa-hayabusa.obj`    | NASA PDS Gaskell Itokawa V1.1, Hayabusa AMICA 64q vertex/plate model, 49,152 plates       | R. Gaskell et al.; Hayabusa AMICA; lossless OBJ conversion by Exora    | NAIF `2025143`; SPK `20025143`              | NASA PDS public data; cite `urn:nasa:pds:gaskell.ast-itokawa.shape-model` | `c948399e83c351ce83d9fc932a9bce6b25672159cdb3e71a4d551db9616412db` | https://sbnarchive.psi.edu/pds4/non_mission/gaskell.ast-itokawa.shape-model_V1_1/data/vertex/ver64q.tab                                                             |
+| `ida-galileo.obj`         | NASA PDS Thomas optical radial model from Galileo SSI, converted sample-for-sample to OBJ | P. C. Thomas et al.; Galileo SSI; conversion by Exora                  | NAIF `2431010`; SPK `20000243`              | NASA PDS public data; cite DOI `10.26033/g5e0-kh52`                       | `77391dc4ced5cd40b1d1be9be5231caeaea90f608f7ee52b543751fd4267cdf3` | https://sbnarchive.psi.edu/pds4/non_mission/ast-sat.thomas.shape-models_V1_0/data/243ida.tab                                                                        |
+| `didymos-dart-v003.obj`   | NASA PDS DART final Didymos global SPC v003, 49,152 plates                                | DART Altimetry Working Group; Daly, Barnouin, Ernst et al.             | NAIF `920065803`; SPK barycenter `20065803` | NASA PDS public data; cite DOI `10.26007/bm57-x327`                       | `ac1f51b06cedcf197d7df88888be729255ef604137a3157219e93a9bcd5115a6` | https://pdssbn.astro.umd.edu/holdings/pds4-dart_shapemodel-v1.0/data_derived_didymos_model_v003/didymos_g_9309mm_spc_obj_0000n00000_v003.obj                        |
+| `dimorphos-dart-v004.obj` | NASA PDS DART final pre-impact Dimorphos global SPC v004, 49,152 plates                   | DART Altimetry Working Group; Daly, Barnouin, Ernst et al.             | NAIF / SPK `120065803`                      | NASA PDS public data; cite DOI `10.26007/0nss-vd15`                       | `134bbaf72bf8f6505d67cbcfd695708b7cf64ec6e27de95775914c93efbeb487` | https://pdssbn.astro.umd.edu/holdings/pds4-dart_shapemodel-v1.0/data_derived_dimorphos_model_v004/dimorphos_g_1940mm_spc_obj_0000n00000_v004.obj                    |
+
+`scripts/convert-pds-radial-grid-to-obj.mjs` documents the Ida conversion. It converts every
+archived latitude/longitude/radius sample to Cartesian coordinates and joins adjacent samples;
+it does not interpolate, smooth, decimate, or invent vertices. The DART products are the archived
+OBJ sources used to generate their corresponding NAIF DSKs, so no DSK plate conversion is needed
+in the browser. `scripts/convert-pds-vertex-plate-to-obj.mjs` preserves every indexed Cartesian
+vertex and triangular plate in the archived Eros and Itokawa tables. The previously considered
+NASA 3D-printing files were intentionally rejected because they contain separated printable
+hemispheres rather than flight-ready complete-body geometry. `scripts/normalize-pds-obj.mjs`
+changes only fixed-width whitespace and line
+endings in archived OBJ vertex/face records so Babylon can parse them; vertex values and plate
+indices remain token-for-token identical. The SHA-256 values above describe the normalized files
+that ship.
+
+No mission image is wrapped onto these models. The neutral materials preserve shape without
+claiming global color coverage. Dactyl is too sparsely resolved for a detailed model and is shown
+only as a measured-dimensions silhouette. Psyche has not yet been visited and Apophis has not yet
+been visited by OSIRIS-APEX; their current views are explicitly dimensions-only. Apophis also
+rotates non-principally, so Exora does not animate it as a simple single-axis rotator. Dimorphos
+uses the final **pre-impact** v004 shape; its post-impact rotation/orbit value is labeled separately.
+The current JPL min/nominal/max 2029 Apophis close-approach solution is presented numerically and
+is never drawn as a false impact corridor.
+
 ## Planet textures
 
 Exora's macro terrain, oceans, ice, lava, cloud systems, giant bands, geometry, and base color are
