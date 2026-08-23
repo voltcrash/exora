@@ -5,6 +5,8 @@ export interface SolarSystemIdentity {
   bodyType: "dwarf-planet" | "moon" | "planet" | "star";
   /** NAIF's permanent numeric body code, shared by JPL Horizons and SPICE. */
   naifId: number;
+  /** JPL Horizons/SBDB SPK identifier. It differs from the legacy NAIF code for some asteroids. */
+  spkId?: string;
   /** The body this object directly orbits; null only for the Sun. */
   parent: string | null;
   /** Inclination to the body's local reference plane (the ecliptic for planets). */
@@ -19,17 +21,39 @@ export interface SolarSystemIdentity {
   summary: string;
   /** Obliquity to the body's orbital plane. */
   axialTiltDegrees: number | null;
+  /** Measured full-axis dimensions, ordered longest to shortest. */
+  dimensionsKilometers?: readonly [number, number, number];
+  /** How faithfully the visible surface can be tied to observations. */
+  surfaceStatus?: "mapped" | "modeled" | "unresolved";
+  /** Plain-language disclosure for incomplete coverage or constrained visualizations. */
+  surfaceNote?: string;
   texture?: {
     credit: string;
+    license?: string;
+    mission?: string;
+    originalUrl?: string;
     path: string;
+    retrievedOn?: string;
     sourceUrl: string;
+    topography?: {
+      credit: string;
+      license: string;
+      originalUrl: string;
+      path: string;
+      retrievalDate: string;
+      /** Peak-to-peak display relief as a fraction of mean radius. */
+      reliefScale: number;
+    };
   };
 }
 
 export interface SolarSystemSource {
-  archive: "NASA/JPL Solar System Dynamics";
+  archive: "NASA/JPL Small-Body Database" | "NASA/JPL Solar System Dynamics";
   retrievedOn: string;
-  table: "planetary-physical-parameters" | "planetary-satellite-physical-parameters";
+  table:
+    | "planetary-physical-parameters"
+    | "planetary-satellite-physical-parameters"
+    | "sbdb-api-v1.3";
 }
 
 export interface ExoplanetObservation {

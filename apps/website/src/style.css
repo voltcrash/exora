@@ -1803,6 +1803,27 @@ h1 em {
     0 0 24px rgb(91 210 224 / 22%);
 }
 
+.solar-eris,
+.solar-makemake,
+.solar-dysnomia,
+.solar-hiʻiaka,
+.solar-namaka,
+.solar-s\/2015-\(136472\)-1 {
+  background: radial-gradient(circle at 31% 27%, #f2f5f4, #aeb9bd 45%, #596369 75%, #171d21);
+  box-shadow:
+    inset -26px -9px 34px rgb(0 0 0 / 63%),
+    0 0 25px rgb(173 210 220 / 12%);
+}
+
+.solar-haumea {
+  height: 86px;
+  border-radius: 48%;
+  background: radial-gradient(ellipse at 31% 27%, #f5f6f2, #bcc7c6 43%, #6a7579 76%, #20272b);
+  box-shadow:
+    inset -28px -8px 35px rgb(0 0 0 / 62%),
+    0 0 24px rgb(190 218 220 / 12%);
+}
+
 .solar-body-copy {
   display: grid;
   align-content: start;
@@ -1823,6 +1844,24 @@ h1 em {
   color: var(--muted);
   font-size: 9px;
   line-height: 1.5;
+}
+
+.solar-body-copy .science-status {
+  width: fit-content;
+  margin-top: 3px;
+  padding: 3px 5px;
+  border: 1px solid rgb(255 173 92 / 22%);
+  border-radius: 4px;
+  color: #c99262;
+  font-family: var(--mono);
+  font-size: 6px;
+  font-style: normal;
+  letter-spacing: 0.08em;
+}
+
+.solar-body-copy .science-status-mapped {
+  border-color: rgb(139 230 234 / 24%);
+  color: #8bd8db;
 }
 .solar-body-meta {
   display: flex;

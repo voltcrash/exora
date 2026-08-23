@@ -1,6 +1,10 @@
 import type { ExoplanetProfile, StarProfile } from "@exora/contracts";
 import { useEffect, useRef } from "react";
-import { SOLAR_SYSTEM_CATALOG_GROUPS, SOLAR_SYSTEM_MOONS } from "../solar-system.ts";
+import {
+  SOLAR_SYSTEM_CATALOG_GROUPS,
+  SOLAR_SYSTEM_DWARF_MOONS,
+  SOLAR_SYSTEM_MOONS,
+} from "../solar-system.ts";
 
 interface SolarSystemCatalogProps {
   onClose: () => void;
@@ -52,7 +56,7 @@ export const SolarSystemCatalog = ({
           <strong>Known worlds. Real surfaces. Our cosmic address.</strong>
           <small>
             Every body keeps its permanent JPL/NAIF identity · {SOLAR_SYSTEM_MOONS.length} principal
-            mission-mapped moons
+            mission-mapped moons · {SOLAR_SYSTEM_DWARF_MOONS.length} unresolved dwarf-planet moons
           </small>
         </div>
         {SOLAR_SYSTEM_CATALOG_GROUPS.map((group) => (
@@ -86,9 +90,20 @@ export const SolarSystemCatalog = ({
                         </small>
                         <strong>{entry.profile.name}</strong>
                         <span>{identity?.summary}</span>
+                        {identity?.surfaceStatus ? (
+                          <em className={`science-status science-status-${identity.surfaceStatus}`}>
+                            {identity.surfaceStatus === "mapped"
+                              ? "MEASURED MISSION SURFACE"
+                              : identity.surfaceStatus === "modeled"
+                                ? "MEASURED SHAPE · UNRESOLVED SURFACE"
+                                : "UNRESOLVED SURFACE"}
+                          </em>
+                        ) : null}
                       </span>
                       <span className="solar-body-meta">
-                        <small>NAIF {identity?.naifId}</small>
+                        <small>
+                          {identity?.spkId ? `SPK ${identity.spkId}` : `NAIF ${identity?.naifId}`}
+                        </small>
                         <strong>TRAVEL ↗</strong>
                       </span>
                     </button>

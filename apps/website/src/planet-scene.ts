@@ -401,16 +401,21 @@ attribute vec3 normal;
 attribute vec2 uv;
 uniform mat4 world;
 uniform mat4 worldViewProjection;
+uniform sampler2D heightMap;
+uniform float topographyScale;
+uniform float useTopography;
 varying vec3 vWorldPosition;
 varying vec3 vWorldNormal;
 varying vec2 vUv;
 
 void main(void) {
-  vec4 worldPosition = world * vec4(position, 1.0);
+  float sampledHeight = texture2D(heightMap, vec2(1.0 - uv.x, uv.y)).r - 0.5;
+  vec3 displacedPosition = position + normal * sampledHeight * topographyScale * useTopography;
+  vec4 worldPosition = world * vec4(displacedPosition, 1.0);
   vWorldPosition = worldPosition.xyz;
   vWorldNormal = normalize(mat3(world) * normal);
   vUv = uv;
-  gl_Position = worldViewProjection * vec4(position, 1.0);
+  gl_Position = worldViewProjection * vec4(displacedPosition, 1.0);
 }
 `;
 
@@ -1485,6 +1490,15 @@ const createPlanet = (
         );
   planet.position.copyFrom(PLANET_POSITION);
   planet.parent = orbitalRoot;
+  const measuredDimensions = planetProfile.solarSystem?.dimensionsKilometers;
+  const meanDiameterKilometers = (planetProfile.observation.radiusEarth ?? 1) * 6_371 * 2;
+  if (measuredDimensions && meanDiameterKilometers > 0) {
+    planet.scaling.set(
+      measuredDimensions[0] / meanDiameterKilometers,
+      measuredDimensions[2] / meanDiameterKilometers,
+      measuredDimensions[1] / meanDiameterKilometers,
+    );
+  }
   const axialTilt =
     planetProfile.solarSystem?.axialTiltDegrees === null || !planetProfile.solarSystem
       ? recipe.axialTilt
@@ -1513,9 +1527,11 @@ const createPlanet = (
           "lightDirection",
           "stellarColor",
           "stellarIntensity",
+          "topographyScale",
           "time",
+          "useTopography",
         ],
-        samplers: ["surfaceMap"],
+        samplers: ["heightMap", "surfaceMap"],
       },
     );
   } else if (recipe.renderer === "rocky") {
@@ -1656,6 +1672,18 @@ const createPlanet = (
     surfaceMap.wrapU = Texture.WRAP_ADDRESSMODE;
     surfaceMap.wrapV = Texture.CLAMP_ADDRESSMODE;
     shader.setTexture("surfaceMap", surfaceMap);
+    const topography = knownTexture.topography;
+    const heightMap = topography ? new Texture(topography.path, scene, true, false) : surfaceMap;
+    heightMap.name = `${planetProfile.id}-measured-topography`;
+    heightMap.anisotropicFilteringLevel = profile.anisotropicFiltering;
+    heightMap.wrapU = Texture.WRAP_ADDRESSMODE;
+    heightMap.wrapV = Texture.CLAMP_ADDRESSMODE;
+    shader.setTexture("heightMap", heightMap);
+    shader.setFloat(
+      "topographyScale",
+      topography ? recipe.radiusSceneUnits * topography.reliefScale : 0,
+    );
+    shader.setFloat("useTopography", topography ? 1 : 0);
   } else if (recipe.renderer === "rocky") {
     shader.setFloat("elevation", recipe.surface.elevation);
     shader.setFloat("planetRadius", recipe.radiusSceneUnits);

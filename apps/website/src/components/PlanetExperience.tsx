@@ -328,11 +328,17 @@ export const PlanetExperience = ({
           <p className="visual-note">
             <span aria-hidden="true" />{" "}
             {solar
-              ? solarIdentity?.texture
-                ? isMoon
-                  ? "NASA MISSION MOSAIC · MEASURED ROTATION + EXORA LIGHTING"
-                  : "SPACECRAFT GLOBAL MOSAIC · EXORA ATMOSPHERE + LIGHTING"
-                : "KNOWN PLANET · PHYSICALLY TUNED ATMOSPHERIC VISUALIZATION"
+              ? solarIdentity?.surfaceStatus === "unresolved"
+                ? "UNRESOLVED SURFACE · PHYSICALLY CONSTRAINED NEUTRAL VISUALIZATION"
+                : solarIdentity?.surfaceStatus === "modeled"
+                  ? "MEASURED PROPORTIONS · UNRESOLVED NEUTRAL SURFACE"
+                  : solarIdentity?.texture?.topography
+                    ? "DAWN GLOBAL MOSAIC + MEASURED TOPOGRAPHY · EXORA LIGHTING"
+                    : solarIdentity?.texture
+                      ? isMoon
+                        ? "NASA MISSION MOSAIC · MEASURED ROTATION + EXORA LIGHTING"
+                        : "SPACECRAFT GLOBAL MOSAIC · EXORA ATMOSPHERE + LIGHTING"
+                      : "KNOWN PLANET · PHYSICALLY TUNED ATMOSPHERIC VISUALIZATION"
               : "PLAUSIBLE VISUALIZATION FROM OBSERVED DATA"}
           </p>
         </section>
@@ -448,6 +454,27 @@ export const PlanetExperience = ({
                 {formatNumber(solarIdentity.orbitalPeriodDays ?? null, 3)} day sidereal orbit · NAIF{" "}
                 {solarIdentity.naifId}
               </small>
+            </div>
+          ) : null}
+          {solarIdentity ? (
+            <div className="telemetry-detail">
+              <span>PERMANENT IDENTIFIER</span>
+              <strong>
+                {solarIdentity.spkId
+                  ? `SPK ${solarIdentity.spkId}`
+                  : `NAIF ${solarIdentity.naifId}`}
+              </strong>
+              <small>
+                NAIF {solarIdentity.naifId}
+                {solarIdentity.parent ? ` · direct parent ${solarIdentity.parent}` : ""}
+              </small>
+            </div>
+          ) : null}
+          {solarIdentity?.surfaceNote ? (
+            <div className="telemetry-detail scientific-disclosure">
+              <span>SURFACE EVIDENCE</span>
+              <strong>{solarIdentity.surfaceStatus?.toUpperCase()}</strong>
+              <small>{solarIdentity.surfaceNote}</small>
             </div>
           ) : null}
           <div className="telemetry-detail">
