@@ -458,7 +458,7 @@ test("the `/` shortcut opens the catalog", async () => {
   await expect.element(page.getByRole("dialog")).toBeVisible();
 });
 
-test("clearing the view puts every panel away, and Escape brings them back", async () => {
+test("Tab toggles the interface away and back, and only on the main screen", async () => {
   stubArchive();
   mountApp();
   await expect.element(page.getByRole("heading", { level: 1 })).toBeVisible();
@@ -469,7 +469,7 @@ test("clearing the view puts every panel away, and Escape brings them back", asy
   const clearView = page.getByRole("button", { name: "Hide the interface" });
   await expect.element(clearView).toBeVisible();
 
-  // Held as nodes rather than queried again after the click. Panels are hidden rather than faded,
+  // Held as nodes rather than queried again after the press. Panels are hidden rather than faded,
   // which takes them out of the accessibility tree as well as off the screen — so a role query
   // would stop finding the very elements the assertions below are about.
   const panels = [".topbar", ".hud", ".mission-control"].map((selector) => {
@@ -478,19 +478,47 @@ test("clearing the view puts every panel away, and Escape brings them back", asy
     return panel!;
   });
 
+  // The button and the key do the same thing, so the button goes first and the key brings it back.
   await userEvent.click(clearView);
-
   for (const panel of panels) await expect.element(panel).not.toBeVisible();
 
-  // The shortcut stands down while the view is cleared, so the one key that could still have
-  // opened a dialog over it does nothing, and Escape below is left unambiguous.
+  // The `/` shortcut stands down while the view is cleared, so the one key that could still have
+  // opened a dialog over it does nothing.
   await userEvent.keyboard("/");
   expect(document.querySelector("dialog")).toBeNull();
 
-  await userEvent.keyboard("{Escape}");
-
+  await userEvent.keyboard("{Tab}");
   for (const panel of panels) await expect.element(panel).toBeVisible();
-  await expect.element(clearView).toBeVisible();
+
+  // …and the same key takes them away again, which is the half a one-way restore key never had.
+  await userEvent.keyboard("{Tab}");
+  for (const panel of panels) await expect.element(panel).not.toBeVisible();
+
+  await userEvent.keyboard("{Tab}");
+  for (const panel of panels) await expect.element(panel).toBeVisible();
+});
+
+test("Tab keeps traversing focus wherever the shortcut stands down", async () => {
+  stubArchive();
+  mountApp();
+  await expect.element(page.getByRole("heading", { level: 1 })).toBeVisible();
+
+  const shell = document.querySelector<HTMLElement>(".experience-shell");
+  expect(shell).not.toBeNull();
+
+  // Shift+Tab is what the shortcut leaves alone, and is therefore what still reaches the page's
+  // own controls from the keyboard now that plain Tab is spoken for.
+  await userEvent.keyboard("{Shift>}{Tab}{/Shift}");
+  expect(shell!.classList.contains("chrome-hidden")).toBe(false);
+
+  // A dialog is not the main screen: it traps focus for its own controls, and Tab has to keep
+  // moving between them rather than hiding an interface nobody can see behind the scrim.
+  await userEvent.click(page.getByRole("button", { name: "Open NASA exoplanet catalog" }));
+  await expect.element(page.getByRole("dialog")).toBeVisible();
+
+  await userEvent.keyboard("{Tab}");
+  expect(shell!.classList.contains("chrome-hidden")).toBe(false);
+  await expect.element(page.getByRole("dialog")).toBeVisible();
 });
 
 test("an open overlay parks the renderer, and closing it starts the loop again", async () => {

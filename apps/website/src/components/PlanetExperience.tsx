@@ -417,7 +417,7 @@ export const PlanetExperience = ({
               <small>CLEAR VIEW</small>
               <strong>HIDE INTERFACE</strong>
             </span>
-            <kbd>ESC</kbd>
+            <kbd>TAB</kbd>
           </button>
         )}
         <div className="interaction-hint" aria-label="Desktop controls">

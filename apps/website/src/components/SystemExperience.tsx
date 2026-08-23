@@ -373,7 +373,7 @@ export const SystemExperience = ({
               <small>CLEAR VIEW</small>
               <strong>HIDE INTERFACE</strong>
             </span>
-            <kbd>ESC</kbd>
+            <kbd>TAB</kbd>
           </button>
         )}
         <div className="interaction-hint">

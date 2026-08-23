@@ -13,6 +13,7 @@ import { RecoveryScreen } from "./components/RecoveryScreen.tsx";
 import { featuredPlanet } from "./planet-profile.ts";
 import { hasRenderer } from "./planet-utils.tsx";
 import { canonicalUrlForSearch } from "./canonical-url.ts";
+import { togglesClearView } from "./clear-view-shortcut.ts";
 import { opensSearchShortcut } from "./search-shortcut.ts";
 import { TRAVEL_CROSS_MS, TRAVEL_REVEAL_MS, type TravelPhase } from "./travel-transition.ts";
 import { useSceneHost } from "./use-scene-host.ts";
@@ -113,6 +114,15 @@ export const App = () => {
     return sceneHost.suspendRendering();
   }, [overlayOpen, sceneHost]);
 
+  // Whether a destination is what is on screen, with nothing layered over it. Everything else the
+  // page can be showing — a dialog, a recovery screen, the first load — is somewhere the Tab
+  // shortcut below has to stand down and let the key go back to traversing focus.
+  const onMainScreen =
+    !overlayOpen &&
+    activeObject !== null &&
+    activeObject.type !== "missing" &&
+    (sceneHostStatus === "initializing" || sceneHostStatus === "ready");
+
   const loadFromLocation = useCallback(() => {
     setCustomRecipe(null);
     setSystemHostName(null);
@@ -129,8 +139,8 @@ export const App = () => {
   //
   // It belongs here rather than inside the catalog, because the catalog is only mounted once it
   // is already open: a listener living there could never see the press that is supposed to open
-  // it. It stands down for as long as the interface is hidden — a cleared view opening a dialog
-  // over itself would be no kind of clearing, and it leaves Escape below unambiguous.
+  // it. It stands down for as long as the interface is hidden: a cleared view opening a dialog
+  // over itself would be no kind of clearing.
   useEffect(() => {
     if (chromeHidden) return;
 
@@ -158,20 +168,39 @@ export const App = () => {
     return () => document.removeEventListener("keydown", openCatalogWithShortcut);
   }, [chromeHidden]);
 
-  // Escape brings the interface back, and is the only thing that can: hiding it hides the button
-  // that did the hiding, which is why that button wears the key on its face. Nothing competes for
-  // the press — every control that opens a dialog is hidden along with the rest, and the one
-  // shortcut that could have opened one from the keyboard is stood down above.
+  // Tab puts the interface away and brings it back. It is the whole of the way back, because the
+  // button that hides the interface is hidden along with it — which is why that button wears the
+  // key on its face, the way the catalog trigger wears `/`.
+  //
+  // Taking the browser's focus key is only defensible taken narrowly, so `togglesClearView`
+  // declines everywhere the key already means something: over a dialog, inside a text field, in a
+  // chord. Shift+Tab is left traversing, which is what still reaches this page's controls.
   useEffect(() => {
-    if (!chromeHidden) return;
+    const toggleChrome = (event: KeyboardEvent): void => {
+      const target = event.target;
+      if (
+        !togglesClearView({
+          altKey: event.altKey,
+          ctrlKey: event.ctrlKey,
+          key: event.key,
+          metaKey: event.metaKey,
+          onMainScreen,
+          shiftKey: event.shiftKey,
+          target: target instanceof HTMLElement ? target : null,
+        })
+      ) {
+        return;
+      }
 
-    const restoreChrome = (event: KeyboardEvent): void => {
-      if (event.key === "Escape") setChromeHidden(false);
+      // Only once the press is known to be the shortcut is suppressing the browser's own focus
+      // traversal the right thing to do.
+      event.preventDefault();
+      setChromeHidden((hidden) => !hidden);
     };
 
-    document.addEventListener("keydown", restoreChrome);
-    return () => document.removeEventListener("keydown", restoreChrome);
-  }, [chromeHidden]);
+    document.addEventListener("keydown", toggleChrome);
+    return () => document.removeEventListener("keydown", toggleChrome);
+  }, [onMainScreen]);
 
   // Keeps the canonical link and the shared-link URL on the destination actually being shown.
   // Travel rewrites the query string through `pushState`, which moves neither on its own, so

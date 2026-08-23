@@ -958,7 +958,7 @@ h1 em {
 /*
  * Each control holds its own end of the row, rather than taking whichever column auto-placement
  * hands it. Two of the three drop out at some width or other — the hints below 960px, the button
- * on the left where there is no Escape key to press — and without this the survivors slide left
+ * on the left where there is no Tab key to press — and without this the survivors slide left
  * into the vacated slots. `-2` is the last column either layout has.
  */
 .clear-view,
@@ -987,9 +987,9 @@ h1 em {
 /*
  * The way to put the interface away and be left with the sky.
  *
- * It advertises Escape with a `<kbd>` the way the catalog trigger advertises `/`, and that chip is
+ * It advertises Tab with a `<kbd>` the way the catalog trigger advertises `/`, and that chip is
  * the whole affordance: pressing it hides this button along with everything else, so the key has
- * to have been read before the click. See `.chrome-hidden` for what goes.
+ * to have been read before the click. Tab toggles from either side. See `.chrome-hidden`.
  */
 .clear-view {
   justify-self: start;
@@ -3616,7 +3616,7 @@ h1 em {
 }
 
 /*
- * Escape is the only way back out of a cleared view, so the button that clears it is not offered
+ * Tab is the only way back out of a cleared view, so the button that clears it is not offered
  * where there is no key to press. A touch-only device would be left holding a hidden interface
  * with nothing on screen to restore it, and the way out would be reloading the page.
  */
