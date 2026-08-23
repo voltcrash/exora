@@ -267,13 +267,14 @@ interface FieldContext {
 /** Quantizes height into visible bedding planes — the terracing that makes a scarp read as layered
  * rock rather than as a smooth slope. */
 const stratify = (height: number, context: FieldContext, amount: number): number => {
-  const strength = context.strataStrength * amount;
+  const strength = context.strataStrength * amount * 0.45;
   if (strength <= 0.001) return height;
-  const spacing = Math.max(0.12, context.strataSpacing);
-  const stepped = Math.round(height / spacing) * spacing;
-  // Soften the step so bedding reads as a bench rather than as a staircase artifact.
-  const blend = smoothstep(0, 1, Math.abs(height - stepped) / spacing + 0.35);
-  return lerp(height, lerp(stepped, height, blend * 0.55), strength);
+  const spacing = Math.max(0.35, context.strataSpacing * 2.4);
+  const phase = height / spacing;
+  const stepped = Math.floor(phase) + smoothstep(0.34, 0.78, phase - Math.floor(phase));
+  // A bench, not a staircase: the tread is flat and the riser is short, and both are only ever
+  // half-applied — the rest of the height passes through so open ground never reads as terraced.
+  return lerp(height, stepped * spacing, strength);
 };
 
 /**
@@ -336,7 +337,7 @@ const duneSea: ArchetypeField = (x, z, context, out) => {
   const across = (-x * context.windSin + z * context.windCos) / context.featureScale;
   const meander = fbm(across * 0.02, along * 0.006, context.seed + 41, 3) * 9;
   const draa = fbm(along * 0.006, across * 0.004, context.seed + 43, 2);
-  const wavelength = 13 * (1 + draa * 0.35);
+  const wavelength = 26 * context.featureScale * (1 + draa * 0.4);
   const phase = ((along + meander) / wavelength) % 1;
   const t = phase < 0 ? phase + 1 : phase;
   // Windward face rises over 72% of the wavelength; the slip face drops over the remaining 28%.

@@ -29,6 +29,12 @@ import type {
 } from "@exora/worldgen";
 import { type RenderQualityProfile, shaderDefines } from "./render-quality.ts";
 import { buildCraterField, sampleTerrainHeight } from "./planet-terrain.ts";
+import { type SurfaceGeology, deriveSurfaceGeology } from "./surface-geology.ts";
+import {
+  SURFACE_PATCH_HALF_EXTENT,
+  type SurfaceVista,
+  createSurfaceVista,
+} from "./surface-vista.ts";
 import type { MountedWorld, SceneHost, WorldConsole } from "./scene-host.ts";
 import { skyViewpointFrom } from "./sky-catalog.ts";
 import { createStellarSurface, type StellarSurface } from "./star-surface.ts";
@@ -86,7 +92,16 @@ const XR_SURFACE_STAND = new Vector3(0, 0, 12);
  * ridge line was a band barely wider than the host star's own disc — nowhere for a star to hang
  * without leaving the frame, which is part of why this one ended up down among the rocks.
  */
-const SURFACE_RESTING_BETA = 1.3;
+const SURFACE_RESTING_BETA = 1.37;
+/**
+ * Vertical field of view for the vista, in radians.
+ *
+ * Wider than the orbital view's default 0.8 for two reasons that pull the same way: a horizon
+ * needs width to read as a horizon, and the sun sits fourteen degrees up while the camera looks
+ * eleven degrees down, so a 46-degree frame would cut the disc off the top of the screen.
+ */
+const SURFACE_FIELD_OF_VIEW = 1.02;
+const ORBIT_FIELD_OF_VIEW = 0.8;
 /**
  * Which way the host star lies from anyone standing on the terrain.
  *
@@ -97,13 +112,22 @@ const SURFACE_RESTING_BETA = 1.3;
  * hanging in front of ridges that were further away than it was. Only the direction survives now;
  * the star rides an anchor pinned to the viewer, the same way the vacuum starfield does.
  *
- * Ahead and a little to the left, which is the strip of sky this camera frames, and three degrees
- * up: clear of the highest ground the terrain generator raises, with the whole disc — up to the
- * widest one worldgen allows — inside the frame at the vista's resting pitch.
+ * Ahead and a little to the left, which is the strip of sky this camera frames, and fourteen
+ * degrees up — mid-afternoon light. Low, because a low sun is what rakes a landscape: it throws
+ * every ridge, dune crest and crater rim into a shadow as long as the feature is tall, which is
+ * the whole reason the terrain bakes its own shadowing. Not lower, because below about ten degrees
+ * a flat surface catches so little of the light that ambient sky glow drowns the shading out and
+ * the ground goes back to reading as one flat colour.
  */
-const SURFACE_STAR_DIRECTION = new Vector3(-0.209, 0.052, 0.977).normalize();
-/** Far enough out that ridges decide whether the star is visible, rather than standing beside it. */
-const SURFACE_STAR_DISTANCE = 320;
+const SURFACE_STAR_DIRECTION = new Vector3(-0.209, 0.242, 0.947).normalize();
+/**
+ * Far enough out that ridges decide whether the star is visible, rather than standing beside it.
+ *
+ * Scaled with the ground: the patch now reaches 150 units from its own origin in every direction,
+ * so a star at the old 320 was only twice as far away as the far rim — close enough to sit among
+ * the terrain rather than beyond all of it.
+ */
+const SURFACE_STAR_DISTANCE = 900;
 /**
  * How wide the host star's disc is in the surface sky, as an angular radius in radians.
  *
@@ -1953,55 +1977,25 @@ const terrainNoise = (x: number, z: number, seed: number): number => {
   return (height / normalizer) * 1.32 + ridge ** 3 * 1.05 + broadMass * 0.72 - 0.43;
 };
 
-const craterField = (x: number, z: number, seed: number, density: number): number => {
-  const cellSize = 7.5 + (1 - density) * 5;
-  const cellX = Math.floor(x / cellSize);
-  const cellZ = Math.floor(z / cellSize);
-  let displacement = 0;
-
-  for (let offsetX = -1; offsetX <= 1; offsetX += 1) {
-    for (let offsetZ = -1; offsetZ <= 1; offsetZ += 1) {
-      const sampleX = cellX + offsetX;
-      const sampleZ = cellZ + offsetZ;
-      const chance = terrainHash(sampleX, sampleZ, seed ^ 0xc4a73);
-      if (chance > density * 0.58) continue;
-      const radius = cellSize * (0.16 + terrainHash(sampleX, sampleZ, seed ^ 0x91da2) * 0.23);
-      const centerX =
-        (sampleX + 0.18 + terrainHash(sampleX, sampleZ, seed ^ 0x3bd17) * 0.64) * cellSize;
-      const centerZ =
-        (sampleZ + 0.18 + terrainHash(sampleX, sampleZ, seed ^ 0x7fe91) * 0.64) * cellSize;
-      const distance = Math.hypot(x - centerX, z - centerZ) / radius;
-      const bowl = Math.max(0, 1 - distance) ** 2 * -1.15;
-      const rim = Math.max(0, 1 - Math.abs(distance - 1) / 0.22) * 0.42;
-      displacement += bowl + rim;
-    }
-  }
-
-  return displacement;
-};
-
-const surfaceTerrainHeight = (x: number, z: number, recipe: WorldRecipe): number => {
+/**
+ * The cloud deck a giant's "surface" excursion stands on.
+ *
+ * A gas or ice giant has no ground, and this has never claimed otherwise: it is the top of a
+ * convecting cloud layer, rolling in long swells. Rocky worlds no longer come through here — they
+ * are built from measured or inferred geology by `surface-vista.ts`, which is what this function
+ * used to stand in for by scaling one noise field by three recipe numbers.
+ */
+const cloudDeckHeight = (x: number, z: number, recipe: WorldRecipe): number => {
   const base = terrainNoise(x, z, recipe.seed);
   const horizonLift = Math.max(0, (z - 2) / 36) * 1.7;
-  if (recipe.renderer === "gas-giant") {
-    return base * 0.52 + Math.sin(z * 0.13 + recipe.seed) * 0.46 + horizonLift * 0.7;
-  }
-  if (recipe.renderer === "ice-giant") {
-    return base * 0.68 + Math.sin(z * 0.1 + recipe.seed) * 0.3 + horizonLift * 0.82;
-  }
-
-  const distance = Math.hypot(x * 0.72, z * 0.25);
-  const relief = 1.1 + Math.min(distance / 25, 1) * (1.5 + recipe.surface.elevation * 3.2);
-  const terraceAmount = Math.min(0.42, Math.max(0, recipe.surface.roughness - 2) * 0.12);
-  const terraced =
-    Math.round(base * (5 + recipe.surface.roughness)) / (5 + recipe.surface.roughness);
-  const crater = craterField(x, z, recipe.seed, recipe.surface.craterDensity);
-  return (base * (1 - terraceAmount) + terraced * terraceAmount) * relief + crater + horizonLift;
+  return recipe.renderer === "ice-giant"
+    ? base * 0.68 + Math.sin(z * 0.1 + recipe.seed) * 0.3 + horizonLift * 0.82
+    : base * 0.52 + Math.sin(z * 0.13 + recipe.seed) * 0.46 + horizonLift * 0.7;
 };
 
-/** Terrain height in world space, matching how the surface ground mesh is placed. */
-const surfaceGroundHeight = (x: number, z: number, recipe: WorldRecipe): number =>
-  SURFACE_GROUND_BASE_Y + surfaceTerrainHeight(x, z - SURFACE_GROUND_ORIGIN_Z, recipe);
+/** Cloud-deck height in world space, matching how the giant surface mesh is placed. */
+const cloudDeckGroundHeight = (x: number, z: number, recipe: WorldRecipe): number =>
+  SURFACE_GROUND_BASE_Y + cloudDeckHeight(x, z - SURFACE_GROUND_ORIGIN_Z, recipe);
 
 const mixRgb = (from: Rgb, to: Rgb, amount: number): Color4 =>
   new Color4(
@@ -2021,7 +2015,7 @@ const createSurfaceSky = (
   parent: TransformNode,
   recipe: WorldRecipe,
   profile: RenderQualityProfile,
-): { material: ShaderMaterial; mesh: Mesh } => {
+): { horizonColor: Color3; material: ShaderMaterial; mesh: Mesh; zenithColor: Color3 } => {
   Effect.ShadersStore.exoraSkyVertexShader = SKY_VERTEX_SHADER;
   Effect.ShadersStore.exoraSkyFragmentShader = SKY_FRAGMENT_SHADER;
   const atmosphere = recipe.atmosphere.color;
@@ -2062,7 +2056,7 @@ const createSurfaceSky = (
   // 90-unit radius it used to have.
   const mesh = MeshBuilder.CreateSphere(
     "surfaceSky",
-    { diameter: 700, segments: profile.tier === "desktop" ? 32 : 20 },
+    { diameter: 1_400, segments: profile.tier === "desktop" ? 40 : 24 },
     scene,
   );
   mesh.parent = parent;
@@ -2100,21 +2094,27 @@ const createSurfaceSky = (
   material.backFaceCulling = false;
   material.disableDepthWrite = true;
   mesh.material = material;
-  return { material, mesh };
+  // The ground reads these back: a lit sky is the ambient source for everything under it, and its
+  // colour is what distance fades into. Sharing the values is what keeps the two agreeing.
+  return { horizonColor, material, mesh, zenithColor };
 };
 
 const createSurfaceEnvironment = (
   scene: Scene,
   recipe: WorldRecipe,
+  geology: SurfaceGeology | null,
   profile: RenderQualityProfile,
   onSelectHostStar?: () => void,
 ): {
   cloudLayers: Mesh[];
+  /** World-space ground height under any point a visitor can reach. */
+  groundHeightAt: (x: number, z: number) => number;
   meshes: AbstractMesh[];
   root: TransformNode;
   sky: ShaderMaterial;
   skyAnchor: TransformNode;
   star: StellarSurface;
+  vista: SurfaceVista | null;
 } => {
   const root = new TransformNode("surfaceEnvironment", scene);
   // What the vista treats as unreachably far — the sky dome, and the host star hanging on it —
@@ -2126,146 +2126,124 @@ const createSurfaceEnvironment = (
   skyAnchor.parent = root;
   const meshes: AbstractMesh[] = [];
   const random = createSeededRandom(recipe.seed ^ 0x9e3779b9);
-  const subdivisions = profile.tier === "desktop" ? 96 : 52;
-  const terrainLowColor =
-    recipe.renderer === "rocky"
-      ? recipe.surface.lowColor
-      : recipe.renderer === "gas-giant"
-        ? recipe.cloudBands.deepColor
-        : recipe.atmosphereBands.deepColor;
-  const terrainHighColor =
-    recipe.renderer === "rocky"
-      ? recipe.surface.highColor
-      : recipe.renderer === "gas-giant"
-        ? recipe.cloudBands.lightColor
-        : recipe.atmosphereBands.lightColor;
-  const ground = MeshBuilder.CreateGround(
-    "surfaceTerrain",
-    { width: 72, height: 82, subdivisions, updatable: true },
-    scene,
-  );
-  ground.parent = root;
-  ground.position.set(0, SURFACE_GROUND_BASE_Y, SURFACE_GROUND_ORIGIN_Z);
-  ground.isPickable = false;
-  meshes.push(ground);
   const surfaceSky = createSurfaceSky(scene, skyAnchor, recipe, profile);
   meshes.push(surfaceSky.mesh);
 
-  const positions = ground.getVerticesData("position");
-  const indices = ground.getIndices();
-  if (positions && indices) {
-    const normals: number[] = [];
-    for (let index = 0; index < positions.length; index += 3) {
-      const x = positions[index] ?? 0;
-      const z = positions[index + 2] ?? 0;
-      positions[index + 1] = surfaceTerrainHeight(x, z, recipe);
-    }
+  // Rocky worlds get real ground: measured or inferred geology, landform provinces, baked sun
+  // shadowing and triplanar material. A giant has no ground at all, so it keeps the rolling cloud
+  // deck below — which is what its "surface" excursion has always actually been standing on.
+  const vista = geology
+    ? createSurfaceVista(scene, {
+        geology,
+        origin: new Vector3(0, SURFACE_GROUND_BASE_Y, SURFACE_GROUND_ORIGIN_Z),
+        parent: root,
+        profile,
+        skyHorizonColor: surfaceSky.horizonColor,
+        skyZenithColor: surfaceSky.zenithColor,
+        sunColor: toColor3(recipe.star.color),
+        sunDirection: SURFACE_STAR_DIRECTION,
+        sunIntensity: Math.min(2.6, Math.max(0.85, recipe.star.intensity)),
+      })
+    : null;
 
-    VertexData.ComputeNormals(positions, indices, normals);
-    const colors: number[] = [];
-    for (let index = 0; index < positions.length; index += 3) {
-      const height = positions[index + 1] ?? 0;
-      const normalY = normals[index + 1] ?? 1;
-      const altitude = Math.min(1, Math.max(0, 0.38 + height * 0.11));
-      const exposedSlope = Math.min(1, Math.max(0, (0.88 - normalY) * 3.6));
-      const biome = smoothTerrainNoise(
-        (positions[index] ?? 0) * 0.075,
-        (positions[index + 2] ?? 0) * 0.075,
-        recipe.seed ^ 0x7193a,
-      );
-      const midColor = recipe.renderer === "rocky" ? recipe.surface.midColor : terrainHighColor;
-      let color =
-        altitude < 0.52
-          ? mixRgb(terrainLowColor, midColor, altitude / 0.52)
-          : mixRgb(midColor, terrainHighColor, (altitude - 0.52) / 0.48);
-      if (recipe.renderer === "rocky") {
-        const slopeColor = mixRgb(
-          recipe.surface.midColor,
-          recipe.surface.highColor,
-          0.24 + biome * 0.2,
-        );
-        color = new Color4(
-          color.r + (slopeColor.r - color.r) * exposedSlope,
-          color.g + (slopeColor.g - color.g) * exposedSlope,
-          color.b + (slopeColor.b - color.b) * exposedSlope,
-          1,
-        );
-        if (recipe.surface.lavaStrength > 0 && height < -0.25) {
-          const lava = Math.min(1, (-height - 0.25) * recipe.surface.lavaStrength * 1.8);
-          color = mixRgb([color.r, color.g, color.b] as Rgb, recipe.surface.emissiveColor, lava);
-        }
-      }
-      const shade = 0.62 + normalY * 0.38 - exposedSlope * 0.14 + (biome - 0.5) * 0.08;
-      colors.push(color.r * shade, color.g * shade, color.b * shade, 1);
-    }
-    ground.updateVerticesData("position", positions);
-    ground.setVerticesData("normal", normals);
-    ground.setVerticesData("color", colors, false, 4);
-  }
-
-  const groundMaterial = new StandardMaterial("surfaceTerrainMaterial", scene);
-  groundMaterial.diffuseColor = Color3.White();
-  groundMaterial.emissiveColor = toColor3(terrainHighColor).scale(
-    recipe.renderer === "rocky" ? 0.1 : 0.22,
-  );
-  groundMaterial.specularColor =
-    recipe.renderer === "rocky" && recipe.surface.waterLevel > 0
-      ? new Color3(0.2, 0.32, 0.38)
-      : new Color3(0.025, 0.035, 0.04);
-  groundMaterial.roughness = recipe.renderer === "rocky" ? 0.92 : 0.7;
-  groundMaterial.freeze();
-  ground.material = groundMaterial;
-
-  if (recipe.renderer === "rocky" && recipe.surface.waterLevel > 0) {
-    const water = MeshBuilder.CreateGround(
-      "surfaceWater",
-      { width: 72, height: 82, subdivisions: 1 },
+  if (vista) {
+    meshes.push(vista.mesh);
+  } else {
+    const deckLowColor =
+      recipe.renderer === "gas-giant"
+        ? recipe.cloudBands.deepColor
+        : recipe.renderer === "ice-giant"
+          ? recipe.atmosphereBands.deepColor
+          : recipe.surface.lowColor;
+    const deckHighColor =
+      recipe.renderer === "gas-giant"
+        ? recipe.cloudBands.lightColor
+        : recipe.renderer === "ice-giant"
+          ? recipe.atmosphereBands.lightColor
+          : recipe.surface.highColor;
+    const subdivisions = profile.tier === "desktop" ? 96 : 52;
+    const ground = MeshBuilder.CreateGround(
+      "surfaceTerrain",
+      { width: 72, height: 82, subdivisions, updatable: true },
       scene,
     );
-    water.parent = root;
-    water.position.set(0, -1.42 + recipe.surface.waterLevel * 0.55, 18);
-    water.isPickable = false;
-    const waterMaterial = new StandardMaterial("surfaceWaterMaterial", scene);
-    waterMaterial.diffuseColor = toColor3(recipe.surface.waterColor);
-    waterMaterial.emissiveColor = toColor3(recipe.surface.waterColor).scale(0.34);
-    waterMaterial.specularColor = mixColor3(recipe.surface.waterColor, [0.72, 0.9, 1], 0.62);
-    waterMaterial.alpha = 0.88;
-    waterMaterial.roughness = 0.18;
-    waterMaterial.freeze();
-    water.material = waterMaterial;
-    meshes.push(water);
+    ground.parent = root;
+    ground.position.set(0, SURFACE_GROUND_BASE_Y, SURFACE_GROUND_ORIGIN_Z);
+    ground.isPickable = false;
+    meshes.push(ground);
+
+    const positions = ground.getVerticesData("position");
+    const indices = ground.getIndices();
+    if (positions && indices) {
+      const normals: number[] = [];
+      for (let index = 0; index < positions.length; index += 3) {
+        const x = positions[index] ?? 0;
+        const z = positions[index + 2] ?? 0;
+        positions[index + 1] = cloudDeckHeight(x, z, recipe);
+      }
+
+      VertexData.ComputeNormals(positions, indices, normals);
+      const colors: number[] = [];
+      for (let index = 0; index < positions.length; index += 3) {
+        const height = positions[index + 1] ?? 0;
+        const normalY = normals[index + 1] ?? 1;
+        const altitude = Math.min(1, Math.max(0, 0.38 + height * 0.11));
+        const biome = smoothTerrainNoise(
+          (positions[index] ?? 0) * 0.075,
+          (positions[index + 2] ?? 0) * 0.075,
+          recipe.seed ^ 0x7193a,
+        );
+        const color =
+          altitude < 0.52
+            ? mixRgb(deckLowColor, deckHighColor, altitude / 0.52)
+            : mixRgb(deckHighColor, deckHighColor, (altitude - 0.52) / 0.48);
+        const shade = 0.62 + normalY * 0.38 + (biome - 0.5) * 0.08;
+        colors.push(color.r * shade, color.g * shade, color.b * shade, 1);
+      }
+      ground.updateVerticesData("position", positions);
+      ground.setVerticesData("normal", normals);
+      ground.setVerticesData("color", colors, false, 4);
+    }
+
+    const groundMaterial = new StandardMaterial("surfaceTerrainMaterial", scene);
+    groundMaterial.diffuseColor = Color3.White();
+    groundMaterial.emissiveColor = toColor3(deckHighColor).scale(0.22);
+    groundMaterial.specularColor = new Color3(0.025, 0.035, 0.04);
+    groundMaterial.roughness = 0.7;
+    groundMaterial.freeze();
+    ground.material = groundMaterial;
   }
 
-  if (recipe.renderer === "rocky") {
-    const rockMaterial = new StandardMaterial("surfaceRockMaterial", scene);
-    const rockColor = mixRgb(terrainLowColor, terrainHighColor, 0.34);
-    rockMaterial.diffuseColor = new Color3(rockColor.r, rockColor.g, rockColor.b);
-    rockMaterial.emissiveColor = rockMaterial.diffuseColor.scale(0.06);
-    rockMaterial.specularColor = new Color3(0.018, 0.02, 0.022);
-    rockMaterial.freeze();
-    const rockCount = profile.tier === "desktop" ? 62 : 28;
-    for (let index = 0; index < rockCount; index += 1) {
-      const rock = MeshBuilder.CreateSphere(
-        `surfaceRock-${index}`,
-        { diameter: 0.55 + random() * 1.25, segments: 5 },
-        scene,
-      );
-      const x = -25 + random() * 50;
-      const z = -2 + random() * 50;
-      const terrainHeight = surfaceTerrainHeight(x, z, recipe);
-      rock.position.set(x, -1.42 + terrainHeight, z + 18);
-      const formation = random() > 0.9 ? 1.35 + random() * 0.9 : 1;
-      rock.scaling.set(
-        (0.42 + random() * 0.9) * formation,
-        (0.48 + random() * 1.45) * formation,
-        (0.42 + random() * 0.9) * formation,
-      );
-      rock.rotation.set(random() * 0.4, random() * Math.PI, random() * 0.35);
-      rock.parent = root;
-      rock.isPickable = false;
-      rock.material = rockMaterial;
-      meshes.push(rock);
-    }
+  if (vista && geology?.liquidLevel !== null && recipe.renderer === "rocky") {
+    const liquid = MeshBuilder.CreateGround(
+      "surfaceWater",
+      {
+        width: SURFACE_PATCH_HALF_EXTENT * 2,
+        height: SURFACE_PATCH_HALF_EXTENT * 2,
+        subdivisions: 1,
+      },
+      scene,
+    );
+    liquid.parent = root;
+    // The datum the terrain generator drains toward, lifted by the world's own water level.
+    liquid.position.set(
+      0,
+      vista.bounds.low +
+        (vista.bounds.high - vista.bounds.low) * (0.2 + recipe.surface.waterLevel * 0.4),
+      SURFACE_GROUND_ORIGIN_Z,
+    );
+    liquid.isPickable = false;
+    liquid.alwaysSelectAsActiveMesh = true;
+    const liquidMaterial = new StandardMaterial("surfaceWaterMaterial", scene);
+    liquidMaterial.diffuseColor = toColor3(recipe.surface.waterColor);
+    liquidMaterial.emissiveColor = toColor3(recipe.surface.waterColor).scale(0.22);
+    liquidMaterial.specularColor = mixColor3(recipe.surface.waterColor, [0.72, 0.9, 1], 0.62);
+    liquidMaterial.specularPower = 128;
+    liquidMaterial.alpha = 0.9;
+    liquidMaterial.roughness = 0.18;
+    liquidMaterial.freeze();
+    liquid.material = liquidMaterial;
+    meshes.push(liquid);
   }
 
   const cloudLayers: Mesh[] = [];
@@ -2329,7 +2307,16 @@ const createSurfaceEnvironment = (
     mesh.setEnabled(false);
   }
   root.setEnabled(false);
-  return { cloudLayers, meshes, root, sky: surfaceSky.material, skyAnchor, star: surfaceStar };
+  return {
+    cloudLayers,
+    groundHeightAt: vista ? vista.heightAt : (x, z) => cloudDeckGroundHeight(x, z, recipe),
+    meshes,
+    root,
+    sky: surfaceSky.material,
+    skyAnchor,
+    star: surfaceStar,
+    vista,
+  };
 };
 
 const setEnvironmentEnabled = (
@@ -2421,7 +2408,24 @@ export const createPlanetWorld = (
   // scatters them out entirely in daylight, so a vacuum starfield shining through a lit sky would
   // be showing the viewer something no one standing on that planet could see.
   orbitalMeshes.push(starfield.mesh);
-  const surfaceEnvironment = createSurfaceEnvironment(scene, recipe, profile, onSelectHostStar);
+  // Measured geology for a Solar System body, inferred geology for a catalogue world, and nothing
+  // at all for a giant — which has no ground for a visitor to stand on in the first place.
+  const surfaceGeology = deriveSurfaceGeology(
+    recipe,
+    planetProfile.solarSystem
+      ? {
+          naifId: planetProfile.solarSystem.naifId,
+          surfaceStatus: planetProfile.solarSystem.surfaceStatus,
+        }
+      : null,
+  );
+  const surfaceEnvironment = createSurfaceEnvironment(
+    scene,
+    recipe,
+    surfaceGeology,
+    profile,
+    onSelectHostStar,
+  );
 
   let elapsedSeconds = 0;
   const displayRotationSpeed = planetProfile.solarSystem?.rotationPeriodHours
@@ -2501,6 +2505,10 @@ export const createPlanetWorld = (
    */
   const swapViewEnvironment = (entering: boolean): void => {
     applyViewEnvironment(entering);
+    camera.fov = entering ? SURFACE_FIELD_OF_VIEW : ORBIT_FIELD_OF_VIEW;
+    if (entering) {
+      surfaceTarget.y = surfaceEnvironment.groundHeightAt(surfaceTarget.x, surfaceTarget.z) + 1.15;
+    }
     camera.target = (entering ? surfaceTarget : orbitTarget).clone();
     camera.alpha = -Math.PI / 2;
     camera.beta = entering ? SURFACE_RESTING_BETA : Math.PI / 2.13;
@@ -2588,6 +2596,21 @@ export const createPlanetWorld = (
       }
     }
 
+    // The vista camera walks over ground that now has real relief, so it has to ride it. An arc
+    // camera has only one height to give — the target's — and the eye hangs off it at a fixed
+    // offset, so both ends are checked and the higher requirement wins: the eye never sinks into
+    // a ridge it is standing behind, and the target never floats over a hollow it is looking into.
+    if (!isInXr && viewState === "surface") {
+      const eyeAboveTarget = camera.radius * Math.cos(camera.beta);
+      const underTarget = surfaceEnvironment.groundHeightAt(camera.target.x, camera.target.z);
+      const eye = camera.globalPosition;
+      const underEye = surfaceEnvironment.groundHeightAt(eye.x, eye.z);
+      const wanted = Math.max(underTarget + 1.15, underEye + 1.5 - eyeAboveTarget);
+      // Followed rather than snapped: a step onto a boulder should not throw the horizon.
+      camera.target.y += (wanted - camera.target.y) * Math.min(1, deltaSeconds * 5.5);
+      surfaceTarget.y = camera.target.y;
+    }
+
     if (!isInXr && viewState === "orbit" && camera.radius <= 10.62) beginViewTransition("entering");
     if (!isInXr && viewState === "surface" && camera.radius >= SURFACE_RETURN_RADIUS)
       beginViewTransition("leaving");
@@ -2653,6 +2676,7 @@ export const createPlanetWorld = (
     hostStar.update(elapsedSeconds, activePosition);
     // The sky rides the viewer: the dome keeps its horizon level with the eye that is under it,
     // and the star holds one direction and one angular size however far a visitor walks.
+    surfaceEnvironment.vista?.update(elapsedSeconds, activePosition);
     surfaceEnvironment.skyAnchor.position.copyFrom(activePosition);
     surfaceEnvironment.star.update(elapsedSeconds, activePosition);
     starfield.update(elapsedSeconds, activePosition);
@@ -2688,7 +2712,7 @@ export const createPlanetWorld = (
     if (!rig) return;
     const headOffset = initial ? 0 : rig.realWorldHeight;
     if (surface) {
-      const groundY = surfaceGroundHeight(XR_SURFACE_STAND.x, XR_SURFACE_STAND.z, recipe);
+      const groundY = surfaceEnvironment.groundHeightAt(XR_SURFACE_STAND.x, XR_SURFACE_STAND.z);
       rig.position.set(XR_SURFACE_STAND.x, groundY + headOffset, XR_SURFACE_STAND.z);
       rig.setTarget(new Vector3(XR_SURFACE_STAND.x, groundY + 1.4, XR_SURFACE_STAND.z + 18));
     } else {
@@ -2699,6 +2723,7 @@ export const createPlanetWorld = (
 
   /** Restores the desktop camera so leaving the headset lands on the view the wearer left in. */
   const syncDesktopCamera = (surface: boolean): void => {
+    camera.fov = surface ? SURFACE_FIELD_OF_VIEW : ORBIT_FIELD_OF_VIEW;
     camera.lowerRadiusLimit = surface ? 7.5 : 10.5;
     camera.upperRadiusLimit = surface ? SURFACE_FAR_LIMIT : 25;
     camera.lowerBetaLimit = surface ? 1.02 : 0.58;
@@ -2795,6 +2820,7 @@ export const createPlanetWorld = (
     // Meshes, materials and the key light are removed by the world scope the host opened around
     // this build; what is left here is everything that lives outside the scene graph.
     dispose: () => {
+      camera.fov = ORBIT_FIELD_OF_VIEW;
       window.removeEventListener("keydown", onMovementKeyDown);
       window.removeEventListener("keyup", onMovementKeyUp);
       window.removeEventListener("blur", clearMovementKeys);
