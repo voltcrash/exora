@@ -17,6 +17,9 @@ test("a catalogued destination is canonical to its own URL", () => {
   expect(canonicalUrlForSearch("?asteroid=101955%20Bennu")).toBe(
     `${SITE_ORIGIN}/?asteroid=101955%20Bennu`,
   );
+  expect(canonicalUrlForSearch("?comet=67P%2FChuryumov%E2%80%93Gerasimenko")).toBe(
+    `${SITE_ORIGIN}/?comet=67P%2FChuryumov%E2%80%93Gerasimenko`,
+  );
 });
 
 test("names with characters that need escaping survive the round trip", () => {

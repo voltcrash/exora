@@ -2,6 +2,8 @@ import type { ExoplanetProfile, StarProfile } from "@exora/contracts";
 import { useEffect, useMemo, useRef, useState } from "react";
 import type { AsteroidProfile } from "../solar-asteroids.ts";
 import { SOLAR_SYSTEM_ASTEROIDS } from "../solar-asteroids.ts";
+import type { CometProfile } from "../solar-comets.ts";
+import { SOLAR_SYSTEM_COMETS } from "../solar-comets.ts";
 import {
   SOLAR_SYSTEM_CATALOG_GROUPS,
   SOLAR_SYSTEM_DWARF_MOONS,
@@ -11,6 +13,7 @@ import {
 interface SolarSystemCatalogProps {
   onClose: () => void;
   onSelectAsteroid: (asteroid: AsteroidProfile) => void;
+  onSelectComet: (comet: CometProfile) => void;
   onSelectPlanet: (planet: ExoplanetProfile, cached: boolean) => void;
   onSelectStar: (star: StarProfile, cached: boolean) => void;
 }
@@ -18,11 +21,14 @@ interface SolarSystemCatalogProps {
 export const SolarSystemCatalog = ({
   onClose,
   onSelectAsteroid,
+  onSelectComet,
   onSelectPlanet,
   onSelectStar,
 }: SolarSystemCatalogProps) => {
   const dialogRef = useRef<HTMLDialogElement>(null);
-  const [filter, setFilter] = useState<"all" | "asteroids" | "dwarfs" | "moons" | "planets">("all");
+  const [filter, setFilter] = useState<
+    "all" | "asteroids" | "comets" | "dwarfs" | "moons" | "planets"
+  >("all");
   const [query, setQuery] = useState("");
   const normalizedQuery = query.trim().toLocaleLowerCase();
 
@@ -53,6 +59,18 @@ export const SolarSystemCatalog = ({
           (normalizedQuery.length === 0 ||
             asteroid.aliases.some((alias) => alias.toLocaleLowerCase().includes(normalizedQuery)) ||
             asteroid.spkId.includes(normalizedQuery)),
+      ),
+    [filter, normalizedQuery],
+  );
+
+  const visibleComets = useMemo(
+    () =>
+      SOLAR_SYSTEM_COMETS.filter(
+        (comet) =>
+          (filter === "all" || filter === "comets") &&
+          (normalizedQuery.length === 0 ||
+            comet.aliases.some((alias) => alias.toLocaleLowerCase().includes(normalizedQuery)) ||
+            comet.spkId.includes(normalizedQuery)),
       ),
     [filter, normalizedQuery],
   );
@@ -108,16 +126,18 @@ export const SolarSystemCatalog = ({
             />
           </label>
           <div className="solar-catalog-filters" aria-label="Filter Solar System catalog">
-            {(["all", "planets", "dwarfs", "moons", "asteroids"] as const).map((option) => (
-              <button
-                className={filter === option ? "active" : ""}
-                key={option}
-                type="button"
-                onClick={() => setFilter(option)}
-              >
-                {option.toUpperCase()}
-              </button>
-            ))}
+            {(["all", "planets", "dwarfs", "moons", "asteroids", "comets"] as const).map(
+              (option) => (
+                <button
+                  className={filter === option ? "active" : ""}
+                  key={option}
+                  type="button"
+                  onClick={() => setFilter(option)}
+                >
+                  {option.toUpperCase()}
+                </button>
+              ),
+            )}
           </div>
         </div>
         {visibleGroups.map((group) => (
@@ -204,7 +224,41 @@ export const SolarSystemCatalog = ({
             </ol>
           </section>
         ) : null}
-        {visibleGroups.length === 0 && visibleAsteroids.length === 0 ? (
+        {visibleComets.length > 0 ? (
+          <section className="solar-catalog-section" key="landmark-comets">
+            <h3>Comets · measured nuclei and simulated activity</h3>
+            <ol className="solar-body-grid">
+              {visibleComets.map((comet) => (
+                <li key={comet.id}>
+                  <button type="button" onClick={() => onSelectComet(comet)}>
+                    <span className="solar-body-portrait comet-portrait" aria-hidden="true">
+                      ☄
+                    </span>
+                    <span className="solar-body-copy">
+                      <small>COMET · {comet.parent}</small>
+                      <strong>{comet.name}</strong>
+                      <span>{comet.summary}</span>
+                      <em className={`science-status science-status-${comet.evidence.geometry}`}>
+                        {comet.descriptor.shapeModel
+                          ? "MEASURED NUCLEUS · SIMULATED TRANSIENT MATERIAL"
+                          : comet.evidence.geometry === "modeled-fragment"
+                            ? "MODELED FRAGMENT · UNRESOLVED SURFACE"
+                            : "MEASURED DIMENSIONS · UNRESOLVED SURFACE"}
+                      </em>
+                    </span>
+                    <span className="solar-body-meta">
+                      <small>SPK {comet.spkId}</small>
+                      <strong>TRAVEL ↗</strong>
+                    </span>
+                  </button>
+                </li>
+              ))}
+            </ol>
+          </section>
+        ) : null}
+        {visibleGroups.length === 0 &&
+        visibleAsteroids.length === 0 &&
+        visibleComets.length === 0 ? (
           <p className="solar-catalog-empty" role="status">
             NO HOME-SYSTEM OBJECTS MATCH THIS FILTER
           </p>

@@ -10,15 +10,22 @@
 
 import { readFileSync, writeFileSync } from "node:fs";
 
-const [sourcePath, destinationPath] = process.argv.slice(2);
+const arguments_ = process.argv.slice(2);
+const longitudeFirst = arguments_.includes("--longitude-first");
+const [sourcePath, destinationPath] = arguments_.filter((argument) => !argument.startsWith("--"));
 if (!sourcePath || !destinationPath) {
-  throw new Error("Usage: convert-pds-radial-grid-to-obj.mjs <source.tab> <destination.obj>");
+  throw new Error(
+    "Usage: convert-pds-radial-grid-to-obj.mjs [--longitude-first] <source.tab> <destination.obj>",
+  );
 }
 
 const samples = readFileSync(sourcePath, "utf8")
   .trim()
   .split(/\r?\n/u)
-  .map((line) => line.trim().split(/\s+/u).map(Number));
+  .map((line) => {
+    const [first, second, radius] = line.trim().split(/\s+/u).map(Number);
+    return longitudeFirst ? [second, first, radius] : [first, second, radius];
+  });
 
 const latitudes = [...new Set(samples.map(([latitude]) => latitude))];
 const longitudes = [...new Set(samples.map(([, longitude]) => longitude))].sort(

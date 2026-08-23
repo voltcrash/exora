@@ -123,6 +123,39 @@ uses the final **pre-impact** v004 shape; its post-impact rotation/orbit value i
 The current JPL min/nominal/max 2029 Apophis close-approach solution is presented numerically and
 is never drawn as a false impact corridor.
 
+## Landmark comets
+
+Retrieved 2026-08-23. Orbital elements, effective diameters, albedos, and reported rotation
+periods are authored from NASA/JPL SBDB API **1.3** `phys-par=1` responses for permanent SPK
+identifiers `1000036` (1P/Halley), `1000012` (67P), `1000093` (9P), `1000107` (81P), `1000005`
+(19P), and `1000132` (Hale–Bopp). Shoemaker–Levy 9 is a disrupted multi-object designation;
+`1000190` identifies fragment K and is explicitly presented as the representative catalog anchor,
+not as an identifier for the entire train. Original query form:
+`https://ssd-api.jpl.nasa.gov/sbdb.api?spk={SPK_ID}&phys-par=1`. NASA/JPL and the cited mission
+teams are credited; factual API data are not redistributed imagery.
+
+| Shipped asset         | Source / mission                                                                                | Credit                                                      | Permanent identity   | License / citation                                                   | SHA-256                                                            | Original URL                                                                                                                |
+| --------------------- | ----------------------------------------------------------------------------------------------- | ----------------------------------------------------------- | -------------------- | -------------------------------------------------------------------- | ------------------------------------------------------------------ | --------------------------------------------------------------------------------------------------------------------------- |
+| `halley-stooke.obj`   | NASA PDS Stooke V1.0 longitude/latitude/radius model; Giotto and Vega imaging; 5,256 plates     | Philip Stooke, Alain Abergel; Giotto HMC and Vega TVS teams | NAIF / SPK `1000036` | NASA PDS public data; cite DOI `10.26033/yt84-5y91`                  | `49258d6a148a7871f2c21ddf40c37208594ed29a2b3333fd59983aee932a9e19` | https://sbnarchive.psi.edu/pds4/non_mission/small_bodies.stooke.shape-models/data/1682q1halley.tab                          |
+| `67p-rosetta.obj`     | ESA PSA / NASA PDS Rosetta 67P V2.0; SPC_ESA MTP019 low-resolution flight model; 104,192 plates | ESA/Rosetta/NAVCAM; ESA Flight Dynamics                     | NAIF / SPK `1000012` | ESA scientific archive; cite `RO-C-MULTI-5-67P-SHAPE-V2.0`           | `4118de78f47412e48bf9acc555d37ccbfb96ea9780c49adcf9ca422f238d2b76` | https://pdssbn.astro.umd.edu/holdings/ro-c-multi-5-67p-shape-v2.0/data/triplate/spc_esa/mtp019/cshp_dv_130_01_lores_obj.obj |
+| `tempel1-mission.obj` | NASA PDS Tempel 1 V2.0 VRML model; Deep Impact plus Stardust-NExT imaging; 32,040 plates        | Tony Farnham, Peter Thomas; Deep Impact and Stardust-NExT   | NAIF / SPK `1000093` | NASA PDS public data; cite `DIF-C-HRIV/ITS/MRI-5-TEMPEL1-SHAPE-V2.0` | `20b85539bfcf123a7463d7a8b700acd83b48508047e267c93971ec352e9ef4ab` | https://pdssbn.astro.umd.edu/holdings/dif-c-hriv_its_mri-5-tempel1-shape-v2.0/data/tempel1_2012_cart.wrl                    |
+| `wild2-stardust.obj`  | NASA PDS Wild 2 V2.1 Cartesian plate model; only flag-0 mission-derived coverage; 12,364 plates | Tony Farnham, T. Duxbury, R. Kirk and the Stardust team     | NAIF / SPK `1000107` | NASA PDS public data; cite `SDU-C-NAVCAM-5-WILD2-SHAPE-MODEL-V2.1`   | `d470f61543ccd24b6c4a875042cd18f291a0d4fd0a2c7bf6b11c414ac34b6437` | https://pdssbn.astro.umd.edu/holdings/sdu-c-navcam-5-wild2-shape-model-v2.1/data/wild2_cart_full.tab                        |
+
+The Halley radial-grid and Tempel 1 VRML conversions preserve their archived samples and triangle
+indices. The Wild 2 conversion intentionally excludes plates flagged as assumed ellipsoid or
+nonphysical transitions, leaving the mission-coverage gap open. Halley’s archive describes
+roughly 0.5–1 km absolute radial uncertainty. Tempel 1’s archive reports about 60 m uncertainty
+where control points constrain the shape, about 100 m at silhouettes, and up to 100–300 m in
+unconstrained regions. Borrelly’s official DS1 DEM covers only the illuminated encounter side, so
+it is not wrapped around a global mesh; the UI uses measured proportions and states the gap.
+Hale–Bopp and Shoemaker–Levy 9 have no resolved global nucleus model. No mission image is treated
+as a global texture.
+
+Every coma, dust tail, ion tail, and jet rendered by Exora is generated transient material. Its
+strength falls to zero at the authored activity-onset distance; ion tails point anti-solar and
+dust tails curve through a qualitative orbital-lag proxy. Localized jets exist only on profiles
+with an observation-based mission note, but their live geometry is still labeled simulated.
+
 ## Planet textures
 
 Exora's macro terrain, oceans, ice, lava, cloud systems, giant bands, geometry, and base color are

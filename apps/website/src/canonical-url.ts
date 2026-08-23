@@ -14,7 +14,7 @@ export const SITE_ORIGIN = "https://exora.voltcrash.com";
 /**
  * The canonical URL for a location, given the site's own query parameters.
  *
- * Only `asteroid`, `planet`, `star` and `system` name a destination, and they are checked in the order
+ * Only `comet`, `asteroid`, `planet`, `star` and `system` name a destination, and they are checked in the order
  * `loadRequestedObject` checks them so the canonical always agrees with what is on screen.
  * `custom` and `customStar` are procedural worlds that exist for one visitor and cannot be
  * resolved by anyone else, so they collapse to the root rather than inviting a crawler to index a
@@ -23,6 +23,9 @@ export const SITE_ORIGIN = "https://exora.voltcrash.com";
  */
 export const canonicalUrlForSearch = (search: string): string => {
   const parameters = new URLSearchParams(search);
+  const comet = parameters.get("comet")?.trim();
+  if (comet) return `${SITE_ORIGIN}/?comet=${encodeURIComponent(comet)}`;
+
   const asteroid = parameters.get("asteroid")?.trim();
   if (asteroid) return `${SITE_ORIGIN}/?asteroid=${encodeURIComponent(asteroid)}`;
 

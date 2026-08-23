@@ -111,6 +111,13 @@ vi.mock("./small-body-scene.ts", () => ({
   },
 }));
 
+vi.mock("./comet-scene.ts", () => ({
+  createCometWorld: (_host: unknown, options: { onFirstFrame: () => void }) => {
+    options.onFirstFrame();
+    return mountedWorld();
+  },
+}));
+
 /**
  * The one scene stub that keeps a piece of the real thing.
  *
@@ -448,6 +455,28 @@ test("the Home System catalog filters mission asteroids and opens measured geome
     .element(page.getByLabelText("Permanent identifiers"))
     .toHaveTextContent("SPK 20101955");
   expect(window.location.search).toBe("?asteroid=101955%20Bennu");
+});
+
+test("the Home System catalog opens a measured comet with explicitly simulated activity", async () => {
+  stubArchive();
+  mountApp();
+
+  await userEvent.click(page.getByRole("button", { name: "Open our Solar System" }));
+  await userEvent.click(page.getByRole("button", { name: "COMETS" }));
+  await userEvent.fill(page.getByPlaceholder("Name, designation, or SPK ID"), "1000012");
+  const rosettaComet = page.getByRole("button", { name: /67P\/Churyumov/ });
+  await expect.element(rosettaComet).toBeVisible();
+  await userEvent.click(rosettaComet);
+
+  await expect
+    .element(page.getByRole("heading", { level: 1 }))
+    .toHaveTextContent("67P/Churyumov–Gerasimenko");
+  await expect.element(page.getByText("SIMULATED ACTIVITY", { exact: true })).toBeVisible();
+  await expect
+    .element(page.getByLabelText("Permanent identifiers"))
+    .toHaveTextContent("SPK 1000012");
+  await expect.element(page.getByLabelText("Heliocentric distance")).toBeVisible();
+  expect(window.location.search).toBe("?comet=67P%2FChuryumov%E2%80%93Gerasimenko");
 });
 
 test("a dialog closes on Escape and returns the page", async () => {

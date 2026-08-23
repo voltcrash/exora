@@ -896,6 +896,9 @@ const createSceneHost = (canvas: HTMLCanvasElement): SceneHost => {
     dispose: () => {
       if (disposed) return;
       disposed = true;
+      // Test remounts and client-side renderer recovery can present the same canvas node again.
+      // Never let the module singleton hand that caller this already-disposed host.
+      if (host?.scene === scene) host = null;
       // Both subscriber sets are released, not just one. A disposed host answers nothing, and
       // `recreateSceneHost` builds its replacement while React still holds the old subscriptions
       // until its effects re-run — so anything still reachable from here is a listener that has
@@ -915,8 +918,14 @@ const createSceneHost = (canvas: HTMLCanvasElement): SceneHost => {
       xr = null;
       looping = false;
       engine.stopRenderLoop();
-      scene.dispose();
-      engine.dispose();
+      // An OBJ/GLB import cannot be cancelled once Babylon has handed it to a loader. Keep the
+      // shared scene alive until that build leaves its serialized scope; disposing it underneath
+      // the loader turns a routine React unmount into a late `clearColor`/mesh write on null
+      // internals. The disposed flag still prevents the completed destination from mounting.
+      void worldBuildGate.then(() => {
+        scene.dispose();
+        engine.dispose();
+      });
     },
   };
 };
