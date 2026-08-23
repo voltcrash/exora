@@ -796,6 +796,84 @@ h1 em {
   font-size: 28px;
 }
 
+.region-experience .eyebrow span,
+.region-experience .telemetry-heading small,
+.region-experience .telemetry dd small,
+.region-experience .small-body-identifiers strong {
+  color: #78c9ed;
+}
+
+.region-experience .world-summary {
+  max-width: 610px;
+}
+
+.region-visual-note {
+  max-width: 660px;
+  color: rgb(148 210 237 / 74%);
+}
+
+.region-visual-note span {
+  background: #78c9ed;
+  box-shadow: 0 0 12px rgb(120 201 237 / 50%);
+}
+
+.region-scale-note {
+  max-width: 620px;
+  margin: 13px 0 0;
+  color: rgb(220 230 231 / 48%);
+  font: 7px/1.55 var(--mono);
+  letter-spacing: 0.1em;
+}
+
+.region-evidence-value {
+  max-width: 120px;
+  color: #78c9ed;
+  font-size: 10px !important;
+  line-height: 1.3 !important;
+}
+
+.region-sources p {
+  display: grid;
+  grid-column: 1 / -1;
+  gap: 3px;
+  margin: 7px 0 0;
+}
+
+.region-portrait {
+  display: grid;
+  place-items: center;
+  color: #78c9ed;
+  background:
+    radial-gradient(circle, transparent 23%, rgb(98 183 226 / 28%) 25% 28%, transparent 31%),
+    radial-gradient(
+      ellipse at center,
+      transparent 42%,
+      rgb(98 183 226 / 20%) 44% 48%,
+      transparent 50%
+    );
+  font-size: 31px;
+  text-shadow: 0 0 18px rgb(98 183 226 / 80%);
+}
+
+.region-portrait-oort-shell {
+  background:
+    radial-gradient(
+      circle,
+      #ffd78a 0 2%,
+      transparent 3% 35%,
+      rgb(109 166 244 / 18%) 52% 55%,
+      transparent 73%
+    ),
+    radial-gradient(circle, rgb(109 166 244 / 8%), transparent 67%);
+}
+
+.solar-body-copy .science-status-modeled-inferred,
+.solar-body-copy .science-status-measured-boundary,
+.solar-body-copy .science-status-statistical-population {
+  border-color: rgb(120 201 237 / 26%);
+  color: #78c9ed;
+}
+
 .mission-encounters p {
   display: grid;
   grid-column: 1 / -1;
@@ -4064,5 +4142,17 @@ h1 em {
 @media (pointer: coarse) and (hover: none) {
   .clear-view {
     display: none;
+  }
+}
+
+/* A region's evidence warning is part of the scientific content, not decorative desktop copy.
+   Keep it on phones even though ordinary world summaries are hidden to protect canvas space. */
+@media (max-width: 640px) {
+  .region-experience .region-visual-note {
+    display: block;
+    max-width: 290px;
+    margin-top: 12px;
+    font-size: 6px;
+    line-height: 1.5;
   }
 }

@@ -20,6 +20,7 @@ test("a catalogued destination is canonical to its own URL", () => {
   expect(canonicalUrlForSearch("?comet=67P%2FChuryumov%E2%80%93Gerasimenko")).toBe(
     `${SITE_ORIGIN}/?comet=67P%2FChuryumov%E2%80%93Gerasimenko`,
   );
+  expect(canonicalUrlForSearch("?region=Oort%20Cloud")).toBe(`${SITE_ORIGIN}/?region=Oort%20Cloud`);
 });
 
 test("names with characters that need escaping survive the round trip", () => {
@@ -52,6 +53,9 @@ test("the destinations resolve in the order the app resolves them", () => {
   );
   expect(canonicalUrlForSearch("?star=Sirius&system=Kepler-22")).toBe(
     `${SITE_ORIGIN}/?star=Sirius`,
+  );
+  expect(canonicalUrlForSearch("?planet=Earth&region=Kuiper%20Belt")).toBe(
+    `${SITE_ORIGIN}/?region=Kuiper%20Belt`,
   );
 });
 

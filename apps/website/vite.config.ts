@@ -4,6 +4,7 @@ import { playwright } from "vite-plus/test/browser-playwright";
 import { NOTABLE_PLANET_NAMES, NOTABLE_STAR_NAMES } from "./src/search-discovery.ts";
 import { FEATURED_ASTEROID_NAMES } from "./src/solar-asteroids.ts";
 import { FEATURED_COMET_NAMES } from "./src/solar-comets.ts";
+import { FEATURED_REGION_NAMES } from "./src/solar-regions.ts";
 
 /**
  * Drops Babylon's WGSL shader sources from the bundle.
@@ -79,6 +80,7 @@ const SITE_ORIGIN = "https://exora.voltcrash.com";
 const buildSitemap = (): string => {
   const destinations = [
     "/",
+    ...FEATURED_REGION_NAMES.map((name) => `/?region=${encodeURIComponent(name)}`),
     ...FEATURED_COMET_NAMES.map((name) => `/?comet=${encodeURIComponent(name)}`),
     ...FEATURED_ASTEROID_NAMES.map((name) => `/?asteroid=${encodeURIComponent(name)}`),
     ...NOTABLE_PLANET_NAMES.map((name) => `/?planet=${encodeURIComponent(name)}`),

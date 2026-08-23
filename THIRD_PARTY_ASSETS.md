@@ -156,6 +156,43 @@ strength falls to zero at the authored activity-onset distance; ion tails point 
 dust tails curve through a qualitative orbital-lag proxy. Localized jets exist only on profiles
 with an observation-based mission note, but their live geometry is still labeled simulated.
 
+## Solar System regions
+
+Retrieved 2026-08-23. These views redistribute no external imagery, particle catalogue, or shape
+asset. Exora generates deterministic point samples to communicate aggregate spatial structure;
+the points have no designations and never claim to be individual catalogued objects. Every view
+is anchored on the Sun (permanent NAIF/SPK `10`), except that the Jupiter Trojan view additionally
+uses Jupiter's permanent NAIF/SPK `599` as its dynamical anchor. Scale, evidence class, source,
+retrieval date, dataset identifier, and limitations are displayed in the destination UI.
+
+| Authored dataset / view                           | Source / mission                                      | Credit                                            | Permanent anchor / dataset ID                 | License                                                       | Original URL                                                                |
+| ------------------------------------------------- | ----------------------------------------------------- | ------------------------------------------------- | --------------------------------------------- | ------------------------------------------------------------- | --------------------------------------------------------------------------- |
+| Main Asteroid Belt 2.2–3.2 AU population envelope | NASA Science Dawn FAQ / Dawn                          | NASA/JPL-Caltech/UCLA/MPS/DLR/IDA                 | NAIF/SPK `10`; `NASA-DAWN-FAQ-MAIN-BELT`      | NASA media guidelines; factual data and U.S. Government works | https://science.nasa.gov/mission/dawn/faq/                                  |
+| Jupiter L4/L5 Trojan population structure         | NASA Asteroid Facts / Lucy context                    | NASA Science Editorial Team; Lucy mission team    | NAIF/SPK `599`; `NASA-LUCY-TROJAN-POPULATION` | NASA media guidelines; factual data and U.S. Government works | https://science.nasa.gov/solar-system/asteroids/facts/                      |
+| Kuiper Belt thick-disk population envelope        | NASA Kuiper Belt Facts                                | NASA Science Editorial Team                       | NAIF/SPK `10`; `NASA-KUIPER-BELT-FACTS`       | NASA media guidelines; factual data and U.S. Government works | https://science.nasa.gov/solar-system/kuiper-belt/facts/                    |
+| Scattered Disk broad orbital envelope             | NASA Basics of Space Flight / JPL SSD orbital context | NASA/JPL Solar System Dynamics                    | NAIF/SPK `10`; `NASA-BASICS-SEDNA-ORBIT`      | NASA media guidelines; factual data and U.S. Government works | https://science.nasa.gov/learn/basics-of-space-flight/chapter1-1/           |
+| Oort Cloud hypothesized shell                     | NASA Oort Cloud Facts                                 | NASA Science Editorial Team                       | NAIF/SPK `10`; `NASA-OORT-CLOUD-FACTS`        | NASA media guidelines; factual data and U.S. Government works | https://science.nasa.gov/solar-system/oort-cloud/                           |
+| Heliosphere global morphology                     | NASA Components of the Heliosphere / IBEX and Voyager | NASA Heliophysics; IBEX and Voyager mission teams | NAIF/SPK `10`; `NASA-HEAT-HELIO-COMPONENTS`   | NASA media guidelines; factual data and U.S. Government works | https://science.nasa.gov/learn/heat/resource/components-of-the-heliosphere/ |
+| Termination-shock crossing constraints            | Voyager Interstellar Mission                          | NASA/JPL-Caltech Voyager mission team             | NAIF/SPK `10`; `VOYAGER-TS-2004-2007`         | NASA media guidelines; factual data and U.S. Government works | https://science.nasa.gov/mission/voyager/interstellar-mission/              |
+| Heliopause crossing constraints                   | Voyager 1 and Voyager 2                               | NASA/JPL-Caltech Voyager mission team             | NAIF/SPK `10`; `VOYAGER-HP-2012-2018`         | NASA media guidelines; factual data and U.S. Government works | https://www.nasa.gov/solar-system/the-voyage-to-interstellar-space/         |
+
+Main-belt points include schematic density reductions near principal Kirkwood resonances, not
+catalogued asteroids. Trojan points are statistical clouds around the stable L4/L5 regions, not
+solved orbits. Kuiper Belt and Scattered Disk points are population envelopes. The Scattered
+Disk's outer transition is intentionally described as uncertain rather than drawn as a hard
+physical wall.
+
+The Oort Cloud is **modeled, indirectly inferred, and not directly observed**. NASA has no direct
+image of it; the adopted 2,000–100,000 AU shell is a scale hypothesis used to communicate its
+proposed extent. The UI repeats this limitation prominently.
+
+Voyager 1 and Voyager 2 supply only two in-situ cuts through the outer heliosphere. Their measured
+termination-shock crossings at about 94 and 84 AU and heliopause crossings near 122 and 119–120 AU
+do not define complete spherical surfaces. Exora's translucent heliosphere, termination-shock,
+and heliopause shells are explicitly labeled simulated global interpolations. They are normalized
+for exploration, vary in reality with solar/interstellar conditions, and are not presented as
+photographed or uniformly measured boundaries.
+
 ## Planet textures
 
 Exora's macro terrain, oceans, ice, lava, cloud systems, giant bands, geometry, and base color are

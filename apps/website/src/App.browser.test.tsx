@@ -118,6 +118,13 @@ vi.mock("./comet-scene.ts", () => ({
   },
 }));
 
+vi.mock("./solar-region-scene.ts", () => ({
+  createSolarRegionWorld: (_host: unknown, options: { onFirstFrame: () => void }) => {
+    options.onFirstFrame();
+    return mountedWorld();
+  },
+}));
+
 /**
  * The one scene stub that keeps a piece of the real thing.
  *
@@ -462,7 +469,7 @@ test("the Home System catalog opens a measured comet with explicitly simulated a
   mountApp();
 
   await userEvent.click(page.getByRole("button", { name: "Open our Solar System" }));
-  await userEvent.click(page.getByRole("button", { name: "COMETS" }));
+  await userEvent.click(page.getByRole("button", { exact: true, name: "COMETS" }));
   await userEvent.fill(page.getByPlaceholder("Name, designation, or SPK ID"), "1000012");
   const rosettaComet = page.getByRole("button", { name: /67P\/Churyumov/ });
   await expect.element(rosettaComet).toBeVisible();
@@ -477,6 +484,27 @@ test("the Home System catalog opens a measured comet with explicitly simulated a
     .toHaveTextContent("SPK 1000012");
   await expect.element(page.getByLabelText("Heliocentric distance")).toBeVisible();
   expect(window.location.search).toBe("?comet=67P%2FChuryumov%E2%80%93Gerasimenko");
+});
+
+test("the Home System catalog opens the Oort Cloud with an explicit inferred-model warning", async () => {
+  stubArchive();
+  mountApp();
+
+  await userEvent.click(page.getByRole("button", { name: "Open our Solar System" }));
+  await userEvent.click(page.getByRole("button", { exact: true, name: "REGIONS" }));
+  await userEvent.fill(page.getByPlaceholder("Name, designation, or SPK ID"), "Oort");
+  const oortCloud = page.getByRole("button", { name: /Oort Cloud/ });
+  await expect.element(oortCloud).toBeVisible();
+  await userEvent.click(oortCloud);
+
+  await expect.element(page.getByRole("heading", { level: 1 })).toHaveTextContent("Oort Cloud");
+  await expect
+    .element(page.getByText(/MODELED \/ INDIRECTLY INFERRED · NOT DIRECTLY OBSERVED/).first())
+    .toBeVisible();
+  await expect
+    .element(page.getByLabelText("Permanent anchor identifiers"))
+    .toHaveTextContent("NAIF 10");
+  expect(window.location.search).toBe("?region=Oort%20Cloud");
 });
 
 test("a dialog closes on Escape and returns the page", async () => {

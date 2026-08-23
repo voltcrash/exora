@@ -17,6 +17,8 @@ import type { RenderQualityProfile } from "./render-quality.ts";
 import type { SceneHost } from "./scene-host.ts";
 import { resetSkyCatalogForTesting } from "./sky-catalog.ts";
 import { createStarWorld } from "./star-scene.ts";
+import { createSolarRegionWorld } from "./solar-region-scene.ts";
+import { findSolarRegion } from "./solar-regions.ts";
 import { createSystemWorld } from "./system-scene.ts";
 import { deriveRenderQuality } from "./render-quality.ts";
 import { openWorldScope } from "./world-scope.ts";
@@ -231,6 +233,32 @@ afterEach(() => {
   resetSkyCatalogForTesting();
   vi.unstubAllGlobals();
 });
+
+test.each(["Oort Cloud", "Heliosphere"])(
+  "%s regional view renders a headless frame and releases its sampled model",
+  async (name) => {
+    const { engine, host, scene } = createHarness();
+    const before = sceneCounts(scene);
+    const firstFrame = vi.fn();
+    const scope = openWorldScope(scene);
+    const region = findSolarRegion(name);
+    if (!region) throw new Error(`Expected ${name} fixture.`);
+    const world = createSolarRegionWorld(host, { onFirstFrame: firstFrame, region });
+    scope.seal();
+    await settleSky();
+
+    expect(sceneCounts(scene).meshes).toBeGreaterThan(before.meshes);
+    expect(starfieldPointCount(scene)).toBeGreaterThan(0);
+    expect(() => scene.render()).not.toThrow();
+    expect(firstFrame).toHaveBeenCalledOnce();
+
+    world.dispose();
+    scope.dispose();
+    expect(sceneCounts(scene)).toEqual(before);
+    engine.dispose();
+  },
+  30_000,
+);
 
 test.each(planets)(
   "$kind world renders one headless frame and releases its scene contents",

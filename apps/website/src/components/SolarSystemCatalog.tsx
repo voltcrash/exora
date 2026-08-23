@@ -4,6 +4,8 @@ import type { AsteroidProfile } from "../solar-asteroids.ts";
 import { SOLAR_SYSTEM_ASTEROIDS } from "../solar-asteroids.ts";
 import type { CometProfile } from "../solar-comets.ts";
 import { SOLAR_SYSTEM_COMETS } from "../solar-comets.ts";
+import type { SolarRegionProfile } from "../solar-regions.ts";
+import { SOLAR_SYSTEM_REGIONS } from "../solar-regions.ts";
 import {
   SOLAR_SYSTEM_CATALOG_GROUPS,
   SOLAR_SYSTEM_DWARF_MOONS,
@@ -15,6 +17,7 @@ interface SolarSystemCatalogProps {
   onSelectAsteroid: (asteroid: AsteroidProfile) => void;
   onSelectComet: (comet: CometProfile) => void;
   onSelectPlanet: (planet: ExoplanetProfile, cached: boolean) => void;
+  onSelectRegion: (region: SolarRegionProfile) => void;
   onSelectStar: (star: StarProfile, cached: boolean) => void;
 }
 
@@ -23,11 +26,12 @@ export const SolarSystemCatalog = ({
   onSelectAsteroid,
   onSelectComet,
   onSelectPlanet,
+  onSelectRegion,
   onSelectStar,
 }: SolarSystemCatalogProps) => {
   const dialogRef = useRef<HTMLDialogElement>(null);
   const [filter, setFilter] = useState<
-    "all" | "asteroids" | "comets" | "dwarfs" | "moons" | "planets"
+    "all" | "asteroids" | "comets" | "dwarfs" | "moons" | "planets" | "regions"
   >("all");
   const [query, setQuery] = useState("");
   const normalizedQuery = query.trim().toLocaleLowerCase();
@@ -71,6 +75,21 @@ export const SolarSystemCatalog = ({
           (normalizedQuery.length === 0 ||
             comet.aliases.some((alias) => alias.toLocaleLowerCase().includes(normalizedQuery)) ||
             comet.spkId.includes(normalizedQuery)),
+      ),
+    [filter, normalizedQuery],
+  );
+
+  const visibleRegions = useMemo(
+    () =>
+      SOLAR_SYSTEM_REGIONS.filter(
+        (region) =>
+          (filter === "all" || filter === "regions") &&
+          (normalizedQuery.length === 0 ||
+            region.name.toLocaleLowerCase().includes(normalizedQuery) ||
+            region.aliases.some((alias) => alias.toLocaleLowerCase().includes(normalizedQuery)) ||
+            region.sources.some((source) =>
+              source.datasetId.toLocaleLowerCase().includes(normalizedQuery),
+            )),
       ),
     [filter, normalizedQuery],
   );
@@ -126,7 +145,7 @@ export const SolarSystemCatalog = ({
             />
           </label>
           <div className="solar-catalog-filters" aria-label="Filter Solar System catalog">
-            {(["all", "planets", "dwarfs", "moons", "asteroids", "comets"] as const).map(
+            {(["all", "planets", "dwarfs", "moons", "asteroids", "comets", "regions"] as const).map(
               (option) => (
                 <button
                   className={filter === option ? "active" : ""}
@@ -256,9 +275,41 @@ export const SolarSystemCatalog = ({
             </ol>
           </section>
         ) : null}
+        {visibleRegions.length > 0 ? (
+          <section className="solar-catalog-section" key="solar-system-regions">
+            <h3>Regions · statistical populations and measured boundaries</h3>
+            <ol className="solar-body-grid">
+              {visibleRegions.map((region) => (
+                <li key={region.id}>
+                  <button type="button" onClick={() => onSelectRegion(region)}>
+                    <span
+                      className={`solar-body-portrait region-portrait region-portrait-${region.kind}`}
+                      aria-hidden="true"
+                    >
+                      ◎
+                    </span>
+                    <span className="solar-body-copy">
+                      <small>REGION · {region.parent}</small>
+                      <strong>{region.name}</strong>
+                      <span>{region.summary}</span>
+                      <em className={`science-status science-status-${region.evidence}`}>
+                        {region.evidence.replaceAll("-", " ").toUpperCase()} · SAMPLED VISUALIZATION
+                      </em>
+                    </span>
+                    <span className="solar-body-meta">
+                      <small>ANCHOR NAIF {region.anchorNaifId}</small>
+                      <strong>EXPLORE ↗</strong>
+                    </span>
+                  </button>
+                </li>
+              ))}
+            </ol>
+          </section>
+        ) : null}
         {visibleGroups.length === 0 &&
         visibleAsteroids.length === 0 &&
-        visibleComets.length === 0 ? (
+        visibleComets.length === 0 &&
+        visibleRegions.length === 0 ? (
           <p className="solar-catalog-empty" role="status">
             NO HOME-SYSTEM OBJECTS MATCH THIS FILTER
           </p>
