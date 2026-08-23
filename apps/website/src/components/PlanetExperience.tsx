@@ -11,7 +11,7 @@ import { warmDestinations } from "../destination-cache.ts";
 import type { ViewMode } from "../planet-scene.ts";
 import { formatNumber, formatPlanetName } from "../planet-utils.tsx";
 import type { SceneHost, XrStatus } from "../scene-host.ts";
-import { tuneSolarWorldRecipe } from "../solar-system.ts";
+import { findSolarWorld, tuneSolarWorldRecipe } from "../solar-system.ts";
 import { SURFACE_TRANSITION_MS, type TravelPhase } from "../travel-transition.ts";
 
 interface PlanetExperienceProps {
@@ -68,6 +68,8 @@ export const PlanetExperience = ({
   const [systemJumpState, setSystemJumpState] = useState<"idle" | "loading" | "error">("idle");
   const planet = result.planet;
   const solar = result.mode === "solar";
+  const solarIdentity = planet.solarSystem;
+  const isMoon = solarIdentity?.bodyType === "moon";
   const observation = planet.observation;
   const recipe = useMemo(
     () => recipeOverride ?? tuneSolarWorldRecipe(planet, deriveWorldRecipe(planet)),
@@ -199,6 +201,13 @@ export const PlanetExperience = ({
       </>
     );
   const radiusValue = observation.radiusJupiter ?? observation.radiusEarth;
+  const localOrbitKilometers = solarIdentity?.orbitalSemiMajorAxisKilometers ?? null;
+
+  const openPrimaryBody = (): void => {
+    if (!isMoon || !solarIdentity.parent) return;
+    const primary = findSolarWorld(solarIdentity.parent);
+    if (primary) onSelectPlanet(primary, true);
+  };
 
   return (
     <div
@@ -319,8 +328,10 @@ export const PlanetExperience = ({
           <p className="visual-note">
             <span aria-hidden="true" />{" "}
             {solar
-              ? planet.solarSystem?.texture
-                ? "SPACECRAFT GLOBAL MOSAIC · EXORA ATMOSPHERE + LIGHTING"
+              ? solarIdentity?.texture
+                ? isMoon
+                  ? "NASA MISSION MOSAIC · MEASURED ROTATION + EXORA LIGHTING"
+                  : "SPACECRAFT GLOBAL MOSAIC · EXORA ATMOSPHERE + LIGHTING"
                 : "KNOWN PLANET · PHYSICALLY TUNED ATMOSPHERIC VISUALIZATION"
               : "PLAUSIBLE VISUALIZATION FROM OBSERVED DATA"}
           </p>
@@ -364,7 +375,8 @@ export const PlanetExperience = ({
             <div>
               <dt>Orbit</dt>
               <dd>
-                {formatNumber(observation.semiMajorAxisAu, 1)} <small>AU</small>
+                {formatNumber(localOrbitKilometers ?? observation.semiMajorAxisAu, 1)}{" "}
+                <small>{localOrbitKilometers === null ? "AU" : "KM"}</small>
               </dd>
             </div>
             <div>
@@ -424,6 +436,20 @@ export const PlanetExperience = ({
               </small>
             ) : null}
           </div>
+          {isMoon && solarIdentity.parent ? (
+            <div className="telemetry-detail host-system-detail">
+              <span>PRIMARY BODY</span>
+              <button className="system-jump" type="button" onClick={openPrimaryBody}>
+                <span aria-hidden="true">◉</span>
+                <strong>{solarIdentity.parent}</strong>
+                <small>VISIT PRIMARY ↗</small>
+              </button>
+              <small>
+                {formatNumber(solarIdentity.orbitalPeriodDays ?? null, 3)} day sidereal orbit · NAIF{" "}
+                {solarIdentity.naifId}
+              </small>
+            </div>
+          ) : null}
           <div className="telemetry-detail">
             <span>ATMOSPHERE MODEL</span>
             <strong>{recipe.atmosphere.label.split(" · ")[0]}</strong>

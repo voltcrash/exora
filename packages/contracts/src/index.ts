@@ -9,6 +9,10 @@ export interface SolarSystemIdentity {
   parent: string | null;
   /** Inclination to the body's local reference plane (the ecliptic for planets). */
   orbitalInclinationDegrees: number | null;
+  /** Sidereal period around the direct parent, used for moons whose host star is still the Sun. */
+  orbitalPeriodDays?: number | null;
+  /** Mean distance from the direct parent; deliberately kept separate from heliocentric AU. */
+  orbitalSemiMajorAxisKilometers?: number | null;
   /** Sidereal rotation, signed so retrograde rotation remains observable. */
   rotationPeriodHours: number | null;
   /** A known body's factual one-line description, not an inferred visual summary. */

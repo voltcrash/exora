@@ -1,5 +1,8 @@
 import type { ExoplanetProfile, StarProfile } from "@exora/contracts";
 import type { WorldRecipe } from "@exora/worldgen";
+import { SOLAR_SYSTEM_MOON_GROUPS, SOLAR_SYSTEM_MOONS } from "./solar-moons.ts";
+
+export { SOLAR_SYSTEM_MOON_GROUPS, SOLAR_SYSTEM_MOONS } from "./solar-moons.ts";
 
 /**
  * Our home system is small, known and useful offline, so it is an authored catalog rather than
@@ -389,7 +392,19 @@ export type SolarSystemCatalogEntry =
 export const SOLAR_SYSTEM_CATALOG: readonly SolarSystemCatalogEntry[] = [
   { profile: SUN, type: "star" },
   ...SOLAR_SYSTEM_WORLDS.map((profile) => ({ profile, type: "world" as const })),
+  ...SOLAR_SYSTEM_MOONS.map((profile) => ({ profile, type: "world" as const })),
 ];
+
+export const SOLAR_SYSTEM_CATALOG_GROUPS = [
+  {
+    entries: SOLAR_SYSTEM_CATALOG.slice(0, 1 + SOLAR_SYSTEM_WORLDS.length),
+    label: "Sun · planets · dwarf planet",
+  },
+  ...SOLAR_SYSTEM_MOON_GROUPS.map(({ moons, parent }) => ({
+    entries: moons.map((profile) => ({ profile, type: "world" as const })),
+    label: `${parent} system · ${moons.length} mapped moon${moons.length === 1 ? "" : "s"}`,
+  })),
+] as const;
 
 export const findSolarStar = (name: string): StarProfile | null =>
   name.trim().toLocaleLowerCase() === SUN.name.toLocaleLowerCase() ? SUN : null;
@@ -416,6 +431,27 @@ const classifications: Readonly<Record<number, string>> = {
   599: "Jovian gas giant",
   699: "Ringed gas giant",
   799: "Sideways ice giant",
+  301: "Earth's natural satellite",
+  401: "Inner Martian moon",
+  402: "Outer Martian moon",
+  501: "Tidally heated volcanic moon",
+  502: "Ocean-bearing ice moon",
+  503: "Magnetized ocean moon",
+  504: "Ancient cratered ice moon",
+  601: "Cratered ocean-candidate moon",
+  602: "Ocean-bearing cryovolcanic moon",
+  603: "Water-ice moon",
+  604: "Tectonic ice moon",
+  605: "Cratered ice-rock moon",
+  606: "Hazy ocean-bearing moon",
+  608: "Two-tone ridge moon",
+  701: "Resurfaced Uranian moon",
+  702: "Dark cratered Uranian moon",
+  703: "Largest Uranian moon",
+  704: "Outer Uranian moon",
+  705: "Corona-covered Uranian moon",
+  801: "Captured retrograde ice moon",
+  901: "Pluto's binary companion",
   899: "Storm-active ice giant",
   999: "Kuiper Belt dwarf planet",
 };
@@ -430,7 +466,7 @@ export const tuneSolarWorldRecipe = (
   recipe: WorldRecipe,
 ): WorldRecipe => {
   const identity = profile.solarSystem;
-  if (!identity || !["dwarf-planet", "planet"].includes(identity.bodyType)) return recipe;
+  if (!identity || !["dwarf-planet", "moon", "planet"].includes(identity.bodyType)) return recipe;
   const base = {
     ...recipe,
     axialTilt:
@@ -443,22 +479,33 @@ export const tuneSolarWorldRecipe = (
   };
 
   if (base.renderer === "rocky") {
+    const moon = identity.bodyType === "moon";
     const atmosphereDensity =
-      identity.naifId === 199
-        ? 0.015
-        : identity.naifId === 299
-          ? 0.98
-          : identity.naifId === 399
-            ? 0.62
-            : 0.11;
+      identity.naifId === 606
+        ? 0.94
+        : identity.naifId === 801
+          ? 0.035
+          : moon
+            ? 0.004
+            : identity.naifId === 199
+              ? 0.015
+              : identity.naifId === 299
+                ? 0.98
+                : identity.naifId === 399
+                  ? 0.62
+                  : 0.11;
     const cloudCover =
-      identity.naifId === 299
-        ? 0.9
-        : identity.naifId === 399
-          ? 0.52
-          : identity.naifId === 499
-            ? 0.04
-            : 0;
+      identity.naifId === 606
+        ? 0.86
+        : moon
+          ? 0
+          : identity.naifId === 299
+            ? 0.9
+            : identity.naifId === 399
+              ? 0.52
+              : identity.naifId === 499
+                ? 0.04
+                : 0;
     return {
       ...base,
       atmosphere: { ...base.atmosphere, density: atmosphereDensity },
@@ -466,16 +513,30 @@ export const tuneSolarWorldRecipe = (
       surface: {
         ...base.surface,
         cloudCover,
-        iceCapStrength: identity.naifId === 399 ? 0.34 : identity.naifId === 499 ? 0.2 : 0,
-        lavaStrength: 0,
+        iceCapStrength:
+          identity.naifId === 399
+            ? 0.34
+            : identity.naifId === 499
+              ? 0.2
+              : moon && identity.naifId !== 501
+                ? 0.12
+                : 0,
+        lavaStrength: identity.naifId === 501 ? 0.22 : 0,
         waterLevel: identity.naifId === 399 ? 0.46 : 0,
       },
       terrain: {
         ...base.terrain,
         atmosphereDensity,
         cloudCoverage: cloudCover,
-        iceCoverage: identity.naifId === 399 ? 0.12 : identity.naifId === 499 ? 0.06 : 0,
-        lavaCoverage: 0,
+        iceCoverage:
+          identity.naifId === 399
+            ? 0.12
+            : identity.naifId === 499
+              ? 0.06
+              : moon && identity.naifId !== 501
+                ? 0.42
+                : 0,
+        lavaCoverage: identity.naifId === 501 ? 0.2 : 0,
         oceanCoverage: identity.naifId === 399 ? 0.46 : 0,
       },
     };

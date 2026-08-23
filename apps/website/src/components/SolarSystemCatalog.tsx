@@ -1,6 +1,6 @@
 import type { ExoplanetProfile, StarProfile } from "@exora/contracts";
 import { useEffect, useRef } from "react";
-import { SOLAR_SYSTEM_CATALOG } from "../solar-system.ts";
+import { SOLAR_SYSTEM_CATALOG_GROUPS, SOLAR_SYSTEM_MOONS } from "../solar-system.ts";
 
 interface SolarSystemCatalogProps {
   onClose: () => void;
@@ -50,43 +50,54 @@ export const SolarSystemCatalog = ({
         <div className="solar-system-hero">
           <span>THE SOLAR SYSTEM</span>
           <strong>Known worlds. Real surfaces. Our cosmic address.</strong>
-          <small>Every body keeps its permanent JPL/NAIF identity.</small>
+          <small>
+            Every body keeps its permanent JPL/NAIF identity · {SOLAR_SYSTEM_MOONS.length} principal
+            mission-mapped moons
+          </small>
         </div>
-        <ol className="solar-body-grid">
-          {SOLAR_SYSTEM_CATALOG.map((entry) => {
-            const identity = entry.profile.solarSystem;
-            return (
-              <li key={entry.profile.id}>
-                <button
-                  type="button"
-                  onClick={() => {
-                    if (entry.type === "star") onSelectStar(entry.profile, true);
-                    else onSelectPlanet(entry.profile, true);
-                  }}
-                >
-                  <span
-                    className={`solar-body-portrait${identity?.texture ? " mapped" : ""} solar-${entry.profile.name.toLocaleLowerCase().replaceAll(" ", "-")}`}
-                    style={
-                      identity?.texture
-                        ? { backgroundImage: `url(${identity.texture.path})` }
-                        : undefined
-                    }
-                    aria-hidden="true"
-                  />
-                  <span className="solar-body-copy">
-                    <small>{identity?.bodyType.toUpperCase()}</small>
-                    <strong>{entry.profile.name}</strong>
-                    <span>{identity?.summary}</span>
-                  </span>
-                  <span className="solar-body-meta">
-                    <small>NAIF {identity?.naifId}</small>
-                    <strong>TRAVEL ↗</strong>
-                  </span>
-                </button>
-              </li>
-            );
-          })}
-        </ol>
+        {SOLAR_SYSTEM_CATALOG_GROUPS.map((group) => (
+          <section className="solar-catalog-section" key={group.label}>
+            <h3>{group.label}</h3>
+            <ol className="solar-body-grid">
+              {group.entries.map((entry) => {
+                const identity = entry.profile.solarSystem;
+                return (
+                  <li key={entry.profile.id}>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        if (entry.type === "star") onSelectStar(entry.profile, true);
+                        else onSelectPlanet(entry.profile, true);
+                      }}
+                    >
+                      <span
+                        className={`solar-body-portrait${identity?.texture ? " mapped" : ""} solar-${entry.profile.name.toLocaleLowerCase().replaceAll(" ", "-")}`}
+                        style={
+                          identity?.texture
+                            ? { backgroundImage: `url(${identity.texture.path})` }
+                            : undefined
+                        }
+                        aria-hidden="true"
+                      />
+                      <span className="solar-body-copy">
+                        <small>
+                          {identity?.bodyType.toUpperCase()}
+                          {identity?.parent ? ` · ${identity.parent}` : ""}
+                        </small>
+                        <strong>{entry.profile.name}</strong>
+                        <span>{identity?.summary}</span>
+                      </span>
+                      <span className="solar-body-meta">
+                        <small>NAIF {identity?.naifId}</small>
+                        <strong>TRAVEL ↗</strong>
+                      </span>
+                    </button>
+                  </li>
+                );
+              })}
+            </ol>
+          </section>
+        ))}
       </div>
     </dialog>
   );

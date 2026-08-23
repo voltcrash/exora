@@ -18,6 +18,24 @@ it is the cited mission mosaic prepared for planetary visualization.
 | Neptune | `textures/solar-system/neptune.jpg` | NASA/JPL Solar System Simulator visualization    | `science.nasa.gov/3d-resources/neptune/`                                     |
 | Pluto   | `textures/solar-system/pluto.jpg`   | New Horizons MVIC global color map / NASA/JHUAPL | `science.nasa.gov/resource/pluto-global-color-map/`                          |
 
+### Principal moon mosaics
+
+The 21 principal moons below are the complete set for which NASA's current public visualization
+library provides a prepared global mission map. The Moon uses the 2025 LRO color map made
+specifically for 3D rendering; Triton uses USGS's global color mosaic; the remaining files come
+from NASA's mirrored 3D Resources set. Mission coverage gaps remain visible instead of being
+filled with invented geography.
+
+| System  | Shipped files                                                                                   | Source data / preparation                      | Source pages                                   |
+| ------- | ----------------------------------------------------------------------------------------------- | ---------------------------------------------- | ---------------------------------------------- |
+| Earth   | `moon.jpg`                                                                                      | LRO WAC 2025 global color map / NASA GSFC SVS  | `svs.gsfc.nasa.gov/4720/`                      |
+| Mars    | `phobos.jpg`, `deimos.jpg`                                                                      | Viking mission maps / NASA JPL-Caltech         | `science.nasa.gov/3d-resources/`               |
+| Jupiter | `io.jpg`, `europa.jpg`, `ganymede.jpg`, `callisto.jpg`                                          | Voyager and Galileo mission mosaics / NASA     | `science.nasa.gov/3d-resources/`               |
+| Saturn  | `mimas.jpg`, `enceladus.jpg`, `tethys.jpg`, `dione.jpg`, `rhea.jpg`, `titan.jpg`, `iapetus.jpg` | Cassini mission mosaics / NASA JPL-Caltech SSI | `science.nasa.gov/3d-resources/`               |
+| Uranus  | `miranda.jpg`, `ariel.jpg`, `umbriel.jpg`, `titania.jpg`, `oberon.jpg`                          | Voyager 2 mission mosaics / NASA JPL-Caltech   | `science.nasa.gov/3d-resources/`               |
+| Neptune | `triton.jpg`                                                                                    | Voyager 2 global color mosaic / NASA JPL USGS  | `science.nasa.gov/photojournal/map-of-triton/` |
+| Pluto   | `charon.jpg`                                                                                    | New Horizons mission mosaic / NASA JHUAPL SwRI | `science.nasa.gov/3d-resources/`               |
+
 The NASA 3D Resources copies were taken from NASA's public `NASA-3D-Resources` GitHub mirror.
 NASA states that the hub's assets are free to download and use subject to the NASA Images and
 Media Usage Guidelines. The Mercury browse mosaic is published by USGS as public domain. Uranus

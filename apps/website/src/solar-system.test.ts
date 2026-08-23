@@ -4,6 +4,8 @@ import {
   findSolarSystem,
   findSolarWorld,
   SOLAR_SYSTEM_CATALOG,
+  SOLAR_SYSTEM_CATALOG_GROUPS,
+  SOLAR_SYSTEM_MOONS,
   SOLAR_SYSTEM_PLANETS,
   SOLAR_SYSTEM_WORLDS,
   SUN,
@@ -48,6 +50,36 @@ describe("the local Solar System catalog", () => {
     expect(pluto?.solarSystem?.texture?.path).toBe("/textures/solar-system/pluto.jpg");
   });
 
+  it("catalogs every principal mission-mapped moon under its primary", () => {
+    expect(SOLAR_SYSTEM_MOONS).toHaveLength(21);
+    expect(SOLAR_SYSTEM_CATALOG).toHaveLength(31);
+    expect(SOLAR_SYSTEM_CATALOG_GROUPS.map(({ label }) => label)).toEqual([
+      "Sun · planets · dwarf planet",
+      "Earth system · 1 mapped moon",
+      "Mars system · 2 mapped moons",
+      "Jupiter system · 4 mapped moons",
+      "Saturn system · 7 mapped moons",
+      "Uranus system · 5 mapped moons",
+      "Neptune system · 1 mapped moon",
+      "Pluto system · 1 mapped moon",
+    ]);
+    expect(new Set(SOLAR_SYSTEM_MOONS.map(({ solarSystem }) => solarSystem?.naifId)).size).toBe(21);
+    expect(SOLAR_SYSTEM_MOONS.every(({ solarSystem }) => solarSystem?.texture)).toBe(true);
+  });
+
+  it("keeps local moon orbits separate from heliocentric lighting distance", () => {
+    const europa = findSolarWorld("europa");
+    expect(europa?.observation.semiMajorAxisAu).toBeCloseTo(5.2028);
+    expect(europa?.solarSystem).toMatchObject({
+      bodyType: "moon",
+      naifId: 502,
+      orbitalPeriodDays: 3.551181,
+      orbitalSemiMajorAxisKilometers: 671_100,
+      parent: "Jupiter",
+    });
+    expect(europa?.source.table).toBe("planetary-satellite-physical-parameters");
+  });
+
   it("uses measured tilts and recognisable ring systems instead of the exoplanet lottery", () => {
     const mercury = tuneSolarWorldRecipe(
       SOLAR_SYSTEM_PLANETS[0],
@@ -61,6 +93,21 @@ describe("the local Solar System catalog", () => {
     expect(mercury.axialTilt).toBeCloseTo((0.034 * Math.PI) / 180);
     expect(saturn.rings?.outerRadius).toBeGreaterThan(saturn.radiusSceneUnits * 2);
     expect(saturn.confidence).toBe("high");
+  });
+
+  it("tunes moon atmospheres from measured identities", () => {
+    const titanProfile = findSolarWorld("Titan");
+    const ioProfile = findSolarWorld("Io");
+    expect(titanProfile).not.toBeNull();
+    expect(ioProfile).not.toBeNull();
+    if (!titanProfile || !ioProfile) return;
+
+    const titan = tuneSolarWorldRecipe(titanProfile, deriveWorldRecipe(titanProfile));
+    const io = tuneSolarWorldRecipe(ioProfile, deriveWorldRecipe(ioProfile));
+    expect(titan.atmosphere.density).toBeGreaterThan(0.9);
+    expect(titan.rings).toBeNull();
+    expect(io.renderer).toBe("rocky");
+    if (io.renderer === "rocky") expect(io.surface.lavaStrength).toBeGreaterThan(0);
   });
 
   it("resolves the Sun without depending on SIMBAD", () => {
