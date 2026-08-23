@@ -72,6 +72,7 @@ export const SystemExperience = ({
   const [xrStatus, setXrStatus] = useState<XrStatus>("checking");
   const [starJumpState, setStarJumpState] = useState<"error" | "idle" | "loading">("idle");
   const { cached, hostStar, planets } = result;
+  const solar = planets.length > 0 && planets.every((planet) => planet.solarSystem);
   // A jump in the air owns the screen: this view's panels go with the world being left, and its
   // loading card stays down, because the flight is what stands in for it now.
   const travelling = travelPhase === "departing" || travelPhase === "crossing";
@@ -235,7 +236,7 @@ export const SystemExperience = ({
       <main className="hud">
         <section className="world-intro" aria-labelledby="system-name">
           <p className="eyebrow">
-            <span>CONFIRMED SYSTEM</span>
+            <span>{solar ? "HOME SYSTEM" : "CONFIRMED SYSTEM"}</span>
             <span>
               {planets.length} KNOWN WORLD{planets.length === 1 ? "" : "S"}
             </span>
@@ -246,12 +247,12 @@ export const SystemExperience = ({
             <span>
               {drawn.length} ORBIT{drawn.length === 1 ? "" : "S"} DRAWN
             </span>
-            <span>NASA ARCHIVE</span>
+            <span>{solar ? "NASA/JPL" : "NASA ARCHIVE"}</span>
           </div>
           <p className="world-summary">
-            Every confirmed world of {hostStar}, on the orbit the archive measured for it and
-            turning at its own measured period. Select a world to travel to it, or the star at the
-            centre to stand at the star itself.
+            {solar
+              ? "Every planet in our Solar System, placed on its measured orbit and turning on its own clock. Select a world to cross the system, or the Sun at the centre to stand at our star."
+              : `Every confirmed world of ${hostStar}, on the orbit the archive measured for it and turning at its own measured period. Select a world to travel to it, or the star at the centre to stand at the star itself.`}
           </p>
           <p className="visual-note">
             <span aria-hidden="true" /> ORBITS MEASURED · LAYOUT DERIVED · APPEARANCE INFERRED

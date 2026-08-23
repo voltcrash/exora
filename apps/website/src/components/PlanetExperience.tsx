@@ -11,6 +11,7 @@ import { warmDestinations } from "../destination-cache.ts";
 import type { ViewMode } from "../planet-scene.ts";
 import { formatNumber, formatPlanetName } from "../planet-utils.tsx";
 import type { SceneHost, XrStatus } from "../scene-host.ts";
+import { tuneSolarWorldRecipe } from "../solar-system.ts";
 import { SURFACE_TRANSITION_MS, type TravelPhase } from "../travel-transition.ts";
 
 interface PlanetExperienceProps {
@@ -66,9 +67,10 @@ export const PlanetExperience = ({
   const [hostJumpState, setHostJumpState] = useState<"idle" | "loading" | "error">("idle");
   const [systemJumpState, setSystemJumpState] = useState<"idle" | "loading" | "error">("idle");
   const planet = result.planet;
+  const solar = result.mode === "solar";
   const observation = planet.observation;
   const recipe = useMemo(
-    () => recipeOverride ?? deriveWorldRecipe(planet),
+    () => recipeOverride ?? tuneSolarWorldRecipe(planet, deriveWorldRecipe(planet)),
     [planet, recipeOverride],
   );
 
@@ -294,8 +296,14 @@ export const PlanetExperience = ({
       <main className="hud">
         <section className="world-intro" aria-labelledby="world-name">
           <p className="eyebrow">
-            <span>{result.mode === "custom" ? "GENERATED WORLD" : "CONFIRMED WORLD"}</span>
-            <span>{planet.kind.replace("-", " ")}</span>
+            <span>
+              {result.mode === "custom"
+                ? "GENERATED WORLD"
+                : solar
+                  ? "SOLAR SYSTEM WORLD"
+                  : "CONFIRMED WORLD"}
+            </span>
+            <span>{solar ? planet.solarSystem?.bodyType : planet.kind.replace("-", " ")}</span>
           </p>
           <h1 id="world-name">{formatPlanetName(planet.name)}</h1>
           <div className="world-tags" aria-label="World classification">
@@ -307,9 +315,14 @@ export const PlanetExperience = ({
             </span>
             <span>{observation.discoveryMethod}</span>
           </div>
-          <p className="world-summary">{recipe.summary}</p>
+          <p className="world-summary">{solar ? planet.solarSystem?.summary : recipe.summary}</p>
           <p className="visual-note">
-            <span aria-hidden="true" /> PLAUSIBLE VISUALIZATION FROM OBSERVED DATA
+            <span aria-hidden="true" />{" "}
+            {solar
+              ? planet.solarSystem?.texture
+                ? "SPACECRAFT GLOBAL MOSAIC · EXORA ATMOSPHERE + LIGHTING"
+                : "KNOWN PLANET · PHYSICALLY TUNED ATMOSPHERIC VISUALIZATION"
+              : "PLAUSIBLE VISUALIZATION FROM OBSERVED DATA"}
           </p>
         </section>
 
@@ -319,8 +332,14 @@ export const PlanetExperience = ({
         >
           <div className="telemetry-heading">
             <span>
-              <small>{result.mode === "custom" ? "WORLD FORGE" : "NASA ARCHIVE"}</small>
-              {result.mode === "custom" ? "Chosen properties" : "Observed properties"}
+              <small>
+                {result.mode === "custom" ? "WORLD FORGE" : solar ? "NASA/JPL" : "NASA ARCHIVE"}
+              </small>
+              {result.mode === "custom"
+                ? "Chosen properties"
+                : solar
+                  ? "Planetary parameters"
+                  : "Observed properties"}
             </span>
             <span className="signal-bars" aria-hidden="true">
               <i />

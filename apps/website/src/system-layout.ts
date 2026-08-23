@@ -260,7 +260,13 @@ export const deriveOrbitElements = (planet: ExoplanetProfile): OrbitElements | n
     Number.isFinite(measuredEccentricity) &&
     measuredEccentricity >= 0;
 
-  const measuredInclination = observation.orbitalInclinationDegrees;
+  // Planetary-system catalogues conventionally measure inclination to their system's reference
+  // plane, while an exoplanet transit catalogue measures it from the observer's sky. Convert the
+  // former at this boundary so the shared diorama can keep one internal convention.
+  const measuredInclination =
+    planet.solarSystem?.orbitalInclinationDegrees === null || !planet.solarSystem
+      ? observation.orbitalInclinationDegrees
+      : 90 - planet.solarSystem.orbitalInclinationDegrees;
   const hasInclination = measuredInclination !== null && Number.isFinite(measuredInclination);
 
   return {

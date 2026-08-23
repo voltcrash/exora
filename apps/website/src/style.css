@@ -1756,6 +1756,15 @@ h1 em {
   border-radius: 50%;
 }
 
+.solar-body-portrait.mapped {
+  background-position: center;
+  background-size: auto 100%;
+  box-shadow:
+    inset 18px 0 24px rgb(255 255 255 / 8%),
+    inset -28px -4px 35px rgb(0 0 0 / 72%),
+    0 14px 34px rgb(0 0 0 / 52%);
+}
+
 .solar-sun {
   background:
     radial-gradient(circle at 34% 29%, #fff5bd 0 2%, transparent 8%),
@@ -1765,6 +1774,13 @@ h1 em {
     0 0 18px #ffb04d,
     0 0 54px rgb(255 114 32 / 52%),
     0 0 96px rgb(255 94 22 / 22%);
+}
+
+.solar-uranus {
+  background: radial-gradient(circle at 32% 28%, #d8ffff, #91e4e8 36%, #58b9c4 68%, #1e6678);
+  box-shadow:
+    inset -24px -7px 32px rgb(0 32 47 / 52%),
+    0 0 24px rgb(91 210 224 / 22%);
 }
 
 .solar-body-copy {

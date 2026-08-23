@@ -7,6 +7,8 @@ export interface SolarSystemIdentity {
   naifId: number;
   /** The body this object directly orbits; null only for the Sun. */
   parent: string | null;
+  /** Inclination to the body's local reference plane (the ecliptic for planets). */
+  orbitalInclinationDegrees: number | null;
   /** Sidereal rotation, signed so retrograde rotation remains observable. */
   rotationPeriodHours: number | null;
   /** A known body's factual one-line description, not an inferred visual summary. */

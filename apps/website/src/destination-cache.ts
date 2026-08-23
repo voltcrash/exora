@@ -26,6 +26,7 @@ import {
   type StarLoadResult,
   type SystemLoadResult,
 } from "./api-client.ts";
+import { findSolarStar, findSolarSystem } from "./solar-system.ts";
 
 const stars = new Map<string, Promise<StarLoadResult | null>>();
 const systems = new Map<string, Promise<SystemLoadResult | null>>();
@@ -54,7 +55,12 @@ const remembered = <Answer>(
 
 /** The star an archive files under this name, or null where it files none. */
 export const reachStar = (name: string): Promise<StarLoadResult | null> =>
-  remembered(stars, name, () => loadStarByName(name));
+  remembered(stars, name, () => {
+    const local = findSolarStar(name);
+    return local
+      ? Promise.resolve({ cached: true, mode: "solar", star: local })
+      : loadStarByName(name);
+  });
 
 /**
  * Every world the archive links to a host, gathered as a system.
@@ -66,6 +72,8 @@ export const reachStar = (name: string): Promise<StarLoadResult | null> =>
  */
 export const reachSystem = (hostStar: string): Promise<SystemLoadResult | null> =>
   remembered(systems, hostStar, async () => {
+    const local = findSolarSystem(hostStar);
+    if (local) return local;
     const result = await loadPlanetsByHost(hostStar);
     if (result.planets.length === 0) return null;
     return { cached: result.cached, hostStar, planets: result.planets };

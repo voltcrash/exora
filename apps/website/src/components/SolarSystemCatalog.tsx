@@ -65,7 +65,12 @@ export const SolarSystemCatalog = ({
                   }}
                 >
                   <span
-                    className={`solar-body-portrait solar-${entry.profile.name.toLocaleLowerCase().replaceAll(" ", "-")}`}
+                    className={`solar-body-portrait${identity?.texture ? " mapped" : ""} solar-${entry.profile.name.toLocaleLowerCase().replaceAll(" ", "-")}`}
+                    style={
+                      identity?.texture
+                        ? { backgroundImage: `url(${identity.texture.path})` }
+                        : undefined
+                    }
                     aria-hidden="true"
                   />
                   <span className="solar-body-copy">

@@ -98,7 +98,7 @@ export const StarExperience = ({
   };
 
   useEffect(() => {
-    if (custom || solar) {
+    if (custom) {
       setSystemPlanets([]);
       setSystemState("idle");
       return;
@@ -127,7 +127,7 @@ export const StarExperience = ({
         if (!controller.signal.aborted) setSystemState("error");
       });
     return () => controller.abort();
-  }, [custom, solar, star.catalogName, star.name, systemHostName]);
+  }, [custom, star.catalogName, star.name, systemHostName]);
 
   useEffect(() => {
     worldRef.current?.setSystemWorlds(systemPlanets, (planet) =>

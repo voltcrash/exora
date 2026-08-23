@@ -8,6 +8,7 @@ import { Vector2, Vector3 } from "@babylonjs/core/Maths/math.vector.js";
 import { Effect } from "@babylonjs/core/Materials/effect.js";
 import { ShaderMaterial } from "@babylonjs/core/Materials/shaderMaterial.js";
 import { StandardMaterial } from "@babylonjs/core/Materials/standardMaterial.js";
+import { Texture } from "@babylonjs/core/Materials/Textures/texture.js";
 import type { FloatArray } from "@babylonjs/core/types.js";
 import type { AbstractMesh } from "@babylonjs/core/Meshes/abstractMesh.js";
 import { Mesh } from "@babylonjs/core/Meshes/mesh.js";
@@ -389,6 +390,61 @@ void main(void) {
   float dither = (hash(vec3(gl_FragCoord.xy, seed)) - 0.5) / 255.0;
 
   gl_FragColor = vec4(finalColor + dither, 1.0);
+}
+`;
+
+const KNOWN_BODY_VERTEX_SHADER = `
+precision highp float;
+
+attribute vec3 position;
+attribute vec3 normal;
+attribute vec2 uv;
+uniform mat4 world;
+uniform mat4 worldViewProjection;
+varying vec3 vWorldPosition;
+varying vec3 vWorldNormal;
+varying vec2 vUv;
+
+void main(void) {
+  vec4 worldPosition = world * vec4(position, 1.0);
+  vWorldPosition = worldPosition.xyz;
+  vWorldNormal = normalize(mat3(world) * normal);
+  vUv = uv;
+  gl_Position = worldViewProjection * vec4(position, 1.0);
+}
+`;
+
+/**
+ * Spacecraft mosaics already contain the geology and cloud structure that procedural noise can
+ * only approximate. This shader leaves that color intact and supplies the physically legible
+ * pieces a flat map does not carry: a night hemisphere, solar tint, soft limb, and grazing sheen.
+ */
+const KNOWN_BODY_FRAGMENT_SHADER = `
+precision highp float;
+
+varying vec3 vWorldPosition;
+varying vec3 vWorldNormal;
+varying vec2 vUv;
+uniform sampler2D surfaceMap;
+uniform vec3 cameraPosition;
+uniform vec3 lightDirection;
+uniform vec3 stellarColor;
+uniform float stellarIntensity;
+uniform float time;
+
+void main(void) {
+  vec3 normal = normalize(vWorldNormal);
+  vec3 viewDirection = normalize(cameraPosition - vWorldPosition);
+  float diffuse = max(dot(normal, lightDirection), 0.0);
+  float wrappedLight = 0.055 + diffuse * 0.98;
+  float rim = pow(1.0 - max(dot(normal, viewDirection), 0.0), 3.2);
+  vec3 halfDirection = normalize(lightDirection + viewDirection);
+  float sheen = pow(max(dot(normal, halfDirection), 0.0), 54.0) * 0.12;
+  vec3 mappedColor = texture2D(surfaceMap, vec2(1.0 - vUv.x, vUv.y)).rgb;
+  vec3 litColor = mappedColor * wrappedLight * mix(vec3(1.0), stellarColor, diffuse * 0.2);
+  litColor *= stellarIntensity;
+  litColor += mappedColor * rim * 0.08 + vec3(1.0) * sheen;
+  gl_FragColor = vec4(litColor, 1.0);
 }
 `;
 
@@ -1378,6 +1434,7 @@ const createPlanet = (
   scene: Scene,
   recipe: WorldRecipe,
   profile: RenderQualityProfile,
+  planetProfile: ExoplanetProfile,
 ): {
   atmosphere: ShaderMaterial;
   cloudLayer: ShaderMaterial | null;
@@ -1399,6 +1456,8 @@ const createPlanet = (
   Effect.ShadersStore.exoraAtmosphereFragmentShader = ATMOSPHERE_FRAGMENT_SHADER;
   Effect.ShadersStore.exoraRingVertexShader = RING_VERTEX_SHADER;
   Effect.ShadersStore.exoraRingFragmentShader = RING_FRAGMENT_SHADER;
+  Effect.ShadersStore.exoraKnownBodyVertexShader = KNOWN_BODY_VERTEX_SHADER;
+  Effect.ShadersStore.exoraKnownBodyFragmentShader = KNOWN_BODY_FRAGMENT_SHADER;
 
   const orbitalRoot = new TransformNode("orbitalWorld", scene);
   const orbitalMeshes: AbstractMesh[] = [];
@@ -1407,8 +1466,9 @@ const createPlanet = (
   // triangles a UV sphere has at the poles, which otherwise show up as displacement/crater
   // artifacts once terrain pushes vertices in and out along their normals. Gas/ice giants have
   // no vertex displacement, so they keep the cheaper UV sphere.
+  const knownTexture = planetProfile.solarSystem?.texture;
   const planet =
-    recipe.renderer === "rocky"
+    recipe.renderer === "rocky" && !knownTexture
       ? MeshBuilder.CreateIcoSphere(
           "planet",
           {
@@ -1425,17 +1485,40 @@ const createPlanet = (
         );
   planet.position.copyFrom(PLANET_POSITION);
   planet.parent = orbitalRoot;
-  planet.rotation.z = recipe.axialTilt;
+  const axialTilt =
+    planetProfile.solarSystem?.axialTiltDegrees === null || !planetProfile.solarSystem
+      ? recipe.axialTilt
+      : (planetProfile.solarSystem.axialTiltDegrees * Math.PI) / 180;
+  planet.rotation.z = axialTilt;
   planet.isPickable = false;
   orbitalMeshes.push(planet);
 
-  if (recipe.renderer === "rocky") {
+  if (recipe.renderer === "rocky" && !knownTexture) {
     displaceRockyPlanet(planet, recipe);
   }
 
   let shader: ShaderMaterial;
 
-  if (recipe.renderer === "rocky") {
+  if (knownTexture) {
+    shader = new ShaderMaterial(
+      "knownSolarSystemBodyMaterial",
+      scene,
+      { vertex: "exoraKnownBody", fragment: "exoraKnownBody" },
+      {
+        attributes: ["position", "normal", "uv"],
+        uniforms: [
+          "world",
+          "worldViewProjection",
+          "cameraPosition",
+          "lightDirection",
+          "stellarColor",
+          "stellarIntensity",
+          "time",
+        ],
+        samplers: ["surfaceMap"],
+      },
+    );
+  } else if (recipe.renderer === "rocky") {
     shader = new ShaderMaterial(
       "rockyPlanetMaterial",
       scene,
@@ -1566,7 +1649,14 @@ const createPlanet = (
   shader.setColor3("stellarColor", toColor3(recipe.star.color));
   shader.setFloat("stellarIntensity", recipe.star.intensity);
 
-  if (recipe.renderer === "rocky") {
+  if (knownTexture) {
+    const surfaceMap = new Texture(knownTexture.path, scene, true, false);
+    surfaceMap.name = `${planetProfile.id}-spacecraft-mosaic`;
+    surfaceMap.anisotropicFilteringLevel = profile.anisotropicFiltering;
+    surfaceMap.wrapU = Texture.WRAP_ADDRESSMODE;
+    surfaceMap.wrapV = Texture.CLAMP_ADDRESSMODE;
+    shader.setTexture("surfaceMap", surfaceMap);
+  } else if (recipe.renderer === "rocky") {
     shader.setFloat("elevation", recipe.surface.elevation);
     shader.setFloat("planetRadius", recipe.radiusSceneUnits);
     shader.setFloat("roughness", recipe.surface.roughness);
@@ -1654,14 +1744,7 @@ const createPlanet = (
 
   const ringRecipe = recipe.rings;
   const ringBuild = ringRecipe
-    ? createRingSystem(
-        scene,
-        profile,
-        recipe.radiusSceneUnits,
-        ringRecipe,
-        recipe.star,
-        recipe.axialTilt,
-      )
+    ? createRingSystem(scene, profile, recipe.radiusSceneUnits, ringRecipe, recipe.star, axialTilt)
     : null;
   const ringSystem = ringBuild?.system ?? null;
   const ringMaterial = ringBuild?.material ?? null;
@@ -1680,7 +1763,7 @@ const createPlanet = (
     );
     cloudMesh.position.copyFrom(PLANET_POSITION);
     cloudMesh.parent = orbitalRoot;
-    cloudMesh.rotation.z = recipe.axialTilt;
+    cloudMesh.rotation.z = axialTilt;
     cloudMesh.isPickable = false;
     cloudMesh.renderingGroupId = 1;
     orbitalMeshes.push(cloudMesh);
@@ -2302,7 +2385,7 @@ export const createPlanetWorld = (
     ringMaterial,
     ringSystem,
     shader,
-  } = createPlanet(scene, recipe, profile);
+  } = createPlanet(scene, recipe, profile, planetProfile);
   const hostStar = createHostStar(scene, recipe, profile, orbitalRoot, onSelectHostStar);
   orbitalMeshes.push(...hostStar.meshes);
   // The deep-space starfield belongs to the orbital view only. Down on the surface the sky shader
@@ -2313,6 +2396,16 @@ export const createPlanetWorld = (
   const surfaceEnvironment = createSurfaceEnvironment(scene, recipe, profile, onSelectHostStar);
 
   let elapsedSeconds = 0;
+  const displayRotationSpeed = planetProfile.solarSystem?.rotationPeriodHours
+    ? Math.sign(planetProfile.solarSystem.rotationPeriodHours) *
+      Math.min(
+        0.22,
+        Math.max(
+          0.008,
+          0.085 * (24 / Math.abs(planetProfile.solarSystem.rotationPeriodHours)) ** 0.32,
+        ),
+      )
+    : recipe.rotationSpeed;
   let viewState: "entering" | "leaving" | "orbit" | "surface" = "orbit";
   let viewTransitionSeconds = 0;
   /** Where the visitor's own scroll had got to when it asked for the other view. */
@@ -2505,10 +2598,10 @@ export const createPlanetWorld = (
       if (progress >= 1) finishViewTransition(entering);
     }
 
-    planet.rotation.y += deltaSeconds * recipe.rotationSpeed;
-    if (ringSystem) ringSystem.rotation.y += deltaSeconds * recipe.rotationSpeed * 0.045;
+    planet.rotation.y += deltaSeconds * displayRotationSpeed;
+    if (ringSystem) ringSystem.rotation.y += deltaSeconds * displayRotationSpeed * 0.045;
     if (cloudMesh && recipe.renderer === "rocky")
-      cloudMesh.rotation.y += deltaSeconds * (recipe.rotationSpeed + recipe.surface.cloudSpeed);
+      cloudMesh.rotation.y += deltaSeconds * (displayRotationSpeed + recipe.surface.cloudSpeed);
     if (recipe.renderer === "gas-giant")
       shader.setFloat("time", elapsedSeconds * recipe.cloudBands.speed * 18);
     if (recipe.renderer === "ice-giant")

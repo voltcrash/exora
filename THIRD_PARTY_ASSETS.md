@@ -1,5 +1,28 @@
 # Third-Party Asset Provenance
 
+## Known Solar System surface maps
+
+Known bodies do not use Exora's inferred exoplanet color at orbital distance when an authoritative
+global mosaic exists. These equirectangular maps are sampled directly on the sphere, then lit by
+Exora's day/night, atmosphere, cloud, and ring passes. The map is never claimed to be live imagery:
+it is the cited mission mosaic prepared for planetary visualization.
+
+| Body    | Shipped file                        | Source data / preparation                        | Source page                                                                  |
+| ------- | ----------------------------------- | ------------------------------------------------ | ---------------------------------------------------------------------------- |
+| Mercury | `textures/solar-system/mercury.jpg` | MESSENGER MDIS global mosaic / USGS Astrogeology | `astrogeology.usgs.gov/search/map/mercury_messenger_mdis_global_mosaic_250m` |
+| Venus   | `textures/solar-system/venus.jpg`   | Magellan radar / NASA JPL-Caltech                | `science.nasa.gov/3d-resources/venus/`                                       |
+| Earth   | `textures/solar-system/earth.jpg`   | MODIS Blue Marble / NASA Goddard                 | `visibleearth.nasa.gov/images/57723/the-blue-marble`                         |
+| Mars    | `textures/solar-system/mars.jpg`    | Viking imagery / USGS / NASA JPL-Caltech         | `science.nasa.gov/3d-resources/mars/`                                        |
+| Jupiter | `textures/solar-system/jupiter.jpg` | Voyager imagery / NASA JPL-Caltech               | `science.nasa.gov/3d-resources/jupiter/`                                     |
+| Saturn  | `textures/solar-system/saturn.jpg`  | NASA/JPL Solar System Simulator visualization    | `science.nasa.gov/3d-resources/saturn/`                                      |
+| Neptune | `textures/solar-system/neptune.jpg` | NASA/JPL Solar System Simulator visualization    | `science.nasa.gov/3d-resources/neptune/`                                     |
+
+The NASA 3D Resources copies were taken from NASA's public `NASA-3D-Resources` GitHub mirror.
+NASA states that the hub's assets are free to download and use subject to the NASA Images and
+Media Usage Guidelines. The Mercury browse mosaic is published by USGS as public domain. Uranus
+has no comparable resolved global color mosaic, so Exora keeps its physically tuned ice-giant
+shader instead of inventing surface geography.
+
 ## Planet textures
 
 Exora's macro terrain, oceans, ice, lava, cloud systems, giant bands, geometry, and base color are

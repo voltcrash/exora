@@ -51,6 +51,7 @@ import {
 import type { RenderQualityProfile } from "./render-quality.ts";
 import type { MountedWorld, SceneHost, WorldConsole } from "./scene-host.ts";
 import { skyViewpointFrom } from "./sky-catalog.ts";
+import { tuneSolarWorldRecipe } from "./solar-system.ts";
 import { createStellarSurface } from "./star-surface.ts";
 import { createStarfield } from "./star-visuals.ts";
 import {
@@ -254,7 +255,7 @@ const buildWorld = (
   onSelect: (planet: ExoplanetProfile) => void,
 ): DrawnWorld => {
   const { planet } = orbit;
-  const recipe = deriveWorldRecipe(planet);
+  const recipe = tuneSolarWorldRecipe(planet, deriveWorldRecipe(planet));
   const color = dioramaBodyColor(recipe);
 
   const plane = new TransformNode(`diorama-plane-${planet.id}`, scene);
