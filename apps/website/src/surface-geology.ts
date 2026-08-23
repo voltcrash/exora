@@ -326,7 +326,7 @@ const MEASURED_GEOLOGY: Readonly<Record<number, MeasuredGeology>> = {
       rgb(0.53, 0.382, 0.238),
     ],
     regolithColor: rgb(0.305, 0.19, 0.108),
-    bedrockColor: rgb(0.112, 0.076, 0.054),
+    bedrockColor: rgb(0.158, 0.1, 0.066),
     frostColor: rgb(0.72, 0.76, 0.8),
     frostCoverage: 0.06,
     craterDensity: 0.55,

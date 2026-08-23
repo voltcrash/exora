@@ -266,15 +266,22 @@ interface FieldContext {
 
 /** Quantizes height into visible bedding planes — the terracing that makes a scarp read as layered
  * rock rather than as a smooth slope. */
-const stratify = (height: number, context: FieldContext, amount: number): number => {
-  const strength = context.strataStrength * amount * 0.45;
+const stratify = (
+  height: number,
+  context: FieldContext,
+  amount: number,
+  /** A local noise value in roughly [-1, 1]: a real bedding plane is not a machined step. */
+  jitter: number,
+): number => {
+  const strength = context.strataStrength * amount * 0.34;
   if (strength <= 0.001) return height;
   const spacing = Math.max(0.35, context.strataSpacing * 2.4);
-  const phase = height / spacing;
-  const stepped = Math.floor(phase) + smoothstep(0.34, 0.78, phase - Math.floor(phase));
-  // A bench, not a staircase: the tread is flat and the riser is short, and both are only ever
-  // half-applied — the rest of the height passes through so open ground never reads as terraced.
-  return lerp(height, stepped * spacing, strength);
+  const phase = height / spacing + jitter * 0.22;
+  const stepped = Math.floor(phase) + smoothstep(0.32, 0.8, phase - Math.floor(phase));
+  // A bench, not a staircase: the tread is flat and the riser is short, both only ever partly
+  // applied so open ground never reads as terraced, and the tread itself carries the same
+  // roughness the rest of the ground has rather than coming out machined level.
+  return lerp(height, stepped * spacing + jitter * spacing * 0.13, strength);
 };
 
 /**
@@ -326,7 +333,7 @@ const floodBasalt: ArchetypeField = (x, z, context, out) => {
   out.scarp = clamp01(wrinkle * 1.4 + channel * 0.8);
   out.frost = 0;
   out.molten = 0;
-  return stratify(height, context, 0.35);
+  return stratify(height, context, 0.35, plain / 0.16);
 };
 
 const duneSea: ArchetypeField = (x, z, context, out) => {
@@ -361,7 +368,12 @@ const yardangBadlands: ArchetypeField = (x, z, context, out) => {
   const carve = ridged(across * 0.11 + warpX * 0.05, along * 0.014, context.seed + 61, 4);
   const platform = fbm(along * 0.007, across * 0.009, context.seed + 67, 3) * 0.5;
   const raw = platform + (carve ** 1.6 - 0.3) * 0.85;
-  const height = stratify(raw, context, 1);
+  const height = stratify(
+    raw,
+    context,
+    1,
+    fbm(across * 0.4, along * 0.4, context.seed + 63, 2) * 2,
+  );
   const flank = clamp01((1 - carve) * 1.5);
   out.regolith = clamp01(0.3 + flank * 0.5);
   out.scarp = clamp01(carve * 1.2);
@@ -385,7 +397,8 @@ const canyonRift: ArchetypeField = (x, z, context, out) => {
   const depth = cut ** 1.7;
   const floorNoise = fbm(x * 0.05, z * 0.05, context.seed + 89, 3) * 0.06;
   const talus = smoothstep(0.06, 0.3, edge) * (1 - smoothstep(0.3, 0.5, edge)) * 0.12;
-  const height = stratify(plateau - depth * 1.35 + talus, context, 0.9) + floorNoise * depth;
+  const height =
+    stratify(plateau - depth * 1.35 + talus, context, 0.9, floorNoise / 0.06) + floorNoise * depth;
   out.regolith = clamp01(0.25 + depth * 0.55);
   out.scarp = clamp01(smoothstep(0.02, 0.24, edge) * (1 - smoothstep(0.24, 0.48, edge)) * 1.6);
   out.frost = 0;
@@ -569,7 +582,7 @@ export interface TerrainField {
  * the ridge line: the sun here sits a few degrees up, and terrain free to raise a peak beside the
  * viewer would put it in front of the sun.
  */
-const nearFieldRelief = (radius: number): number => 0.34 + smoothstep(5, 105, radius) * 0.66;
+const nearFieldRelief = (radius: number): number => 0.38 + smoothstep(4, 58, radius) * 0.62;
 
 const primarySample = createTerrainSample();
 const secondarySample = createTerrainSample();

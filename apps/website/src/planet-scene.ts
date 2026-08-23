@@ -30,6 +30,7 @@ import type {
 import { type RenderQualityProfile, shaderDefines } from "./render-quality.ts";
 import { buildCraterField, sampleTerrainHeight } from "./planet-terrain.ts";
 import { type SurfaceGeology, deriveSurfaceGeology } from "./surface-geology.ts";
+import { createSurfaceScatter } from "./surface-scatter.ts";
 import {
   SURFACE_PATCH_HALF_EXTENT,
   type SurfaceVista,
@@ -112,14 +113,17 @@ const ORBIT_FIELD_OF_VIEW = 0.8;
  * hanging in front of ridges that were further away than it was. Only the direction survives now;
  * the star rides an anchor pinned to the viewer, the same way the vacuum starfield does.
  *
- * Ahead and a little to the left, which is the strip of sky this camera frames, and fourteen
+ * Ahead and twenty-seven degrees to the left, which is the strip of sky this camera frames, and
+ * fourteen
  * degrees up — mid-afternoon light. Low, because a low sun is what rakes a landscape: it throws
  * every ridge, dune crest and crater rim into a shadow as long as the feature is tall, which is
  * the whole reason the terrain bakes its own shadowing. Not lower, because below about ten degrees
  * a flat surface catches so little of the light that ambient sky glow drowns the shading out and
- * the ground goes back to reading as one flat colour.
+ * the ground goes back to reading as one flat colour. And to the side rather than straight ahead,
+ * because a sun directly down the camera's axis back-lights every rock in the frame into a
+ * silhouette; across the view it rakes them, and a raked rock has a shape.
  */
-const SURFACE_STAR_DIRECTION = new Vector3(-0.209, 0.242, 0.947).normalize();
+const SURFACE_STAR_DIRECTION = new Vector3(-0.44, 0.245, 0.864).normalize();
 /**
  * Far enough out that ridges decide whether the star is visible, rather than standing beside it.
  *
@@ -2146,8 +2150,19 @@ const createSurfaceEnvironment = (
       })
     : null;
 
-  if (vista) {
+  if (vista && geology) {
     meshes.push(vista.mesh);
+    // Loose rock, sharing the ground's material so it takes the same sun, the same baked shadow
+    // and the same air — and merged into one mesh, so the whole field costs a single draw call.
+    const scatter = createSurfaceScatter(scene, {
+      geology,
+      material: vista.material,
+      origin: new Vector3(0, SURFACE_GROUND_BASE_Y, SURFACE_GROUND_ORIGIN_Z),
+      parent: root,
+      profile,
+      vista,
+    });
+    if (scatter) meshes.push(scatter);
   } else {
     const deckLowColor =
       recipe.renderer === "gas-giant"

@@ -270,7 +270,7 @@ void main(void) {
   // what stops a flat province from resolving to one flat colour.
   vec3 albedo = sampleRamp(0.25 + altitude * 0.55 + macro * 0.5 + grain * 0.1);
   // Freshly broken rock on everything too steep to hold a mantle.
-  albedo = mix(albedo, bedrockColor * (0.85 + grain * 0.5), clamp(exposure * 0.85, 0.0, 1.0));
+  albedo = mix(albedo, bedrockColor * (1.05 + grain * 0.6), clamp(exposure * 0.62, 0.0, 1.0));
   // Fines gather on the flats and in the hollows, and they are the brightest thing on most worlds.
   float mantle = clamp(fines * (1.0 - slope * 1.7), 0.0, 1.0);
   albedo = mix(albedo, regolithColor * (0.86 + grain * 0.42 + macro * 0.2), mantle * 0.72);
@@ -340,7 +340,7 @@ void main(void) {
   // --- Air ---------------------------------------------------------------------------------
   // Aerial perspective: distance reads as distance because the air between puts its own colour in
   // front of everything. Forward scattering brightens the sky within a few degrees of the sun.
-  float optical = 1.0 - exp(-viewDistance * hazeDensity * 0.019);
+  float optical = 1.0 - exp(-viewDistance * hazeDensity * 0.011);
   float sunGlow = pow(max(dot(-viewDirection, sunDirection), 0.0), 6.0);
   vec3 airColor = mix(skyHorizonColor, skyZenithColor, clamp(viewDirection.y * 1.4, 0.0, 1.0))
     + sunColor * sunGlow * hazeDensity * 0.5;
@@ -386,6 +386,23 @@ export interface SurfaceVista {
     x: number,
     z: number,
   ) => { frost: number; molten: number; regolith: number; scarp: number };
+  /** The baked light at a point: how open the sky is above it, and whether the sun reaches it.
+   * Anything standing on the ground reads these so it is lit by the same light the ground is. */
+  shadeAt: (x: number, z: number) => { occlusion: number; sunVisibility: number };
+  /** Ground normal at a point, for standing something upright on a slope. */
+  slopeAt: (x: number, z: number) => Vector3;
+  /**
+   * Lays the shadows of everything standing on the ground into the ground's own baked light.
+   *
+   * A boulder that casts nothing is a sticker. Rather than a shadow map — which a hand-written
+   * shader would have to be rebuilt around, for a scene where neither the sun nor the rocks ever
+   * move — each caster's shadow is projected down the sun's own direction and stamped into the
+   * per-vertex sun visibility the terrain already carries. One upload, no per-frame cost, and the
+   * shadows land in exactly the same light the terrain shades itself with.
+   */
+  stampShadows: (
+    casters: readonly { height: number; radius: number; x: number; z: number }[],
+  ) => void;
   update: (elapsedSeconds: number, cameraPosition: Vector3) => void;
 }
 
@@ -757,7 +774,10 @@ export const createSurfaceVista = (
   material.setFloat("hazeDensity", geology.hazeDensity);
   // Thick air is itself the light source on a world like Venus or Titan; a vacuum world gets only
   // the small floor that keeps its shadowed ground legible rather than pure black.
-  material.setFloat("ambientStrength", 0.07 + geology.hazeDensity * 0.3);
+  // Sky light. On a world with air this is what fills the shadows — a Martian rock's shaded face
+  // is plainly readable under a dust-bright sky, not a black cut-out — and on an airless one the
+  // small floor left here is all that keeps a shadowed slope from going to nothing at all.
+  material.setFloat("ambientStrength", 0.11 + geology.hazeDensity * 0.5);
   material.setFloat("strataStrength", geology.strataStrength);
   material.setFloat("strataSpacing", Math.max(0.18, geology.strataSpacing));
   material.setFloat("windStreaks", geology.windStreaks);
@@ -788,6 +808,90 @@ export const createSurfaceVista = (
     heightAt: (x, z) => origin.y + field.height(x - origin.x, z - origin.z),
     material,
     mesh,
+    stampShadows: (casters) => {
+      const horizontal = Math.hypot(sunDirection.x, sunDirection.z);
+      if (horizontal < 1e-4 || sunDirection.y <= 0.01 || casters.length === 0) return;
+      // How far a shadow reaches per unit of caster height, and which way it lies.
+      const reach = horizontal / sunDirection.y;
+      const alongX = -sunDirection.x / horizontal;
+      const alongZ = -sunDirection.z / horizontal;
+
+      for (const caster of casters) {
+        const length = caster.height * reach;
+        const localX = caster.x - origin.x;
+        const localZ = caster.z - origin.z;
+        const tipX = localX + alongX * length;
+        const tipZ = localZ + alongZ * length;
+        const pad = caster.radius + 0.5;
+        const minX = Math.min(localX, tipX) - pad;
+        const maxX = Math.max(localX, tipX) + pad;
+        const minZ = Math.min(localZ, tipZ) - pad;
+        const maxZ = Math.max(localZ, tipZ) + pad;
+        if (maxX < -HALF_EXTENT || minX > HALF_EXTENT) continue;
+
+        const ix0 = Math.max(0, Math.floor((inverseGradeAxis(minX) + 1) * 0.5 * resolution));
+        const ix1 = Math.min(
+          resolution,
+          Math.ceil((inverseGradeAxis(maxX) + 1) * 0.5 * resolution),
+        );
+        const iz0 = Math.max(0, Math.floor((inverseGradeAxis(minZ) + 1) * 0.5 * resolution));
+        const iz1 = Math.min(
+          resolution,
+          Math.ceil((inverseGradeAxis(maxZ) + 1) * 0.5 * resolution),
+        );
+
+        for (let iz = iz0; iz <= iz1; iz += 1) {
+          const worldZ = gradeAxis((iz / resolution) * 2 - 1);
+          for (let ix = ix0; ix <= ix1; ix += 1) {
+            const worldX = gradeAxis((ix / resolution) * 2 - 1);
+            // Distance along the shadow's axis, and away from it.
+            const dx = worldX - localX;
+            const dz = worldZ - localZ;
+            const along = dx * alongX + dz * alongZ;
+            if (along < -caster.radius || along > length + caster.radius) continue;
+            const across = Math.abs(dx * -alongZ + dz * alongX);
+            // Shadows soften along their length as the sun's disc widens the penumbra, and the
+            // far end of a long one has all but dissolved.
+            const spread = caster.radius * (1 + along * 0.12);
+            if (across > spread) continue;
+            const fade = (1 - Math.min(1, Math.max(0, along / Math.max(length, 0.001)))) ** 0.6;
+            const soft = 1 - (across / spread) ** 2;
+            const shadow = Math.min(0.82, fade * soft * 0.9);
+            const index = iz * stride + ix;
+            shade[index * 2 + 1] = Math.min(shade[index * 2 + 1] ?? 1, 1 - shadow);
+            // A rock also blocks part of the sky right around its foot.
+            if (along < caster.radius * 1.2 && across < caster.radius * 1.2) {
+              shade[index * 2] = Math.min(shade[index * 2] ?? 1, 0.55);
+            }
+          }
+        }
+      }
+
+      mesh.updateVerticesData("uv", shade, false, false);
+    },
+    shadeAt: (x, z) => {
+      const u = inverseGradeAxis(x - origin.x);
+      const v = inverseGradeAxis(z - origin.z);
+      const fx = (u + 1) * 0.5 * resolution;
+      const fz = (v + 1) * 0.5 * resolution;
+      const x0 = Math.min(resolution, Math.max(0, Math.round(fx)));
+      const z0 = Math.min(resolution, Math.max(0, Math.round(fz)));
+      const index = z0 * stride + x0;
+      return {
+        occlusion: occlusion[index] ?? 1,
+        sunVisibility: visibility[index] ?? 1,
+      };
+    },
+    slopeAt: (x, z) => {
+      // Central differences on the field itself rather than on the grid: whatever stands here
+      // should sit on the ground the shader draws, not on the average of the quad around it.
+      const step = 0.6;
+      const localX = x - origin.x;
+      const localZ = z - origin.z;
+      const dx = field.height(localX + step, localZ) - field.height(localX - step, localZ);
+      const dz = field.height(localX, localZ + step) - field.height(localX, localZ - step);
+      return new Vector3(-dx, 2 * step, -dz).normalize();
+    },
     sampleAt: (x, z) => {
       field.sample(x - origin.x, z - origin.z, sampleScratch);
       return {
