@@ -5,6 +5,7 @@ import {
   findSolarWorld,
   SOLAR_SYSTEM_CATALOG,
   SOLAR_SYSTEM_PLANETS,
+  SOLAR_SYSTEM_WORLDS,
   SUN,
   tuneSolarWorldRecipe,
 } from "./solar-system.ts";
@@ -35,8 +36,16 @@ describe("the local Solar System catalog", () => {
   });
 
   it("builds the local Sun system without an archive request", () => {
-    expect(findSolarSystem("sun")?.planets).toEqual(SOLAR_SYSTEM_PLANETS);
+    expect(findSolarSystem("sun")?.planets).toEqual(SOLAR_SYSTEM_WORLDS);
     expect(findSolarSystem("Kepler-297")).toBeNull();
+  });
+
+  it("keeps Pluto after the eight planets as a dwarf planet", () => {
+    const pluto = findSolarWorld("Pluto");
+    expect(SOLAR_SYSTEM_WORLDS).toHaveLength(9);
+    expect(SOLAR_SYSTEM_WORLDS.at(-1)).toBe(pluto);
+    expect(pluto?.solarSystem).toMatchObject({ bodyType: "dwarf-planet", naifId: 999 });
+    expect(pluto?.solarSystem?.texture?.path).toBe("/textures/solar-system/pluto.jpg");
   });
 
   it("uses measured tilts and recognisable ring systems instead of the exoplanet lottery", () => {

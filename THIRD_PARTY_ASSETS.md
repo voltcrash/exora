@@ -16,6 +16,7 @@ it is the cited mission mosaic prepared for planetary visualization.
 | Jupiter | `textures/solar-system/jupiter.jpg` | Voyager imagery / NASA JPL-Caltech               | `science.nasa.gov/3d-resources/jupiter/`                                     |
 | Saturn  | `textures/solar-system/saturn.jpg`  | NASA/JPL Solar System Simulator visualization    | `science.nasa.gov/3d-resources/saturn/`                                      |
 | Neptune | `textures/solar-system/neptune.jpg` | NASA/JPL Solar System Simulator visualization    | `science.nasa.gov/3d-resources/neptune/`                                     |
+| Pluto   | `textures/solar-system/pluto.jpg`   | New Horizons MVIC global color map / NASA/JHUAPL | `science.nasa.gov/resource/pluto-global-color-map/`                          |
 
 The NASA 3D Resources copies were taken from NASA's public `NASA-3D-Resources` GitHub mirror.
 NASA states that the hub's assets are free to download and use subject to the NASA Images and

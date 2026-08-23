@@ -50,6 +50,7 @@ export const SUN: StarProfile = {
 
 interface PlanetParameters {
   axialTiltDegrees: number;
+  bodyType?: "dwarf-planet" | "planet";
   discoveryMethod: string;
   discoveryYear: number | null;
   eccentricity: number;
@@ -75,6 +76,7 @@ interface PlanetParameters {
 
 const planet = ({
   axialTiltDegrees,
+  bodyType = "planet",
   discoveryMethod,
   discoveryYear,
   eccentricity,
@@ -123,7 +125,7 @@ const planet = ({
   },
   solarSystem: {
     axialTiltDegrees,
-    bodyType: "planet",
+    bodyType,
     naifId,
     orbitalInclinationDegrees: inclinationDegrees,
     parent: "Sun",
@@ -353,13 +355,40 @@ export const SOLAR_SYSTEM_PLANETS = [
   NEPTUNE,
 ] as const;
 
+export const PLUTO = planet({
+  axialTiltDegrees: 119.61,
+  bodyType: "dwarf-planet",
+  discoveryMethod: "Photographic plate",
+  discoveryYear: 1930,
+  eccentricity: 0.2488,
+  equilibriumTemperatureKelvin: 44,
+  id: "pluto",
+  inclinationDegrees: 17.16,
+  kind: "rocky",
+  massEarth: 0.00218,
+  name: "Pluto",
+  naifId: 999,
+  orbitalPeriodDays: 90_560,
+  radiusEarth: 0.186,
+  rotationPeriodHours: -153.293,
+  semiMajorAxisAu: 39.482,
+  summary:
+    "A complex Kuiper Belt dwarf planet with blue haze, mountains of water ice, and the vast nitrogen glacier Sputnik Planitia.",
+  texture: {
+    credit: "NASA New Horizons / JHUAPL / SwRI",
+    page: "https://science.nasa.gov/resource/pluto-global-color-map/",
+  },
+});
+
+export const SOLAR_SYSTEM_WORLDS = [...SOLAR_SYSTEM_PLANETS, PLUTO] as const;
+
 export type SolarSystemCatalogEntry =
   | { profile: ExoplanetProfile; type: "world" }
   | { profile: StarProfile; type: "star" };
 
 export const SOLAR_SYSTEM_CATALOG: readonly SolarSystemCatalogEntry[] = [
   { profile: SUN, type: "star" },
-  ...SOLAR_SYSTEM_PLANETS.map((profile) => ({ profile, type: "world" as const })),
+  ...SOLAR_SYSTEM_WORLDS.map((profile) => ({ profile, type: "world" as const })),
 ];
 
 export const findSolarStar = (name: string): StarProfile | null =>
@@ -376,7 +405,7 @@ export const findSolarWorld = (name: string): ExoplanetProfile | null => {
 
 export const findSolarSystem = (hostStar: string) =>
   hostStar.trim().toLocaleLowerCase() === "sun"
-    ? { cached: true, hostStar: "Sun", planets: [...SOLAR_SYSTEM_PLANETS] }
+    ? { cached: true, hostStar: "Sun", planets: [...SOLAR_SYSTEM_WORLDS] }
     : null;
 
 const classifications: Readonly<Record<number, string>> = {
@@ -388,6 +417,7 @@ const classifications: Readonly<Record<number, string>> = {
   699: "Ringed gas giant",
   799: "Sideways ice giant",
   899: "Storm-active ice giant",
+  999: "Kuiper Belt dwarf planet",
 };
 
 /**
@@ -400,7 +430,7 @@ export const tuneSolarWorldRecipe = (
   recipe: WorldRecipe,
 ): WorldRecipe => {
   const identity = profile.solarSystem;
-  if (!identity || identity.bodyType !== "planet") return recipe;
+  if (!identity || !["dwarf-planet", "planet"].includes(identity.bodyType)) return recipe;
   const base = {
     ...recipe,
     axialTilt:
