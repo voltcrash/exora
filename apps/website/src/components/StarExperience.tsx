@@ -1,7 +1,8 @@
 import type { ExoplanetProfile, StarProfile } from "@exora/contracts";
 import type { CustomStar, CustomWorld } from "@exora/worldgen";
 import { useEffect, useRef, useState } from "react";
-import { loadPlanetsByHost, type StarLoadResult } from "../api-client.ts";
+import type { StarLoadResult } from "../api-client.ts";
+import { reachSystem } from "../destination-cache.ts";
 import type { StarWorld } from "../star-scene.ts";
 import { formatNumber } from "../planet-utils.tsx";
 import type { SceneHost, XrStatus } from "../scene-host.ts";
@@ -106,8 +107,10 @@ export const StarExperience = ({
     setSystemState("loading");
     void (async () => {
       for (const alias of aliases) {
-        const response = await loadPlanetsByHost(alias, { signal: controller.signal });
-        if (response.planets.length > 0) return response;
+        // The same lookup the diorama jump makes, so asking here is what makes that jump
+        // instant: whichever alias answers is the one already in hand when it is taken.
+        const response = await reachSystem(alias);
+        if (response) return response;
       }
       return null;
     })()

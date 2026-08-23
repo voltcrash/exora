@@ -5,12 +5,13 @@ import {
   type CustomWorld,
   type WorldRecipe,
 } from "@exora/worldgen";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState, type CSSProperties } from "react";
 import type { PlanetLoadResult } from "../api-client.ts";
+import { warmDestinations } from "../destination-cache.ts";
 import type { ViewMode } from "../planet-scene.ts";
 import { formatNumber, formatPlanetName } from "../planet-utils.tsx";
 import type { SceneHost, XrStatus } from "../scene-host.ts";
-import type { TravelPhase } from "../travel-transition.ts";
+import { SURFACE_TRANSITION_MS, type TravelPhase } from "../travel-transition.ts";
 
 interface PlanetExperienceProps {
   chromeHidden: boolean;
@@ -99,6 +100,14 @@ export const PlanetExperience = ({
     if (!found) host?.cancelTravel();
     setSystemJumpState(found ? "idle" : "error");
   };
+
+  // Both routes out of this world are named by the world itself, so they are asked for now
+  // rather than when the visitor clicks — a flight that has to wait for an archive is a flight
+  // that stops in mid-air. Nothing here waits on the answer; it is only put where the jump will
+  // find it. Custom worlds have no archive behind them and nothing to ask about.
+  useEffect(() => {
+    if (result.mode !== "custom") warmDestinations(planet.hostStar);
+  }, [planet.hostStar, result.mode]);
 
   useEffect(() => host?.onXrStatus(setXrStatus), [host]);
 
@@ -190,6 +199,9 @@ export const PlanetExperience = ({
   return (
     <div
       className={`experience-shell view-${viewMode} ${settled ? "scene-ready" : ""} ${sceneState === "error" ? "scene-error" : ""} ${travelling ? "travelling" : ""} ${chromeHidden ? "chrome-hidden" : ""}`}
+      // The dark over a descent is one timeline with the camera flying it, so the stylesheet is
+      // told how long that is rather than keeping its own copy of the number.
+      style={{ "--surface-transition": `${SURFACE_TRANSITION_MS}ms` } as CSSProperties}
     >
       <div className="space-haze" aria-hidden="true" />
       <div className="viewport-grid" aria-hidden="true" />

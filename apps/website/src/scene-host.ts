@@ -46,11 +46,15 @@ import {
   type RendererStatus,
 } from "./renderer-recovery.ts";
 import {
+  arrivalRadius,
   departureRadius,
   easeAway,
+  easeDrift,
   easeSettle,
   travelStep,
   TRAVEL_ARRIVE_MS,
+  TRAVEL_COAST_MS,
+  TRAVEL_COAST_SCALE,
   TRAVEL_CROSS_MS,
   TRAVEL_DEPART_MS,
   TRAVEL_RECALL_MS,
@@ -142,6 +146,14 @@ export interface SceneHost {
   onXrStatus: (listener: (status: XrStatus) => void) => () => void;
   /** Subscribes to WebGL availability and recovery, called immediately with the current state. */
   onRendererStatus: (listener: (status: RendererStatus) => void) => () => void;
+  /**
+   * Whether the visitor has asked for less movement.
+   *
+   * Read here rather than in each scene, because a jump between destinations and a descent
+   * within one are the same promise to that visitor, and answering it differently in two places
+   * is how one of them ends up still flying.
+   */
+  prefersReducedMotion: () => boolean;
   /**
    * Parks the render loop while something else owns the screen, returning the release.
    *
@@ -457,6 +469,8 @@ const createSceneHost = (canvas: HTMLCanvasElement): SceneHost => {
   let travelOrigin: { lower: number | null; radius: number; upper: number | null } | null = null;
   /** The outbound flight in progress, shared by whoever started it and whoever lands on it. */
   let departure: Promise<boolean> | null = null;
+  /** Set once a mount has taken the outbound flight over, so it stops drifting and crosses. */
+  let departureClaimed = false;
   let glideFrame = 0;
   let glideDeadline = 0;
   let landGlide: ((landed: boolean) => void) | null = null;
@@ -555,8 +569,18 @@ const createSceneHost = (canvas: HTMLCanvasElement): SceneHost => {
       radius: camera.radius,
       upper: camera.upperRadiusLimit,
     };
+    departureClaimed = false;
     setTravelPhase("departing");
-    departure = glideCamera(flightRadius(camera.radius), TRAVEL_DEPART_MS, easeAway);
+    const far = flightRadius(camera.radius);
+    departure = glideCamera(far, TRAVEL_DEPART_MS, easeAway).then((landed) => {
+      // Nothing has come to claim the flight, so an archive is still being asked where this jump
+      // is going. It carries on drifting at the speed it had rather than stopping dead in the
+      // middle of the sky, which is what reads as the page having hung rather than as travel.
+      if (landed && !departureClaimed && !disposed) {
+        void glideCamera(far * TRAVEL_COAST_SCALE, TRAVEL_COAST_MS, easeDrift);
+      }
+      return landed;
+    });
   };
 
   const cancelTravel = (): void => {
@@ -580,14 +604,24 @@ const createSceneHost = (canvas: HTMLCanvasElement): SceneHost => {
   const departFromWorld = async (): Promise<void> => {
     if (isInXr) return;
     if (!departure) beginTravel();
+    departureClaimed = true;
     await departure;
     setTravelPhase("crossing");
     await new Promise<void>((resolve) => window.setTimeout(resolve, TRAVEL_CROSS_MS));
   };
 
-  /** The inbound half: the destination starts distant, and the camera falls in and settles on it. */
-  const arriveAtWorld = (): void => {
+  /**
+   * The inbound half: the destination is already close, and the camera settles back onto it.
+   *
+   * Started on the destination's first drawn frame rather than the instant it was built. The
+   * build stalls the frame loop, and behind that stall sits the shader compilation for
+   * everything it just made — together long enough that a flight timed from the end of the build
+   * would spend its first third frozen and then jump to wherever the clock had got to. Waiting
+   * for the frame costs the jump nothing, because the dark is over that whole stall anyway.
+   */
+  const arriveAtWorld = (mounted: number): void => {
     departure = null;
+    departureClaimed = false;
     travelOrigin = null;
     if (isInXr) {
       setTravelPhase("idle");
@@ -598,19 +632,40 @@ const createSceneHost = (canvas: HTMLCanvasElement): SceneHost => {
     const resting = camera.radius;
     const lower = camera.lowerRadiusLimit;
     const upper = camera.upperRadiusLimit;
-    const far = flightRadius(resting);
-    widenCameraReach(resting, far);
-    camera.radius = far;
-    setTravelPhase("arriving");
-    void glideCamera(resting, TRAVEL_ARRIVE_MS, easeSettle).then((landed) => {
-      // A flight overtaken by the next jump, or one whose host was disposed out from under it,
-      // has nothing to hand back: the limits and the controls belong to whatever replaced it.
-      if (!landed || disposed) return;
-      camera.lowerRadiusLimit = lower;
-      camera.upperRadiusLimit = upper;
-      if (!isInXr) camera.attachControl(canvas, true);
-      setTravelPhase("idle");
-    });
+    const near = arrivalRadius(resting, lower ?? undefined);
+    widenCameraReach(near, resting);
+    camera.radius = near;
+
+    const settle = (): void => {
+      // The first world of a session arrives out of `idle` rather than out of the dark, so what
+      // is checked is that this is still the world the scene holds — not which phase it came from.
+      if (disposed || mounted !== mountToken) return;
+      // The dark lifts here rather than when the build returned: everything the visitor is about
+      // to see starts together, on a frame that has actually been drawn.
+      setTravelPhase("arriving");
+      void glideCamera(resting, TRAVEL_ARRIVE_MS, easeSettle).then((landed) => {
+        // A flight overtaken by the next jump, or one whose host was disposed out from under it,
+        // has nothing to hand back: the limits and the controls belong to whatever replaced it.
+        if (!landed || disposed) return;
+        camera.lowerRadiusLimit = lower;
+        camera.upperRadiusLimit = upper;
+        if (!isInXr) camera.attachControl(canvas, true);
+        setTravelPhase("idle");
+      });
+    };
+
+    // Whichever comes first: the frame, or a deadline for the case where no frame is coming
+    // because a dialog has the loop parked and nothing is being drawn at all.
+    let started = false;
+    const startOnce = (): void => {
+      if (started) return;
+      started = true;
+      scene.onAfterRenderObservable.remove(firstDrawn);
+      window.clearTimeout(drawDeadline);
+      settle();
+    };
+    const firstDrawn = scene.onAfterRenderObservable.add(() => startOnce());
+    const drawDeadline = window.setTimeout(startOnce, 400);
   };
 
   const mountWorld = async <World extends MountedWorld>(
@@ -660,11 +715,18 @@ const createSceneHost = (canvas: HTMLCanvasElement): SceneHost => {
     rigAwaitingWorld = isInXr;
     xrConsole?.refresh();
     void fadeVeil(0);
-    arriveAtWorld();
+    arriveAtWorld(token);
     // A destination can be chosen from a dialog that is still open over the canvas — the catalog
     // closes and the world mounts in the same commit, and nothing says which lands first. One
     // frame here means the scrim is never left blurring the world the visitor just left.
     if (!looping) renderFrame();
+    // Building a world stalls the frame loop, and the rolling average knows nothing about why:
+    // left alone it reports the stall as a run of enormous frames for seconds afterwards, which
+    // shows up as a heads-up display insisting on single digits and — worse — as the quality
+    // adapter deciding the machine cannot keep up and dropping the render scale, which
+    // reallocates the framebuffer and hitches the arrival it was supposed to be helping.
+    engine.performanceMonitor.reset();
+    qualitySampleSeconds = 0;
     return world;
   };
 
@@ -773,6 +835,7 @@ const createSceneHost = (canvas: HTMLCanvasElement): SceneHost => {
     qualityTier: profile.tier,
     beginTravel,
     cancelTravel,
+    prefersReducedMotion,
     getFps: () => engine.getFps(),
     isInXr: () => isInXr,
     isVrSupported: () => isVrSupported,

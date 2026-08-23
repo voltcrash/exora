@@ -51,6 +51,7 @@ vi.mock("./scene-host.ts", () => {
     getFps: () => 60,
     isInXr: () => false,
     isVrSupported: () => false,
+    prefersReducedMotion: () => false,
     mountWorld: async (build: () => unknown) => build(),
     onRendererStatus: (listener: (status: string) => void) => {
       listener("ready");

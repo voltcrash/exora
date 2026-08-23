@@ -70,14 +70,41 @@ button {
   background: #020405;
   visibility: hidden;
   opacity: 0;
-  transition:
-    opacity 420ms ease,
-    visibility 420ms ease;
 }
 
+/*
+ * The dark a descent passes through.
+ *
+ * It used to hold at three quarters and fade in over its own timing, while the world it was
+ * covering for changed in the very first frame of the move — so the swap happened in plain sight
+ * and the dark arrived afterwards, to cover something that had already been seen. It is now one
+ * timeline, run from `travel-transition.ts` alongside the camera: full dark across the middle,
+ * which is exactly where the scene hands over from one half of the world to the other.
+ */
 .view-transition .surface-veil {
   visibility: visible;
-  opacity: 0.78;
+  animation: surface-dip var(--surface-transition, 760ms) linear both;
+}
+
+/*
+ * Full dark across the whole middle, rather than only at the instant of the swap.
+ *
+ * The scene keeps its own clock and hands the world over at the halfway mark; this timeline is
+ * started by a React commit, which lands a frame or two later. That gap is nothing on a machine
+ * drawing sixty frames a second and a fifth of a second on one drawing three, so the dark is held
+ * wide enough that the swap is covered either way.
+ */
+@keyframes surface-dip {
+  0% {
+    opacity: 0;
+  }
+  28%,
+  72% {
+    opacity: 1;
+  }
+  100% {
+    opacity: 0;
+  }
 }
 
 /*
@@ -234,8 +261,8 @@ button {
   z-index: 2;
   pointer-events: none;
   transition:
-    opacity 360ms ease,
-    visibility 360ms ease;
+    opacity 220ms ease,
+    visibility 220ms ease;
 }
 
 /*

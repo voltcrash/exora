@@ -33,6 +33,12 @@ import { skyViewpointFrom } from "./sky-catalog.ts";
 import { createStellarSurface, type StellarSurface } from "./star-surface.ts";
 import { createStarfield } from "./star-visuals.ts";
 import { getSurfaceDetailTextures, surfaceDetailSelectionForPalette } from "./texture-cache.ts";
+import {
+  easeAway,
+  easeSettle,
+  SURFACE_SWAP_AT,
+  SURFACE_TRANSITION_MS,
+} from "./travel-transition.ts";
 import { planetFacts } from "./xr-console-model.ts";
 import type { XrCell } from "./xr-panel-layout.ts";
 
@@ -53,6 +59,22 @@ const SURFACE_RETURN_RADIUS = 18.1;
  * as a request to leave the vista — the return would animate the same camera the flight is on.
  */
 const SURFACE_DEPARTURE_RADIUS = 17.6;
+
+/**
+ * The distances a descent, and the climb back to orbit, are flown between.
+ *
+ * Each half of the move carries on the way the visitor's scroll was already going: scrolling in
+ * keeps closing on the world until the dark takes it, and comes out of the dark still closing, on
+ * ground that is now underfoot. The two `-ENTRY` distances are the ones nobody ever sees, because
+ * they are set at the instant the dark is deepest; they exist so that the second half of the move
+ * has somewhere to travel from.
+ */
+const SURFACE_PLUNGE_RADIUS = 7.9;
+const SURFACE_ENTRY_RADIUS = 15.6;
+const SURFACE_RESTING_RADIUS = 12.8;
+const ORBIT_CLIMB_RADIUS = 21.6;
+const ORBIT_ENTRY_RADIUS = 10.6;
+const ORBIT_RETURN_RADIUS = 12.2;
 /** Where the wearer stands when the immersive session drops onto the terrain. */
 const XR_SURFACE_STAND = new Vector3(0, 0, 12);
 /**
@@ -2293,6 +2315,9 @@ export const createPlanetWorld = (
   let elapsedSeconds = 0;
   let viewState: "entering" | "leaving" | "orbit" | "surface" = "orbit";
   let viewTransitionSeconds = 0;
+  /** Where the visitor's own scroll had got to when it asked for the other view. */
+  let viewTransitionFrom = 0;
+  let viewTransitionSwapped = false;
   const pressedMovementKeys = new Set<string>();
   const orbitTarget = PLANET_POSITION.clone();
   const surfaceTarget = new Vector3(0, 0.1, 25);
@@ -2345,18 +2370,65 @@ export const createPlanetWorld = (
 
   applyViewEnvironment(false);
 
+  /**
+   * Hands the world over to the other half of itself, at the instant the dark is deepest.
+   *
+   * Everything that cannot be moved through goes here together: the ground and sky appearing or
+   * being taken away, the fog, the colour behind it all, and where the camera is pointing and
+   * from what angle. Doing any of it a frame earlier or later puts it on screen, and a world that
+   * changes out from under a moving camera reads as a glitch rather than as an arrival.
+   */
+  const swapViewEnvironment = (entering: boolean): void => {
+    applyViewEnvironment(entering);
+    camera.target = (entering ? surfaceTarget : orbitTarget).clone();
+    camera.alpha = -Math.PI / 2;
+    camera.beta = entering ? SURFACE_RESTING_BETA : Math.PI / 2.13;
+    // A visitor who asked for less movement is put down where the view rests, and the dark that
+    // was covering the flight covers a plain cut instead.
+    camera.radius = host.prefersReducedMotion()
+      ? entering
+        ? SURFACE_RESTING_RADIUS
+        : ORBIT_RETURN_RADIUS
+      : entering
+        ? SURFACE_ENTRY_RADIUS
+        : ORBIT_ENTRY_RADIUS;
+  };
+
+  const finishViewTransition = (entering: boolean): void => {
+    if (!viewTransitionSwapped) swapViewEnvironment(entering);
+    viewState = entering ? "surface" : "orbit";
+    camera.radius = entering ? SURFACE_RESTING_RADIUS : ORBIT_RETURN_RADIUS;
+    camera.lowerRadiusLimit = entering ? 7.5 : 10.5;
+    camera.upperRadiusLimit = entering ? SURFACE_FAR_LIMIT : 25;
+    camera.lowerBetaLimit = entering ? 1.02 : 0.58;
+    camera.upperBetaLimit = entering ? 1.48 : Math.PI - 0.58;
+    camera.attachControl(canvas, true);
+    onViewModeChange(entering ? "surface" : "orbit");
+  };
+
   const beginViewTransition = (direction: "entering" | "leaving"): void => {
     if (viewState !== "orbit" && viewState !== "surface") return;
     viewState = direction;
     viewTransitionSeconds = 0;
+    viewTransitionFrom = camera.radius;
+    viewTransitionSwapped = false;
     camera.detachControl();
-    applyViewEnvironment(direction === "entering");
+    // The environment stays as it is for now. It used to change here, at the top of the move,
+    // where the veil covering it had not begun to darken — so the world being left vanished in
+    // one frame and the camera then flew through whatever had replaced it.
     onViewModeChange("transition");
   };
 
   const renderObserver = scene.onBeforeRenderObservable.add(() => {
     const isInXr = host.isInXr();
-    const deltaSeconds = Math.min(engine.getDeltaTime() / 1_000, 0.05);
+    // Two clocks, deliberately. Anything that integrates — walking, rotation, drifting cloud —
+    // reads the clamped one, so that a single long frame cannot teleport it across the world.
+    // Anything with a fixed duration reads the real one, because clamping *that* is what makes a
+    // move take five seconds on a machine drawing three frames a second: every frame advances it
+    // by fifty milliseconds however long the frame really was, and the camera falls out of step
+    // with the dark on screen that is covering for it.
+    const realDeltaSeconds = engine.getDeltaTime() / 1_000;
+    const deltaSeconds = Math.min(realDeltaSeconds, 0.05);
     elapsedSeconds += deltaSeconds;
 
     const movementX =
@@ -2400,28 +2472,37 @@ export const createPlanetWorld = (
       beginViewTransition("leaving");
 
     if (viewState === "entering" || viewState === "leaving") {
-      viewTransitionSeconds += deltaSeconds;
-      const progress = Math.min(1, viewTransitionSeconds / 0.95);
-      const eased = progress * progress * (3 - 2 * progress);
+      // Timed off the clock rather than stepped per frame. What used to be here moved the camera
+      // by a fraction of the distance remaining *each frame*, so the same descent took half as
+      // long on a 120 Hz display as on a 60 Hz one, arrived somewhere different on each, and
+      // never quite reached the end — whatever the decay had got to when the clock ran out was
+      // snapped away by the limits going back on.
+      viewTransitionSeconds += realDeltaSeconds;
+      const progress = Math.min(1, (viewTransitionSeconds * 1_000) / SURFACE_TRANSITION_MS);
       const entering = viewState === "entering";
-      const target = entering ? surfaceTarget : orbitTarget;
-      const targetRadius = entering ? 12.8 : 12.2;
-      const targetBeta = entering ? SURFACE_RESTING_BETA : Math.PI / 2.13;
-      camera.target = Vector3.Lerp(camera.target, target, Math.min(1, eased * 0.18 + 0.06));
-      camera.radius += (targetRadius - camera.radius) * Math.min(1, eased * 0.18 + 0.06);
-      camera.beta += (targetBeta - camera.beta) * Math.min(1, eased * 0.16 + 0.05);
-      camera.alpha += (-Math.PI / 2 - camera.alpha) * Math.min(1, eased * 0.16 + 0.05);
 
-      if (progress >= 1) {
-        viewState = entering ? "surface" : "orbit";
-        applyViewEnvironment(entering);
-        camera.lowerRadiusLimit = entering ? 7.5 : 10.5;
-        camera.upperRadiusLimit = entering ? SURFACE_FAR_LIMIT : 25;
-        camera.lowerBetaLimit = entering ? 1.02 : 0.58;
-        camera.upperBetaLimit = entering ? 1.48 : Math.PI - 0.58;
-        camera.attachControl(canvas, true);
-        onViewModeChange(entering ? "surface" : "orbit");
+      if (progress >= SURFACE_SWAP_AT && !viewTransitionSwapped) {
+        viewTransitionSwapped = true;
+        swapViewEnvironment(entering);
       }
+
+      // One move in one direction, in two halves that never share a frame: away from where the
+      // scroll started, then on to where the other view rests.
+      if (host.prefersReducedMotion()) {
+        // Nothing to fly: the swap above already put the camera where this view rests.
+      } else if (viewTransitionSwapped) {
+        const settling = (progress - SURFACE_SWAP_AT) / (1 - SURFACE_SWAP_AT);
+        const from = entering ? SURFACE_ENTRY_RADIUS : ORBIT_ENTRY_RADIUS;
+        const to = entering ? SURFACE_RESTING_RADIUS : ORBIT_RETURN_RADIUS;
+        camera.radius = from + (to - from) * easeSettle(settling);
+      } else {
+        const leaving = entering ? SURFACE_PLUNGE_RADIUS : ORBIT_CLIMB_RADIUS;
+        camera.radius =
+          viewTransitionFrom +
+          (leaving - viewTransitionFrom) * easeAway(progress / SURFACE_SWAP_AT);
+      }
+
+      if (progress >= 1) finishViewTransition(entering);
     }
 
     planet.rotation.y += deltaSeconds * recipe.rotationSpeed;
@@ -2459,6 +2540,22 @@ export const createPlanetWorld = (
   const firstFrameObserver = scene.onAfterRenderObservable.addOnce(onFirstFrame);
 
   /**
+   * A jump out of this world takes the camera, so a descent still in the air lands first.
+   *
+   * Both are flights, and both write the same one camera every frame: left to run together they
+   * would each undo the other's step, which is the one kind of stutter no amount of easing fixes.
+   * Landing rather than freezing is what makes it safe for the jump to come to nothing — a
+   * destination the archive cannot resolve flies back to a world that is in one of its two
+   * states, not stranded between them with its controls taken away.
+   */
+  const releaseCameraToTravel = host.onTravelPhase((phase) => {
+    if (phase !== "departing") return;
+    if (viewState === "entering" || viewState === "leaving") {
+      finishViewTransition(viewState === "entering");
+    }
+  });
+
+  /**
    * Moves the rig to the spot that makes sense for a view.
    *
    * On the very first pose Babylon has yet to add the wearer's real height to the rig, so the
@@ -2486,7 +2583,7 @@ export const createPlanetWorld = (
     camera.lowerBetaLimit = surface ? 1.02 : 0.58;
     camera.upperBetaLimit = surface ? 1.48 : Math.PI - 0.58;
     camera.target.copyFrom(surface ? surfaceTarget : orbitTarget);
-    camera.radius = surface ? 12.8 : 17.2;
+    camera.radius = surface ? SURFACE_RESTING_RADIUS : 17.2;
     camera.beta = surface ? SURFACE_RESTING_BETA : Math.PI / 2.13;
     camera.alpha = -Math.PI / 2;
     camera.attachControl(canvas, true);
@@ -2580,6 +2677,7 @@ export const createPlanetWorld = (
       window.removeEventListener("keydown", onMovementKeyDown);
       window.removeEventListener("keyup", onMovementKeyUp);
       window.removeEventListener("blur", clearMovementKeys);
+      releaseCameraToTravel();
       scene.onBeforeRenderObservable.remove(renderObserver);
       scene.onAfterRenderObservable.remove(firstFrameObserver);
     },

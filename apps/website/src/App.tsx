@@ -3,12 +3,11 @@ import type { CustomStar, CustomWorld, WorldRecipe } from "@exora/worldgen";
 import { lazy, Suspense, useCallback, useEffect, useState, type CSSProperties } from "react";
 import {
   loadPlanetByName,
-  loadPlanetsByHost,
-  loadStarByName,
   type PlanetLoadResult,
   type StarLoadResult,
   type SystemLoadResult,
 } from "./api-client.ts";
+import { reachStar, reachSystem } from "./destination-cache.ts";
 import { PlanetExperience } from "./components/PlanetExperience.tsx";
 import { RecoveryScreen } from "./components/RecoveryScreen.tsx";
 import { featuredPlanet } from "./planet-profile.ts";
@@ -47,32 +46,18 @@ const defaultPlanetObject = (): ActiveObject => ({
   type: "planet",
 });
 
-/**
- * Resolves a whole host system from the archive.
- *
- * A system needs no SIMBAD lookup: every planet row carries its host star's temperature, radius,
- * mass and luminosity, which is everything the diorama draws the star from. So a system is
- * reachable even where the host name is one SIMBAD cannot resolve, which is most of the Kepler
- * and TOI catalogue.
- */
-const loadSystem = async (hostStar: string): Promise<SystemLoadResult | null> => {
-  const result = await loadPlanetsByHost(hostStar).catch(() => null);
-  if (!result || result.planets.length === 0) return null;
-  return { cached: result.cached, hostStar, planets: result.planets };
-};
-
 const loadRequestedObject = async (): Promise<ActiveObject> => {
   const parameters = new URLSearchParams(window.location.search);
   const starName = parameters.get("star");
   if (starName) {
-    const star = await loadStarByName(starName);
+    const star = await reachStar(starName);
     if (star) return { result: star, type: "star" };
     return { kind: "star", name: starName, type: "missing" };
   }
 
   const systemName = parameters.get("system");
   if (systemName) {
-    const system = await loadSystem(systemName);
+    const system = await reachSystem(systemName);
     if (system) return { result: system, type: "system" };
     return { kind: "system", name: systemName, type: "missing" };
   }
@@ -226,7 +211,7 @@ export const App = () => {
    * the view that asked can say so rather than the page going somewhere empty.
    */
   const selectSystem = useCallback(async (hostStar: string): Promise<boolean> => {
-    const system = await loadSystem(hostStar);
+    const system = await reachSystem(hostStar);
     if (!system) return false;
     window.history.pushState({}, "", `?system=${encodeURIComponent(hostStar)}`);
     setCustomRecipe(null);
@@ -236,7 +221,7 @@ export const App = () => {
   }, []);
 
   const selectHostStar = useCallback(async (hostStar: string): Promise<boolean> => {
-    const result = await loadStarByName(hostStar);
+    const result = await reachStar(hostStar);
     if (!result) return false;
     window.history.pushState({}, "", `?star=${encodeURIComponent(result.star.name)}`);
     setCustomRecipe(null);

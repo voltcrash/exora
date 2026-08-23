@@ -2,6 +2,7 @@ import type { ExoplanetProfile, StarProfile } from "@exora/contracts";
 import type { CustomStar, CustomWorld } from "@exora/worldgen";
 import { useEffect, useState } from "react";
 import type { SystemLoadResult } from "../api-client.ts";
+import { reachStar } from "../destination-cache.ts";
 import { formatNumber } from "../planet-utils.tsx";
 import type { SceneHost, XrStatus } from "../scene-host.ts";
 import {
@@ -86,6 +87,12 @@ export const SystemExperience = ({
     if (!found) host?.cancelTravel();
     setStarJumpState(found ? "idle" : "error");
   };
+
+  // The one route out of a diorama that has to be looked up. Asked for as the orbits are drawn,
+  // so that standing at the star is a flight rather than a flight and then a wait.
+  useEffect(() => {
+    void reachStar(hostStar).catch(() => null);
+  }, [hostStar]);
 
   useEffect(() => host?.onXrStatus(setXrStatus), [host]);
 

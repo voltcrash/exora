@@ -1,9 +1,12 @@
 import { expect, test } from "vite-plus/test";
 import {
+  arrivalRadius,
   departureRadius,
   easeAway,
+  easeDrift,
   easeSettle,
   travelStep,
+  TRAVEL_ARRIVAL_SCALE,
   TRAVEL_DEPARTURE_SCALE,
 } from "./travel-transition.ts";
 
@@ -66,4 +69,31 @@ test("a view that cannot be left from far away is departed from no further than 
 test("a limit closer than the visitor already is leaves the camera where it stands", () => {
   // Otherwise a flight *away* would begin by lurching toward the thing being left.
   expect(departureRadius(20, 12)).toBe(20);
+});
+
+test("a destination stands nearer than it will settle, so the jump keeps pulling back", () => {
+  // The property the whole shape rests on: both halves of a jump travel the same way. An arrival
+  // that started outside where it settles would push in, and the jump would read as a retreat
+  // followed by an approach rather than as one movement.
+  const resting = 17.2;
+  expect(arrivalRadius(resting)).toBeLessThan(resting);
+  expect(arrivalRadius(resting)).toBeCloseTo(resting * TRAVEL_ARRIVAL_SCALE, 10);
+  expect(departureRadius(resting)).toBeGreaterThan(resting);
+});
+
+test("a destination never appears nearer than its own view allows", () => {
+  // Below this the camera is inside what it came to look at.
+  expect(arrivalRadius(17.2, 12)).toBe(12);
+  expect(arrivalRadius(17.2, 9)).toBeCloseTo(17.2 * TRAVEL_ARRIVAL_SCALE, 10);
+});
+
+test("a nearest distance beyond where the world settles still arrives at the world", () => {
+  expect(arrivalRadius(17.2, 40)).toBe(17.2);
+});
+
+test("a coast carries the speed it had rather than easing in again", () => {
+  expect(easeDrift(0)).toBe(0);
+  expect(easeDrift(0.5)).toBe(0.5);
+  expect(easeDrift(1)).toBe(1);
+  expect(easeDrift(3)).toBe(1);
 });

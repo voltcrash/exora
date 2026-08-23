@@ -172,6 +172,8 @@ const createHarness = (
     scene,
     getFps: () => 60,
     isInXr: () => insideHeadset,
+    prefersReducedMotion: () => false,
+    onTravelPhase: () => () => undefined,
     isVrSupported: () => false,
     refreshConsole: () => undefined,
     xrCamera: () => null,
