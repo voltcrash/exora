@@ -139,7 +139,12 @@ interface Harness {
   scene: Scene;
 }
 
-const createHarness = (profile: RenderQualityProfile = testProfile): Harness => {
+const createHarness = (
+  profile: RenderQualityProfile = testProfile,
+  /** The desktop path — and the view transition that walks down onto the terrain — only runs
+   * outside a headset; everything else in this file is happy to be inside one. */
+  insideHeadset = true,
+): Harness => {
   const engine = new NullEngine({
     deterministicLockstep: false,
     lockstepMaxSteps: 4,
@@ -166,7 +171,7 @@ const createHarness = (profile: RenderQualityProfile = testProfile): Harness => 
     qualityTier: profile.tier,
     scene,
     getFps: () => 60,
-    isInXr: () => true,
+    isInXr: () => insideHeadset,
     isVrSupported: () => false,
     refreshConsole: () => undefined,
     xrCamera: () => null,
@@ -735,5 +740,109 @@ test("a seven-world diorama costs less than the one world it travels to", () => 
   world.dispose();
   scope.dispose();
   expect(scene.meshes.length).toBe(before);
+  engine.dispose();
+}, 30_000);
+
+/**
+ * The host star used to be scenery standing on the terrain rather than a body in its sky.
+ *
+ * It hung at a fixed point 36 units in front of the ground's origin — inside the patch the wheel
+ * and WASD move across — so it parallaxed exactly like the boulder beside it: crossing the vista
+ * swung it through tens of degrees, doubled its disc, and drew it in front of ridges that were
+ * further away than it was. Nothing about that reads as a sun; it reads as a lamp on a pole.
+ *
+ * This asserts the properties that make it a sky object instead. From anywhere a visitor can
+ * stand it holds one direction, one distance and one angular size; that distance is far beyond
+ * every piece of ground the excursion can put between a viewer and it, so only a ridge genuinely
+ * in the way can hide it; and its disc clears the highest ground in sight rather than sitting in
+ * it. The sky dome rides the viewer for the same reason — the flag Babylon offers for it,
+ * `infiniteDistance`, is ignored outright on a parented mesh.
+ */
+test("the surface star holds one place in the sky wherever the viewer walks", async () => {
+  vi.stubGlobal("window", new EventTarget());
+  const { engine, host, scene } = createHarness(testProfile, false);
+  const scope = openWorldScope(scene);
+  const planet = planets[0];
+  if (!planet) throw new Error("Expected a rocky fixture.");
+  let mode = "orbit";
+  const world = createPlanetWorld(host, {
+    onFirstFrame: () => undefined,
+    onViewModeChange: (next) => {
+      mode = next;
+    },
+    planet,
+    recipe: deriveWorldRecipe(planet),
+  });
+  scope.seal();
+  await settleSky();
+
+  // Scrolling this far in is what asks for the excursion; the transition down takes about a
+  // second of frames, and a bare `scene.render()` reports no delta of its own.
+  vi.spyOn(engine, "getDeltaTime").mockReturnValue(16);
+  host.camera.radius = 10.5;
+  for (let frame = 0; frame < 200 && mode !== "surface"; frame += 1) scene.render();
+  expect(mode).toBe("surface");
+
+  const star = scene.meshes
+    .filter((mesh) => mesh.name === "star-photosphere")
+    .find((mesh) => mesh.isEnabled());
+  const ground = scene.meshes.find((mesh) => mesh.name === "surfaceTerrain");
+  const sky = scene.meshes.find((mesh) => mesh.name === "surfaceSky");
+  if (!star || !ground || !sky) throw new Error("Expected a terrain vista to have been built.");
+
+  /** Where the star is, as anyone standing on the terrain would describe it. */
+  const sightline = () => {
+    const delta = star.getAbsolutePosition().subtract(host.camera.globalPosition);
+    const distance = delta.length();
+    return {
+      azimuth: Math.atan2(delta.x, delta.z),
+      distance,
+      elevation: Math.asin(delta.y / distance),
+      radius: Math.atan(star.getBoundingInfo().boundingBox.extendSize.x / distance),
+    };
+  };
+
+  /** How far the ground reaches from the eye, and how high it stands in the eye's sky. */
+  const groundInSight = (): { farthest: number; highest: number } => {
+    const positions = ground.getVerticesData("position");
+    if (!positions) throw new Error("Expected the terrain to carry positions.");
+    const origin = ground.getAbsolutePosition();
+    const eye = host.camera.globalPosition;
+    let farthest = 0;
+    let highest = -Math.PI / 2;
+    for (let index = 0; index < positions.length; index += 3) {
+      const x = positions[index]! + origin.x - eye.x;
+      const y = positions[index + 1]! + origin.y - eye.y;
+      const z = positions[index + 2]! + origin.z - eye.z;
+      farthest = Math.max(farthest, Math.hypot(x, y, z));
+      // Ground immediately underfoot is steeply below the eye and says nothing about the horizon.
+      if (Math.hypot(x, z) > 4) highest = Math.max(highest, Math.atan2(y, Math.hypot(x, z)));
+    }
+    return { farthest, highest };
+  };
+
+  const resting = sightline();
+  const terrain = groundInSight();
+  expect(resting.distance).toBeGreaterThan(terrain.farthest * 2);
+  expect(resting.elevation - resting.radius).toBeGreaterThan(terrain.highest);
+
+  // The far corner of the ground WASD can reach, which is where the old placement was worst: it
+  // put the viewer level with the star and a few units from it.
+  host.camera.target.set(-30, 0.1, 53);
+  // Two frames, because the sky is pinned to the pose the previous one left.
+  scene.render();
+  scene.render();
+  const walked = sightline();
+
+  expect(walked.distance).toBeCloseTo(resting.distance, 2);
+  // Five decimals of a radian is a thousandth of a degree; the placement this replaces moved
+  // through a fifth of a radian on the same walk.
+  expect(walked.azimuth).toBeCloseTo(resting.azimuth, 5);
+  expect(walked.elevation).toBeCloseTo(resting.elevation, 5);
+  expect(walked.radius).toBeCloseTo(resting.radius, 5);
+  expect(sky.getAbsolutePosition().equalsWithEpsilon(host.camera.globalPosition, 0.001)).toBe(true);
+
+  world.dispose();
+  scope.dispose();
   engine.dispose();
 }, 30_000);

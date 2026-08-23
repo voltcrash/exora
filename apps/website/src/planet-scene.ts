@@ -55,6 +55,42 @@ const SURFACE_RETURN_RADIUS = 18.1;
 const SURFACE_DEPARTURE_RADIUS = 17.6;
 /** Where the wearer stands when the immersive session drops onto the terrain. */
 const XR_SURFACE_STAND = new Vector3(0, 0, 12);
+/**
+ * How the vista camera sits once it has settled onto the terrain.
+ *
+ * Babylon measures beta down from straight up, so this is a camera a little above the spot it
+ * orbits, looking slightly down at it. It used to look down steeply enough that the sky over the
+ * ridge line was a band barely wider than the host star's own disc — nowhere for a star to hang
+ * without leaving the frame, which is part of why this one ended up down among the rocks.
+ */
+const SURFACE_RESTING_BETA = 1.3;
+/**
+ * Which way the host star lies from anyone standing on the terrain.
+ *
+ * A sun is a direction and an angular size, at a distance nothing on the ground can be measured
+ * against. This one used to be a fixed point 36 units in front of the terrain's origin — inside
+ * the patch the wheel and WASD move across — so it behaved like the boulder it was standing next
+ * to: walking the vista swung it through forty degrees of sky, doubled its disc, and left it
+ * hanging in front of ridges that were further away than it was. Only the direction survives now;
+ * the star rides an anchor pinned to the viewer, the same way the vacuum starfield does.
+ *
+ * Ahead and a little to the left, which is the strip of sky this camera frames, and three degrees
+ * up: clear of the highest ground the terrain generator raises, with the whole disc — up to the
+ * widest one worldgen allows — inside the frame at the vista's resting pitch.
+ */
+const SURFACE_STAR_DIRECTION = new Vector3(-0.209, 0.052, 0.977).normalize();
+/** Far enough out that ridges decide whether the star is visible, rather than standing beside it. */
+const SURFACE_STAR_DISTANCE = 320;
+/**
+ * How wide the host star's disc is in the surface sky, as an angular radius in radians.
+ *
+ * Distance is a free choice for something drawn as a sky object, so the size that has to be pinned
+ * down is the angle it covers — and it is the same angle the old, far closer placement subtended.
+ * The floor keeps a modest star from shrinking to a dot in a sky that holds nothing else to judge
+ * it against; the slope carries the relative sizes worldgen derives from each system's geometry.
+ */
+const surfaceStarAngularRadius = (apparentRadiusRadians: number): number =>
+  0.021 + apparentRadiusRadians * 0.39;
 
 const SKY_VERTEX_SHADER = `
 precision highp float;
@@ -1849,7 +1885,7 @@ const mixColor3 = (from: Rgb, to: Rgb, amount: number): Color3 => {
 
 const createSurfaceSky = (
   scene: Scene,
-  root: TransformNode,
+  parent: TransformNode,
   recipe: WorldRecipe,
   profile: RenderQualityProfile,
 ): { material: ShaderMaterial; mesh: Mesh } => {
@@ -1886,13 +1922,17 @@ const createSurfaceSky = (
     : isIceGiant
       ? toColor3(recipe.atmosphereBands.hazeColor)
       : toColor3(recipe.surface.cloudColor);
+  // Wide enough that the whole terrain patch stays inside it from every corner a visitor can
+  // stand in, with the star hanging inside it too. The dome writes no depth, so nothing sorts
+  // against it — but ground that ends up outside it is ground the sky can be drawn over, and
+  // pinning the dome to the viewer puts the far side of an 82-unit patch well outside the
+  // 90-unit radius it used to have.
   const mesh = MeshBuilder.CreateSphere(
     "surfaceSky",
-    { diameter: 180, segments: profile.tier === "desktop" ? 32 : 20 },
+    { diameter: 700, segments: profile.tier === "desktop" ? 32 : 20 },
     scene,
   );
-  mesh.parent = root;
-  mesh.infiniteDistance = true;
+  mesh.parent = parent;
   mesh.isPickable = false;
   mesh.renderingGroupId = 0;
 
@@ -1940,9 +1980,17 @@ const createSurfaceEnvironment = (
   meshes: AbstractMesh[];
   root: TransformNode;
   sky: ShaderMaterial;
+  skyAnchor: TransformNode;
   star: StellarSurface;
 } => {
   const root = new TransformNode("surfaceEnvironment", scene);
+  // What the vista treats as unreachably far — the sky dome, and the host star hanging on it —
+  // rides this instead of the ground, and the render loop pins it to wherever the viewer is.
+  // Babylon's own `infiniteDistance` cannot do the job: it is skipped outright on a parented mesh
+  // (`transformNode.ts` applies it only when `!this.parent`), so the flag the dome carried had no
+  // effect and the sky slid with every step, tipping its own horizon as it went.
+  const skyAnchor = new TransformNode("surfaceSkyAnchor", scene);
+  skyAnchor.parent = root;
   const meshes: AbstractMesh[] = [];
   const random = createSeededRandom(recipe.seed ^ 0x9e3779b9);
   const subdivisions = profile.tier === "desktop" ? 96 : 52;
@@ -1967,7 +2015,7 @@ const createSurfaceEnvironment = (
   ground.position.set(0, SURFACE_GROUND_BASE_Y, SURFACE_GROUND_ORIGIN_Z);
   ground.isPickable = false;
   meshes.push(ground);
-  const surfaceSky = createSurfaceSky(scene, root, recipe, profile);
+  const surfaceSky = createSurfaceSky(scene, skyAnchor, recipe, profile);
   meshes.push(surfaceSky.mesh);
 
   const positions = ground.getVerticesData("position");
@@ -2119,10 +2167,11 @@ const createSurfaceEnvironment = (
   // spreads a bright source out much further than vacuum does.
   const surfaceStar = createStellarSurface({
     detail: "distant",
-    diameter: 1.6 + recipe.star.apparentRadiusRadians * 30,
-    parent: root,
+    diameter:
+      SURFACE_STAR_DISTANCE * 2 * surfaceStarAngularRadius(recipe.star.apparentRadiusRadians),
+    parent: skyAnchor,
     pickable: Boolean(onSelectHostStar),
-    position: new Vector3(-8, 3.8, 48),
+    position: SURFACE_STAR_DIRECTION.scale(SURFACE_STAR_DISTANCE),
     profile,
     recipe: recipe.star,
     // Group 1 puts the star over the sky dome, which draws in group 0 without a depth write.
@@ -2147,7 +2196,7 @@ const createSurfaceEnvironment = (
     mesh.setEnabled(false);
   }
   root.setEnabled(false);
-  return { cloudLayers, meshes, root, sky: surfaceSky.material, star: surfaceStar };
+  return { cloudLayers, meshes, root, sky: surfaceSky.material, skyAnchor, star: surfaceStar };
 };
 
 const setEnvironmentEnabled = (
@@ -2357,7 +2406,7 @@ export const createPlanetWorld = (
       const entering = viewState === "entering";
       const target = entering ? surfaceTarget : orbitTarget;
       const targetRadius = entering ? 12.8 : 12.2;
-      const targetBeta = entering ? 1.23 : Math.PI / 2.13;
+      const targetBeta = entering ? SURFACE_RESTING_BETA : Math.PI / 2.13;
       camera.target = Vector3.Lerp(camera.target, target, Math.min(1, eased * 0.18 + 0.06));
       camera.radius += (targetRadius - camera.radius) * Math.min(1, eased * 0.18 + 0.06);
       camera.beta += (targetBeta - camera.beta) * Math.min(1, eased * 0.16 + 0.05);
@@ -2400,6 +2449,9 @@ export const createPlanetWorld = (
     cloudLayer?.setVector3("cameraPosition", activePosition);
     ringMaterial?.setVector3("cameraPosition", activePosition);
     hostStar.update(elapsedSeconds, activePosition);
+    // The sky rides the viewer: the dome keeps its horizon level with the eye that is under it,
+    // and the star holds one direction and one angular size however far a visitor walks.
+    surfaceEnvironment.skyAnchor.position.copyFrom(activePosition);
     surfaceEnvironment.star.update(elapsedSeconds, activePosition);
     starfield.update(elapsedSeconds, activePosition);
   });
@@ -2435,7 +2487,7 @@ export const createPlanetWorld = (
     camera.upperBetaLimit = surface ? 1.48 : Math.PI - 0.58;
     camera.target.copyFrom(surface ? surfaceTarget : orbitTarget);
     camera.radius = surface ? 12.8 : 17.2;
-    camera.beta = surface ? 1.23 : Math.PI / 2.13;
+    camera.beta = surface ? SURFACE_RESTING_BETA : Math.PI / 2.13;
     camera.alpha = -Math.PI / 2;
     camera.attachControl(canvas, true);
   };
