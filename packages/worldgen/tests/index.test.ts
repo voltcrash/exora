@@ -45,7 +45,9 @@ const featuredPlanet: ExoplanetProfile = {
   },
 };
 
-const temperateRockyPlanet: ExoplanetProfile = {
+/** Kepler-62 f: a real 208 K equilibrium temperature, which is the cold-desert regime rather
+ * than the temperate one — Mars sits at 210 K. Used as the base for the rocky fixtures below. */
+const coldDesertRockyPlanet: ExoplanetProfile = {
   ...featuredPlanet,
   id: "kepler-62-f",
   name: "Kepler-62 f",
@@ -57,6 +59,19 @@ const temperateRockyPlanet: ExoplanetProfile = {
     radiusEarth: 1.41,
     massEarth: 2.8,
     equilibriumTemperatureKelvin: 208,
+  },
+};
+
+/** Kepler-452 b: 265 K, inside the band where liquid surface water is possible at all. */
+const temperateRockyPlanet: ExoplanetProfile = {
+  ...coldDesertRockyPlanet,
+  id: "kepler-452-b",
+  name: "Kepler-452 b",
+  observation: {
+    ...coldDesertRockyPlanet.observation,
+    radiusEarth: 1.63,
+    massEarth: 5,
+    equilibriumTemperatureKelvin: 265,
   },
 };
 
@@ -143,6 +158,57 @@ test("temperate rocky planets produce displaced terrain with low basins", () => 
   expect(recipe.surface.iceCapStrength).toBeGreaterThan(0);
   expect(recipe.surface.lavaStrength).toBe(0);
   expect(recipe.atmosphere.label).toContain("inferred");
+});
+
+/**
+ * Equilibrium temperature is a blackbody figure for an airless body, and reading it as a surface
+ * temperature is what used to hand Mars an ocean and an ice-blue palette: at 210 K it fell inside
+ * a "temperate" band that ran down to 180 K, and inside an ice threshold that ran up to 250 K.
+ * Both of those swept up Earth (255 K) as well. A world in Mars's regime is a cold desert.
+ */
+test("worlds in Mars's thermal regime infer a cold desert, not an ice world with an ocean", () => {
+  const recipe = deriveWorldRecipe({
+    ...coldDesertRockyPlanet,
+    id: "mars-analog",
+    name: "Mars Analog",
+    observation: {
+      ...coldDesertRockyPlanet.observation,
+      radiusEarth: 0.532,
+      massEarth: 0.107,
+      equilibriumTemperatureKelvin: 210,
+    },
+  });
+
+  if (recipe.renderer !== "rocky") throw new Error("Expected a rocky recipe.");
+  expect(recipe.classification).toBe("Cold desert world");
+  expect(recipe.inferred.visualClass).toBe("rocky");
+  expect(recipe.inferred.paletteFamily).not.toBe("ice-blue");
+  expect(recipe.surface.waterLevel).toBe(0);
+  expect(recipe.terrain.oceanCoverage).toBe(0);
+  // Polar caps, not a glaciated world, and next to no weather.
+  expect(recipe.surface.iceCapStrength).toBeLessThan(0.4);
+  expect(recipe.surface.iceCapStrength).toBeGreaterThan(0);
+  expect(recipe.terrain.polarIceBias).toBeGreaterThan(0.6);
+  expect(recipe.surface.cloudCover).toBeLessThan(0.12);
+});
+
+test("Earth's own equilibrium temperature still reads as temperate rather than frozen", () => {
+  const recipe = deriveWorldRecipe({
+    ...coldDesertRockyPlanet,
+    id: "earth-itself",
+    name: "Earth Analog 255K",
+    observation: {
+      ...coldDesertRockyPlanet.observation,
+      radiusEarth: 1,
+      massEarth: 1,
+      equilibriumTemperatureKelvin: 255,
+    },
+  });
+
+  if (recipe.renderer !== "rocky") throw new Error("Expected a rocky recipe.");
+  expect(recipe.inferred.visualClass).not.toBe("ice");
+  expect(recipe.inferred.iceLikelihood).toBeLessThan(0.3);
+  expect(recipe.surface.waterLevel).toBeGreaterThan(0);
 });
 
 test("scorched rocky planets generate emissive fractures without water", () => {

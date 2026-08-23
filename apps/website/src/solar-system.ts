@@ -1,6 +1,7 @@
 import type { ExoplanetProfile, StarProfile } from "@exora/contracts";
 import type { WorldRecipe } from "@exora/worldgen";
 import { SOLAR_SYSTEM_MOON_GROUPS, SOLAR_SYSTEM_MOONS } from "./solar-moons.ts";
+import { measuredSurfaceAppearance } from "./surface-geology.ts";
 
 export { SOLAR_SYSTEM_MOON_GROUPS, SOLAR_SYSTEM_MOONS } from "./solar-moons.ts";
 
@@ -818,12 +819,24 @@ export const tuneSolarWorldRecipe = (
               : identity.naifId === 499
                 ? 0.04
                 : 0;
+    // A known body's surface colours are established by mission imagery, so they are stated
+    // rather than inferred from equilibrium temperature and bulk density. Left to the inference,
+    // Mars came out blue: at 210 K it landed inside an ice threshold calibrated for worlds a
+    // hundred kelvin colder, and the vista painted the reddest planet in the sky as glacier.
+    const appearance = unresolved ? null : measuredSurfaceAppearance(identity.naifId);
     return {
       ...base,
       atmosphere: { ...base.atmosphere, density: atmosphereDensity },
       rings: null,
       surface: {
         ...base.surface,
+        ...(appearance
+          ? {
+              highColor: appearance.highColor,
+              lowColor: appearance.lowColor,
+              midColor: appearance.midColor,
+            }
+          : {}),
         ...(unresolved
           ? {
               craterDensity: 0,
@@ -848,6 +861,7 @@ export const tuneSolarWorldRecipe = (
       },
       terrain: {
         ...base.terrain,
+        ...(appearance ? { paletteFamily: appearance.paletteFamily } : {}),
         atmosphereDensity,
         cloudCoverage: cloudCover,
         iceCoverage:
