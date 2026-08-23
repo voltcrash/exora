@@ -1,5 +1,14 @@
 # Third-Party Asset Provenance
 
+## Irregular-body model runtime
+
+`@babylonjs/loaders` 9.22.1 is used to load attributed NASA/PDS OBJ and GLB shape assets and the
+plate-preserving GLB derivatives of NAIF Digital Shape Kernels. It is distributed under
+Apache-2.0. The loader is registered dynamically, so format code is fetched only for a selected
+body. The dependency itself contributes no scientific geometry; every model, map, and DSK source
+must have its own row below before it can ship. The conversion and validation contract is recorded
+in `docs/irregular-body-shape-models.md`.
+
 ## Known Solar System surface maps
 
 Known bodies do not use Exora's inferred exoplanet color at orbital distance when an authoritative

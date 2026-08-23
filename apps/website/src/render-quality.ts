@@ -21,6 +21,12 @@ export interface RenderQualityProfile {
   /** How many storms a gas/ice giant's fragment shader evaluates per pixel, the dominant cost
    * of the multi-storm loop. A recipe's own `bandDetail.stormCount` is clamped to this. */
   maxGiantStorms: number;
+  /** Highest plate count selected from an irregular body's authored shape-model LODs. */
+  maxIrregularBodyTriangles: number;
+  /** Enables authoritative normal maps on measured small-body geometry. */
+  irregularBodyNormalMapping: boolean;
+  /** Shadow-map resolution used for small-body self-shadowing. */
+  irregularBodyShadowMapSize: number;
   /** Icosphere subdivision level for rocky planets (vertex count ~= 10 * n^2 + 2), chosen to
    * roughly match planetSegments' vertex density on a UV sphere at the same tier. */
   planetIcoSubdivisions: number;
@@ -118,6 +124,9 @@ export const deriveRenderQuality = ({
       systemOrbitSegments: 72,
       fbmOctaves: 4,
       maxGiantStorms: 1,
+      maxIrregularBodyTriangles: 60_000,
+      irregularBodyNormalMapping: false,
+      irregularBodyShadowMapSize: 512,
       anisotropicFiltering: 4,
       surfaceColorDetail: true,
       surfaceMicrodetail: false,
@@ -144,6 +153,9 @@ export const deriveRenderQuality = ({
       systemOrbitSegments: 96,
       fbmOctaves: 5,
       maxGiantStorms: 2,
+      maxIrregularBodyTriangles: 140_000,
+      irregularBodyNormalMapping: true,
+      irregularBodyShadowMapSize: 768,
       anisotropicFiltering: 4,
       surfaceColorDetail: true,
       // KTX2 keeps both selected normal/roughness families GPU-compressed, making the richer
@@ -170,6 +182,9 @@ export const deriveRenderQuality = ({
       systemOrbitSegments: 96,
       fbmOctaves: 4,
       maxGiantStorms: 3,
+      maxIrregularBodyTriangles: 240_000,
+      irregularBodyNormalMapping: true,
+      irregularBodyShadowMapSize: 1_024,
       anisotropicFiltering: 8,
       surfaceColorDetail: true,
       surfaceMicrodetail: false,
@@ -195,6 +210,9 @@ export const deriveRenderQuality = ({
     systemOrbitSegments: 160,
     fbmOctaves: 5,
     maxGiantStorms: 3,
+    maxIrregularBodyTriangles: 900_000,
+    irregularBodyNormalMapping: true,
+    irregularBodyShadowMapSize: 2_048,
     anisotropicFiltering: 16,
     surfaceColorDetail: true,
     surfaceMicrodetail: true,
