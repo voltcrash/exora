@@ -27,19 +27,18 @@ interface MissionControlProps {
 }
 
 /**
- * MISSION CONTROL — the single deck at the bottom centre holding everything a view can be told.
+ * MISSION CONTROL — the deck at the bottom centre, and the line of copy over it.
  *
- * Discover, the gesture legend, the clear-view switch and the immersive entry each used to hold a
- * different corner of the screen. They are one instrument here, so there is one place to look
- * rather than four, and every destination gets the same one: the deck is shared, and a view
- * supplies only the parts that differ — its legend, and whether it has an immersive scene to
- * offer at all.
+ * Discover, the gesture legend, the frame counter, the clear-view switch and the immersive entry
+ * each used to hold a different corner of the screen. Gathering them cost nothing but showed what
+ * each one was: three of them are controls and two of them are reading matter, and a tray of five
+ * cells made no distinction between pressing something and being told something.
  *
- * The frame counter is the one reading that left again: it belongs beside the signal bars in the
- * archive panel, which were drawing a meter for it long before they were wired to one.
- *
- * Discover leads because it is the only control that goes somewhere. It keeps its own lit
- * surface for that reason; the rest sit flat in the deck until they are hovered.
+ * So the deck is now the three controls alone — clear view, Discover, the immersive entry — with
+ * Discover in the middle because it is the only one that goes somewhere, flanked by the two that
+ * change how this world is being shown. The frame counter went to the archive panel's signal
+ * bars; the legend, and the alert that replaces it, sit above the deck as copy rather than as
+ * cells that look pressable and are not.
  */
 export const MissionControl = ({
   hints,
@@ -49,34 +48,28 @@ export const MissionControl = ({
   xr,
 }: MissionControlProps) => (
   <footer className="mission-control">
+    {/*
+     * A renderer that could not build the world has no gestures to advertise, so the alert takes
+     * the legend's line rather than a place of its own. The deck below is untouched by either —
+     * travelling somewhere else is the way out of a world that would not assemble.
+     */}
+    {sceneFailed ? (
+      <p className="scene-alert" role="status">
+        RENDERER UNAVAILABLE
+      </p>
+    ) : (
+      <div className="interaction-hint" aria-label="Desktop controls">
+        {hints.map((hint) => (
+          <span key={hint.key}>
+            <kbd>{hint.key}</kbd>
+            <small>{hint.meaning}</small>
+          </span>
+        ))}
+      </div>
+    )}
+
     <div className="control-deck">
-      <DiscoverTrigger onClick={onOpenDiscover} />
-
-      {/*
-       * A renderer that could not build the world has no gestures to advertise, so the legend is
-       * what the alert replaces. Discover stays either way — travelling somewhere else is the way
-       * out of a world that would not assemble.
-       */}
-      {sceneFailed ? (
-        <div className="deck-group">
-          <p className="scene-alert" role="status">
-            RENDERER UNAVAILABLE
-          </p>
-        </div>
-      ) : (
-        <div className="deck-group deck-legend">
-          <div className="interaction-hint" aria-label="Desktop controls">
-            {hints.map((hint) => (
-              <span key={hint.key}>
-                <kbd>{hint.key}</kbd>
-                <small>{hint.meaning}</small>
-              </span>
-            ))}
-          </div>
-        </div>
-      )}
-
-      <div className="deck-group deck-actions">
+      <div className="deck-group deck-utility">
         <button
           className="clear-view"
           type="button"
@@ -90,7 +83,13 @@ export const MissionControl = ({
           </span>
           <kbd>TAB</kbd>
         </button>
-        {xr ? (
+      </div>
+
+      <DiscoverTrigger onClick={onOpenDiscover} />
+
+      {/* Rendered only where there is a scene to enter: an absent group leaves no seam behind. */}
+      {xr ? (
+        <div className="deck-group deck-actions">
           <button
             className="enter-vr"
             type="button"
@@ -110,8 +109,8 @@ export const MissionControl = ({
               ↗
             </span>
           </button>
-        ) : null}
-      </div>
+        </div>
+      ) : null}
     </div>
   </footer>
 );

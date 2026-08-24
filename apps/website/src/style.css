@@ -2454,20 +2454,26 @@ h1 em {
 }
 
 /*
- * MISSION CONTROL — one deck at the bottom centre, holding everything this view can be told.
+ * MISSION CONTROL — one deck at the bottom centre, and the line of copy standing over it.
  *
  * Discover, the gesture legend, the frame-rate readout, the clear-view switch and the immersive
  * entry each used to hold a corner of their own. Four corners means four places to look and four
- * panels floating over the world; one deck means one. The deck owns the whole panel treatment —
- * border, blur, shadow — and its cells sit flat inside it until they are hovered, which is what
- * makes five controls read as one instrument rather than five cards that happen to be adjacent.
+ * panels floating over the world; one place means one. The deck owns the whole panel treatment —
+ * border, blur, shadow — and what sits inside it is now only what can be pressed: three controls,
+ * flat until hovered, reading as one instrument rather than three adjacent cards.
+ *
+ * The legend and the renderer's alert are not pressable and no longer look it. They stand on
+ * their own line above the deck, over the world rather than on a surface, so the tray holds
+ * controls and the copy above it holds copy.
  */
 .mission-control {
   right: 0;
   bottom: 20px;
   left: 0;
   display: flex;
-  justify-content: center;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
   padding-inline: 16px;
 }
 
@@ -2488,13 +2494,21 @@ h1 em {
 }
 
 /*
- * A hairline for each seam between the deck's three duties: travel somewhere else, read what the
- * scene is doing, change how it is being shown. Discover leads and needs no rule before it.
+ * A hairline on either side of Discover, dividing the one control that travels somewhere from
+ * the two that only change how this world is shown. Drawn on the flanking cells rather than on
+ * Discover itself, so a seam is only ever present where there is something beyond it.
  */
 .deck-group {
   display: flex;
   align-items: stretch;
-  gap: 7px;
+}
+
+.deck-utility {
+  padding-right: 7px;
+  border-right: 1px solid var(--line);
+}
+
+.deck-actions {
   padding-left: 7px;
   border-left: 1px solid var(--line);
 }
@@ -2582,36 +2596,28 @@ h1 em {
 }
 
 /*
- * Takes the readout's place when a world fails to build: a renderer that produced nothing has no
- * gestures worth advertising and no frames to count. Discover stays beside it, because the way
- * out of a world that would not assemble is travelling to one that will.
+ * Takes the legend's line when a world fails to build: a renderer that produced nothing has no
+ * gestures worth advertising. The deck stays under it, because the way out of a world that would
+ * not assemble is travelling to one that will.
  *
  * Nothing else says so: the loading card stands down as soon as the attempt settles either way,
  * and the page-level recovery screens answer for the renderer itself, not for one scene that
  * could not be assembled on it.
  */
 .scene-alert {
-  min-height: 46px;
   display: flex;
   align-items: center;
   gap: 10px;
   margin: 0;
   padding: 8px 13px;
-  border: 1px solid var(--line);
+  border: 1px solid rgb(255 107 50 / 32%);
   border-radius: 13px;
-  background: rgb(8 13 15 / 76%);
+  background: rgb(20 10 6 / 82%);
   backdrop-filter: blur(18px);
   color: #c8d4d7;
   font-family: var(--mono);
   font-size: 9px;
   letter-spacing: 0.06em;
-}
-
-/* On the deck the surface is already there, so the alert spends its panel on the warning instead. */
-.control-deck .scene-alert {
-  border-color: rgb(255 107 50 / 32%);
-  background: rgb(255 107 50 / 9%);
-  backdrop-filter: none;
 }
 
 .scene-alert::before {
@@ -5955,24 +5961,19 @@ h1 em {
  * with nothing on screen to restore it, and the way out would be reloading the page.
  */
 @media (pointer: coarse) and (hover: none) {
-  .clear-view {
-    display: none;
-  }
-
-  /* On a view with no immersive scene to offer, hiding the switch empties the group it shared
-     with the immersive entry, and an empty group is still a seam — a rule drawn down the end of
-     the deck with nothing after it. */
-  .deck-actions:not(:has(.enter-vr)) {
+  /* The cell goes with it: an empty cell is still a seam — a rule drawn down the side of the deck
+     with nothing beyond it. */
+  .deck-utility {
     display: none;
   }
 }
 
 /*
- * Where that leaves Discover holding the deck alone — a touch device narrow enough to have given
- * up the readout too, on a view with no immersive entry — the deck stands down and lets the one
- * cell be the control. A tray drawn around a single button is a border around a border.
+ * Where that leaves Discover holding the deck alone — a touch device on a view with no immersive
+ * entry — the deck stands down and lets the one control be the control. A tray drawn around a
+ * single button is a border around a border.
  */
-@media (pointer: coarse) and (hover: none) and (max-width: 640px) {
+@media (pointer: coarse) and (hover: none) {
   .control-deck:not(:has(.enter-vr)) {
     padding: 0;
     border: 0;
