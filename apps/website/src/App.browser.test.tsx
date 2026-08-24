@@ -113,6 +113,13 @@ vi.mock("./star-scene.ts", () => ({
   },
 }));
 
+vi.mock("./black-hole-scene.ts", () => ({
+  createBlackHoleWorld: (_host: unknown, options: { onFirstFrame: () => void }) => {
+    options.onFirstFrame();
+    return mountedWorld();
+  },
+}));
+
 vi.mock("./small-body-scene.ts", () => ({
   createSmallBodyWorld: (_host: unknown, options: { onFirstFrame: () => void }) => {
     options.onFirstFrame();
@@ -413,7 +420,7 @@ const mountApp = (search = ""): void => {
 };
 
 const openDiscoverSection = async (
-  name: "Exoplanets" | "Solar System" | "Stars" | "World Forge",
+  name: "Black Holes" | "Exoplanets" | "Solar System" | "Stars" | "World Forge",
 ): Promise<void> => {
   await userEvent.click(page.getByRole("button", { name: "Open Discover" }));
   await expect.element(page.getByRole("dialog", { name: /All of space/ })).toBeVisible();
@@ -471,6 +478,19 @@ test("a deep link to a named star resolves to that star", async () => {
   mountApp("?star=Sirius");
 
   await expect.element(page.getByRole("heading", { level: 1 })).toHaveTextContent("Sirius");
+});
+
+test("a black-hole deep link resolves without an archive request", async () => {
+  const calls = stubArchive();
+  mountApp("?blackHole=M87*");
+
+  await expect.element(page.getByRole("heading", { level: 1 })).toHaveTextContent("M87*");
+  await expect.element(page.getByText(/INTERPRETIVE GRAVITATIONAL-LENSING MODEL/)).toBeVisible();
+  expect(window.location.search).toBe("?blackHole=M87*");
+  expect(document.querySelector('link[rel="canonical"]')?.getAttribute("href")).toContain(
+    "?blackHole=M87*",
+  );
+  expect(calls.filter((path) => path.includes("/api/")).length).toBe(0);
 });
 
 test("a mission deep link keeps its optional trajectory hidden until requested", async () => {
@@ -589,6 +609,22 @@ test("the star catalog opens and travels to a star", async () => {
 
   await expect.element(page.getByRole("heading", { level: 1 })).toHaveTextContent("Sirius");
   expect(window.location.search).toBe("?star=Sirius");
+});
+
+test("the black-hole atlas opens and travels to a sourced horizon", async () => {
+  stubArchive();
+  mountApp();
+
+  await openDiscoverSection("Black Holes");
+  await expect
+    .element(page.getByRole("heading", { name: "Follow the light to its edge." }))
+    .toBeVisible();
+  const destination = page.getByRole("button", { name: /Sagittarius A\*/ });
+  await expect.element(destination).toBeVisible();
+  await userEvent.click(destination);
+
+  await expect.element(page.getByRole("heading", { level: 1 })).toHaveTextContent("Sagittarius A*");
+  expect(window.location.search).toBe("?blackHole=Sagittarius%20A*");
 });
 
 test("the Home System catalog filters mission asteroids and opens measured geometry", async () => {

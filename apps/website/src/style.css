@@ -215,6 +215,10 @@
   color: #ff8354;
 }
 
+.discover-nav-item.violet {
+  color: #c7a8ff;
+}
+
 .discover-nav-index {
   color: #45565b;
   font-family: var(--mono);
@@ -558,6 +562,11 @@
   background: linear-gradient(145deg, rgb(42 22 15 / 86%), rgb(10 12 13 / 88%));
 }
 
+.discover-portal-card.violet {
+  color: #c7a8ff;
+  background: linear-gradient(145deg, rgb(31 23 48 / 88%), rgb(8 10 14 / 90%));
+}
+
 .discover-card-topline {
   grid-column: 1 / -1;
   display: flex;
@@ -755,7 +764,7 @@
   }
 
   .discover-nav {
-    grid-template-columns: repeat(4, minmax(0, 1fr));
+    grid-template-columns: repeat(5, minmax(0, 1fr));
     gap: 5px;
     margin: 0;
   }
@@ -2453,6 +2462,16 @@ h1 em {
   text-transform: uppercase;
 }
 
+.source-note a {
+  color: inherit;
+  text-decoration: none;
+}
+
+.source-note a:hover,
+.source-note a:focus-visible {
+  color: var(--cyan);
+}
+
 /*
  * MISSION CONTROL — one deck at the bottom centre, and the line of copy standing over it.
  *
@@ -3155,6 +3174,199 @@ h1 em {
   background: radial-gradient(circle at 50% 0, rgb(118 76 21 / 20%), transparent 44%), #0b0d0e;
 }
 
+.black-hole-catalog {
+  border-color: rgb(190 155 255 / 20%);
+  background:
+    radial-gradient(circle at 52% -8%, rgb(117 75 186 / 24%), transparent 44%),
+    radial-gradient(circle at 86% 78%, rgb(220 137 69 / 8%), transparent 32%), #07070b;
+}
+
+.black-hole-catalog-hero {
+  display: grid;
+  grid-template-columns: minmax(260px, 0.75fr) minmax(320px, 1fr);
+  align-items: end;
+  gap: 32px;
+  margin: 18px 26px 20px;
+  padding: 22px 24px;
+  border: 1px solid rgb(190 155 255 / 16%);
+  border-radius: 18px;
+  background:
+    radial-gradient(circle at 12% 50%, rgb(190 155 255 / 10%), transparent 34%),
+    linear-gradient(120deg, rgb(76 49 118 / 10%), rgb(255 255 255 / 2%));
+}
+
+.black-hole-catalog-hero p,
+.black-hole-catalog-hero h2 {
+  margin: 0;
+}
+
+.black-hole-catalog-hero > div p {
+  margin-bottom: 7px;
+  color: #b995f6;
+  font: 7px var(--mono);
+  letter-spacing: 0.16em;
+}
+
+.black-hole-catalog-hero h2 {
+  color: #f2eaff;
+  font-size: 24px;
+  font-weight: 500;
+  letter-spacing: -0.025em;
+}
+
+.black-hole-catalog-hero > p {
+  color: #8e879b;
+  font-size: 10px;
+  line-height: 1.65;
+}
+
+.black-hole-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(196px, 1fr));
+  gap: 10px;
+  margin: 0;
+  padding: 0 26px 18px;
+  list-style: none;
+}
+
+.black-hole-grid li {
+  min-width: 0;
+}
+
+.black-hole-card {
+  height: 100%;
+  display: grid;
+  grid-template-rows: 1fr auto;
+  overflow: hidden;
+  border: 1px solid rgb(220 205 246 / 11%);
+  border-radius: 17px;
+  background: linear-gradient(160deg, rgb(30 24 40 / 82%), rgb(7 8 12 / 92%));
+  transition:
+    border-color 170ms ease,
+    box-shadow 170ms ease,
+    transform 170ms ease;
+}
+
+.black-hole-card:hover {
+  border-color: rgb(190 155 255 / 36%);
+  box-shadow: 0 20px 54px rgb(0 0 0 / 32%);
+  transform: translateY(-3px);
+}
+
+.black-hole-card > button {
+  min-width: 0;
+  display: grid;
+  grid-template-columns: 28px minmax(0, 1fr);
+  gap: 12px;
+  padding: 10px 10px 12px;
+  border: 0;
+  color: inherit;
+  background: transparent;
+  cursor: pointer;
+  text-align: left;
+}
+
+.black-hole-card > button:focus-visible,
+.black-hole-card > a:focus-visible {
+  outline: 2px solid #c5a4ff;
+  outline-offset: -2px;
+}
+
+.black-hole-card .black-hole-catalog-visual {
+  grid-column: 1 / -1;
+}
+
+.black-hole-card-index {
+  color: #695c7c;
+  font: 7px var(--mono);
+  letter-spacing: 0.1em;
+}
+
+.black-hole-card-copy {
+  min-width: 0;
+  display: grid;
+  gap: 5px;
+}
+
+.black-hole-card-copy small {
+  min-height: 20px;
+  color: #ad95ce;
+  font: 6px/1.45 var(--mono);
+  letter-spacing: 0.07em;
+  text-transform: uppercase;
+}
+
+.black-hole-card-copy strong {
+  overflow: hidden;
+  color: #f3edfb;
+  font-size: 17px;
+  font-weight: 500;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.black-hole-card-copy > span,
+.black-hole-card-metrics,
+.black-hole-card-action,
+.black-hole-card > a,
+.black-hole-method-note {
+  font-family: var(--mono);
+  text-transform: uppercase;
+}
+
+.black-hole-card-copy > span {
+  overflow: hidden;
+  color: #706c7b;
+  font-size: 6px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.black-hole-card-metrics {
+  grid-column: 1 / -1;
+  display: flex;
+  justify-content: space-between;
+  gap: 9px;
+  padding-top: 10px;
+  border-top: 1px solid rgb(220 205 246 / 8%);
+  color: #aca2ba;
+  font-size: 6px;
+}
+
+.black-hole-card-action {
+  grid-column: 1 / -1;
+  color: #c7a8ff;
+  font-size: 7px;
+  letter-spacing: 0.08em;
+  text-align: right;
+}
+
+.black-hole-card > a {
+  padding: 9px 12px 10px;
+  border-top: 1px solid rgb(220 205 246 / 8%);
+  overflow: hidden;
+  color: #6f6281;
+  font-size: 5px;
+  letter-spacing: 0.06em;
+  text-decoration: none;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.black-hole-card > a:hover {
+  color: #bba0e5;
+}
+
+.black-hole-method-note {
+  margin: 0 26px 26px;
+  padding-top: 14px;
+  border-top: 1px solid rgb(220 205 246 / 8%);
+  color: #5e5867;
+  font-size: 6px;
+  letter-spacing: 0.08em;
+  line-height: 1.65;
+}
+
 .solar-system-catalog {
   border-color: rgb(255 162 67 / 22%);
   background: radial-gradient(circle at 50% -12%, rgb(255 120 35 / 22%), transparent 48%), #0b0c0d;
@@ -3784,6 +3996,111 @@ h1 em {
 .star-experience .visual-note span {
   background: #ffc96f;
   box-shadow: 0 0 10px rgb(255 190 80 / 65%);
+}
+
+.black-hole-experience .space-haze {
+  background:
+    radial-gradient(circle at 50% 48%, rgb(149 89 225 / 7%), transparent 23%),
+    radial-gradient(
+      circle at 52% 47%,
+      transparent 17%,
+      rgb(0 0 0 / 18%) 48%,
+      rgb(0 0 0 / 78%) 112%
+    ),
+    linear-gradient(
+      90deg,
+      rgb(1 1 4 / 84%) 0%,
+      transparent 31%,
+      transparent 69%,
+      rgb(1 1 4 / 78%) 100%
+    );
+}
+
+.black-hole-experience .world-intro {
+  max-height: 100%;
+  overflow-x: hidden;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  pointer-events: auto;
+  scrollbar-color: rgb(190 155 255 / 28%) transparent;
+  scrollbar-width: thin;
+}
+
+.black-hole-experience .eyebrow,
+.black-hole-experience .telemetry-heading small,
+.black-hole-experience .telemetry dd small {
+  color: #c7a8ff;
+}
+
+.black-hole-experience .eyebrow span:first-child::before {
+  background: #c7a8ff;
+}
+
+.black-hole-experience .world-tags span:first-child {
+  border-color: rgb(190 155 255 / 32%);
+  color: #decaff;
+  background: rgb(149 89 225 / 10%);
+}
+
+.black-hole-experience .world-summary {
+  max-width: 410px;
+}
+
+.black-hole-visual-note {
+  max-width: 470px;
+  color: rgb(199 168 255 / 66%);
+  line-height: 1.55;
+}
+
+.black-hole-visual-note span {
+  flex: none;
+  background: #b48aff;
+  box-shadow: 0 0 12px rgb(180 138 255 / 70%);
+}
+
+.black-hole-telemetry {
+  border-color: rgb(190 155 255 / 16%);
+  background: linear-gradient(145deg, rgb(68 42 105 / 18%), transparent 45%), var(--panel);
+}
+
+.black-hole-telemetry dl {
+  grid-template-columns: 1fr;
+}
+
+.black-hole-telemetry dl div {
+  min-height: 68px;
+}
+
+.black-hole-telemetry dd {
+  font-size: 14px;
+}
+
+.black-hole-science-detail {
+  border-left: 2px solid rgb(190 155 255 / 34%);
+  padding-left: 10px;
+}
+
+.black-hole-science-detail strong {
+  color: #cfb5ff;
+}
+
+.black-hole-science-detail small {
+  line-height: 1.55;
+  text-transform: none;
+}
+
+.black-hole-experience .source-note a:hover,
+.black-hole-experience .source-note a:focus-visible {
+  color: #c7a8ff;
+}
+
+.black-hole-loading {
+  border-color: rgb(190 155 255 / 18%);
+}
+
+.black-hole-loading span {
+  background: #c7a8ff;
+  box-shadow: 0 0 12px #b48aff;
 }
 
 /*
@@ -4951,6 +5268,86 @@ h1 em {
     radial-gradient(circle, hsl(var(--star-hue) 90% 62% / 10%), transparent 68%), #05080c;
 }
 
+.black-hole-catalog-visual {
+  background:
+    radial-gradient(circle at 16% 20%, rgb(236 231 255 / 24%) 0 1px, transparent 1.6px),
+    radial-gradient(circle at 82% 24%, rgb(236 231 255 / 18%) 0 1px, transparent 1.6px),
+    radial-gradient(circle at 74% 78%, rgb(255 220 183 / 16%) 0 1px, transparent 1.6px),
+    radial-gradient(circle, hsl(var(--black-hole-hue) 90% 54% / 8%), transparent 65%), #020205;
+}
+
+.black-hole-catalog-disk,
+.black-hole-catalog-ring,
+.black-hole-catalog-shadow,
+.black-hole-catalog-jet {
+  position: absolute;
+}
+
+.black-hole-catalog-disk {
+  width: 154px;
+  height: 58px;
+  border: 9px solid hsl(var(--black-hole-hue) 94% 66% / 76%);
+  border-right-color: hsl(calc(var(--black-hole-hue) + 26deg) 96% 82% / 96%);
+  border-left-color: hsl(var(--black-hole-hue) 82% 44% / 45%);
+  border-radius: 50%;
+  box-shadow:
+    0 0 7px hsl(var(--black-hole-hue) 95% 72% / 62%),
+    0 0 24px hsl(var(--black-hole-hue) 90% 58% / 30%);
+  transform: rotate(var(--black-hole-tilt));
+}
+
+.black-hole-catalog-disk.rear {
+  z-index: 1;
+  opacity: calc(0.45 + var(--black-hole-activity) * 0.45);
+}
+
+.black-hole-catalog-disk.front {
+  z-index: 5;
+  clip-path: inset(50% -16px -16px -16px);
+  filter: saturate(1.18) brightness(1.12);
+}
+
+.black-hole-catalog-shadow {
+  width: 68px;
+  height: 68px;
+  z-index: 3;
+  border-radius: 50%;
+  background: #000;
+  box-shadow:
+    inset 8px 0 14px rgb(39 25 58 / 28%),
+    0 0 0 2px rgb(0 0 0 / 80%),
+    0 0 24px rgb(0 0 0 / 95%);
+}
+
+.black-hole-catalog-ring {
+  width: 76px;
+  height: 76px;
+  z-index: 4;
+  border: 2px solid hsl(var(--black-hole-hue) 100% 78% / 72%);
+  border-right-color: #fff4df;
+  border-radius: 50%;
+  box-shadow: 0 0 12px hsl(var(--black-hole-hue) 96% 74% / 45%);
+  transform: rotate(calc(var(--black-hole-tilt) * -0.45));
+}
+
+.black-hole-catalog-jet {
+  width: 14px;
+  height: 152px;
+  z-index: 0;
+  background: linear-gradient(
+    to bottom,
+    transparent,
+    hsl(calc(var(--black-hole-hue) + 170deg) 90% 78% / 8%) 28%,
+    hsl(calc(var(--black-hole-hue) + 170deg) 90% 78% / 24%) 48%,
+    transparent 52%,
+    hsl(calc(var(--black-hole-hue) + 170deg) 90% 78% / 16%) 72%,
+    transparent
+  );
+  clip-path: polygon(36% 0, 64% 0, 100% 48%, 72% 52%, 68% 100%, 32% 100%, 28% 52%, 0 48%);
+  opacity: calc(var(--black-hole-activity) * 0.72);
+  transform: rotate(var(--black-hole-tilt));
+}
+
 /* Diffraction vanes. Crossed linear gradients rather than a conic sweep: a conic gradient can
    only make soft wedges radiating from the centre, and what actually reads as a star is a pair of
    hard, thin, symmetrical spikes running clean through it. */
@@ -5447,6 +5844,21 @@ h1 em {
 }
 
 @media (max-width: 760px) {
+  .black-hole-catalog-hero {
+    grid-template-columns: 1fr;
+    gap: 12px;
+    margin-inline: 18px;
+  }
+
+  .black-hole-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    padding-inline: 18px;
+  }
+
+  .black-hole-method-note {
+    margin-inline: 18px;
+  }
+
   .forge-trigger,
   .star-trigger {
     min-width: 46px;
@@ -6019,6 +6431,19 @@ h1 em {
     font-size: 6px;
     line-height: 1.5;
   }
+
+  .black-hole-experience .black-hole-visual-note {
+    display: block;
+    max-width: 260px;
+    margin-top: 11px;
+    font-size: 5px;
+    line-height: 1.5;
+  }
+
+  .black-hole-experience h1 {
+    font-size: clamp(30px, 9.2vw, 50px);
+    letter-spacing: -0.075em;
+  }
 }
 
 /*
@@ -6054,6 +6479,32 @@ h1 em {
 }
 
 @media (max-width: 520px) {
+  .black-hole-catalog-hero {
+    margin: 8px 12px 12px;
+    padding: 16px;
+  }
+
+  .black-hole-catalog-hero h2 {
+    font-size: 19px;
+  }
+
+  .black-hole-catalog-hero > p {
+    font-size: 8px;
+  }
+
+  .black-hole-grid {
+    grid-template-columns: 1fr;
+    padding: 0 12px 14px;
+  }
+
+  .black-hole-card .black-hole-catalog-visual {
+    height: 148px;
+  }
+
+  .black-hole-method-note {
+    margin-inline: 12px;
+  }
+
   .discover-trigger {
     min-width: 46px;
     width: 46px;

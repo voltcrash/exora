@@ -1,5 +1,6 @@
 import type { ExoplanetProfile, StarProfile } from "@exora/contracts";
 import type { CSSProperties } from "react";
+import type { BlackHoleProfile } from "../black-holes.ts";
 
 type VisualStyle = CSSProperties & Record<`--${string}`, string>;
 
@@ -67,6 +68,24 @@ export const StarCatalogVisual = ({ star }: { star: StarProfile }) => {
     <span className="catalog-visual star-catalog-visual" style={style} aria-hidden="true">
       <span className="catalog-star-rays" />
       <span className="catalog-star-core" />
+    </span>
+  );
+};
+
+export const BlackHoleCatalogVisual = ({ blackHole }: { blackHole: BlackHoleProfile }) => {
+  const style: VisualStyle = {
+    "--black-hole-activity": blackHole.visual.diskActivity.toString(),
+    "--black-hole-hue": `${blackHole.visual.diskHueDegrees}deg`,
+    "--black-hole-tilt": `${blackHole.visual.diskTiltDegrees}deg`,
+  };
+
+  return (
+    <span className="catalog-visual black-hole-catalog-visual" style={style} aria-hidden="true">
+      <span className="black-hole-catalog-jet" />
+      <span className="black-hole-catalog-disk rear" />
+      <span className="black-hole-catalog-shadow" />
+      <span className="black-hole-catalog-ring" />
+      <span className="black-hole-catalog-disk front" />
     </span>
   );
 };

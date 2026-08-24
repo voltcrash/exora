@@ -1,16 +1,18 @@
 import type { ExoplanetProfile, StarProfile } from "@exora/contracts";
 import type { CustomStar, CustomWorld } from "@exora/worldgen";
 import { useEffect, useRef, useState } from "react";
+import type { BlackHoleProfile } from "../black-holes.ts";
 import type { AsteroidProfile } from "../solar-asteroids.ts";
 import type { CometProfile } from "../solar-comets.ts";
 import type { SolarMissionProfile } from "../solar-missions.ts";
 import type { SolarRegionProfile } from "../solar-regions.ts";
 import { WorldForge } from "./CustomPlanetBuilder.tsx";
+import { BlackHoleCatalog } from "./BlackHoleCatalog.tsx";
 import { PlanetCatalog } from "./PlanetCatalog.tsx";
 import { SolarSystemCatalog } from "./SolarSystemCatalog.tsx";
 import { StarCatalog } from "./StarCatalog.tsx";
 
-export type DiscoverSection = "overview" | "solar" | "worlds" | "stars" | "forge";
+export type DiscoverSection = "overview" | "solar" | "worlds" | "stars" | "black-holes" | "forge";
 
 interface DiscoverScreenProps {
   initialForgeMode: "planet" | "star";
@@ -19,6 +21,7 @@ interface DiscoverScreenProps {
   onGeneratePlanet: (world: CustomWorld) => void;
   onGenerateStar: (star: CustomStar) => void;
   onSelectAsteroid: (asteroid: AsteroidProfile) => void;
+  onSelectBlackHole: (blackHole: BlackHoleProfile) => void;
   onSelectComet: (comet: CometProfile) => void;
   onSelectMission: (mission: SolarMissionProfile) => void;
   onSelectPlanet: (planet: ExoplanetProfile, cached: boolean) => void;
@@ -63,6 +66,15 @@ const sections: readonly {
     source: "SIMBAD",
   },
   {
+    accent: "violet",
+    description: "Cross five iconic horizons, from our quiet galactic center to a giant quasar.",
+    eyebrow: "THE HORIZON FIVE",
+    glyph: "◉",
+    id: "black-holes",
+    label: "Black Holes",
+    source: "NASA / EHT / ESA",
+  },
+  {
     accent: "coral",
     description: "Shape a new planet or ignite a star, then enter it immediately.",
     eyebrow: "CELESTIAL SYNTHESIS",
@@ -95,6 +107,11 @@ const sectionCopy: Record<DiscoverSection, { eyebrow: string; title: string; sum
     title: "Follow the light.",
     summary: "Search the stellar catalog, browse distinct families, or take a surprise jump.",
   },
+  "black-holes": {
+    eyebrow: "NASA / EHT / ESA COMPACT OBJECT ATLAS",
+    title: "Follow the light to its edge.",
+    summary: "Enter five observed black-hole systems through disclosed, data-led visualizations.",
+  },
   forge: {
     eyebrow: "EXORA CELESTIAL SYNTHESIS",
     title: "Make the next discovery.",
@@ -109,6 +126,7 @@ export const DiscoverScreen = ({
   onGeneratePlanet,
   onGenerateStar,
   onSelectAsteroid,
+  onSelectBlackHole,
   onSelectComet,
   onSelectMission,
   onSelectPlanet,
@@ -283,6 +301,12 @@ export const DiscoverScreen = ({
                   embedded
                   onClose={() => setSection("overview")}
                   onSelect={onSelectStar}
+                />
+              ) : section === "black-holes" ? (
+                <BlackHoleCatalog
+                  embedded
+                  onClose={() => setSection("overview")}
+                  onSelect={onSelectBlackHole}
                 />
               ) : (
                 <WorldForge

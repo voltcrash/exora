@@ -11,6 +11,7 @@ const discoverMarkup = (initialSection: DiscoverSection = "overview"): string =>
       onGeneratePlanet={vi.fn()}
       onGenerateStar={vi.fn()}
       onSelectAsteroid={vi.fn()}
+      onSelectBlackHole={vi.fn()}
       onSelectComet={vi.fn()}
       onSelectMission={vi.fn()}
       onSelectPlanet={vi.fn()}
@@ -25,8 +26,21 @@ test("one Discover directory exposes every exploration surface", () => {
   expect(markup).toContain("Solar System");
   expect(markup).toContain("Exoplanets");
   expect(markup).toContain("Stars");
+  expect(markup).toContain("Black Holes");
   expect(markup).toContain("World Forge");
   expect(markup).toContain('aria-label="Discover destinations"');
+});
+
+test("the black-hole destination exposes the five sourced landmarks", () => {
+  const markup = discoverMarkup("black-holes");
+
+  expect(markup).toContain('aria-label="Black hole catalog"');
+  expect(markup).toContain("Sagittarius A*");
+  expect(markup).toContain("M87*");
+  expect(markup).toContain("TON 618");
+  expect(markup).toContain("Cygnus X-1");
+  expect(markup).toContain("Gaia BH1");
+  expect(markup).toContain("interpretive gravitational-lensing visualization");
 });
 
 test("an embedded catalog becomes a named region inside the full-screen dialog", () => {

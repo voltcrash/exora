@@ -15,6 +15,7 @@ import { RecoveryScreen } from "./components/RecoveryScreen.tsx";
 import { featuredPlanet } from "./planet-profile.ts";
 import { hasRenderer } from "./planet-utils.tsx";
 import { canonicalUrlForSearch } from "./canonical-url.ts";
+import type { BlackHoleProfile } from "./black-holes.ts";
 import { togglesClearView } from "./clear-view-shortcut.ts";
 import { togglesDiscoverShortcut } from "./discover-shortcut.ts";
 import { TRAVEL_CROSS_MS, TRAVEL_REVEAL_MS, type TravelPhase } from "./travel-transition.ts";
@@ -42,6 +43,11 @@ const RegionExperience = lazy(() =>
     default: module.RegionExperience,
   })),
 );
+const BlackHoleExperience = lazy(() =>
+  import("./components/BlackHoleExperience.tsx").then((module) => ({
+    default: module.BlackHoleExperience,
+  })),
+);
 const MissionExperience = lazy(() =>
   import("./components/MissionExperience.tsx").then((module) => ({
     default: module.MissionExperience,
@@ -49,6 +55,7 @@ const MissionExperience = lazy(() =>
 );
 type ActiveObject =
   | { asteroid: AsteroidProfile; type: "asteroid" }
+  | { blackHole: BlackHoleProfile; type: "black-hole" }
   | { comet: CometProfile; type: "comet" }
   | { mission: SolarMissionProfile; type: "mission" }
   | { result: PlanetLoadResult; type: "planet" }
@@ -56,7 +63,15 @@ type ActiveObject =
   | { result: SystemLoadResult; type: "system" }
   | { region: SolarRegionProfile; type: "region" }
   | {
-      kind: "asteroid" | "comet" | "mission" | "planet" | "region" | "star" | "system";
+      kind:
+        | "asteroid"
+        | "black hole"
+        | "comet"
+        | "mission"
+        | "planet"
+        | "region"
+        | "star"
+        | "system";
       name: string;
       type: "missing";
     };
@@ -68,6 +83,14 @@ const defaultPlanetObject = (): ActiveObject => ({
 
 const loadRequestedObject = async (): Promise<ActiveObject> => {
   const parameters = new URLSearchParams(window.location.search);
+  const blackHoleName = parameters.get("blackHole");
+  if (blackHoleName) {
+    const { findBlackHole } = await import("./black-holes.ts");
+    const blackHole = findBlackHole(blackHoleName);
+    return blackHole
+      ? { blackHole, type: "black-hole" }
+      : { kind: "black hole", name: blackHoleName, type: "missing" };
+  }
   const missionName = parameters.get("mission");
   if (missionName) {
     const mission = findSolarMission(missionName);
@@ -140,7 +163,8 @@ export const App = () => {
   const [discoverSection, setDiscoverSection] = useState<DiscoverSection>("overview");
   const [activeObject, setActiveObject] = useState<ActiveObject | null>(() => {
     const parameters = new URLSearchParams(window.location.search);
-    return parameters.has("asteroid") ||
+    return parameters.has("blackHole") ||
+      parameters.has("asteroid") ||
       parameters.has("comet") ||
       parameters.has("mission") ||
       parameters.has("region") ||
@@ -308,6 +332,14 @@ export const App = () => {
     setActiveObject({ asteroid, type: "asteroid" });
   }, []);
 
+  const selectBlackHole = useCallback((blackHole: BlackHoleProfile): void => {
+    window.history.pushState({}, "", `?blackHole=${encodeURIComponent(blackHole.name)}`);
+    setDiscoverOpen(false);
+    setCustomRecipe(null);
+    setSystemHostName(null);
+    setActiveObject({ blackHole, type: "black-hole" });
+  }, []);
+
   const selectComet = useCallback((comet: CometProfile): void => {
     window.history.pushState({}, "", `?comet=${encodeURIComponent(comet.name)}`);
     setDiscoverOpen(false);
@@ -409,17 +441,19 @@ export const App = () => {
     activeObject && activeObject.type !== "missing"
       ? activeObject.type === "asteroid"
         ? activeObject.asteroid.name
-        : activeObject.type === "comet"
-          ? activeObject.comet.name
-          : activeObject.type === "mission"
-            ? activeObject.mission.name
-            : activeObject.type === "region"
-              ? activeObject.region.name
-              : activeObject.type === "planet"
-                ? activeObject.result.planet.name
-                : activeObject.type === "system"
-                  ? `the ${activeObject.result.hostStar} system`
-                  : activeObject.result.star.name
+        : activeObject.type === "black-hole"
+          ? activeObject.blackHole.name
+          : activeObject.type === "comet"
+            ? activeObject.comet.name
+            : activeObject.type === "mission"
+              ? activeObject.mission.name
+              : activeObject.type === "region"
+                ? activeObject.region.name
+                : activeObject.type === "planet"
+                  ? activeObject.result.planet.name
+                  : activeObject.type === "system"
+                    ? `the ${activeObject.result.hostStar} system`
+                    : activeObject.result.star.name
       : null;
 
   return (
@@ -484,6 +518,18 @@ export const App = () => {
           heading="DESTINATION UNAVAILABLE"
           onRetry={returnHome}
         />
+      ) : activeObject.type === "black-hole" ? (
+        <Suspense fallback={null}>
+          <BlackHoleExperience
+            key={activeObject.blackHole.id}
+            blackHole={activeObject.blackHole}
+            chromeHidden={chromeHidden}
+            host={sceneHost}
+            onHideChrome={() => setChromeHidden(true)}
+            onOpenDiscover={openDiscover}
+            travelPhase={travelPhase}
+          />
+        </Suspense>
       ) : activeObject.type === "asteroid" ? (
         <SmallBodyExperience
           key={activeObject.asteroid.id}
@@ -596,6 +642,7 @@ export const App = () => {
             onGeneratePlanet={generatePlanet}
             onGenerateStar={generateStar}
             onSelectAsteroid={selectAsteroid}
+            onSelectBlackHole={selectBlackHole}
             onSelectComet={selectComet}
             onSelectMission={selectMission}
             onSelectPlanet={selectPlanet}

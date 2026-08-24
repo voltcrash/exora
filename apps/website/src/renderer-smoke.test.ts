@@ -17,6 +17,8 @@ import type { RenderQualityProfile } from "./render-quality.ts";
 import type { SceneHost } from "./scene-host.ts";
 import { resetSkyCatalogForTesting } from "./sky-catalog.ts";
 import { createStarWorld } from "./star-scene.ts";
+import { createBlackHoleWorld } from "./black-hole-scene.ts";
+import { BLACK_HOLES } from "./black-holes.ts";
 import { createSolarRegionWorld } from "./solar-region-scene.ts";
 import { findSolarRegion } from "./solar-regions.ts";
 import { createMissionWorld } from "./mission-scene.ts";
@@ -205,6 +207,31 @@ const sceneCounts = (scene: Scene) => ({
   materials: scene.materials.length,
   meshes: scene.meshes.length,
   transformNodes: scene.transformNodes.length,
+});
+
+test("a black-hole world separates the shadow, photon ring and observed environment", () => {
+  const { engine, host, scene } = createHarness();
+  const scope = openWorldScope(scene);
+  const before = sceneCounts(scene);
+  const blackHole = BLACK_HOLES.find(({ name }) => name === "M87*");
+  if (!blackHole) throw new Error("Expected the M87* catalog landmark.");
+
+  const world = createBlackHoleWorld(host, {
+    blackHole,
+    onFirstFrame: () => undefined,
+  });
+  scope.seal();
+
+  expect(scene.meshes.some(({ name }) => name === "event-horizon-shadow")).toBe(true);
+  expect(scene.meshes.some(({ name }) => name === "photon-ring-reference")).toBe(true);
+  expect(scene.meshes.some(({ name }) => name.startsWith("accretion-band"))).toBe(true);
+  expect(scene.meshes.some(({ name }) => name.startsWith("relativistic-jet"))).toBe(true);
+  expect(() => scene.render()).not.toThrow();
+
+  world.dispose();
+  scope.dispose();
+  expect(sceneCounts(scene)).toEqual(before);
+  engine.dispose();
 });
 
 /**

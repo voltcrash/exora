@@ -12,6 +12,9 @@ test("a catalogued destination is canonical to its own URL", () => {
   expect(canonicalUrlForSearch("?planet=Kepler-22%20b")).toBe(
     `${SITE_ORIGIN}/?planet=Kepler-22%20b`,
   );
+  expect(canonicalUrlForSearch("?blackHole=Sagittarius%20A*")).toBe(
+    `${SITE_ORIGIN}/?blackHole=Sagittarius%20A*`,
+  );
   expect(canonicalUrlForSearch("?star=Sirius")).toBe(`${SITE_ORIGIN}/?star=Sirius`);
   expect(canonicalUrlForSearch("?system=TRAPPIST-1")).toBe(`${SITE_ORIGIN}/?system=TRAPPIST-1`);
   expect(canonicalUrlForSearch("?asteroid=101955%20Bennu")).toBe(
@@ -28,6 +31,12 @@ test("names with characters that need escaping survive the round trip", () => {
   expect(canonicalUrlForSearch("?planet=55%20Cnc%20e")).toBe(`${SITE_ORIGIN}/?planet=55%20Cnc%20e`);
   expect(canonicalUrlForSearch("?star=Barnard's%20star")).toBe(
     `${SITE_ORIGIN}/?star=Barnard's%20star`,
+  );
+});
+
+test("a black-hole destination wins in the same order the app resolves it", () => {
+  expect(canonicalUrlForSearch("?planet=Earth&blackHole=M87*")).toBe(
+    `${SITE_ORIGIN}/?blackHole=M87*`,
   );
 });
 
@@ -62,6 +71,7 @@ test("the destinations resolve in the order the app resolves them", () => {
 
 test("an empty or blank destination is not treated as one", () => {
   expect(canonicalUrlForSearch("?planet=")).toBe(`${SITE_ORIGIN}/`);
+  expect(canonicalUrlForSearch("?blackHole=%20%20")).toBe(`${SITE_ORIGIN}/`);
   expect(canonicalUrlForSearch("?star=%20%20")).toBe(`${SITE_ORIGIN}/`);
   expect(canonicalUrlForSearch("?system=")).toBe(`${SITE_ORIGIN}/`);
 });

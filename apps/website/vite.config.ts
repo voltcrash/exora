@@ -6,6 +6,7 @@ import { FEATURED_ASTEROID_NAMES } from "./src/solar-asteroids.ts";
 import { FEATURED_COMET_NAMES } from "./src/solar-comets.ts";
 import { FEATURED_REGION_NAMES } from "./src/solar-regions.ts";
 import { FEATURED_MISSION_NAMES } from "./src/solar-missions.ts";
+import { FEATURED_BLACK_HOLE_NAMES } from "./src/black-holes.ts";
 
 /**
  * Drops Babylon's WGSL shader sources from the bundle.
@@ -81,6 +82,7 @@ const SITE_ORIGIN = "https://exora.voltcrash.com";
 const buildSitemap = (): string => {
   const destinations = [
     "/",
+    ...FEATURED_BLACK_HOLE_NAMES.map((name) => `/?blackHole=${encodeURIComponent(name)}`),
     ...FEATURED_MISSION_NAMES.map((name) => `/?mission=${encodeURIComponent(name)}`),
     ...FEATURED_REGION_NAMES.map((name) => `/?region=${encodeURIComponent(name)}`),
     ...FEATURED_COMET_NAMES.map((name) => `/?comet=${encodeURIComponent(name)}`),
