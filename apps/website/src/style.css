@@ -5695,8 +5695,13 @@ h1 em {
     border-radius: 16px;
   }
 
-  .deck-group {
-    gap: 5px;
+  /* The seams close with the deck: each is drawn on the side of its cell that faces Discover, so
+     a padding written for the left of both would pad the wrong side of one of them. */
+  .deck-utility {
+    padding-right: 5px;
+  }
+
+  .deck-actions {
     padding-left: 5px;
   }
 
