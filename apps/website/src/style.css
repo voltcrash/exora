@@ -1086,17 +1086,18 @@ button {
   transition: opacity var(--travel-cross, 190ms) ease-in;
 }
 
-.view-surface .topbar,
+.view-surface .topbar > *,
 .view-surface .hud > *,
-.view-surface .mission-control {
+.view-surface .mission-control > * {
   opacity: 0.34;
+  pointer-events: auto;
   transition: opacity 240ms ease;
 }
 
-.view-surface .topbar:hover,
+.view-surface .topbar > *:hover,
 .view-surface .hud > *:hover,
-.view-surface .mission-control:hover {
-  opacity: 0.88;
+.view-surface .mission-control > *:hover {
+  opacity: 1;
 }
 
 .space-haze {

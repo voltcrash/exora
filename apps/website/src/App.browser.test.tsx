@@ -840,7 +840,7 @@ test("Tab toggles the interface away and back, and only on the main screen", asy
   for (const panel of panels) await expect.element(panel).toBeVisible();
 });
 
-test("terrain view fades every interface region", async () => {
+test("terrain view fades every interface region and reveals the hovered one", async () => {
   stubArchive();
   mountApp();
   await expect.element(page.getByRole("heading", { level: 1 })).toBeVisible();
@@ -850,9 +850,21 @@ test("terrain view fades every interface region", async () => {
   shell!.classList.replace("view-orbit", "view-surface");
   await new Promise((resolve) => window.setTimeout(resolve, 300));
 
-  const regions = document.querySelectorAll<HTMLElement>(".topbar, .hud > *, .mission-control");
+  const regions = document.querySelectorAll<HTMLElement>(
+    ".topbar > *, .hud > *, .mission-control > *",
+  );
   expect(regions.length).toBeGreaterThan(2);
   for (const region of regions) expect(getComputedStyle(region).opacity).toBe("0.34");
+
+  const hoveredRegion = document.querySelector<HTMLElement>(".world-intro");
+  expect(hoveredRegion).not.toBeNull();
+  await userEvent.hover(hoveredRegion!);
+  await new Promise((resolve) => window.setTimeout(resolve, 300));
+
+  expect(getComputedStyle(hoveredRegion!).opacity).toBe("1");
+  for (const region of regions) {
+    if (region !== hoveredRegion) expect(getComputedStyle(region).opacity).toBe("0.34");
+  }
 });
 
 test("Tab keeps traversing focus wherever the shortcut stands down", async () => {
