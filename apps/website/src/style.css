@@ -2511,9 +2511,8 @@ h1 em {
 }
 
 /*
- * A hairline on either side of Discover, dividing the one control that travels somewhere from
- * the two that only change how this world is shown. Drawn on the flanking cells rather than on
- * Discover itself, so a seam is only ever present where there is something beyond it.
+ * The groups retain a little breathing room around Discover without ruling the navigation deck
+ * into separate cells.
  */
 .deck-group {
   display: flex;
@@ -2522,12 +2521,10 @@ h1 em {
 
 .deck-utility {
   padding-right: 7px;
-  border-right: 1px solid var(--line);
 }
 
 .deck-actions {
   padding-left: 7px;
-  border-left: 1px solid var(--line);
 }
 
 /*
