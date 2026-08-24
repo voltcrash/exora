@@ -2361,9 +2361,9 @@ h1 em {
 }
 
 .enter-vr {
-  min-width: 196px;
+  min-width: 0;
   display: grid;
-  grid-template-columns: 26px 1fr 14px;
+  grid-template-columns: 26px max-content 14px;
   gap: 9px;
   padding: 6px 10px;
   color: #f2f9fa;
