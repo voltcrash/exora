@@ -31,11 +31,7 @@ import { type RenderQualityProfile, shaderDefines } from "./render-quality.ts";
 import { buildCraterField, sampleTerrainHeight } from "./planet-terrain.ts";
 import { type SurfaceGeology, deriveSurfaceGeology } from "./surface-geology.ts";
 import { createSurfaceScatter } from "./surface-scatter.ts";
-import {
-  SURFACE_PATCH_HALF_EXTENT,
-  type SurfaceVista,
-  createSurfaceVista,
-} from "./surface-vista.ts";
+import { type SurfaceVista, createSurfaceVista } from "./surface-vista.ts";
 import type { MountedWorld, SceneHost, WorldConsole } from "./scene-host.ts";
 import { skyViewpointFrom } from "./sky-catalog.ts";
 import { createStellarSurface, type StellarSurface } from "./star-surface.ts";
@@ -2163,6 +2159,15 @@ const createSurfaceEnvironment = (
   const vista = geology
     ? createSurfaceVista(scene, {
         geology,
+        liquid:
+          geology.liquidLevel !== null && recipe.renderer === "rocky"
+            ? {
+                deepColor: geology.liquidColor,
+                shallowColor: geology.liquidShallowColor,
+                // Thin, cold air raises almost no swell; a thick atmosphere raises a lot of it.
+                waveHeight: 0.5 + geology.hazeDensity * 1.4,
+              }
+            : null,
         origin: new Vector3(0, SURFACE_GROUND_BASE_Y, SURFACE_GROUND_ORIGIN_Z),
         parent: root,
         profile,
@@ -2176,6 +2181,7 @@ const createSurfaceEnvironment = (
 
   if (vista && geology) {
     meshes.push(vista.mesh);
+    if (vista.liquid) meshes.push(vista.liquid.mesh);
     // Loose rock, sharing the ground's material so it takes the same sun, the same baked shadow
     // and the same air — and merged into one mesh, so the whole field costs a single draw call.
     const scatter = createSurfaceScatter(scene, {
@@ -2251,38 +2257,6 @@ const createSurfaceEnvironment = (
     groundMaterial.roughness = 0.7;
     groundMaterial.freeze();
     ground.material = groundMaterial;
-  }
-
-  if (vista && geology?.liquidLevel !== null && recipe.renderer === "rocky") {
-    const liquid = MeshBuilder.CreateGround(
-      "surfaceWater",
-      {
-        width: SURFACE_PATCH_HALF_EXTENT * 2,
-        height: SURFACE_PATCH_HALF_EXTENT * 2,
-        subdivisions: 1,
-      },
-      scene,
-    );
-    liquid.parent = root;
-    // The datum the terrain generator drains toward, lifted by the world's own water level.
-    liquid.position.set(
-      0,
-      vista.bounds.low +
-        (vista.bounds.high - vista.bounds.low) * (0.2 + recipe.surface.waterLevel * 0.4),
-      SURFACE_GROUND_ORIGIN_Z,
-    );
-    liquid.isPickable = false;
-    liquid.alwaysSelectAsActiveMesh = true;
-    const liquidMaterial = new StandardMaterial("surfaceWaterMaterial", scene);
-    liquidMaterial.diffuseColor = toColor3(recipe.surface.waterColor);
-    liquidMaterial.emissiveColor = toColor3(recipe.surface.waterColor).scale(0.22);
-    liquidMaterial.specularColor = mixColor3(recipe.surface.waterColor, [0.72, 0.9, 1], 0.62);
-    liquidMaterial.specularPower = 128;
-    liquidMaterial.alpha = 0.9;
-    liquidMaterial.roughness = 0.18;
-    liquidMaterial.freeze();
-    liquid.material = liquidMaterial;
-    meshes.push(liquid);
   }
 
   const cloudLayers: Mesh[] = [];

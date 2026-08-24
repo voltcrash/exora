@@ -374,6 +374,149 @@ void main(void) {
 }
 `;
 
+/**
+ * Standing liquid, as a surface rather than as a coloured plane.
+ *
+ * Water is almost entirely a mirror at a glancing angle and almost entirely its own colour looking
+ * straight down, and what makes it read as liquid is that the boundary between those two moves.
+ * So this is Fresnel over a wave-perturbed normal: the sky above reflected off the far half of the
+ * surface, the depth-tinted body of it underfoot, a glint where the sun's own reflection lands,
+ * and a shoreline that follows the terrain rather than cutting a straight line across it.
+ */
+const LIQUID_VERTEX_SHADER = `
+precision highp float;
+
+attribute vec3 position;
+attribute vec4 color;
+attribute vec2 uv;
+
+uniform mat4 world;
+uniform mat4 worldViewProjection;
+
+varying vec3 vWorldPosition;
+varying vec2 vDepth;
+varying vec2 vShade;
+
+void main(void) {
+  vec4 worldPosition = world * vec4(position, 1.0);
+  vWorldPosition = worldPosition.xyz;
+  // x: how deep the liquid is here, normalized. y: how close the shoreline is.
+  vDepth = color.xy;
+  vShade = uv;
+  gl_Position = worldViewProjection * vec4(position, 1.0);
+}
+`;
+
+const LIQUID_FRAGMENT_SHADER = `
+precision highp float;
+
+varying vec3 vWorldPosition;
+varying vec2 vDepth;
+varying vec2 vShade;
+
+uniform vec3 cameraPosition;
+uniform vec3 sunDirection;
+uniform vec3 sunColor;
+uniform float sunIntensity;
+uniform vec3 skyZenithColor;
+uniform vec3 skyHorizonColor;
+uniform vec3 shallowColor;
+uniform vec3 deepColor;
+uniform float hazeDensity;
+uniform float exposure;
+uniform float waveHeight;
+uniform float time;
+uniform float seed;
+uniform float horizonStart;
+uniform float horizonEnd;
+uniform vec3 patchOrigin;
+
+float hash21(vec2 point) {
+  vec3 p = fract(vec3(point.xyx) * 0.1031 + seed * 0.000013);
+  p += dot(p, p.yzx + 33.33);
+  return fract((p.x + p.y) * p.z);
+}
+
+float valueNoise(vec2 point) {
+  vec2 index = floor(point);
+  vec2 fraction = fract(point);
+  fraction = fraction * fraction * (3.0 - 2.0 * fraction);
+  return mix(
+    mix(hash21(index), hash21(index + vec2(1.0, 0.0)), fraction.x),
+    mix(hash21(index + vec2(0.0, 1.0)), hash21(index + vec2(1.0, 1.0)), fraction.x),
+    fraction.y
+  );
+}
+
+/** Slope of a drifting wave field, as a gradient rather than a height — the surface itself is
+ * flat geometry and everything about the swell is carried in the normal. */
+vec2 waveGradient(vec2 point, float scale, vec2 drift) {
+  vec2 p = point * scale + drift * time;
+  float epsilon = 0.35;
+  float center = valueNoise(p);
+  return vec2(valueNoise(p + vec2(epsilon, 0.0)) - center, valueNoise(p + vec2(0.0, epsilon)) - center);
+}
+
+void main(void) {
+  float depth = vDepth.x;
+  float shore = vDepth.y;
+  // Below the waterline the liquid is not there at all: the shoreline follows the ground under it
+  // rather than cutting a straight edge across the patch.
+  if (depth <= 0.002) discard;
+
+  vec2 ground = vWorldPosition.xz - patchOrigin.xz;
+  vec3 toCamera = cameraPosition - vWorldPosition;
+  float viewDistance = length(toCamera);
+  vec3 viewDirection = toCamera / max(viewDistance, 0.0001);
+
+  // Three wave trains at different scales and headings, the way a real swell is built. The
+  // shallows carry less of the long swell, which is why they go glassy near a shore.
+  vec2 slope = waveGradient(ground, 0.19, vec2(0.09, 0.05)) * 1.9 * min(1.0, depth * 2.4)
+    + waveGradient(ground, 0.62, vec2(-0.14, 0.11)) * 0.9
+    + waveGradient(ground, 2.1, vec2(0.31, -0.24)) * 0.35;
+  vec3 normal = normalize(vec3(-slope.x, 1.0 / max(waveHeight, 0.02), -slope.y));
+
+  // Fresnel: nearly transparent looking straight down, nearly a mirror at a grazing angle.
+  float facing = clamp(dot(normal, viewDirection), 0.0, 1.0);
+  float fresnel = 0.02 + 0.98 * pow(1.0 - facing, 5.0);
+
+  // What the mirror half shows: the sky in the direction the surface throws the eye.
+  vec3 reflectedDirection = reflect(-viewDirection, normal);
+  vec3 reflected = mix(skyHorizonColor, skyZenithColor, clamp(reflectedDirection.y * 1.6, 0.0, 1.0));
+
+  // What the transmitted half shows: the liquid's own colour, deepening with the water column.
+  // Depth carries the colour away fast: a body of water is its own filter, and a couple of its
+  // own depths of it is enough to take the shallow tint out entirely.
+  vec3 body = mix(shallowColor, deepColor, clamp(depth * 2.6, 0.0, 1.0));
+  // Light that went in, scattered, and came back out — why shallow water glows against a shore.
+  float scatter = (1.0 - clamp(depth * 3.2, 0.0, 1.0)) * max(dot(normal, sunDirection), 0.0);
+  body += shallowColor * scatter * 0.4;
+
+  float sunVisibility = clamp(vShade.y, 0.0, 1.0);
+  vec3 halfVector = normalize(sunDirection + viewDirection);
+  // A tight, very bright glint: the sun's own reflection, broken up by the waves into a path.
+  float glint = pow(max(dot(normal, halfVector), 0.0), 420.0) * sunVisibility;
+
+  vec3 color = mix(body, reflected, fresnel);
+  color += sunColor * sunIntensity * glint * 1.6;
+  // Where the liquid meets the ground it thins to nothing and brightens as it goes.
+  color = mix(color, shallowColor * 1.5 + sunColor * 0.1, shore * 0.32);
+  color *= exposure;
+
+  float optical = 1.0 - exp(-viewDistance * pow(hazeDensity, 1.6) * 0.031);
+  float sunGlow = pow(max(dot(-viewDirection, sunDirection), 0.0), 6.0);
+  vec3 airColor = mix(skyHorizonColor, skyZenithColor, clamp(viewDirection.y * 1.4, 0.0, 1.0))
+    + sunColor * sunGlow * hazeDensity * 0.5;
+  color = mix(color, airColor, clamp(optical, 0.0, 0.96));
+
+  float rim = max(abs(ground.x), abs(ground.y));
+  color = mix(color, mix(skyHorizonColor, skyZenithColor, 0.15), smoothstep(horizonStart, horizonEnd, rim));
+
+  float dither = (hash21(gl_FragCoord.xy) - 0.5) / 255.0;
+  gl_FragColor = vec4(color + dither, 1.0);
+}
+`;
+
 const toColor3 = ([red, green, blue]: Rgb): Color3 => new Color3(red, green, blue);
 
 export interface SurfaceVistaOptions {
@@ -389,11 +532,22 @@ export interface SurfaceVistaOptions {
   /** Unit vector from the ground toward the host star. */
   sunDirection: Vector3;
   sunIntensity: number;
+  /** Deep and shallow tints for standing liquid, and how high its swell runs. */
+  liquid: { deepColor: Rgb; shallowColor: Rgb; waveHeight: number } | null;
+}
+
+export interface SurfaceLiquid {
+  material: ShaderMaterial;
+  mesh: Mesh;
+  /** World Y of the liquid's surface. */
+  level: number;
 }
 
 export interface SurfaceVista {
   /** Highest and lowest ground in the patch, in world Y — used to place anything that sits on it. */
   bounds: { high: number; low: number };
+  /** Standing liquid over this ground, or null on a dry world. */
+  liquid: SurfaceLiquid | null;
   /** World-space ground height, matching the mesh exactly. */
   heightAt: (x: number, z: number) => number;
   material: ShaderMaterial;
@@ -602,6 +756,7 @@ export const createSurfaceVista = (
   scene: Scene,
   {
     geology,
+    liquid,
     origin,
     parent,
     profile,
@@ -832,10 +987,11 @@ export const createSurfaceVista = (
   // The target is a display-space mid-tone rather than a photometric one: this renderer writes
   // shader output straight to the framebuffer with no tone curve, the same as every other surface
   // in the scene, so the number to aim at is what a mid-grey looks like on the glass.
-  material.setFloat(
-    "exposure",
-    Math.min(5, Math.max(0.6, 0.42 / Math.max(rampLuminance * (flatSunlight + flatAmbient), 0.02))),
+  const groundExposure = Math.min(
+    5,
+    Math.max(0.6, 0.42 / Math.max(rampLuminance * (flatSunlight + flatAmbient), 0.02)),
   );
+  material.setFloat("exposure", groundExposure);
   material.setFloat("strataStrength", geology.strataStrength);
   material.setFloat("strataSpacing", Math.max(0.18, geology.strataSpacing));
   material.setFloat("windStreaks", geology.windStreaks);
@@ -859,10 +1015,141 @@ export const createSurfaceVista = (
   material.backFaceCulling = true;
   mesh.material = material;
 
+  /**
+   * The liquid surface, built on the same graded grid as the ground beneath it.
+   *
+   * Sharing the grid is what buys the shoreline: every vertex already knows how far the ground
+   * under it is below the waterline, so the depth tint, the shallowing swell and the waterline
+   * itself all follow the terrain instead of being drawn as one flat rectangle with a straight
+   * edge. Quads with no submerged corner are never emitted at all, so a mostly dry world pays
+   * almost nothing for having a lake in one corner of it.
+   */
+  const buildLiquid = (): SurfaceLiquid | null => {
+    if (!liquid) return null;
+    // The datum the ground drains toward, lifted by however much of this world is under liquid.
+    const level =
+      low + (high - low) * (0.18 + Math.min(1, Math.max(0, geology.liquidLevel ?? 0)) * 0.5);
+    const span = Math.max(0.6, high - low);
+
+    const liquidPositions: number[] = [];
+    const liquidColors: number[] = [];
+    const liquidShade: number[] = [];
+    const liquidIndices: number[] = [];
+    const remap = new Int32Array(vertexCount).fill(-1);
+
+    const claim = (index: number): number => {
+      const existing = remap[index] ?? -1;
+      if (existing >= 0) return existing;
+      const next = liquidPositions.length / 3;
+      const depth = level - (heights[index] ?? 0);
+      liquidPositions.push(positions[index * 3] ?? 0, level, positions[index * 3 + 2] ?? 0);
+      liquidColors.push(
+        Math.min(1, Math.max(0, depth / (span * 0.35))),
+        1 - Math.min(1, Math.max(0, depth / (span * 0.07))),
+        0,
+        1,
+      );
+      liquidShade.push(shade[index * 2] ?? 1, shade[index * 2 + 1] ?? 1);
+      remap[index] = next;
+      return next;
+    };
+
+    for (let iz = 0; iz < resolution; iz += 1) {
+      for (let ix = 0; ix < resolution; ix += 1) {
+        const topLeft = iz * stride + ix;
+        const topRight = topLeft + 1;
+        const bottomLeft = topLeft + stride;
+        const bottomRight = bottomLeft + 1;
+        const wet =
+          level > (heights[topLeft] ?? 0) ||
+          level > (heights[topRight] ?? 0) ||
+          level > (heights[bottomLeft] ?? 0) ||
+          level > (heights[bottomRight] ?? 0);
+        if (!wet) continue;
+        const a = claim(topLeft);
+        const b = claim(topRight);
+        const c = claim(bottomLeft);
+        const d = claim(bottomRight);
+        liquidIndices.push(a, b, c, b, d, c);
+      }
+    }
+
+    if (liquidIndices.length === 0) return null;
+
+    Effect.ShadersStore.exoraLiquidVertexShader = LIQUID_VERTEX_SHADER;
+    Effect.ShadersStore.exoraLiquidFragmentShader = LIQUID_FRAGMENT_SHADER;
+
+    const liquidMesh = new Mesh("surfaceWater", scene);
+    const liquidData = new VertexData();
+    liquidData.positions = liquidPositions;
+    liquidData.indices = liquidIndices;
+    liquidData.colors = liquidColors;
+    liquidData.uvs = liquidShade;
+    liquidData.applyToMesh(liquidMesh, false);
+    liquidMesh.parent = parent;
+    liquidMesh.position.copyFrom(origin);
+    liquidMesh.isPickable = false;
+    liquidMesh.alwaysSelectAsActiveMesh = true;
+
+    const liquidMaterial = new ShaderMaterial(
+      "surfaceWaterMaterial",
+      scene,
+      { fragment: "exoraLiquid", vertex: "exoraLiquid" },
+      {
+        attributes: ["position", "color", "uv"],
+        defines: [`#define FBM_OCTAVES ${Math.max(3, profile.fbmOctaves - 1)}`],
+        uniforms: [
+          "world",
+          "worldViewProjection",
+          "cameraPosition",
+          "sunDirection",
+          "sunColor",
+          "sunIntensity",
+          "skyZenithColor",
+          "skyHorizonColor",
+          "shallowColor",
+          "deepColor",
+          "hazeDensity",
+          "exposure",
+          "waveHeight",
+          "time",
+          "seed",
+          "horizonStart",
+          "horizonEnd",
+          "patchOrigin",
+        ],
+      },
+    );
+    liquidMaterial.setVector3("sunDirection", sunDirection);
+    liquidMaterial.setColor3("sunColor", sunColor);
+    liquidMaterial.setFloat("sunIntensity", sunIntensity);
+    liquidMaterial.setColor3("skyZenithColor", skyZenithColor);
+    liquidMaterial.setColor3("skyHorizonColor", skyHorizonColor);
+    liquidMaterial.setColor3("shallowColor", toColor3(liquid.shallowColor));
+    liquidMaterial.setColor3("deepColor", toColor3(liquid.deepColor));
+    liquidMaterial.setFloat("hazeDensity", geology.hazeDensity);
+    // The same stop the ground is exposed at, so a shore does not change brightness at the
+    // waterline — without it the water simply multiplied by zero and rendered black.
+    liquidMaterial.setFloat("exposure", groundExposure);
+    liquidMaterial.setFloat("waveHeight", liquid.waveHeight);
+    liquidMaterial.setFloat("time", 0);
+    liquidMaterial.setFloat("seed", geology.seed % 100_000);
+    liquidMaterial.setFloat("horizonStart", HALF_EXTENT * 0.72);
+    liquidMaterial.setFloat("horizonEnd", HALF_EXTENT * 0.985);
+    liquidMaterial.setVector3("patchOrigin", origin);
+    liquidMaterial.backFaceCulling = false;
+    liquidMesh.material = liquidMaterial;
+
+    return { level: origin.y + level, material: liquidMaterial, mesh: liquidMesh };
+  };
+
+  const surfaceLiquid = buildLiquid();
+
   const sampleScratch = createTerrainSample();
 
   return {
     bounds: { high: worldHigh, low: worldLow },
+    liquid: surfaceLiquid,
     heightAt: (x, z) => origin.y + field.height(x - origin.x, z - origin.z),
     material,
     mesh,
@@ -962,8 +1249,8 @@ export const createSurfaceVista = (
     update: (elapsedSeconds, cameraPosition) => {
       material.setFloat("time", elapsedSeconds);
       material.setVector3("cameraPosition", cameraPosition);
+      surfaceLiquid?.material.setFloat("time", elapsedSeconds);
+      surfaceLiquid?.material.setVector3("cameraPosition", cameraPosition);
     },
   };
 };
-
-export const SURFACE_PATCH_HALF_EXTENT = HALF_EXTENT;

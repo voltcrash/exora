@@ -88,7 +88,10 @@ export interface SurfaceGeology {
   lavaGlow: number;
   /** Standing liquid height in the height field's own units, or null for a dry world. */
   liquidLevel: number | null;
+  /** The colour of a deep body of it, and of a shallow one — which is most of what tells a
+   * viewer where the shore is. */
   liquidColor: Rgb;
+  liquidShallowColor: Rgb;
   provenance: "inferred" | "measured";
   provinces: readonly TerrainProvince[];
   /**
@@ -261,6 +264,8 @@ const MEASURED_GEOLOGY: Readonly<Record<number, MeasuredGeology>> = {
     bedrockColor: rgb(0.21, 0.2, 0.19),
     frostColor: rgb(0.82, 0.86, 0.9),
     frostCoverage: 0.22,
+    liquidColor: rgb(0.008, 0.032, 0.082),
+    liquidShallowColor: rgb(0.055, 0.24, 0.29),
     craterDensity: 0.01,
     regolithDepth: 0.55,
     boulderDensity: 0.3,
@@ -657,7 +662,8 @@ const MEASURED_GEOLOGY: Readonly<Record<number, MeasuredGeology>> = {
     strataSpacing: 0.9,
     windStreaks: 0.7,
     hazeDensity: 0.96,
-    liquidColor: rgb(0.02, 0.018, 0.016),
+    liquidColor: rgb(0.016, 0.014, 0.012),
+    liquidShallowColor: rgb(0.07, 0.055, 0.035),
     detail: {
       chemistry: "carbon",
       chemistryScale: 14,
@@ -1133,6 +1139,7 @@ const inferredGeology = (recipe: RockyWorldRecipe): SurfaceGeology => {
     lavaColor: surface.lavaStrength > 0 ? surface.emissiveColor : rgb(0, 0, 0),
     liquidLevel: surface.waterLevel > 0 ? surface.waterLevel : null,
     liquidColor: surface.waterColor,
+    liquidShallowColor: surface.waterColorShallow,
     hazeDensity: clamp01(air * 0.7 + surface.cloudCover * 0.2),
     // The recipe's atmosphere colour is what this world's air would scatter; with no air to
     // scatter in, the sky is simply space.
@@ -1184,6 +1191,7 @@ const unresolvedGeology = (recipe: RockyWorldRecipe): SurfaceGeology => ({
   lavaColor: rgb(0, 0, 0),
   liquidLevel: null,
   liquidColor: rgb(0.1, 0.12, 0.14),
+  liquidShallowColor: rgb(0.2, 0.24, 0.28),
   hazeDensity: 0,
   skyColor: rgb(0.003, 0.004, 0.008),
   detail: {
@@ -1228,6 +1236,7 @@ export const deriveSurfaceGeology = (
     // plane already agree on, and the measured table has no business restating it.
     liquidLevel: inferred.liquidLevel,
     liquidColor: measured.liquidColor ?? inferred.liquidColor,
+    liquidShallowColor: measured.liquidShallowColor ?? inferred.liquidShallowColor,
     lavaGlow: measured.lavaGlow ?? 0,
     lavaColor: measured.lavaColor ?? inferred.lavaColor,
     windDirection: inferred.windDirection,
