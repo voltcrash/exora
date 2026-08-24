@@ -1823,13 +1823,11 @@ h1 em {
  *
  * They were drawn as a signal meter and measured nothing, while the number they are the meter for
  * sat on the control deck below spending deck width on a figure nobody travels anywhere by. The
- * two cost less together than either did apart: bars for the glance, the count for the second look.
+ * two cost less together than either did apart: bars and count share a row above their caption,
+ * close enough to read as one value.
  */
 .frame-rate-signal {
   flex: 0 0 auto;
-  display: flex;
-  align-items: flex-start;
-  gap: 8px;
 }
 
 .signal-bars {
@@ -1884,7 +1882,13 @@ h1 em {
   gap: 1px;
 }
 
-.frame-rate-count strong {
+.frame-rate-reading {
+  display: flex;
+  align-items: flex-start;
+  gap: 5px;
+}
+
+.frame-rate-reading strong {
   color: #e0e8ea;
   font-family: var(--mono);
   font-size: 13px;
