@@ -4026,6 +4026,12 @@ h1 em {
   scrollbar-width: thin;
 }
 
+/* Long catalog names must fit inside the intro column: hidden horizontal overflow keeps the
+   scrollable HUD clean, so an oversized heading would otherwise lose the end of its first word. */
+.black-hole-experience h1 {
+  font-size: clamp(48px, 5vw, 72px);
+}
+
 .black-hole-experience .eyebrow,
 .black-hole-experience .telemetry-heading small,
 .black-hole-experience .telemetry dd small {

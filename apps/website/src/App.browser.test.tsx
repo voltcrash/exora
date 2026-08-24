@@ -624,6 +624,9 @@ test("the black-hole atlas opens and travels to a sourced horizon", async () => 
   await userEvent.click(destination);
 
   await expect.element(page.getByRole("heading", { level: 1 })).toHaveTextContent("Sagittarius A*");
+  const title = document.querySelector<HTMLElement>("#black-hole-name");
+  expect(title).not.toBeNull();
+  expect(title?.scrollWidth).toBeLessThanOrEqual(title?.clientWidth ?? 0);
   expect(window.location.search).toBe("?blackHole=Sagittarius%20A*");
 });
 
