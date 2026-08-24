@@ -4,7 +4,7 @@ import type { SceneHost } from "../scene-host.ts";
 import { cometActivityAtDistance, type CometProfile } from "../solar-comets.ts";
 import { findSolarStar, findSolarWorld } from "../solar-system.ts";
 import type { TravelPhase } from "../travel-transition.ts";
-import { DiscoverTrigger } from "./DiscoverTrigger.tsx";
+import { MissionControl } from "./MissionControl.tsx";
 
 interface CometExperienceProps {
   chromeHidden: boolean;
@@ -88,9 +88,6 @@ export const CometExperience = ({
             <small>UNIVERSE OBSERVATORY</small>
           </span>
         </a>
-        <div className="exploration-actions">
-          <DiscoverTrigger onClick={onOpenDiscover} />
-        </div>
       </header>
       <main className="hud">
         <section className="world-intro" aria-labelledby="world-name">
@@ -217,41 +214,16 @@ export const CometExperience = ({
           </p>
         </aside>
       </main>
-      <footer className="mission-control">
-        {sceneState === "error" ? (
-          <p className="scene-alert" role="status">
-            RENDERER UNAVAILABLE
-          </p>
-        ) : (
-          <button
-            className="clear-view"
-            type="button"
-            aria-label="Hide the interface"
-            onClick={onHideChrome}
-          >
-            <span className="clear-view-mark" aria-hidden="true" />
-            <span>
-              <small>CLEAR VIEW</small>
-              <strong>HIDE INTERFACE</strong>
-            </span>
-            <kbd>TAB</kbd>
-          </button>
-        )}
-        <div className="interaction-hint" aria-label="Desktop controls">
-          <span>
-            <kbd>DRAG</kbd>
-            <small>ORBIT</small>
-          </span>
-          <span>
-            <kbd>SCROLL</kbd>
-            <small>SCALE</small>
-          </span>
-          <span className="performance-readout">
-            <strong>{fps}</strong>
-            <small>FPS</small>
-          </span>
-        </div>
-      </footer>
+      <MissionControl
+        fps={fps}
+        hints={[
+          { key: "DRAG", meaning: "ORBIT" },
+          { key: "SCROLL", meaning: "SCALE" },
+        ]}
+        onHideChrome={onHideChrome}
+        onOpenDiscover={onOpenDiscover}
+        sceneFailed={sceneState === "error"}
+      />
       {sceneState === "loading" ? (
         <div className="loading-screen" role="status">
           <div className="loading-orbit" aria-hidden="true">

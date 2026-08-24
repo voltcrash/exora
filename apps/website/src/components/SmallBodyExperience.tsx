@@ -6,7 +6,7 @@ import type { AsteroidProfile } from "../solar-asteroids.ts";
 import { findSolarAsteroid } from "../solar-asteroids.ts";
 import { findSolarStar } from "../solar-system.ts";
 import type { TravelPhase } from "../travel-transition.ts";
-import { DiscoverTrigger } from "./DiscoverTrigger.tsx";
+import { MissionControl } from "./MissionControl.tsx";
 
 interface SmallBodyExperienceProps {
   asteroid: AsteroidProfile;
@@ -18,14 +18,6 @@ interface SmallBodyExperienceProps {
   onSelectStar: (star: StarProfile, cached: boolean) => void;
   travelPhase: TravelPhase;
 }
-
-const xrButtonCopy: Record<XrStatus, string> = {
-  checking: "CHECKING HEADSET",
-  entering: "ENTERING SESSION",
-  "in-xr": "SESSION ACTIVE",
-  ready: "ENTER IMMERSIVE VR",
-  unavailable: "VR UNAVAILABLE",
-};
 
 const compact = (value: number | null, digits = 3): string =>
   value === null
@@ -115,9 +107,6 @@ export const SmallBodyExperience = ({
             <small>UNIVERSE OBSERVATORY</small>
           </span>
         </a>
-        <div className="exploration-actions">
-          <DiscoverTrigger onClick={onOpenDiscover} />
-        </div>
       </header>
 
       <main className="hud">
@@ -240,56 +229,18 @@ export const SmallBodyExperience = ({
         </aside>
       </main>
 
-      <footer className="mission-control">
-        {sceneState === "error" ? (
-          <p className="scene-alert" role="status">
-            RENDERER UNAVAILABLE
-          </p>
-        ) : (
-          <button
-            className="clear-view"
-            type="button"
-            aria-label="Hide the interface"
-            onClick={onHideChrome}
-          >
-            <span className="clear-view-mark" aria-hidden="true" />
-            <span>
-              <small>CLEAR VIEW</small>
-              <strong>HIDE INTERFACE</strong>
-            </span>
-            <kbd>TAB</kbd>
-          </button>
-        )}
-        <div className="interaction-hint" aria-label="Desktop controls">
-          <span>
-            <kbd>DRAG</kbd>
-            <small>ORBIT</small>
-          </span>
-          <span>
-            <kbd>SCROLL</kbd>
-            <small>SCALE</small>
-          </span>
-          <span className="performance-readout">
-            <strong>{fps}</strong>
-            <small>FPS · {qualityTier}</small>
-          </span>
-        </div>
-        <button
-          className="enter-vr"
-          type="button"
-          disabled={xrStatus !== "ready"}
-          onClick={() => void host?.enterVr().catch((error: unknown) => console.error(error))}
-        >
-          <span className="button-orbit" aria-hidden="true" />
-          <span>
-            <small>IMMERSIVE MODE</small>
-            <strong>{xrButtonCopy[xrStatus]}</strong>
-          </span>
-          <span className="button-arrow" aria-hidden="true">
-            ↗
-          </span>
-        </button>
-      </footer>
+      <MissionControl
+        fps={fps}
+        hints={[
+          { key: "DRAG", meaning: "ORBIT" },
+          { key: "SCROLL", meaning: "SCALE" },
+        ]}
+        onHideChrome={onHideChrome}
+        onOpenDiscover={onOpenDiscover}
+        qualityTier={qualityTier}
+        sceneFailed={sceneState === "error"}
+        xr={{ host, status: xrStatus }}
+      />
 
       <div className="loading-screen" role="status">
         <div className="loading-orbit" aria-hidden="true">

@@ -7,10 +7,11 @@ import { StarExperience } from "./StarExperience.tsx";
 
 /**
  * Discover sheds its text on narrow phones and keeps only a decorative orbital mark. The name
- * therefore has to come from an attribute the media query cannot reach.
+ * therefore has to come from an attribute the media query cannot reach. The same is true of the
+ * immersive entry beside it on the deck, which loses its copy at the same width.
  *
- * `renderToStaticMarkup` is enough: no effect runs, no scene mounts, and the header is the part
- * of the tree that renders from props alone.
+ * `renderToStaticMarkup` is enough: no effect runs, no scene mounts, and the control deck is the
+ * part of the tree that renders from props alone.
  */
 const sirius: StarProfile = {
   catalogName: "* alf CMa",
@@ -70,35 +71,45 @@ const starMarkup = (): string =>
     />,
   );
 
-/** The buttons in the top bar, which is the first `exploration-actions` group in the markup. */
-const explorationActions = (markup: string): string[] => {
-  const start = markup.indexOf('class="exploration-actions"');
+/** Every button on the bottom-centre control deck, in the order the markup places them. */
+const deckButtons = (markup: string): string[] => {
+  const start = markup.indexOf('class="control-deck"');
   expect(start).toBeGreaterThan(-1);
-  const group = markup.slice(start, markup.indexOf("</header>", start));
-  return [...group.matchAll(/<button[^>]*>/g)].map(([tag]) => tag);
+  const deck = markup.slice(start, markup.indexOf("</footer>", start));
+  return [...deck.matchAll(/<button[^>]*>/g)].map(([tag]) => tag);
 };
 
-test("the Discover entry on the world view names itself", () => {
+/** The name each of those buttons answers to, sorted so two views can be compared directly. */
+const deckNames = (markup: string): string[] =>
+  deckButtons(markup)
+    .map((button) => /aria-label="([^"]+)"/.exec(button)?.[1] ?? "")
+    .sort();
+
+test("the world view gathers every control onto one named deck", () => {
   const markup = planetMarkup();
-  const buttons = explorationActions(markup);
 
-  expect(buttons).toHaveLength(1);
-  expect(buttons[0]).toContain('aria-label="Open Discover"');
+  // Discover, clear view and the immersive entry: the whole of what this view can be told, and
+  // all of it in one place rather than the three corners these used to hold.
+  expect(deckNames(markup)).toEqual([
+    "Hide the interface",
+    "Immersive mode: CHECKING HEADSET",
+    "Open Discover",
+  ]);
   expect(markup).toContain('<kbd aria-label="Backspace or Delete">⌫</kbd>');
+
+  // Nothing is left in the top bar but the way home.
+  const header = markup.slice(markup.indexOf("<header"), markup.indexOf("</header>"));
+  expect([...header.matchAll(/<button[^>]*>/g)]).toHaveLength(0);
 });
 
-test("the Discover entry on the star view names itself", () => {
-  const buttons = explorationActions(starMarkup());
-
-  expect(buttons).toHaveLength(1);
-  expect(buttons[0]).toContain('aria-label="Open Discover"');
+test("the star view gathers the same controls onto the same deck", () => {
+  expect(deckNames(starMarkup())).toEqual([
+    "Hide the interface",
+    "Immersive mode: CHECKING HEADSET",
+    "Open Discover",
+  ]);
 });
 
-test("the same destination is named the same way from either view", () => {
-  const namesOf = (markup: string): string[] =>
-    explorationActions(markup)
-      .map((button) => /aria-label="([^"]+)"/.exec(button)?.[1] ?? "")
-      .sort();
-
-  expect(namesOf(planetMarkup())).toEqual(namesOf(starMarkup()));
+test("the same control is named the same way from either view", () => {
+  expect(deckNames(planetMarkup())).toEqual(deckNames(starMarkup()));
 });

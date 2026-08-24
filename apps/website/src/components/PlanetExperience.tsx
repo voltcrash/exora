@@ -14,7 +14,7 @@ import type { PlanetarySubsystem } from "../planetary-subsystems.ts";
 import type { SceneHost, XrStatus } from "../scene-host.ts";
 import { findSolarWorld, tuneSolarWorldRecipe } from "../solar-system.ts";
 import { SURFACE_TRANSITION_MS, type TravelPhase } from "../travel-transition.ts";
-import { DiscoverTrigger } from "./DiscoverTrigger.tsx";
+import { MissionControl } from "./MissionControl.tsx";
 
 interface PlanetExperienceProps {
   chromeHidden: boolean;
@@ -31,14 +31,6 @@ interface PlanetExperienceProps {
   result: PlanetLoadResult;
   travelPhase: TravelPhase;
 }
-
-const xrButtonCopy: Record<XrStatus, string> = {
-  checking: "CHECKING HEADSET",
-  entering: "ENTERING SESSION",
-  "in-xr": "SESSION ACTIVE",
-  ready: "ENTER IMMERSIVE VR",
-  unavailable: "VR UNAVAILABLE",
-};
 
 export const PlanetExperience = ({
   chromeHidden,
@@ -265,9 +257,6 @@ export const PlanetExperience = ({
             <small>UNIVERSE OBSERVATORY</small>
           </span>
         </a>
-        <div className="exploration-actions">
-          <DiscoverTrigger onClick={onOpenDiscover} />
-        </div>
       </header>
 
       <main className="hud">
@@ -669,66 +658,27 @@ export const PlanetExperience = ({
         </aside>
       </main>
 
-      <footer className="mission-control">
-        {sceneState === "error" ? (
-          <p className="scene-alert" role="status">
-            RENDERER UNAVAILABLE
-          </p>
-        ) : (
-          <button
-            className="clear-view"
-            type="button"
-            aria-label="Hide the interface"
-            onClick={onHideChrome}
-          >
-            <span className="clear-view-mark" aria-hidden="true" />
-            <span>
-              <small>CLEAR VIEW</small>
-              <strong>HIDE INTERFACE</strong>
-            </span>
-            <kbd>TAB</kbd>
-          </button>
-        )}
-        <div className="interaction-hint" aria-label="Desktop controls">
-          <span>
-            <kbd>WASD</kbd>
-            <small>MOVE</small>
-          </span>
-          <span>
-            <kbd>DRAG</kbd>
-            <small>{viewMode === "surface" ? "LOOK" : "ORBIT"}</small>
-          </span>
-          <span>
-            <kbd>SCROLL</kbd>
-            <small>
-              {viewMode === "surface"
+      <MissionControl
+        fps={fps}
+        hints={[
+          { key: "WASD", meaning: "MOVE" },
+          { key: "DRAG", meaning: viewMode === "surface" ? "LOOK" : "ORBIT" },
+          {
+            key: "SCROLL",
+            meaning:
+              viewMode === "surface"
                 ? "RETURN"
                 : viewMode === "subsystem"
                   ? "SCALE SYSTEM"
-                  : "ZOOM / APPROACH"}
-            </small>
-          </span>
-          <span className="performance-readout">
-            <strong>{fps}</strong>
-            <small>FPS · {qualityTier}</small>
-          </span>
-        </div>
-        <button
-          className="enter-vr"
-          type="button"
-          disabled={xrStatus !== "ready"}
-          onClick={() => void host?.enterVr().catch((error: unknown) => console.error(error))}
-        >
-          <span className="button-orbit" aria-hidden="true" />
-          <span>
-            <small>IMMERSIVE MODE</small>
-            <strong>{xrButtonCopy[xrStatus]}</strong>
-          </span>
-          <span className="button-arrow" aria-hidden="true">
-            ↗
-          </span>
-        </button>
-      </footer>
+                  : "ZOOM / APPROACH",
+          },
+        ]}
+        onHideChrome={onHideChrome}
+        onOpenDiscover={onOpenDiscover}
+        qualityTier={qualityTier}
+        sceneFailed={sceneState === "error"}
+        xr={{ host, status: xrStatus }}
+      />
 
       <div className="loading-screen" role="status">
         <div className="loading-orbit" aria-hidden="true">
