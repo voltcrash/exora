@@ -9,6 +9,7 @@ import type {
   SurfaceMissionSite,
 } from "../solar-missions.ts";
 import type { TravelPhase } from "../travel-transition.ts";
+import { FrameRateSignal } from "./FrameRateSignal.tsx";
 import { MissionControl } from "./MissionControl.tsx";
 
 interface MissionExperienceProps {
@@ -182,12 +183,7 @@ export const MissionExperience = ({
             <span>
               <small>{mission.agency}</small>Mission evidence
             </span>
-            <span className="signal-bars" aria-hidden="true">
-              <i />
-              <i />
-              <i />
-              <i />
-            </span>
+            <FrameRateSignal fps={fps} />
           </div>
           <dl>
             <div>
@@ -279,7 +275,6 @@ export const MissionExperience = ({
         </aside>
       </main>
       <MissionControl
-        fps={fps}
         hints={[
           { key: "DRAG", meaning: "ORBIT" },
           { key: "SCROLL", meaning: "SCALE" },

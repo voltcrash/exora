@@ -2124,6 +2124,7 @@ h1 em {
   display: flex;
   align-items: center;
   justify-content: space-between;
+  gap: 12px;
   padding-bottom: 16px;
 }
 
@@ -2142,16 +2143,51 @@ h1 em {
   letter-spacing: 0.1em;
 }
 
+/*
+ * THE SIGNAL — four bars in the archive heading, reading the renderer they used to only decorate.
+ *
+ * They were drawn as a signal meter and measured nothing, while the number they are the meter for
+ * sat on the control deck below spending deck width on a figure nobody travels anywhere by. The
+ * two cost less together than either did apart: bars for the glance, the count for the second look.
+ */
+.frame-rate-signal {
+  flex: 0 0 auto;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
 .signal-bars {
   height: 13px;
   display: flex;
   align-items: end;
   gap: 2px;
+  color: var(--cyan);
+}
+
+/* A world being drawn at under two fifths of a display's rate is not a reading to state calmly in
+   the panel's own colour, so the meter takes the colour the interface warns in. */
+.signal-bars[data-strength="1"],
+.signal-bars[data-strength="2"] {
+  color: var(--accent);
 }
 
 .signal-bars i {
   width: 2px;
-  background: var(--cyan);
+  background: currentcolor;
+  /* Unlit rather than absent: the height of the meter is part of what it says, and a bar that
+     disappears takes the scale with it. */
+  opacity: 0.22;
+  transition:
+    opacity 320ms ease,
+    background 320ms ease;
+}
+
+.signal-bars[data-strength="1"] i:nth-child(-n + 1),
+.signal-bars[data-strength="2"] i:nth-child(-n + 2),
+.signal-bars[data-strength="3"] i:nth-child(-n + 3),
+.signal-bars[data-strength="4"] i:nth-child(-n + 4) {
+  opacity: 1;
 }
 
 .signal-bars i:nth-child(1) {
@@ -2165,6 +2201,33 @@ h1 em {
 }
 .signal-bars i:nth-child(4) {
   height: 13px;
+}
+
+.frame-rate-count {
+  display: grid;
+  justify-items: end;
+  gap: 1px;
+}
+
+.frame-rate-count strong {
+  color: #e0e8ea;
+  font-family: var(--mono);
+  font-size: 13px;
+  font-weight: 500;
+  line-height: 1;
+}
+
+/*
+ * Kept after the rules above so it wins the ties: every `small` in this heading is otherwise the
+ * archive eyebrow, in cyan or in whatever colour the view themes that eyebrow. The unit under the
+ * count is a footnote to a number, not a second label for the panel.
+ */
+.telemetry-heading .frame-rate-count small {
+  color: var(--faint);
+  font-family: var(--mono);
+  font-size: 7px;
+  letter-spacing: 0.04em;
+  white-space: nowrap;
 }
 
 .telemetry dl {
@@ -2593,30 +2656,6 @@ h1 em {
   color: var(--faint);
   font-family: var(--mono);
   font-size: 7px;
-}
-
-.performance-readout {
-  min-height: 46px;
-  display: grid;
-  align-content: center;
-  gap: 1px;
-  padding: 0 12px;
-  border-radius: 12px;
-  background: rgb(229 244 247 / 4%);
-}
-
-.performance-readout strong {
-  color: #e0e8ea;
-  font-family: var(--mono);
-  font-size: 13px;
-  font-weight: 500;
-}
-
-.performance-readout small {
-  color: var(--faint);
-  font-family: var(--mono);
-  font-size: 7px;
-  white-space: nowrap;
 }
 
 .enter-vr {
@@ -5634,10 +5673,6 @@ h1 em {
     padding-left: 5px;
   }
 
-  .deck-readout {
-    display: none;
-  }
-
   .scene-alert {
     padding: 8px 11px;
     font-size: 8px;
@@ -5902,6 +5937,7 @@ h1 em {
   .surprise-journey,
   .clear-view,
   .enter-vr,
+  .signal-bars i,
   .loading-screen,
   .viewport-grid,
   .surface-veil,
@@ -5959,15 +5995,15 @@ h1 em {
 }
 
 /*
- * The deck holds five controls on one line, so a narrowing screen is answered by giving each of
+ * The deck holds its controls on one line, so a narrowing screen is answered by giving each of
  * them up in turn rather than by wrapping — a control centre that reflows into two rows stops
  * reading as one instrument. Kept after the legacy responsive rules so this ladder is what wins.
  *
  * The order is what a visitor can most afford to lose first: the clear-view copy (its Tab chip
- * still says what the button does), then the gesture legend at 960px and the frame counter at
- * 640px above, and only then the copy on Discover and the immersive entry. Every mark left
- * behind is aria-hidden, so each of these buttons resolves by name at these widths only because
- * it carries an aria-label — removing those leaves the deck unnamed on a phone.
+ * still says what the button does), then the gesture legend at 960px above, and only then the
+ * copy on Discover and the immersive entry. Every mark left behind is aria-hidden, so each of
+ * these buttons resolves by name at these widths only because it carries an aria-label —
+ * removing those leaves the deck unnamed on a phone.
  */
 @media (max-width: 1080px) {
   .clear-view {

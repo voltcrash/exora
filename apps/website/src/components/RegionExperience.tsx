@@ -4,6 +4,7 @@ import type { SceneHost } from "../scene-host.ts";
 import type { SolarRegionProfile } from "../solar-regions.ts";
 import { findSolarStar } from "../solar-system.ts";
 import type { TravelPhase } from "../travel-transition.ts";
+import { FrameRateSignal } from "./FrameRateSignal.tsx";
 import { MissionControl } from "./MissionControl.tsx";
 
 interface RegionExperienceProps {
@@ -111,12 +112,7 @@ export const RegionExperience = ({
             <span>
               <small>NASA / JPL · REGIONAL MODEL</small>Scale and evidence
             </span>
-            <span className="signal-bars" aria-hidden="true">
-              <i />
-              <i />
-              <i />
-              <i />
-            </span>
+            <FrameRateSignal fps={fps} />
           </div>
           <dl>
             <div>
@@ -171,7 +167,6 @@ export const RegionExperience = ({
         </aside>
       </main>
       <MissionControl
-        fps={fps}
         hints={[
           { key: "DRAG", meaning: "ORBIT" },
           { key: "SCROLL", meaning: "SCALE" },

@@ -8,6 +8,7 @@ import { formatNumber } from "../planet-utils.tsx";
 import type { SceneHost, XrStatus } from "../scene-host.ts";
 import { deriveStarVisual, starKindLabel, starSummary } from "../star-utils.ts";
 import type { TravelPhase } from "../travel-transition.ts";
+import { FrameRateSignal } from "./FrameRateSignal.tsx";
 import { MissionControl } from "./MissionControl.tsx";
 
 interface StarExperienceProps {
@@ -279,12 +280,7 @@ export const StarExperience = ({
                   ? "Home-star parameters"
                   : "Observed properties"}
             </span>
-            <span className="signal-bars" aria-hidden="true">
-              <i />
-              <i />
-              <i />
-              <i />
-            </span>
+            <FrameRateSignal fps={fps} qualityTier={qualityTier} />
           </div>
           <dl>
             {custom ? (
@@ -376,14 +372,12 @@ export const StarExperience = ({
       </main>
 
       <MissionControl
-        fps={fps}
         hints={[
           { key: "DRAG", meaning: "ORBIT" },
           { key: "SCROLL", meaning: "ZOOM" },
         ]}
         onHideChrome={onHideChrome}
         onOpenDiscover={onOpenDiscover}
-        qualityTier={qualityTier}
         sceneFailed={sceneState === "error"}
         xr={{ host, status: xrStatus }}
       />

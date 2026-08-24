@@ -6,6 +6,7 @@ import type { AsteroidProfile } from "../solar-asteroids.ts";
 import { findSolarAsteroid } from "../solar-asteroids.ts";
 import { findSolarStar } from "../solar-system.ts";
 import type { TravelPhase } from "../travel-transition.ts";
+import { FrameRateSignal } from "./FrameRateSignal.tsx";
 import { MissionControl } from "./MissionControl.tsx";
 
 interface SmallBodyExperienceProps {
@@ -147,12 +148,7 @@ export const SmallBodyExperience = ({
               </small>
               Measured parameters
             </span>
-            <span className="signal-bars" aria-hidden="true">
-              <i />
-              <i />
-              <i />
-              <i />
-            </span>
+            <FrameRateSignal fps={fps} qualityTier={qualityTier} />
           </div>
           <dl>
             <div>
@@ -230,14 +226,12 @@ export const SmallBodyExperience = ({
       </main>
 
       <MissionControl
-        fps={fps}
         hints={[
           { key: "DRAG", meaning: "ORBIT" },
           { key: "SCROLL", meaning: "SCALE" },
         ]}
         onHideChrome={onHideChrome}
         onOpenDiscover={onOpenDiscover}
-        qualityTier={qualityTier}
         sceneFailed={sceneState === "error"}
         xr={{ host, status: xrStatus }}
       />

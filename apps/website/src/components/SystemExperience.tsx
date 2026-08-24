@@ -15,6 +15,7 @@ import {
 } from "../system-layout.ts";
 import type { SystemWorld } from "../system-scene.ts";
 import type { TravelPhase } from "../travel-transition.ts";
+import { FrameRateSignal } from "./FrameRateSignal.tsx";
 import { MissionControl } from "./MissionControl.tsx";
 
 interface SystemExperienceProps {
@@ -438,12 +439,7 @@ export const SystemExperience = ({
               <small>DIORAMA SCALE</small>
               What the picture compressed
             </span>
-            <span className="signal-bars" aria-hidden="true">
-              <i />
-              <i />
-              <i />
-              <i />
-            </span>
+            <FrameRateSignal fps={fps} qualityTier={qualityTier} />
           </div>
           {/*
             The three numbers a reader needs before reading anything off the layout. None of them
@@ -511,7 +507,6 @@ export const SystemExperience = ({
       </main>
 
       <MissionControl
-        fps={fps}
         hints={[
           { key: "DRAG", meaning: "ORBIT" },
           { key: "SCROLL", meaning: "ZOOM" },
@@ -519,7 +514,6 @@ export const SystemExperience = ({
         ]}
         onHideChrome={onHideChrome}
         onOpenDiscover={onOpenDiscover}
-        qualityTier={qualityTier}
         sceneFailed={sceneState === "error"}
         xr={{ host, status: xrStatus }}
       />

@@ -4,6 +4,7 @@ import type { SceneHost } from "../scene-host.ts";
 import { cometActivityAtDistance, type CometProfile } from "../solar-comets.ts";
 import { findSolarStar, findSolarWorld } from "../solar-system.ts";
 import type { TravelPhase } from "../travel-transition.ts";
+import { FrameRateSignal } from "./FrameRateSignal.tsx";
 import { MissionControl } from "./MissionControl.tsx";
 
 interface CometExperienceProps {
@@ -134,12 +135,7 @@ export const CometExperience = ({
             <span>
               <small>NASA/JPL SBDB 1.3</small>Measured parameters
             </span>
-            <span className="signal-bars" aria-hidden="true">
-              <i />
-              <i />
-              <i />
-              <i />
-            </span>
+            <FrameRateSignal fps={fps} />
           </div>
           <dl>
             <div>
@@ -215,7 +211,6 @@ export const CometExperience = ({
         </aside>
       </main>
       <MissionControl
-        fps={fps}
         hints={[
           { key: "DRAG", meaning: "ORBIT" },
           { key: "SCROLL", meaning: "SCALE" },

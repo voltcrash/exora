@@ -16,14 +16,10 @@ export interface ControlHint {
 }
 
 interface MissionControlProps {
-  /** The host's last frame-rate reading, or `--` before one has been taken. */
-  fps: string;
   /** The legend for this view: every gesture the scene answers to, in reading order. */
   hints: ControlHint[];
   onHideChrome: () => void;
   onOpenDiscover: () => void;
-  /** Printed beside the frame rate by the views that pick a render tier. */
-  qualityTier?: string | undefined;
   /** Whether the world under the deck failed to build. */
   sceneFailed: boolean;
   /** Left out by the views with no immersive scene to enter. */
@@ -33,21 +29,22 @@ interface MissionControlProps {
 /**
  * MISSION CONTROL — the single deck at the bottom centre holding everything a view can be told.
  *
- * Discover, the gesture legend, the frame-rate readout, the clear-view switch and the immersive
- * entry each used to hold a different corner of the screen. They are one instrument here, so
- * there is one place to look rather than four, and every destination gets the same one: the deck
- * is shared, and a view supplies only the parts that differ — its legend, and whether it has an
- * immersive scene to offer at all.
+ * Discover, the gesture legend, the clear-view switch and the immersive entry each used to hold a
+ * different corner of the screen. They are one instrument here, so there is one place to look
+ * rather than four, and every destination gets the same one: the deck is shared, and a view
+ * supplies only the parts that differ — its legend, and whether it has an immersive scene to
+ * offer at all.
+ *
+ * The frame counter is the one reading that left again: it belongs beside the signal bars in the
+ * archive panel, which were drawing a meter for it long before they were wired to one.
  *
  * Discover leads because it is the only control that goes somewhere. It keeps its own lit
  * surface for that reason; the rest sit flat in the deck until they are hovered.
  */
 export const MissionControl = ({
-  fps,
   hints,
   onHideChrome,
   onOpenDiscover,
-  qualityTier,
   sceneFailed,
   xr,
 }: MissionControlProps) => (
@@ -56,9 +53,9 @@ export const MissionControl = ({
       <DiscoverTrigger onClick={onOpenDiscover} />
 
       {/*
-       * A renderer that could not build the world has no gestures to advertise and no frames to
-       * count, so the readout is what the alert replaces. Discover stays either way — travelling
-       * somewhere else is the way out of a world that would not assemble.
+       * A renderer that could not build the world has no gestures to advertise, so the legend is
+       * what the alert replaces. Discover stays either way — travelling somewhere else is the way
+       * out of a world that would not assemble.
        */}
       {sceneFailed ? (
         <div className="deck-group">
@@ -67,7 +64,7 @@ export const MissionControl = ({
           </p>
         </div>
       ) : (
-        <div className="deck-group deck-readout">
+        <div className="deck-group deck-legend">
           <div className="interaction-hint" aria-label="Desktop controls">
             {hints.map((hint) => (
               <span key={hint.key}>
@@ -76,10 +73,6 @@ export const MissionControl = ({
               </span>
             ))}
           </div>
-          <span className="performance-readout">
-            <strong>{fps}</strong>
-            <small>{qualityTier === undefined ? "FPS" : `FPS · ${qualityTier}`}</small>
-          </span>
         </div>
       )}
 

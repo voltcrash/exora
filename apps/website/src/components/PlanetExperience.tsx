@@ -14,6 +14,7 @@ import type { PlanetarySubsystem } from "../planetary-subsystems.ts";
 import type { SceneHost, XrStatus } from "../scene-host.ts";
 import { findSolarWorld, tuneSolarWorldRecipe } from "../solar-system.ts";
 import { SURFACE_TRANSITION_MS, type TravelPhase } from "../travel-transition.ts";
+import { FrameRateSignal } from "./FrameRateSignal.tsx";
 import { MissionControl } from "./MissionControl.tsx";
 
 interface PlanetExperienceProps {
@@ -390,12 +391,7 @@ export const PlanetExperience = ({
                   ? "Planetary parameters"
                   : "Observed properties"}
             </span>
-            <span className="signal-bars" aria-hidden="true">
-              <i />
-              <i />
-              <i />
-              <i />
-            </span>
+            <FrameRateSignal fps={fps} qualityTier={qualityTier} />
           </div>
           {subsystem ? (
             <div className="telemetry-detail host-system-detail subsystem-switch-detail">
@@ -659,7 +655,6 @@ export const PlanetExperience = ({
       </main>
 
       <MissionControl
-        fps={fps}
         hints={[
           { key: "WASD", meaning: "MOVE" },
           { key: "DRAG", meaning: viewMode === "surface" ? "LOOK" : "ORBIT" },
@@ -675,7 +670,6 @@ export const PlanetExperience = ({
         ]}
         onHideChrome={onHideChrome}
         onOpenDiscover={onOpenDiscover}
-        qualityTier={qualityTier}
         sceneFailed={sceneState === "error"}
         xr={{ host, status: xrStatus }}
       />
