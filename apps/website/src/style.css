@@ -2473,7 +2473,7 @@ h1 em {
 }
 
 /*
- * MISSION CONTROL — one deck at the bottom centre, and the line of copy standing over it.
+ * MISSION CONTROL — one compact navigation deck at the top right.
  *
  * Discover, the gesture legend, the frame-rate readout, the clear-view switch and the immersive
  * entry each used to hold a corner of their own. Four corners means four places to look and four
@@ -2481,19 +2481,17 @@ h1 em {
  * border, blur, shadow — and what sits inside it is now only what can be pressed: three controls,
  * flat until hovered, reading as one instrument rather than three adjacent cards.
  *
- * The legend and the renderer's alert are not pressable and no longer look it. They stand on
- * their own line above the deck, over the world rather than on a surface, so the tray holds
- * controls and the copy above it holds copy.
+ * The legend and the renderer's alert are not pressable and no longer look it. They remain copy
+ * rather than cells in the navigation surface, while the controls sit beside the identity mark
+ * like the opposite end of a conventional top bar.
  */
 .mission-control {
-  right: 0;
-  bottom: 20px;
-  left: 0;
+  top: 22px;
+  right: 24px;
   display: flex;
   flex-direction: column;
-  align-items: center;
+  align-items: flex-end;
   gap: 10px;
-  padding-inline: 16px;
 }
 
 .control-deck {
@@ -5834,8 +5832,8 @@ h1 em {
   }
 
   .mission-control {
-    bottom: 14px;
-    padding-inline: 12px;
+    top: 16px;
+    right: 16px;
   }
 
   /* The line a narrow screen can most afford to lose: every gesture it names belongs to a
