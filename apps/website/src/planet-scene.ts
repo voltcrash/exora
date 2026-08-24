@@ -30,6 +30,7 @@ import type {
 import { type RenderQualityProfile, shaderDefines } from "./render-quality.ts";
 import { buildCraterField, sampleTerrainHeight } from "./planet-terrain.ts";
 import { type SurfaceGeology, cloudDeckGeology, deriveSurfaceGeology } from "./surface-geology.ts";
+import { type SurfaceMotes, createSurfaceMotes } from "./surface-motes.ts";
 import { createSurfaceScatter } from "./surface-scatter.ts";
 import { type SurfaceVista, createSurfaceVista } from "./surface-vista.ts";
 import type { MountedWorld, SceneHost, WorldConsole } from "./scene-host.ts";
@@ -2070,6 +2071,7 @@ const createSurfaceEnvironment = (
   /** World-space ground height under any point a visitor can reach. */
   groundHeightAt: (x: number, z: number) => number;
   meshes: AbstractMesh[];
+  motes: SurfaceMotes | null;
   root: TransformNode;
   sky: ShaderMaterial;
   skyAnchor: TransformNode;
@@ -2088,6 +2090,7 @@ const createSurfaceEnvironment = (
   const random = createSeededRandom(recipe.seed ^ 0x9e3779b9);
   const surfaceSky = createSurfaceSky(scene, skyAnchor, recipe, geology, profile);
   meshes.push(surfaceSky.mesh);
+  let motes: SurfaceMotes | null = null;
 
   // Rocky worlds get real ground: measured or inferred geology, landform provinces, baked sun
   // shadowing and triplanar material. A giant has no ground at all, so it gets the top of its own
@@ -2129,6 +2132,17 @@ const createSurfaceEnvironment = (
       vista,
     });
     if (scatter) meshes.push(scatter);
+
+    // Whatever this world holds up in its air, between the eye and everything else.
+    motes = createSurfaceMotes(scene, {
+      geology,
+      parent: skyAnchor,
+      profile,
+      skyHorizonColor: surfaceSky.horizonColor,
+      sunColor: toColor3(recipe.star.color),
+      sunDirection: SURFACE_STAR_DIRECTION,
+    });
+    if (motes) meshes.push(motes.mesh);
   }
 
   const cloudLayers: Mesh[] = [];
@@ -2216,6 +2230,7 @@ const createSurfaceEnvironment = (
     cloudLayers,
     groundHeightAt: vista ? vista.heightAt : () => SURFACE_GROUND_BASE_Y,
     meshes,
+    motes,
     root,
     sky: surfaceSky.material,
     skyAnchor,
@@ -2595,6 +2610,7 @@ export const createPlanetWorld = (
     // The sky rides the viewer: the dome keeps its horizon level with the eye that is under it,
     // and the star holds one direction and one angular size however far a visitor walks.
     surfaceEnvironment.vista?.update(elapsedSeconds, activePosition);
+    surfaceEnvironment.motes?.update(elapsedSeconds, activePosition);
     surfaceEnvironment.skyAnchor.position.copyFrom(activePosition);
     surfaceEnvironment.star.update(elapsedSeconds, activePosition);
     starfield.update(elapsedSeconds, activePosition);
