@@ -248,7 +248,7 @@ export const CALLISTO = moon({
 });
 
 export const MIMAS = moon({
-  credit: "NASA Cassini / JPL-Caltech / SSI",
+  credit: "NASA Cassini ISS / DLR / JPL-Caltech",
   discoveryYear: 1789,
   equilibriumTemperatureKelvin: 64,
   gmKm3PerSecond2: 2.50349,
@@ -265,6 +265,7 @@ export const MIMAS = moon({
   sourceSlug: "saturn-mimas",
   summary:
     "A cratered ice moon dominated by the enormous Herschel basin, with evidence for a surprisingly young hidden ocean.",
+  textureSourceUrl: "https://science.nasa.gov/resource/mimas-global-map-june-2017/",
 });
 
 export const ENCELADUS = moon({

@@ -55,7 +55,7 @@ quantisation.
 
 | Body    | Shipped file                        | Source data / preparation                                       | Source page                                                                    |
 | ------- | ----------------------------------- | --------------------------------------------------------------- | ------------------------------------------------------------------------------ |
-| Mercury | `textures/solar-system/mercury.jpg` | MESSENGER MDIS global mosaic / USGS Astrogeology                | `astrogeology.usgs.gov/search/map/mercury_messenger_mdis_global_mosaic_250m`   |
+| Mercury | `textures/solar-system/mercury.jpg` | MESSENGER MDIS 250 m global mosaic / USGS Astrogeology          | `astrogeology.usgs.gov/search/map/mercury_messenger_mdis_global_mosaic_250m`   |
 | Venus   | `textures/solar-system/venus.jpg`   | Magellan radar / NASA JPL-Caltech                               | `science.nasa.gov/3d-resources/venus/`                                         |
 | Earth   | `textures/solar-system/earth.jpg`   | MODIS Blue Marble / NASA Goddard                                | `visibleearth.nasa.gov/images/57723/the-blue-marble`                           |
 | Mars    | `textures/solar-system/mars.jpg`    | Viking imagery / USGS / NASA JPL-Caltech                        | `science.nasa.gov/3d-resources/mars/`                                          |
@@ -81,7 +81,8 @@ absent data rather than as terrain.
 | Mars    | `phobos.jpg`, `deimos.jpg`                                             | Viking mission maps / NASA JPL-Caltech                                | `science.nasa.gov/3d-resources/`                                             |
 | Jupiter | `io.jpg`, `europa.jpg`, `ganymede.jpg`, `callisto.jpg`                 | Galileo SSI and Voyager controlled mosaics / USGS Astrogeology        | `astrogeology.usgs.gov/search/map/` (per-body slugs below)                   |
 | Saturn  | `enceladus.jpg`, `tethys.jpg`, `dione.jpg`, `rhea.jpg`                 | Cassini ISS (Voyager gap fill) controlled mosaics / USGS Astrogeology | `astrogeology.usgs.gov/search/map/` (per-body slugs below)                   |
-| Saturn  | `mimas.jpg`, `titan.jpg`, `iapetus.jpg`                                | Cassini mission mosaics / NASA JPL-Caltech SSI                        | `science.nasa.gov/3d-resources/`                                             |
+| Saturn  | `mimas.jpg`                                                            | Cassini ISS semi-controlled basemap / DLR                             | `science.nasa.gov/resource/mimas-global-map-june-2017/`                      |
+| Saturn  | `titan.jpg`, `iapetus.jpg`                                             | Cassini mission mosaics / NASA JPL-Caltech SSI                        | `science.nasa.gov/3d-resources/`                                             |
 | Uranus  | `miranda.jpg`, `ariel.jpg`, `umbriel.jpg`, `titania.jpg`, `oberon.jpg` | Voyager 2 mission mosaics / NASA JPL-Caltech                          | `science.nasa.gov/3d-resources/`                                             |
 | Neptune | `triton.jpg`                                                           | Voyager 2 global color mosaic / USGS Astrogeology                     | `astrogeology.usgs.gov/search/map/triton_voyager_2_global_color_mosaic_600m` |
 | Pluto   | `charon.jpg`                                                           | New Horizons mission mosaic / NASA JHUAPL SwRI                        | `science.nasa.gov/3d-resources/`                                             |
@@ -103,6 +104,17 @@ credit line in `solar-moons.ts` does.
 | `rhea.jpg`      | `rhea_cassini_voyager_global_mosaic_417m`                | `Rhea_Cassini_Voyager_mosaic_global_417m.tif`            | 4096 × 2048  |
 | `triton.jpg`    | `triton_voyager_2_global_color_mosaic_600m`              | `Triton_Voyager2_ClrMosaic_GlobalFill_600m.tif`          | 4096 × 2048  |
 
+Mimas is the one moon in that group with no Astropedia entry of its own. Its map is the DLR
+semi-controlled Cassini ISS basemap `MI_170630_DLR_basemap.tif` (5760 x 2880) from
+`mosaic/Mimas/Cassini_DLR_Mimas.zip` in the same PDS Annex, produced by Roatsch et al. and
+released by NASA/JPL-Caltech as the June 2017 Mimas global map. It replaces a 3D Resources file
+whose northern hemisphere and equatorial band were blank.
+
+Mercury's map is the monochrome MESSENGER MDIS 250 m global mosaic
+(`Mercury_MESSENGER_mosaic_global_250m_2013.tif`, 61324 x 30662) from the same PDS Annex,
+resampled to 4096 x 2048. The MDIS enhanced-colour mosaic was rejected: its colour is stretched
+to separate surface units, not to reproduce what an observer would see.
+
 Jupiter's map is Cassini's 2000 flyby cylindrical mosaic, retrieved as the full-resolution
 Photojournal TIFF for PIA07782 and resampled to its native 3600 × 1800. Its unimaged polar bands
 are left at the neutral value the published product carries.
@@ -115,7 +127,8 @@ shader instead of inventing surface geography. Saturn and Neptune keep their JPL
 Simulator maps: no higher-resolution global cylindrical map of either planet is published, and the
 Hubble OPAL global maps that do exist carry ring-shadow gaps that would render as holes.
 
-Three moons deliberately keep their lower-resolution NASA 3D Resources map. Iapetus's USGS mosaic
+Two moons and one dwarf-planet satellite deliberately keep their lower-resolution NASA 3D Resources
+map. Iapetus's USGS mosaic
 is photometrically normalised, which removes the leading/trailing albedo dichotomy that is the
 body's defining feature; Titan's Cassini ISS mosaic images the surface through the 938 nm methane
 window rather than the orange haze an observer would see; Charon's USGS mosaic leaves the entire
