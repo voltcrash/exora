@@ -3,6 +3,7 @@ import type {
   ExoplanetProfile,
   PlanetResponse,
   PlanetSearchResponse,
+  MissionTrajectoryResponse,
   SmallBodyLookup,
   SmallBodyParameter,
   SmallBodySearchResponse,
@@ -33,6 +34,7 @@ const OBJECT_LOOKUP_TIMEOUT_MS = 8_000;
 const PLANET_COLLECTION_TIMEOUT_MS = 8_000;
 const STAR_COLLECTION_TIMEOUT_MS = 10_000;
 const EPHEMERIS_TIMEOUT_MS = 20_000;
+const MISSION_TRAJECTORY_TIMEOUT_MS = 20_000;
 const SMALL_BODY_TIMEOUT_MS = 15_000;
 
 interface CollectionOptions {
@@ -213,6 +215,33 @@ const isEphemerisResponse = (value: unknown): value is EphemerisResponse => {
   );
 };
 
+const isMissionTrajectoryResponse = (value: unknown): value is MissionTrajectoryResponse => {
+  if (!value || typeof value !== "object") return false;
+  const candidate = value as Partial<MissionTrajectoryResponse>;
+  return Boolean(
+    Array.isArray(candidate.data) &&
+    candidate.data.length >= 2 &&
+    candidate.data.length <= 400 &&
+    candidate.data.every(
+      (point) =>
+        typeof point.calendarTdb === "string" &&
+        point.calendarTdb.includes("TDB") &&
+        Number.isFinite(point.julianDateTdb) &&
+        isFiniteVector(point.positionAu) &&
+        isFiniteVector(point.velocityAuPerDay),
+    ) &&
+    candidate.meta?.source === "NASA/JPL Horizons API" &&
+    candidate.meta.center === "Sun (10)" &&
+    candidate.meta.coordinateFrame === "Ecliptic J2000" &&
+    typeof candidate.meta.spkId === "string" &&
+    typeof candidate.meta.targetName === "string" &&
+    typeof candidate.meta.solution === "string" &&
+    Number.isInteger(candidate.meta.stepDays) &&
+    typeof candidate.meta.cached === "boolean" &&
+    typeof candidate.meta.stale === "boolean",
+  );
+};
+
 const isSmallBodyParameter = (value: unknown): value is SmallBodyParameter => {
   if (!value || typeof value !== "object") return false;
   const candidate = value as Partial<SmallBodyParameter>;
@@ -315,6 +344,30 @@ export const loadSolarEphemeris = async (
     )
   ) {
     throw new Error("JPL ephemeris returned a different target set or epoch.");
+  }
+  return response;
+};
+
+export const loadMissionTrajectory = async (
+  spkId: string,
+  range: { start: string; stepDays: number; stop: string },
+  options: CollectionOptions = {},
+): Promise<MissionTrajectoryResponse> => {
+  const parameters = new URLSearchParams({
+    spk: spkId,
+    start: range.start,
+    step: String(range.stepDays),
+    stop: range.stop,
+  });
+  const response = await requestCollection(
+    `/api/mission-trajectories?${parameters.toString()}`,
+    options,
+    MISSION_TRAJECTORY_TIMEOUT_MS,
+    "JPL mission trajectory",
+    isMissionTrajectoryResponse,
+  );
+  if (response.meta.spkId !== spkId || response.meta.stepDays !== range.stepDays) {
+    throw new Error("JPL mission trajectory returned a different target or sample interval.");
   }
   return response;
 };

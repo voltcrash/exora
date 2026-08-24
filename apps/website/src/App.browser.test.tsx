@@ -134,6 +134,13 @@ vi.mock("./solar-region-scene.ts", () => ({
   },
 }));
 
+vi.mock("./mission-scene.ts", () => ({
+  createMissionWorld: (_host: unknown, options: { onFirstFrame: () => void }) => {
+    options.onFirstFrame();
+    return { ...mountedWorld(), setLayerVisible: () => undefined };
+  },
+}));
+
 /**
  * The one scene stub that keeps a piece of the real thing.
  *
@@ -232,6 +239,40 @@ const stubArchive = ({ missing = [] as string[] } = {}) => {
           source: "NASA/JPL Horizons API",
           sourceVersion: "1.2",
           stale: false,
+        },
+      });
+    }
+
+    if (url.pathname === "/api/mission-trajectories") {
+      const spkId = url.searchParams.get("spk") ?? "-31";
+      const stepDays = Number(url.searchParams.get("step") ?? "60");
+      return Response.json({
+        data: [
+          {
+            calendarTdb: "A.D. 1977-Sep-06 00:00:00.0000 TDB",
+            julianDateTdb: 2_443_392.5,
+            positionAu: { x: 1, y: 0, z: 0 },
+            velocityAuPerDay: { x: 0, y: 0.02, z: 0 },
+          },
+          {
+            calendarTdb: "A.D. 2035-Jan-01 00:00:00.0000 TDB",
+            julianDateTdb: 2_464_327.5,
+            positionAu: { x: 190, y: 30, z: 4 },
+            velocityAuPerDay: { x: 0.01, y: 0, z: 0 },
+          },
+        ],
+        meta: {
+          cached: true,
+          center: "Sun (10)",
+          coordinateFrame: "Ecliptic J2000",
+          retrievedAt: "2026-08-24T12:00:00.000Z",
+          solution: "Voyager_1_ST+refit2022_m",
+          source: "NASA/JPL Horizons API",
+          sourceVersion: "1.2",
+          spkId,
+          stale: false,
+          stepDays,
+          targetName: "Voyager 1",
         },
       });
     }
@@ -432,6 +473,22 @@ test("a deep link to a named star resolves to that star", async () => {
   await expect.element(page.getByRole("heading", { level: 1 })).toHaveTextContent("Sirius");
 });
 
+test("a mission deep link keeps its optional trajectory hidden until requested", async () => {
+  stubArchive();
+  mountApp("?mission=Voyager%201");
+
+  await expect.element(page.getByRole("heading", { level: 1 })).toHaveTextContent("Voyager 1");
+  const toggle = page.getByRole("button", { name: "SHOW MISSION LAYER" });
+  await expect.element(toggle).toHaveAttribute("aria-pressed", "false");
+  await userEvent.click(toggle);
+  await expect
+    .element(page.getByRole("button", { name: "HIDE MISSION LAYER" }))
+    .toHaveAttribute("aria-pressed", "true");
+  expect(document.querySelector('link[rel="canonical"]')?.getAttribute("href")).toContain(
+    "?mission=Voyager%201",
+  );
+});
+
 test("a deep link to a system resolves to the diorama, and says what it compressed", async () => {
   stubArchive();
   mountApp("?system=Kepler-90");
@@ -555,6 +612,27 @@ test("the Home System catalog filters mission asteroids and opens measured geome
     .element(page.getByLabelText("Permanent identifiers"))
     .toHaveTextContent("SPK 20101955");
   expect(window.location.search).toBe("?asteroid=101955%20Bennu");
+});
+
+test("the Home System mission filter opens measured sites as an optional layer", async () => {
+  stubArchive();
+  mountApp();
+
+  await userEvent.click(page.getByRole("button", { name: "Open our Solar System" }));
+  await userEvent.click(page.getByRole("button", { exact: true, name: "MISSIONS" }));
+  await userEvent.fill(page.getByPlaceholder("Name, designation, or SPK ID"), "Apollo");
+  const apollo = page.getByRole("button", { name: /Apollo landing sites/ });
+  await expect.element(apollo).toBeVisible();
+  await userEvent.click(apollo);
+
+  await expect.element(page.getByRole("heading", { level: 1 })).toHaveTextContent("Apollo");
+  const toggle = page.getByRole("button", { name: "SHOW MISSION LAYER" });
+  await expect.element(toggle).toHaveAttribute("aria-pressed", "false");
+  await userEvent.click(toggle);
+  await expect
+    .element(page.getByRole("button", { name: "HIDE MISSION LAYER" }))
+    .toHaveAttribute("aria-pressed", "true");
+  expect(window.location.search).toBe("?mission=Apollo%20landing%20sites");
 });
 
 test("the Home System catalog searches JPL SBDB without inventing missing physical data", async () => {

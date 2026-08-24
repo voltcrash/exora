@@ -21,6 +21,7 @@ test("a catalogued destination is canonical to its own URL", () => {
     `${SITE_ORIGIN}/?comet=67P%2FChuryumov%E2%80%93Gerasimenko`,
   );
   expect(canonicalUrlForSearch("?region=Oort%20Cloud")).toBe(`${SITE_ORIGIN}/?region=Oort%20Cloud`);
+  expect(canonicalUrlForSearch("?mission=Voyager%201")).toBe(`${SITE_ORIGIN}/?mission=Voyager%201`);
 });
 
 test("names with characters that need escaping survive the round trip", () => {

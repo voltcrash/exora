@@ -5,6 +5,7 @@ import { NasaArchiveError, type PlanetRepository } from "../src/nasa-archive.ts"
 import { createRateLimiter } from "../src/rate-limit.ts";
 import { SbdbError, type SbdbRepository } from "../src/sbdb.ts";
 import type { HorizonsRepository } from "../src/horizons.ts";
+import type { MissionTrajectoryRepository } from "../src/mission-trajectories.ts";
 import { SimbadArchiveError, type StarRepository } from "../src/simbad-archive.ts";
 
 const planet: ExoplanetProfile = {
@@ -101,6 +102,30 @@ const ephemerisRepository: HorizonsRepository = {
         solution: "DE441",
         spkId: "399",
         velocityAuPerDay: { x: 0, y: 0.0172, z: 0 },
+      },
+    ],
+  }),
+};
+
+const missionTrajectoryRepository: MissionTrajectoryRepository = {
+  trajectory: async (spkId, _start, _stop, _stepDays) => ({
+    cached: true,
+    retrievedAt: "2026-08-24T12:00:00.000Z",
+    solution: "Voyager_1_ST+refit2022_m",
+    stale: false,
+    target: { command: spkId, name: "Voyager 1", spkId },
+    value: [
+      {
+        calendarTdb: "A.D. 1977-Sep-06 00:00:00.0000 TDB",
+        julianDateTdb: 2_443_392.5,
+        positionAu: { x: 1, y: 0, z: 0 },
+        velocityAuPerDay: { x: 0, y: 0.02, z: 0 },
+      },
+      {
+        calendarTdb: "A.D. 1978-Sep-06 00:00:00.0000 TDB",
+        julianDateTdb: 2_443_757.5,
+        positionAu: { x: 3, y: 2, z: 0.1 },
+        velocityAuPerDay: { x: 0.01, y: 0.01, z: 0 },
       },
     ],
   }),
@@ -206,6 +231,46 @@ test("applies a smaller request budget to the upstream-expensive ephemeris route
   expect(first.status).toBe(200);
   expect(refused.status).toBe(429);
   expect(refused.headers.get("Retry-After")).toBeTruthy();
+});
+
+test("returns a bounded mission trajectory through the backend", async () => {
+  const response = await createApp({ missionTrajectoryRepository, repository }).request(
+    "/api/mission-trajectories?spk=-31&start=1977-09-06&stop=1978-09-06&step=365",
+  );
+
+  expect(response.status).toBe(200);
+  expect(response.headers.get("Cache-Control")).toContain("stale-while-revalidate");
+  expect(await response.json()).toMatchObject({
+    data: [{ calendarTdb: expect.stringContaining("TDB") }, { julianDateTdb: 2_443_757.5 }],
+    meta: {
+      cached: true,
+      center: "Sun (10)",
+      coordinateFrame: "Ecliptic J2000",
+      solution: "Voyager_1_ST+refit2022_m",
+      source: "NASA/JPL Horizons API",
+      sourceVersion: "1.2",
+      spkId: "-31",
+      stale: false,
+      stepDays: 365,
+      targetName: "Voyager 1",
+    },
+  });
+});
+
+test("rejects unsupported or unbounded mission trajectories before repository access", async () => {
+  const trajectory = vi.spyOn(missionTrajectoryRepository, "trajectory");
+  const app = createApp({ missionTrajectoryRepository, repository });
+  const unsupported = await app.request(
+    "/api/mission-trajectories?spk=-999&start=2000-01-01&stop=2001-01-01&step=30",
+  );
+  const tooMany = await app.request(
+    "/api/mission-trajectories?spk=-31&start=1977-09-06&stop=2026-01-01&step=1",
+  );
+
+  expect(unsupported.status).toBe(400);
+  expect(tooMany.status).toBe(400);
+  expect(trajectory).not.toHaveBeenCalled();
+  trajectory.mockRestore();
 });
 
 test("returns normalized JPL small-body data through the backend", async () => {

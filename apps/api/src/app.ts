@@ -2,6 +2,7 @@ import type {
   ApiErrorResponse,
   EphemerisResponse,
   ExoplanetProfile,
+  MissionTrajectoryResponse,
   PlanetResponse,
   PlanetSearchResponse,
   SmallBodyLookup,
@@ -20,6 +21,11 @@ import {
   type HorizonsRepository,
   JplHorizonsRepository,
 } from "./horizons.ts";
+import {
+  JplMissionTrajectoryRepository,
+  MISSION_TRAJECTORY_TARGETS,
+  type MissionTrajectoryRepository,
+} from "./mission-trajectories.ts";
 import {
   NasaArchiveError,
   NasaPlanetRepository,
@@ -52,6 +58,8 @@ import {
 interface CreateAppOptions {
   horizonsRateLimiter?: RateLimiter;
   horizonsRepository?: HorizonsRepository;
+  missionRateLimiter?: RateLimiter;
+  missionTrajectoryRepository?: MissionTrajectoryRepository;
   /** Overridable so a test can exercise the limit without issuing a hundred requests. */
   rateLimiter?: RateLimiter;
   repository?: PlanetRepository;
@@ -128,6 +136,8 @@ const starCollection = (
 export const createApp = ({
   horizonsRateLimiter = createRateLimiter({ limit: 8, windowMs: 60_000 }),
   horizonsRepository = new JplHorizonsRepository(),
+  missionRateLimiter = createRateLimiter({ limit: 8, windowMs: 60_000 }),
+  missionTrajectoryRepository = new JplMissionTrajectoryRepository(),
   rateLimiter = createRateLimiter(DEFAULT_RATE_LIMIT),
   repository = new NasaPlanetRepository(),
   sbdbRateLimiter = createRateLimiter({ limit: 20, windowMs: 60_000 }),
@@ -238,6 +248,76 @@ export const createApp = ({
         source: HORIZONS_SOURCE,
         sourceVersion: HORIZONS_API_VERSION,
         stale: result.stale,
+      },
+    });
+  });
+
+  app.get("/api/mission-trajectories", async (context) => {
+    const decision = missionRateLimiter.check(
+      clientKey({
+        forwardedFor: context.req.header("x-forwarded-for"),
+        realIp: context.req.header("x-real-ip"),
+      }),
+      Date.now(),
+    );
+    context.header("Mission-RateLimit-Limit", String(decision.limit));
+    context.header("Mission-RateLimit-Remaining", String(decision.remaining));
+    if (!decision.allowed) {
+      context.header("Retry-After", String(decision.retryAfterSeconds));
+      return context.json(
+        apiError("RATE_LIMITED", "Too many mission requests. Please wait before trying again."),
+        429,
+      );
+    }
+
+    const spkId = context.req.query("spk")?.trim() ?? "";
+    const start = context.req.query("start")?.trim() ?? "";
+    const stop = context.req.query("stop")?.trim() ?? "";
+    const stepDays = Number.parseInt(context.req.query("step")?.trim() ?? "", 10);
+    const datePattern = /^\d{4}-\d{2}-\d{2}$/;
+    const startDate = new Date(`${start}T00:00:00Z`);
+    const stopDate = new Date(`${stop}T00:00:00Z`);
+    const durationDays = (stopDate.getTime() - startDate.getTime()) / 86_400_000;
+    const supported = new Set<string>(MISSION_TRAJECTORY_TARGETS.map((target) => target.spkId));
+    if (
+      !supported.has(spkId) ||
+      !datePattern.test(start) ||
+      !datePattern.test(stop) ||
+      !Number.isFinite(startDate.getTime()) ||
+      !Number.isFinite(stopDate.getTime()) ||
+      start < "1970-01-01" ||
+      stop > "2036-01-01" ||
+      !Number.isInteger(stepDays) ||
+      stepDays < 1 ||
+      stepDays > 365 ||
+      durationDays <= 0 ||
+      Math.ceil(durationDays / stepDays) + 1 > 400
+    ) {
+      return context.json(
+        apiError(
+          "INVALID_REQUEST",
+          "Mission trajectory requires an allowlisted SPK ID, valid 1970–2036 dates, and 2–400 samples.",
+        ),
+        400,
+      );
+    }
+
+    const result = await missionTrajectoryRepository.trajectory(spkId, start, stop, stepDays);
+    context.header("Cache-Control", "public, max-age=86400, stale-while-revalidate=2592000");
+    return context.json<MissionTrajectoryResponse>({
+      data: result.value,
+      meta: {
+        cached: result.cached,
+        center: "Sun (10)",
+        coordinateFrame: "Ecliptic J2000",
+        retrievedAt: result.retrievedAt,
+        solution: result.solution,
+        source: HORIZONS_SOURCE,
+        sourceVersion: HORIZONS_API_VERSION,
+        spkId: result.target.spkId,
+        stale: result.stale,
+        stepDays,
+        targetName: result.target.name,
       },
     });
   });

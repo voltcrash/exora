@@ -3,6 +3,7 @@ import {
   discoverRandomPlanet,
   discoverRandomStar,
   loadFeaturedPlanet,
+  loadMissionTrajectory,
   loadPlanetFilterPool,
   loadPlanetByName,
   loadPlanetsByHost,
@@ -153,6 +154,54 @@ test("rejects a malformed Horizons contract instead of drawing unvalidated posit
         }),
     }),
   ).rejects.toThrow("invalid response");
+});
+
+test("loads a validated mission path only through Exora's API", async () => {
+  const result = await loadMissionTrajectory(
+    "-31",
+    { start: "1977-09-06", stepDays: 365, stop: "1978-09-06" },
+    {
+      fetcher: async (input) => {
+        const path =
+          typeof input === "string" ? input : input instanceof URL ? input.href : input.url;
+        expect(path).toContain("/api/mission-trajectories?");
+        expect(path).toContain("spk=-31");
+        expect(path).not.toContain("ssd.jpl.nasa.gov");
+        return Response.json({
+          data: [
+            {
+              calendarTdb: "A.D. 1977-Sep-06 00:00:00.0000 TDB",
+              julianDateTdb: 2_443_392.5,
+              positionAu: { x: 1, y: 0, z: 0 },
+              velocityAuPerDay: { x: 0, y: 0.02, z: 0 },
+            },
+            {
+              calendarTdb: "A.D. 1978-Sep-06 00:00:00.0000 TDB",
+              julianDateTdb: 2_443_757.5,
+              positionAu: { x: 3, y: 2, z: 0.1 },
+              velocityAuPerDay: { x: 0.01, y: 0.01, z: 0 },
+            },
+          ],
+          meta: {
+            cached: true,
+            center: "Sun (10)",
+            coordinateFrame: "Ecliptic J2000",
+            retrievedAt: "2026-08-24T12:00:00.000Z",
+            solution: "Voyager_1_ST+refit2022_m",
+            source: "NASA/JPL Horizons API",
+            sourceVersion: "1.2",
+            spkId: "-31",
+            stale: false,
+            stepDays: 365,
+            targetName: "Voyager 1",
+          },
+        });
+      },
+    },
+  );
+
+  expect(result.data[0]?.julianDateTdb).toBe(2_443_392.5);
+  expect(result.meta.spkId).toBe("-31");
 });
 
 const sbdbPayload = {

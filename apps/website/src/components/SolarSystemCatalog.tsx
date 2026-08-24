@@ -13,6 +13,8 @@ import type { CometProfile } from "../solar-comets.ts";
 import { SOLAR_SYSTEM_COMETS } from "../solar-comets.ts";
 import type { SolarRegionProfile } from "../solar-regions.ts";
 import { SOLAR_SYSTEM_REGIONS } from "../solar-regions.ts";
+import type { SolarMissionProfile } from "../solar-missions.ts";
+import { SOLAR_SYSTEM_MISSIONS } from "../solar-missions.ts";
 import {
   SOLAR_SYSTEM_CATALOG_GROUPS,
   SOLAR_SYSTEM_DWARF_MOONS,
@@ -23,6 +25,7 @@ interface SolarSystemCatalogProps {
   onClose: () => void;
   onSelectAsteroid: (asteroid: AsteroidProfile) => void;
   onSelectComet: (comet: CometProfile) => void;
+  onSelectMission: (mission: SolarMissionProfile) => void;
   onSelectPlanet: (planet: ExoplanetProfile, cached: boolean) => void;
   onSelectRegion: (region: SolarRegionProfile) => void;
   onSelectStar: (star: StarProfile, cached: boolean) => void;
@@ -35,6 +38,7 @@ export const SolarSystemCatalog = ({
   onClose,
   onSelectAsteroid,
   onSelectComet,
+  onSelectMission,
   onSelectPlanet,
   onSelectRegion,
   onSelectStar,
@@ -42,7 +46,7 @@ export const SolarSystemCatalog = ({
   const dialogRef = useRef<HTMLDialogElement>(null);
   const sbdbAbort = useRef<AbortController | null>(null);
   const [filter, setFilter] = useState<
-    "all" | "asteroids" | "comets" | "dwarfs" | "moons" | "planets" | "regions"
+    "all" | "asteroids" | "comets" | "dwarfs" | "missions" | "moons" | "planets" | "regions"
   >("all");
   const [query, setQuery] = useState("");
   const [sbdbRequest, setSbdbRequest] = useState<"error" | "idle" | "loading">("idle");
@@ -103,6 +107,20 @@ export const SolarSystemCatalog = ({
             region.sources.some((source) =>
               source.datasetId.toLocaleLowerCase().includes(normalizedQuery),
             )),
+      ),
+    [filter, normalizedQuery],
+  );
+
+  const visibleMissions = useMemo(
+    () =>
+      SOLAR_SYSTEM_MISSIONS.filter(
+        (mission) =>
+          (filter === "all" || filter === "missions") &&
+          (normalizedQuery.length === 0 ||
+            mission.name.toLocaleLowerCase().includes(normalizedQuery) ||
+            mission.aliases.some((alias) => alias.toLocaleLowerCase().includes(normalizedQuery)) ||
+            mission.agency.toLocaleLowerCase().includes(normalizedQuery) ||
+            (mission.kind === "trajectory" && mission.spkId.includes(normalizedQuery))),
       ),
     [filter, normalizedQuery],
   );
@@ -198,18 +216,27 @@ export const SolarSystemCatalog = ({
             </span>
           </label>
           <div className="solar-catalog-filters" aria-label="Filter Solar System catalog">
-            {(["all", "planets", "dwarfs", "moons", "asteroids", "comets", "regions"] as const).map(
-              (option) => (
-                <button
-                  className={filter === option ? "active" : ""}
-                  key={option}
-                  type="button"
-                  onClick={() => setFilter(option)}
-                >
-                  {option.toUpperCase()}
-                </button>
-              ),
-            )}
+            {(
+              [
+                "all",
+                "planets",
+                "dwarfs",
+                "moons",
+                "asteroids",
+                "comets",
+                "regions",
+                "missions",
+              ] as const
+            ).map((option) => (
+              <button
+                className={filter === option ? "active" : ""}
+                key={option}
+                type="button"
+                onClick={() => setFilter(option)}
+              >
+                {option.toUpperCase()}
+              </button>
+            ))}
           </div>
         </form>
         {sbdbRequest === "error" ? (
@@ -518,10 +545,48 @@ export const SolarSystemCatalog = ({
             </ol>
           </section>
         ) : null}
+        {visibleMissions.length > 0 ? (
+          <section className="solar-catalog-section" key="solar-system-missions">
+            <h3>Missions · optional trajectories and exploration sites</h3>
+            <ol className="solar-body-grid mission-catalog-grid">
+              {visibleMissions.map((mission) => (
+                <li key={mission.id}>
+                  <button type="button" onClick={() => onSelectMission(mission)}>
+                    <span className="solar-body-portrait mission-portrait" aria-hidden="true">
+                      {mission.kind === "trajectory" ? "⌁" : "⌖"}
+                    </span>
+                    <span className="solar-body-copy">
+                      <small>
+                        {mission.kind === "trajectory" ? "SPACECRAFT TRAJECTORY" : "SURFACE SITES"}{" "}
+                        · {mission.parent}
+                      </small>
+                      <strong>{mission.name}</strong>
+                      <span>{mission.summary}</span>
+                      <em className="science-status science-status-mapped">
+                        {mission.kind === "trajectory"
+                          ? "JPL HORIZONS / SPICE · OPTIONAL LAYER"
+                          : "MEASURED COORDINATES · OPTIONAL LAYER"}
+                      </em>
+                    </span>
+                    <span className="solar-body-meta">
+                      <small>
+                        {mission.kind === "trajectory"
+                          ? `SPK ${mission.spkId}`
+                          : `ANCHOR NAIF ${mission.anchorNaifId}`}
+                      </small>
+                      <strong>TRACE ↗</strong>
+                    </span>
+                  </button>
+                </li>
+              ))}
+            </ol>
+          </section>
+        ) : null}
         {visibleGroups.length === 0 &&
         visibleAsteroids.length === 0 &&
         visibleComets.length === 0 &&
-        visibleRegions.length === 0 ? (
+        visibleRegions.length === 0 &&
+        visibleMissions.length === 0 ? (
           <p className="solar-catalog-empty" role="status">
             NO HOME-SYSTEM OBJECTS MATCH THIS FILTER
           </p>

@@ -241,6 +241,34 @@ export interface EphemerisResponse {
   };
 }
 
+export interface MissionTrajectoryPoint {
+  /** Calendar timestamp normalized with an explicit TDB time-scale suffix. */
+  calendarTdb: string;
+  /** Julian Date in the TDB time scale. */
+  julianDateTdb: number;
+  /** Heliocentric ecliptic-J2000 geometric position, in astronomical units. */
+  positionAu: { x: number; y: number; z: number };
+  /** Heliocentric ecliptic-J2000 geometric velocity, in astronomical units per day. */
+  velocityAuPerDay: { x: number; y: number; z: number };
+}
+
+export interface MissionTrajectoryResponse {
+  data: MissionTrajectoryPoint[];
+  meta: {
+    cached: boolean;
+    center: "Sun (10)";
+    coordinateFrame: "Ecliptic J2000";
+    retrievedAt: string;
+    solution: string;
+    source: "NASA/JPL Horizons API";
+    sourceVersion: string;
+    spkId: string;
+    stale: boolean;
+    stepDays: number;
+    targetName: string;
+  };
+}
+
 export type SmallBodyKind = "asteroid" | "comet";
 export type SmallBodyLookup = "auto" | "designation" | "spk";
 

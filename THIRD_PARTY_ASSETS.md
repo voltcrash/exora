@@ -1,5 +1,33 @@
 # Third-Party Asset Provenance
 
+## Solar System mission layers
+
+Retrieved 2026-08-24. Exora ships no spacecraft models or mission imagery for these views. The
+twelve spacecraft paths are requested server-side from NASA/JPL Horizons API 1.2 using the
+spacecraft's permanent NAIF/SPK code, the Sun (`500@10`) as center, geometric ecliptic-J2000
+vectors, TDB sample times, and AU/day units. The allowlist is Pioneer 10 (`-23`), Pioneer 11
+(`-24`), Voyager 1 (`-31`), Voyager 2 (`-32`), Juno (`-61`), OSIRIS-REx (`-64`), Galileo
+Orbiter (`-77`), Cassini (`-82`), Parker Solar Probe (`-96`), New Horizons (`-98`), Dawn
+(`-203`), and Rosetta (`-226`). Source: https://ssd.jpl.nasa.gov/horizons/; permanent ID source:
+https://naif.jpl.nasa.gov/pub/naif/toolkit_docs/C/req/naif_ids.html.
+
+The browser receives at most 400 validated path samples through Exora's API and never calls JPL
+directly. Horizons documents that spacecraft trajectories originate with mission navigation teams
+and may be updated on weekly or monthly schedules rather than in real time. Archived spacecraft
+solutions can also be offset from modern target-body ephemerides. The interface therefore prints
+the returned solution identifier and retrieval/cache status, uses no interpolated event claim,
+and snaps milestone markers only to the nearest returned sample. Its radial view is explicitly
+log-compressed and is not a linear distance chart.
+
+Apollo landing points reproduce the six LROC landing-site coordinates from NASA/Arizona State
+University (`https://www.lroc.asu.edu/featured_sites`) on Moon anchor NAIF/SPK `301`. The Mars
+collection reproduces the reported landing coordinates for the principal successful NASA surface
+missions Viking 1/2, Pathfinder/Sojourner, Spirit, Opportunity, Phoenix, Curiosity, InSight, and
+Perseverance from the NASA Mars Exploration Program
+(`https://science.nasa.gov/mars/exploration/`) on Mars anchor NAIF/SPK `499`. Spacecraft codes are
+shown only where NAIF publishes a permanent code. Marker sizes are exaggerated; the neutral
+Moon/Mars context sphere is neither mission imagery nor a high-resolution terrain product.
+
 ## Irregular-body model runtime
 
 `@babylonjs/loaders` 9.22.1 is used to load attributed NASA/PDS OBJ and GLB shape assets and the

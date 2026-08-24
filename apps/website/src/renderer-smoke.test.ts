@@ -9,7 +9,7 @@ import type { AbstractMesh } from "@babylonjs/core/Meshes/abstractMesh.js";
 import { MeshBuilder } from "@babylonjs/core/Meshes/meshBuilder.js";
 import { TransformNode } from "@babylonjs/core/Meshes/transformNode.js";
 import { Scene } from "@babylonjs/core/scene.js";
-import type { ExoplanetProfile, StarProfile } from "@exora/contracts";
+import type { ExoplanetProfile, MissionTrajectoryResponse, StarProfile } from "@exora/contracts";
 import { deriveWorldRecipe } from "@exora/worldgen";
 import { afterEach, beforeEach, expect, test, vi } from "vite-plus/test";
 import { createPlanetWorld } from "./planet-scene.ts";
@@ -19,6 +19,8 @@ import { resetSkyCatalogForTesting } from "./sky-catalog.ts";
 import { createStarWorld } from "./star-scene.ts";
 import { createSolarRegionWorld } from "./solar-region-scene.ts";
 import { findSolarRegion } from "./solar-regions.ts";
+import { createMissionWorld } from "./mission-scene.ts";
+import { findSolarMission } from "./solar-missions.ts";
 import { findPlanetarySubsystem } from "./planetary-subsystems.ts";
 import { JUPITER } from "./solar-system.ts";
 import { createSystemWorld } from "./system-scene.ts";
@@ -262,6 +264,75 @@ test.each(["Oort Cloud", "Heliosphere"])(
   },
   30_000,
 );
+
+test("a spacecraft mission keeps its measured trajectory optional and releases it", async () => {
+  const { engine, host, scene } = createHarness();
+  const before = sceneCounts(scene);
+  const scope = openWorldScope(scene);
+  const mission = findSolarMission("Voyager 1");
+  if (!mission || mission.kind !== "trajectory") throw new Error("Expected Voyager 1 fixture.");
+  const trajectory: MissionTrajectoryResponse = {
+    data: [
+      {
+        calendarTdb: "A.D. 1977-Sep-06 TDB",
+        julianDateTdb: 2_443_392.5,
+        positionAu: { x: 1, y: 0, z: 0 },
+        velocityAuPerDay: { x: 0, y: 0.02, z: 0 },
+      },
+      {
+        calendarTdb: "A.D. 2012-Aug-25 TDB",
+        julianDateTdb: 2_456_164.5,
+        positionAu: { x: 120, y: 20, z: 2 },
+        velocityAuPerDay: { x: 0.01, y: 0, z: 0 },
+      },
+    ],
+    meta: {
+      cached: true,
+      center: "Sun (10)",
+      coordinateFrame: "Ecliptic J2000",
+      retrievedAt: "2026-08-24T00:00:00.000Z",
+      solution: "Voyager_1_ST",
+      source: "NASA/JPL Horizons API",
+      sourceVersion: "1.2",
+      spkId: "-31",
+      stale: false,
+      stepDays: 60,
+      targetName: "Voyager 1",
+    },
+  };
+  const world = createMissionWorld(host, { mission, onFirstFrame: vi.fn(), trajectory });
+  scope.seal();
+  await settleSky();
+  const path = scene.getMeshByName("voyager-1-measured-horizons-trajectory");
+  expect(path?.isEnabled()).toBe(false);
+  world.setLayerVisible(true);
+  expect(path?.isEnabled()).toBe(true);
+  expect(() => scene.render()).not.toThrow();
+  world.dispose();
+  scope.dispose();
+  expect(sceneCounts(scene)).toEqual(before);
+  engine.dispose();
+}, 30_000);
+
+test("a surface mission keeps measured sites optional and releases them", async () => {
+  const { engine, host, scene } = createHarness();
+  const before = sceneCounts(scene);
+  const scope = openWorldScope(scene);
+  const mission = findSolarMission("Apollo landing sites");
+  if (!mission || mission.kind !== "surface-sites") throw new Error("Expected Apollo fixture.");
+  const world = createMissionWorld(host, { mission, onFirstFrame: vi.fn(), trajectory: null });
+  scope.seal();
+  await settleSky();
+  const site = scene.getMeshByName("apollo-landing-sites-apollo-11-·-tranquility-base-site");
+  expect(site?.isEnabled()).toBe(false);
+  world.setLayerVisible(true);
+  expect(site?.isEnabled()).toBe(true);
+  expect(() => scene.render()).not.toThrow();
+  world.dispose();
+  scope.dispose();
+  expect(sceneCounts(scene)).toEqual(before);
+  engine.dispose();
+}, 30_000);
 
 test("a planetary subsystem renders measured tracks and releases every explanatory layer", async () => {
   const { engine, host, scene } = createHarness();
