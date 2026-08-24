@@ -12,7 +12,7 @@ import { PlanetCatalog } from "./PlanetCatalog.tsx";
 import { SolarSystemCatalog } from "./SolarSystemCatalog.tsx";
 import { StarCatalog } from "./StarCatalog.tsx";
 
-export type DiscoverSection = "overview" | "solar" | "worlds" | "stars" | "black-holes" | "forge";
+export type DiscoverSection = "solar" | "worlds" | "stars" | "black-holes" | "forge";
 
 interface DiscoverScreenProps {
   initialForgeMode: "planet" | "star";
@@ -31,17 +31,13 @@ interface DiscoverScreenProps {
 
 const sections: readonly {
   accent: string;
-  description: string;
-  eyebrow: string;
   glyph: string;
-  id: Exclude<DiscoverSection, "overview">;
+  id: DiscoverSection;
   label: string;
   source: string;
 }[] = [
   {
     accent: "amber",
-    description: "Return to familiar worlds, moons, missions, comets and the deep frontier.",
-    eyebrow: "OUR COSMIC ADDRESS",
     glyph: "☉",
     id: "solar",
     label: "Solar System",
@@ -49,8 +45,6 @@ const sections: readonly {
   },
   {
     accent: "cyan",
-    description: "Search confirmed exoplanets or follow a curated path beyond the Sun.",
-    eyebrow: "DISTANT WORLDS",
     glyph: "◎",
     id: "worlds",
     label: "Exoplanets",
@@ -58,8 +52,6 @@ const sections: readonly {
   },
   {
     accent: "gold",
-    description: "Navigate stellar families, iconic lights and nearby host systems.",
-    eyebrow: "STELLAR ATLAS",
     glyph: "✦",
     id: "stars",
     label: "Stars",
@@ -67,8 +59,6 @@ const sections: readonly {
   },
   {
     accent: "violet",
-    description: "Cross five iconic horizons, from our quiet galactic center to a giant quasar.",
-    eyebrow: "THE HORIZON FIVE",
     glyph: "◉",
     id: "black-holes",
     label: "Black Holes",
@@ -76,8 +66,6 @@ const sections: readonly {
   },
   {
     accent: "coral",
-    description: "Shape a new planet or ignite a star, then enter it immediately.",
-    eyebrow: "CELESTIAL SYNTHESIS",
     glyph: "+",
     id: "forge",
     label: "World Forge",
@@ -86,12 +74,6 @@ const sections: readonly {
 ] as const;
 
 const sectionCopy: Record<DiscoverSection, { eyebrow: string; title: string; summary: string }> = {
-  overview: {
-    eyebrow: "EXORA UNIVERSE OBSERVATORY",
-    title: "All of space. One way in.",
-    summary:
-      "Move from our home system to distant worlds, stars and objects of your own design without leaving Discover.",
-  },
   solar: {
     eyebrow: "NASA / JPL HOME SYSTEM",
     title: "Start close to home.",
@@ -121,7 +103,7 @@ const sectionCopy: Record<DiscoverSection, { eyebrow: string; title: string; sum
 
 export const DiscoverScreen = ({
   initialForgeMode,
-  initialSection = "overview",
+  initialSection = "solar",
   onClose,
   onGeneratePlanet,
   onGenerateStar,
@@ -178,9 +160,8 @@ export const DiscoverScreen = ({
         <button
           className="discover-home"
           type="button"
-          aria-label="Discover overview"
-          aria-current={section === "overview" ? "page" : undefined}
-          onClick={() => setSection("overview")}
+          aria-label="Open Solar System"
+          onClick={() => setSection("solar")}
         >
           <span className="brand-mark" aria-hidden="true" />
           <span>
@@ -195,6 +176,7 @@ export const DiscoverScreen = ({
               className={`discover-nav-item ${item.accent}`}
               key={item.id}
               type="button"
+              aria-label={`${item.label} · ${item.source}`}
               aria-current={section === item.id ? "page" : undefined}
               onClick={() => setSection(item.id)}
             >
@@ -237,116 +219,42 @@ export const DiscoverScreen = ({
         </header>
 
         <main className="discover-main">
-          {section === "overview" ? (
-            <div className="discover-overview">
-              <section className="discover-orbit-panel" aria-labelledby="discover-orbit-title">
-                <div className="discover-orbit-intro">
-                  <p>
-                    <span aria-hidden="true" /> LIVE CELESTIAL INDEX
-                  </p>
-                  <h2 id="discover-orbit-title">Begin with a point of light.</h2>
-                  <span>
-                    Five trajectories connect the known, the distant, and the worlds not made yet.
-                  </span>
-                </div>
-                <div className="discover-orbit-map" aria-hidden="true">
-                  <span className="discover-orbit orbit-one" />
-                  <span className="discover-orbit orbit-two" />
-                  <span className="discover-orbit orbit-three" />
-                  <span className="discover-map-core" />
-                  <span className="discover-map-object object-one" />
-                  <span className="discover-map-object object-two" />
-                  <span className="discover-map-object object-three" />
-                  <small>LOCAL REFERENCE · SOL</small>
-                </div>
-                <div className="discover-orbit-readout" aria-hidden="true">
-                  <span>OBSERVATORY ONLINE</span>
-                  <span>CATALOGS 03</span>
-                  <span>GENERATIVE LAB 01</span>
-                </div>
-              </section>
-
-              <nav className="discover-directory" aria-label="Choose a trajectory">
-                <header className="discover-directory-header">
-                  <div>
-                    <p>SELECT TRAJECTORY</p>
-                    <h2>Where to next?</h2>
-                  </div>
-                  <span>05 DESTINATIONS</span>
-                </header>
-                <div className="discover-portal-grid">
-                  {sections.map((item, index) => (
-                    <button
-                      className={`discover-portal-card ${item.accent}`}
-                      key={item.id}
-                      type="button"
-                      onClick={() => setSection(item.id)}
-                    >
-                      <small className="discover-card-index">0{index + 1}</small>
-                      <span className="discover-card-glyph" aria-hidden="true">
-                        {item.glyph}
-                      </span>
-                      <span className="discover-card-copy">
-                        <small>{item.eyebrow}</small>
-                        <strong>{item.label}</strong>
-                        <span>{item.description}</span>
-                      </span>
-                      <span className="discover-card-action" aria-hidden="true">
-                        <small>{item.source}</small>
-                        <i>↗</i>
-                      </span>
-                    </button>
-                  ))}
-                </div>
-              </nav>
-              <footer className="discover-overview-footer">
-                <span>SEARCH REAL CATALOGS</span>
-                <span>TRAVEL IN ONE STEP</span>
-                <span>KEYBOARD &amp; TOUCH READY</span>
-              </footer>
-            </div>
-          ) : (
-            <div className="discover-workspace" aria-live="polite">
-              {section === "solar" ? (
-                <SolarSystemCatalog
-                  embedded
-                  onClose={() => setSection("overview")}
-                  onSelectAsteroid={onSelectAsteroid}
-                  onSelectComet={onSelectComet}
-                  onSelectMission={onSelectMission}
-                  onSelectPlanet={onSelectPlanet}
-                  onSelectRegion={onSelectRegion}
-                  onSelectStar={onSelectStar}
-                />
-              ) : section === "worlds" ? (
-                <PlanetCatalog
-                  embedded
-                  onClose={() => setSection("overview")}
-                  onSelect={onSelectPlanet}
-                />
-              ) : section === "stars" ? (
-                <StarCatalog
-                  embedded
-                  onClose={() => setSection("overview")}
-                  onSelect={onSelectStar}
-                />
-              ) : section === "black-holes" ? (
-                <BlackHoleCatalog
-                  embedded
-                  onClose={() => setSection("overview")}
-                  onSelect={onSelectBlackHole}
-                />
-              ) : (
-                <WorldForge
-                  embedded
-                  initialMode={initialForgeMode}
-                  onClose={() => setSection("overview")}
-                  onGeneratePlanet={onGeneratePlanet}
-                  onGenerateStar={onGenerateStar}
-                />
-              )}
-            </div>
-          )}
+          <div className="discover-workspace" aria-live="polite">
+            {section === "solar" ? (
+              <SolarSystemCatalog
+                embedded
+                onClose={() => setSection("solar")}
+                onSelectAsteroid={onSelectAsteroid}
+                onSelectComet={onSelectComet}
+                onSelectMission={onSelectMission}
+                onSelectPlanet={onSelectPlanet}
+                onSelectRegion={onSelectRegion}
+                onSelectStar={onSelectStar}
+              />
+            ) : section === "worlds" ? (
+              <PlanetCatalog
+                embedded
+                onClose={() => setSection("solar")}
+                onSelect={onSelectPlanet}
+              />
+            ) : section === "stars" ? (
+              <StarCatalog embedded onClose={() => setSection("solar")} onSelect={onSelectStar} />
+            ) : section === "black-holes" ? (
+              <BlackHoleCatalog
+                embedded
+                onClose={() => setSection("solar")}
+                onSelect={onSelectBlackHole}
+              />
+            ) : (
+              <WorldForge
+                embedded
+                initialMode={initialForgeMode}
+                onClose={() => setSection("solar")}
+                onGeneratePlanet={onGeneratePlanet}
+                onGenerateStar={onGenerateStar}
+              />
+            )}
+          </div>
         </main>
       </div>
     </dialog>

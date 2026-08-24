@@ -2,7 +2,7 @@ import { renderToStaticMarkup } from "react-dom/server";
 import { expect, test, vi } from "vite-plus/test";
 import { DiscoverScreen, type DiscoverSection } from "./DiscoverScreen.tsx";
 
-const discoverMarkup = (initialSection: DiscoverSection = "overview"): string =>
+const discoverMarkup = (initialSection: DiscoverSection = "solar"): string =>
   renderToStaticMarkup(
     <DiscoverScreen
       initialForgeMode="planet"
@@ -20,7 +20,7 @@ const discoverMarkup = (initialSection: DiscoverSection = "overview"): string =>
     />,
   );
 
-test("one Discover directory exposes every exploration surface", () => {
+test("Discover starts directly in the Solar System catalog", () => {
   const markup = discoverMarkup();
 
   expect(markup).toContain("Solar System");
@@ -29,9 +29,9 @@ test("one Discover directory exposes every exploration surface", () => {
   expect(markup).toContain("Black Holes");
   expect(markup).toContain("World Forge");
   expect(markup).toContain('aria-label="Discover destinations"');
-  expect(markup).toContain('aria-label="Choose a trajectory"');
-  expect(markup).toContain("Begin with a point of light.");
-  expect(markup).toContain("Where to next?");
+  expect(markup).toContain('aria-label="Solar System catalog"');
+  expect(markup).toContain("Start close to home.");
+  expect(markup).not.toContain("All of space. One way in.");
 });
 
 test("the black-hole destination exposes the five sourced landmarks", () => {

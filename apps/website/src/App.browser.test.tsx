@@ -423,7 +423,7 @@ const openDiscoverSection = async (
   name: "Black Holes" | "Exoplanets" | "Solar System" | "Stars" | "World Forge",
 ): Promise<void> => {
   await userEvent.click(page.getByRole("button", { name: "Open Discover" }));
-  await expect.element(page.getByRole("dialog", { name: /All of space/ })).toBeVisible();
+  await expect.element(page.getByRole("dialog", { name: /Start close to home/ })).toBeVisible();
   await userEvent.click(page.getByRole("button", { name: new RegExp(name) }).first());
 };
 
@@ -453,7 +453,7 @@ test("the landing page reaches a rendered world", async () => {
   await expect.element(page.getByRole("button", { name: "Open Discover" })).toBeVisible();
 });
 
-test("Discover is reachable and named at this width", async () => {
+test("Discover opens directly into the Solar System at this width", async () => {
   stubArchive();
   mountApp();
 
@@ -461,6 +461,9 @@ test("Discover is reachable and named at this width", async () => {
   // are aria-hidden, so on the mobile instance these buttons resolve by name only because each
   // one carries an aria-label. A Node test cannot see that, because no stylesheet has run.
   await expect.element(page.getByRole("button", { name: "Open Discover" })).toBeVisible();
+  await userEvent.click(page.getByRole("button", { name: "Open Discover" }));
+  await expect.element(page.getByRole("dialog", { name: /Start close to home/ })).toBeVisible();
+  await expect.element(page.getByRole("region", { name: "Solar System catalog" })).toBeVisible();
 });
 
 test("a deep link to a named world resolves to that world", async () => {
@@ -849,7 +852,7 @@ test("Backspace toggles Discover open and closed", async () => {
   mountApp();
 
   await userEvent.keyboard("{Backspace}");
-  await expect.element(page.getByRole("dialog", { name: /All of space/ })).toBeVisible();
+  await expect.element(page.getByRole("dialog", { name: /Start close to home/ })).toBeVisible();
 
   await userEvent.keyboard("{Backspace}");
   await expect.element(page.getByRole("dialog")).not.toBeInTheDocument();

@@ -25,7 +25,6 @@ import { findSolarAsteroid, type AsteroidProfile } from "./solar-asteroids.ts";
 import { findSolarComet, type CometProfile } from "./solar-comets.ts";
 import { findSolarRegion, type SolarRegionProfile } from "./solar-regions.ts";
 import { findSolarMission, type SolarMissionProfile } from "./solar-missions.ts";
-import type { DiscoverSection } from "./components/DiscoverScreen.tsx";
 
 const DiscoverScreen = lazy(() =>
   import("./components/DiscoverScreen.tsx").then((module) => ({ default: module.DiscoverScreen })),
@@ -160,7 +159,6 @@ export const App = () => {
     status: sceneHostStatus,
   } = useSceneHost(canvas);
   const [discoverOpen, setDiscoverOpen] = useState(false);
-  const [discoverSection, setDiscoverSection] = useState<DiscoverSection>("overview");
   const [activeObject, setActiveObject] = useState<ActiveObject | null>(() => {
     const parameters = new URLSearchParams(window.location.search);
     return parameters.has("blackHole") ||
@@ -245,7 +243,6 @@ export const App = () => {
         setDiscoverOpen(false);
         return;
       }
-      setDiscoverSection("overview");
       setDiscoverOpen(true);
     };
 
@@ -431,7 +428,6 @@ export const App = () => {
   }, []);
 
   const openDiscover = useCallback((): void => {
-    setDiscoverSection("overview");
     setDiscoverOpen(true);
   }, []);
 
@@ -637,7 +633,6 @@ export const App = () => {
         <Suspense fallback={null}>
           <DiscoverScreen
             initialForgeMode={activeObject.type === "star" ? "star" : "planet"}
-            initialSection={discoverSection}
             onClose={closeDiscover}
             onGeneratePlanet={generatePlanet}
             onGenerateStar={generateStar}
