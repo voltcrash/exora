@@ -86,16 +86,18 @@ test("a vista holds several landform provinces rather than one repeated process"
  */
 test("worlds with different geology produce uncorrelated ground, not one shape rescaled", () => {
   const bodies = [MERCURY, VENUS, EARTH, MARS, moon("Io"), moon("Europa"), moon("Titan")];
-  // Sampled on a far annulus rather than the whole patch: every world deliberately keeps its
-  // landing site open and lets relief grow outward, and that shared composition would otherwise
-  // show up as correlation between worlds that are nothing alike.
+  // Sampled outside the landing site rather than over the whole patch: every world deliberately
+  // keeps its arrival area open and lets relief grow outward, and that shared composition would
+  // otherwise register as similarity between worlds that are nothing alike. Everything past 60
+  // units is under the same full relief, and covers enough landform territories that a chance
+  // agreement between two of them cannot carry the statistic.
   const heights = bodies.map((profile) => {
     const field = fieldFor(profile);
     const values: number[] = [];
-    for (let x = -125; x <= 125; x += 3.5) {
-      for (let z = -125; z <= 125; z += 3.5) {
+    for (let x = -145; x <= 145; x += 2.5) {
+      for (let z = -145; z <= 145; z += 2.5) {
         const radius = Math.hypot(x, z);
-        if (radius >= 92 && radius <= 125) values.push(field.height(x, z));
+        if (radius >= 60 && radius <= 145) values.push(field.height(x, z));
       }
     }
     return values;

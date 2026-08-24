@@ -2014,10 +2014,15 @@ const mixColor3 = (from: Rgb, to: Rgb, amount: number): Color3 => {
   return new Color3(mixed.r, mixed.g, mixed.b);
 };
 
+/** What a sky with nothing in it looks like: not quite black, because the zodiacal light and the
+ * unresolved stars behind it are not quite nothing. */
+const AIRLESS_SKY: Rgb = [0.003, 0.004, 0.008];
+
 const createSurfaceSky = (
   scene: Scene,
   parent: TransformNode,
   recipe: WorldRecipe,
+  geology: SurfaceGeology | null,
   profile: RenderQualityProfile,
 ): { horizonColor: Color3; material: ShaderMaterial; mesh: Mesh; zenithColor: Color3 } => {
   Effect.ShadersStore.exoraSkyVertexShader = SKY_VERTEX_SHADER;
@@ -2025,29 +2030,43 @@ const createSurfaceSky = (
   const atmosphere = recipe.atmosphere.color;
   const isGasGiant = recipe.renderer === "gas-giant";
   const isIceGiant = recipe.renderer === "ice-giant";
+  /**
+   * How much air there is to look through, which is the one number a sky is made of.
+   *
+   * This used to start at 0.25 for every rocky world and climb with cloud cover, so the Moon —
+   * which has no atmosphere at all, and whose sky is black at noon with the sun blazing in it —
+   * got a quarter-density blue one. The geology's own haze figure is the honest answer: zero on
+   * the Moon and Mercury, a hundredth on Europa, a third on Mars where suspended dust does the
+   * scattering, and nearly total on Venus and Titan.
+   */
+  const air = geology
+    ? Math.min(1, Math.max(0, geology.hazeDensity))
+    : Math.min(1, Math.max(0, recipe.renderer === "rocky" ? recipe.atmosphere.density : 1));
   const cloudiness = isGasGiant
     ? 0.94
     : isIceGiant
       ? 0.8
-      : Math.max(0.08, recipe.surface.cloudCover);
-  const density = isGasGiant
-    ? 1
-    : isIceGiant
-      ? 0.9
-      : Math.min(
-          0.82,
-          0.25 + recipe.surface.cloudCover * 0.72 + recipe.surface.lavaStrength * 0.22,
-        );
+      : Math.min(1, recipe.surface.cloudCover * air * 1.6);
+  const density = isGasGiant ? 1 : isIceGiant ? 0.9 : air;
+  // What this world's air actually scatters. The geology states it outright for a body a mission
+  // has stood on or flown through; everything else falls back to the recipe's inferred colour.
+  const skyTint = geology ? geology.skyColor : atmosphere;
   const zenithColor = isGasGiant
     ? mixColor3(atmosphere, recipe.cloudBands.deepColor, 0.62)
     : isIceGiant
       ? mixColor3(atmosphere, recipe.atmosphereBands.deepColor, 0.66)
-      : mixColor3(atmosphere, [0.008, 0.014, 0.035], 0.64 - density * 0.24);
+      : // Deeper and darker overhead than at the horizon, because that is the shorter path
+        // through the air — the same reason Earth's zenith is a stronger blue than its skyline.
+        mixColor3(AIRLESS_SKY, skyTint, Math.min(1, air ** 0.6 * 1.15) * 0.72);
   const horizonColor = isGasGiant
     ? mixColor3(atmosphere, recipe.cloudBands.lightColor, 0.35)
     : isIceGiant
       ? mixColor3(atmosphere, recipe.atmosphereBands.hazeColor, 0.38)
-      : mixColor3(atmosphere, recipe.surface.highColor, 0.14);
+      : mixColor3(
+          AIRLESS_SKY,
+          mixColor3(skyTint, [1, 0.94, 0.86], 0.22).asArray() as unknown as Rgb,
+          Math.min(1, air ** 0.5 * 1.25),
+        );
   const cloudColor = isGasGiant
     ? toColor3(recipe.cloudBands.lightColor)
     : isIceGiant
@@ -2091,7 +2110,12 @@ const createSurfaceSky = (
   material.setFloat("seed", recipe.seed);
   material.setFloat("density", density);
   material.setFloat("cloudiness", cloudiness);
-  material.setFloat("starVisibility", isGasGiant ? 0 : isIceGiant ? 0.02 : 1 - density);
+  // Stars burn through a thin sky in broad daylight — from the Moon they are there the whole time,
+  // and only a real atmosphere scatters enough light to hide them.
+  material.setFloat(
+    "starVisibility",
+    isGasGiant ? 0 : isIceGiant ? 0.02 : Math.max(0, 1 - air * 2.2),
+  );
   material.setColor3("horizonColor", horizonColor);
   material.setColor3("zenithColor", zenithColor);
   material.setColor3("cloudColor", cloudColor);
@@ -2130,7 +2154,7 @@ const createSurfaceEnvironment = (
   skyAnchor.parent = root;
   const meshes: AbstractMesh[] = [];
   const random = createSeededRandom(recipe.seed ^ 0x9e3779b9);
-  const surfaceSky = createSurfaceSky(scene, skyAnchor, recipe, profile);
+  const surfaceSky = createSurfaceSky(scene, skyAnchor, recipe, geology, profile);
   meshes.push(surfaceSky.mesh);
 
   // Rocky worlds get real ground: measured or inferred geology, landform provinces, baked sun
@@ -2262,7 +2286,16 @@ const createSurfaceEnvironment = (
   }
 
   const cloudLayers: Mesh[] = [];
-  const hazeCount = recipe.renderer === "rocky" ? (recipe.surface.cloudCover > 0 ? 3 : 1) : 5;
+  /**
+   * Drifting haze banks, for the giants only.
+   *
+   * A rocky world's sky is drawn by the dome above and its distance by the ground's own aerial
+   * perspective, both of which know what that world's air is made of. These flattened emissive
+   * spheres knew neither: on the Moon one hung over a black airless sky as a lit ellipse, and on
+   * Titan they read as saucers cut out of the smog. A giant's excursion has no ground and no
+   * aerial perspective, so there they are still the cloud layer the viewer is standing in.
+   */
+  const hazeCount = recipe.renderer === "rocky" ? 0 : 5;
   for (let index = 0; index < hazeCount; index += 1) {
     const haze = MeshBuilder.CreateSphere(
       `surfaceHaze-${index}`,
@@ -2307,6 +2340,17 @@ const createSurfaceEnvironment = (
     spotCoverage: recipe.star.spotCoverage,
   });
   meshes.push(...surfaceStar.meshes);
+
+  // Air thick enough and the sun is not a disc any more: Huygens saw no sun at all from Titan's
+  // surface, and neither Venera nor Magellan ever resolved one through Venus's cloud deck. What
+  // reaches the ground is the whole sky glowing, which the dome above is already drawing.
+  if (geology && geology.hazeDensity > 0.85) {
+    for (const target of surfaceStar.meshes) {
+      target.isVisible = false;
+      target.setEnabled(false);
+    }
+    meshes.splice(0, meshes.length, ...meshes.filter((mesh) => !surfaceStar.meshes.includes(mesh)));
+  }
 
   if (onSelectHostStar) {
     for (const target of surfaceStar.meshes) {

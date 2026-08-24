@@ -156,18 +156,18 @@ const shapeFor = (form: RockForm, random: () => number): RockShape => {
   switch (form) {
     case "block":
       return {
-        bury: 0.16 + random() * 0.14,
+        bury: 0.08 + random() * 0.1,
         faceting: 0.62 + random() * 0.24,
-        grain: 1.6 + random() * 0.9,
+        grain: 0.85 + random() * 0.3,
         scale: [0.8 + random() * 0.5, 0.62 + random() * 0.45, 0.75 + random() * 0.55],
       };
     case "slab":
       // Wide, thin and flat-lying: the platy basalt Venera photographed, and the ledges a
       // layered scarp sheds.
       return {
-        bury: 0.3 + random() * 0.2,
+        bury: 0.22 + random() * 0.16,
         faceting: 0.5 + random() * 0.2,
-        grain: 1.2 + random() * 0.5,
+        grain: 0.7 + random() * 0.2,
         scale: [1.25 + random() * 0.75, 0.2 + random() * 0.16, 1.05 + random() * 0.8],
       };
     case "spire":
@@ -175,22 +175,22 @@ const shapeFor = (form: RockForm, random: () => number): RockShape => {
       return {
         bury: 0.1 + random() * 0.1,
         faceting: 0.72 + random() * 0.2,
-        grain: 2.4 + random() * 1.1,
+        grain: 1.15 + random() * 0.35,
         scale: [0.42 + random() * 0.24, 1.7 + random() * 1.5, 0.42 + random() * 0.24],
       };
     case "raft":
       // A slab of crust that broke free and tilted: flat top, square sides, jumbled attitude.
       return {
-        bury: 0.34 + random() * 0.22,
-        faceting: 0.34 + random() * 0.18,
-        grain: 1.1 + random() * 0.4,
-        scale: [1.35 + random() * 0.9, 0.42 + random() * 0.34, 1.2 + random() * 0.9],
+        bury: 0.24 + random() * 0.16,
+        faceting: 0.62 + random() * 0.22,
+        grain: 0.62 + random() * 0.2,
+        scale: [0.95 + random() * 0.7, 0.4 + random() * 0.3, 0.85 + random() * 0.65],
       };
     default:
       return {
-        bury: 0.24 + random() * 0.2,
-        faceting: 0.22 + random() * 0.22,
-        grain: 1.9 + random() * 0.8,
+        bury: 0.12 + random() * 0.14,
+        faceting: 0.42 + random() * 0.24,
+        grain: 1.0 + random() * 0.3,
         scale: [0.9 + random() * 0.35, 0.72 + random() * 0.3, 0.88 + random() * 0.36],
       };
   }
@@ -375,9 +375,11 @@ export const createSurfaceScatter = (
     if (random() > likelihood) continue;
 
     // Power-law sizes, the way a real block field grades: many small, a few large, and the
-    // largest an order of magnitude above the median rather than twice it.
+    // largest an order of magnitude above the median rather than twice it. Capped well under
+    // human scale at the median, because a boulder is the one thing in the frame whose size a
+    // visitor can read directly — get it wrong and the whole vista changes size with it.
     const sizeRoll = random();
-    const size = geology.boulderScale * (0.16 + sizeRoll ** 3.2 * 6.5);
+    const size = geology.boulderScale * (0.1 + sizeRoll ** 3.6 * 1.15);
 
     const form: RockForm =
       ground.frost > 0.55
@@ -385,7 +387,9 @@ export const createSurfaceScatter = (
         : geology.strataStrength > 0.6 && random() > 0.55
           ? "slab"
           : ground.scarp > 0.55
-            ? random() > 0.86
+            ? // A spire is what wind leaves behind when it takes the soft rock away. Without wind
+              // there is nothing to carve one, so an airless world never grows them.
+              geology.windStreaks > 0.3 && random() > 0.9
               ? "spire"
               : "block"
             : random() > 0.55

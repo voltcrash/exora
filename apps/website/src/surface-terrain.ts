@@ -344,13 +344,13 @@ const duneSea: ArchetypeField = (x, z, context, out) => {
   const across = (-x * context.windSin + z * context.windCos) / context.featureScale;
   const meander = fbm(across * 0.02, along * 0.006, context.seed + 41, 3) * 9;
   const draa = fbm(along * 0.006, across * 0.004, context.seed + 43, 2);
-  const wavelength = 26 * context.featureScale * (1 + draa * 0.4);
+  const wavelength = 19 * context.featureScale * (1 + draa * 0.4);
   const phase = ((along + meander) / wavelength) % 1;
   const t = phase < 0 ? phase + 1 : phase;
   // Windward face rises over 72% of the wavelength; the slip face drops over the remaining 28%.
   const profile = t < 0.72 ? (t / 0.72) ** 1.35 : 1 - (t - 0.72) / 0.28;
   const crestBreak = fbm(across * 0.05, along * 0.05, context.seed + 47, 3) * 0.3;
-  const height = (profile - 0.45) * (0.72 + draa * 0.4) + draa * 0.45 + crestBreak * 0.12;
+  const height = (profile - 0.45) * (1.15 + draa * 0.55) + draa * 0.45 + crestBreak * 0.12;
   const ripple =
     Math.sin(along * 1.6 + fbm(along * 0.1, across * 0.1, context.seed + 49, 2) * 5) * 0.01;
   out.regolith = 1;
@@ -376,7 +376,7 @@ const yardangBadlands: ArchetypeField = (x, z, context, out) => {
   );
   const flank = clamp01((1 - carve) * 1.5);
   out.regolith = clamp01(0.3 + flank * 0.5);
-  out.scarp = clamp01(carve * 1.2);
+  out.scarp = clamp01((carve - 0.42) * 2.4);
   out.frost = 0;
   out.molten = 0;
   return height;
@@ -435,15 +435,17 @@ const lavaFields: ArchetypeField = (x, z, context, out) => {
   const surface = fbm(x * 0.06, z * 0.06, context.seed + 109, 3) * 0.12;
   const ropey = Math.sin(cell.f1 * 34 + plate * 8) * 0.02 * (1 - crack);
   const vents = smoothstep(
-    0.72,
-    0.94,
+    0.62,
+    0.88,
     fbm(x * 0.014, z * 0.014, context.seed + 113, 3) * 0.5 + 0.5,
   );
   const height = (plate - 0.5) * 0.22 + surface - crack * 0.16 - vents * 0.25 + ropey;
   out.regolith = clamp01(0.2 + (1 - crack) * 0.2);
   out.scarp = clamp01(crack * 1.2);
   out.frost = 0;
-  out.molten = clamp01(crack * 0.85 + vents * 0.9);
+  // The light comes up through the gaps between the crust plates and out of the open vents; the
+  // plates themselves have cooled dark. That contrast is the whole look of an active flow field.
+  out.molten = clamp01(crack * 1.15 + vents * 1.1);
   return height;
 };
 
@@ -481,19 +483,22 @@ const fracturedIce: ArchetypeField = (x, z, context, out) => {
   const warpX = fbm(x * 0.006, z * 0.006, context.seed + 149, 2) * 18;
   const cell = cellular((x + warpX) * scale, z * scale, context.seed + 151, 0.9);
   const edge = cell.f2 - cell.f1;
+  // `cellular` hands back one shared record, so anything still needed after the next call has to
+  // be taken out of it first — the raft displacement below reads this cell, not the finer one.
+  const plate = cell.cell;
   // Two ridges either side of the groove: the double-ridge profile the flybys resolved.
   const ridgePair =
     Math.exp(-(((edge - 0.055) / 0.035) ** 2)) - Math.exp(-((edge / 0.03) ** 2)) * 0.55;
   const secondary = cellular(x * scale * 3.1 + 7.3, z * scale * 3.1, context.seed + 157, 0.9);
   const hairline = Math.exp(-(((secondary.f2 - secondary.f1) / 0.05) ** 2)) * 0.22;
   const chaos = smoothstep(0.68, 0.9, fbm(x * 0.012, z * 0.012, context.seed + 163, 3) * 0.5 + 0.5);
-  const raft = chaos * (((cell.cell >>> 5) & 0xff) / 255 - 0.5) * 0.9;
+  const raft = chaos * (((plate >>> 5) & 0xff) / 255 - 0.5) * 0.9;
   const plain = fbm(x * 0.02, z * 0.02, context.seed + 167, 3) * 0.12;
   out.regolith = clamp01(0.3 + chaos * 0.3);
   out.scarp = clamp01(Math.abs(ridgePair) * 1.6 + chaos * 0.8);
   out.frost = clamp01(0.9 - chaos * 0.4);
   out.molten = 0;
-  return plain + ridgePair * 0.8 + hairline * 0.3 + raft;
+  return plain + ridgePair * 1.15 + hairline * 0.35 + raft;
 };
 
 const foldedMountains: ArchetypeField = (x, z, context, out) => {
@@ -505,17 +510,19 @@ const foldedMountains: ArchetypeField = (x, z, context, out) => {
   const warpZ = fbm(x * 0.004 - 8.2, z * 0.004 + 2.9, context.seed + 179, 2) * 26;
   const sharp = ridged((x + warpX) * scale, (z + warpZ) * scale, context.seed + 181, 5, 0.52);
   const rounded = fbm((x + warpX) * scale, (z + warpZ) * scale, context.seed + 181, 4) * 0.5 + 0.5;
-  const relief = lerp(sharp, rounded, context.erosion * 0.7);
+  // Erosion rounds a range off; it does not level it. Blending more than half-way toward the
+  // smooth field left every mountain world with the same gentle swell.
+  const relief = lerp(sharp, rounded, context.erosion * 0.45);
   const massif = fbm(x * 0.0035, z * 0.0035, context.seed + 191, 2) * 0.5 + 0.5;
-  const peak = relief ** 1.35 * (0.35 + massif * 0.95);
+  const peak = relief ** 1.25 * (0.4 + massif * 1.15);
   // Talus: loose debris banked against the lower slopes, filling in the sharpest lows.
   const talus = (1 - relief) ** 2 * 0.18 * (0.4 + context.erosion);
   const detail = fbm(x * 0.09, z * 0.09, context.seed + 193, 3) * 0.05 * relief;
   out.regolith = clamp01(0.2 + talus * 3 + (1 - relief) * 0.35);
-  out.scarp = clamp01(relief * 1.35);
+  out.scarp = clamp01((relief - 0.52) * 2.6);
   out.frost = clamp01((peak - 0.55) * 2.2);
   out.molten = 0;
-  return peak * 1.4 + talus + detail - 0.45;
+  return peak * 1.75 + talus + detail - 0.55;
 };
 
 const coastalShelf: ArchetypeField = (x, z, context, out) => {
@@ -537,8 +544,8 @@ const coastalShelf: ArchetypeField = (x, z, context, out) => {
 const saltPan: ArchetypeField = (x, z, context, out) => {
   // Dead level, and crazed into polygons as the last of the liquid left it.
   const cell = cellular(x * 0.16, z * 0.16, context.seed + 211, 0.7);
-  const edge = cell.f2 - cell.f1;
-  const rim = Math.exp(-((edge / 0.045) ** 2)) * 0.035;
+  // Read out before the coarser lattice below overwrites the shared record.
+  const rim = Math.exp(-(((cell.f2 - cell.f1) / 0.045) ** 2)) * 0.035;
   const coarse = cellular(x * 0.03, z * 0.03, context.seed + 223, 0.7);
   const coarseRim = Math.exp(-(((coarse.f2 - coarse.f1) / 0.05) ** 2)) * 0.05;
   const basin = fbm(x * 0.005, z * 0.005, context.seed + 227, 2) * 0.09;
@@ -609,6 +616,14 @@ export const createTerrainField = (geology: SurfaceGeology): TerrainField => {
   }
   const total = running > 0 ? running : 1;
 
+  /** Which province has the largest share — the landform this world is most itself in. */
+  let signature = 0;
+  for (let index = 1; index < provinceList.length; index += 1) {
+    if ((provinceList[index]?.weight ?? 0) > (provinceList[signature]?.weight ?? 0)) {
+      signature = index;
+    }
+  }
+
   const provinceAt = (hash: number): number => {
     const roll = ((hash >>> 3) & 0xffff) / 65_536;
     const target = roll * total;
@@ -621,6 +636,17 @@ export const createTerrainField = (geology: SurfaceGeology): TerrainField => {
   // Province territories are large — a vista should hold two or three of them, not twenty — and
   // their boundaries are warped so no one ever sees the lattice they came from.
   const territoryScale = 0.0125 / Math.max(0.35, geology.featureScale);
+
+  // The cell the vista's own origin falls in, resolved once so the arrival province is stable.
+  const landingCell =
+    provinceList.length === 0
+      ? 0
+      : cellular(
+          fbm(0, 0, context.seed + 907, 2) * 62 * territoryScale,
+          fbm(12.7, -4.3, context.seed + 911, 2) * 62 * territoryScale,
+          context.seed + 919,
+          0.95,
+        ).cell;
 
   const sample = (x: number, z: number, out: TerrainSample): TerrainSample => {
     if (provinceList.length === 0) {
@@ -641,7 +667,11 @@ export const createTerrainField = (geology: SurfaceGeology): TerrainField => {
       context.seed + 919,
       0.95,
     );
-    const primaryIndex = provinceAt(territory.cell);
+    // The territory a visitor actually arrives in is the world's own signature landform rather
+    // than whichever one the lattice happened to roll there. Landing on Io means landing among
+    // its flow fields, on Titan among its dunes, on Europa on its fractured ice — the thing that
+    // world is known for, with everything else it has starting a few hundred metres away.
+    const primaryIndex = territory.cell === landingCell ? signature : provinceAt(territory.cell);
     // The neighbouring territory, reached by stepping across the boundary the cell map already
     // found, so the blend runs between the two provinces that actually meet here.
     const boundary = territory.f2 - territory.f1;
@@ -677,10 +707,12 @@ export const createTerrainField = (geology: SurfaceGeology): TerrainField => {
     const radius = Math.sqrt(x * x + z * z);
     const scaled = height * geology.relief * nearFieldRelief(radius);
     // Broad regional grade, so the ground is not statistically level in every direction at once —
-    // real ground drains somewhere. Kept to a few undulations across the vista and to a third of
-    // the world's relief: at a lower frequency it degenerates into one arbitrary planar tilt, which
-    // on a genuinely flat world (a lava plain, an ice sheet) is the only thing left to look at.
-    const regional = fbm(x * 0.0068, z * 0.0068, context.seed + 937, 3) * geology.relief * 0.32;
+    // real ground drains somewhere. Kept to several undulations across the vista and to a fifth of
+    // the world's relief: at a lower frequency it degenerates into one arbitrary planar tilt, and
+    // on a genuinely flat world — a lava plain, a dune sea, an ice sheet — that tilt becomes the
+    // only thing in the frame, which is how three worlds with nothing in common end up with the
+    // same landscape under different colours.
+    const regional = fbm(x * 0.0125, z * 0.0125, context.seed + 937, 3) * geology.relief * 0.22;
 
     out.height = Number.isFinite(scaled) ? scaled + regional : 0;
     // Fines gather where the ground is low and still, and the world's own mantle depth sets the

@@ -118,10 +118,12 @@ uniform vec3 regolithColor;
 uniform vec3 bedrockColor;
 uniform vec3 frostColor;
 uniform vec3 lavaColor;
+uniform vec3 groundAlbedo;
 uniform float groundLow;
 uniform float groundSpan;
 uniform float hazeDensity;
 uniform float ambientStrength;
+uniform float exposure;
 uniform float strataStrength;
 uniform float strataSpacing;
 uniform vec2 windAxis;
@@ -251,9 +253,9 @@ void main(void) {
   vec3 fineNormal = triplanarNormal(primaryNormalMap, vWorldPosition * fineDetailScale, blend, baseNormal);
   vec3 coarseNormal = triplanarNormal(secondaryNormalMap, vWorldPosition * coarseDetailScale, blend, baseNormal);
   // Bedrock texture takes over where fines cannot rest: steep ground, scarps, crater rims.
-  float exposure = clamp(slope * 1.9 + scarp * 1.1 - fines * 0.7, 0.0, 1.0);
+  float rockExposure = clamp(slope * 1.4 + scarp * 1.1 - fines * 0.7, 0.0, 1.0);
   vec3 detailNormal = normalize(mix(coarseNormal, fineNormal, fineFade * 0.72));
-  shadingNormal = normalize(mix(baseNormal, detailNormal, 0.62 * (0.45 + exposure * 0.55)));
+  shadingNormal = normalize(mix(baseNormal, detailNormal, 0.62 * (0.45 + rockExposure * 0.55)));
   roughness = mix(
     0.92,
     triplanarScalar(primaryRoughnessMap, vWorldPosition * coarseDetailScale, blend),
@@ -261,7 +263,7 @@ void main(void) {
   );
   roughness = clamp(roughness * (1.0 - frost * 0.45) - molten * 0.3, 0.05, 1.0);
 #else
-  float exposure = clamp(slope * 1.9 + scarp * 1.1 - fines * 0.7, 0.0, 1.0);
+  float rockExposure = clamp(slope * 1.4 + scarp * 1.1 - fines * 0.7, 0.0, 1.0);
 #endif
 
   // --- Colour ------------------------------------------------------------------------------
@@ -270,7 +272,7 @@ void main(void) {
   // what stops a flat province from resolving to one flat colour.
   vec3 albedo = sampleRamp(0.25 + altitude * 0.55 + macro * 0.5 + grain * 0.1);
   // Freshly broken rock on everything too steep to hold a mantle.
-  albedo = mix(albedo, bedrockColor * (1.05 + grain * 0.6), clamp(exposure * 0.62, 0.0, 1.0));
+  albedo = mix(albedo, bedrockColor * (1.05 + grain * 0.6), clamp(rockExposure * 0.62, 0.0, 1.0));
   // Fines gather on the flats and in the hollows, and they are the brightest thing on most worlds.
   float mantle = clamp(fines * (1.0 - slope * 1.7), 0.0, 1.0);
   albedo = mix(albedo, regolithColor * (0.86 + grain * 0.42 + macro * 0.2), mantle * 0.72);
@@ -278,7 +280,7 @@ void main(void) {
   // Bedding planes, visible only where rock is exposed — a scarp is a stack of layers, not a slope.
   float bedding = fract((vWorldPosition.y + macro * strataSpacing * 0.7) / max(strataSpacing, 0.05));
   float bed = smoothstep(0.44, 0.5, abs(bedding - 0.5));
-  albedo *= 1.0 + (bed - 0.35) * strataStrength * exposure * 0.55;
+  albedo *= 1.0 + (bed - 0.35) * strataStrength * rockExposure * 0.55;
 
   // Wind streaks: fines swept into long tails, stretched along the prevailing wind and narrow
   // across it, only on ground shallow enough for them to settle.
@@ -318,29 +320,44 @@ void main(void) {
   float skyFacing = clamp(shadingNormal.y * 0.5 + 0.5, 0.0, 1.0);
   vec3 ambient = mix(skyHorizonColor, skyZenithColor, skyFacing) * ambientStrength * occlusion;
   // Light that has already bounced off the ground once, arriving from below.
-  vec3 bounce = albedo * sunColor * sunIntensity * 0.1 * clamp(0.5 - shadingNormal.y * 0.5, 0.0, 1.0) * occlusion;
+  // Light that has already bounced off the ground once. On an airless world there is no sky to
+  // fill a shadow, and this is the whole reason a shadowed slope on the Moon is dark rather than
+  // absent: the sunlit ground a few metres away is throwing light into it.
+  // How much light the ground around this point is throwing back is a fact about *that* ground,
+  // not about the face receiving it — which is why a shadowed slope on Europa's 90%-albedo ice is
+  // plainly lit while the same slope on the Moon's 12% regolith is nearly black.
+  vec3 bounce = albedo * groundAlbedo * sunColor * sunIntensity * occlusion
+    * (0.34 * clamp(0.5 - shadingNormal.y * 0.5, 0.0, 1.0) + 0.2);
 
   vec3 halfVector = normalize(sunDirection + viewDirection);
   float specularPower = mix(3.0, 120.0, 1.0 - roughness);
   float specular = pow(max(dot(shadingNormal, halfVector), 0.0), specularPower)
     * (1.0 - roughness) * sunVisibility;
   // Rock is not a mirror; frost and wet ground are closer to one.
-  float specularStrength = 0.06 + frostMask * 0.5;
+  // Rock is not a mirror; frost and ice come much closer to being one.
+  float specularStrength = 0.035 + frostMask * 0.45;
 
   vec3 color = albedo * (sunlight + ambient) + bounce;
   color += sunColor * sunIntensity * specular * specularStrength;
   // Grazing light picks out every grain, which is what makes a low sun read as low.
   float grazing = pow(1.0 - clamp(dot(shadingNormal, viewDirection), 0.0, 1.0), 4.0);
-  color += mix(skyHorizonColor, sunColor, 0.5) * grazing * 0.05 * (sunVisibility * 0.7 + 0.3);
+  color += mix(skyHorizonColor, sunColor, 0.5) * grazing * 0.028 * (sunVisibility * 0.7 + 0.3);
 
   // Incandescence, from below, pulsing on its own clock rather than the frame's.
   float glow = molten * (0.72 + 0.2 * sin(time * 0.8 + macro * 14.0) + 0.14 * sin(time * 2.3 + grain * 9.0));
   color += lavaColor * glow;
 
+  // Exposure last, over everything the surface emitted or reflected — the way a camera works, and
+  // the only way the highlights keep the same relationship to the diffuse that they were given.
+  color *= exposure;
+
   // --- Air ---------------------------------------------------------------------------------
   // Aerial perspective: distance reads as distance because the air between puts its own colour in
   // front of everything. Forward scattering brightens the sky within a few degrees of the sun.
-  float optical = 1.0 - exp(-viewDistance * hazeDensity * 0.011);
+  // Optical depth rises faster than linearly with the amount of air, which is why Mars's thin
+  // dusty sky still leaves a hundred metres of ground readable while Titan's smog closes in
+  // within a few dozen — Huygens could not see its own horizon.
+  float optical = 1.0 - exp(-viewDistance * pow(hazeDensity, 1.6) * 0.031);
   float sunGlow = pow(max(dot(-viewDirection, sunDirection), 0.0), 6.0);
   vec3 airColor = mix(skyHorizonColor, skyZenithColor, clamp(viewDirection.y * 1.4, 0.0, 1.0))
     + sunColor * sunGlow * hazeDensity * 0.5;
@@ -731,10 +748,12 @@ export const createSurfaceVista = (
         "bedrockColor",
         "frostColor",
         "lavaColor",
+        "groundAlbedo",
         "groundLow",
         "groundSpan",
         "hazeDensity",
         "ambientStrength",
+        "exposure",
         "strataStrength",
         "strataSpacing",
         "windAxis",
@@ -769,6 +788,15 @@ export const createSurfaceVista = (
   material.setColor3("bedrockColor", toColor3(geology.bedrockColor));
   material.setColor3("frostColor", toColor3(geology.frostColor));
   material.setColor3("lavaColor", toColor3(geology.lavaColor));
+  // The average colour of this world's ground, which is what its bounced light is made of.
+  material.setColor3(
+    "groundAlbedo",
+    new Color3(
+      geology.ramp.reduce((sum, stop) => sum + stop[0], 0) / geology.ramp.length,
+      geology.ramp.reduce((sum, stop) => sum + stop[1], 0) / geology.ramp.length,
+      geology.ramp.reduce((sum, stop) => sum + stop[2], 0) / geology.ramp.length,
+    ),
+  );
   material.setFloat("groundLow", worldLow);
   material.setFloat("groundSpan", Math.max(0.4, worldHigh - worldLow));
   material.setFloat("hazeDensity", geology.hazeDensity);
@@ -778,6 +806,36 @@ export const createSurfaceVista = (
   // is plainly readable under a dust-bright sky, not a black cut-out — and on an airless one the
   // small floor left here is all that keeps a shadowed slope from going to nothing at all.
   material.setFloat("ambientStrength", 0.11 + geology.hazeDensity * 0.5);
+  /**
+   * Exposure, the way a camera sets it rather than the way a light meter reads it.
+   *
+   * Albedo across the Solar System spans more than an order of magnitude — the Moon reflects 12%
+   * of the light that hits it, Enceladus essentially all of it — and rendering both at the same
+   * gain leaves one a black field and the other a white one. Every photograph ever taken of a
+   * surface was exposed for that surface; this does the same, opening up for dark ground and
+   * stopping down for bright, within the range a real exposure would move.
+   */
+  const rampLuminance =
+    geology.ramp.reduce(
+      (sum, stop) => sum + (stop[0] * 0.2126 + stop[1] * 0.7152 + stop[2] * 0.0722),
+      0,
+    ) / geology.ramp.length;
+  // What flat ground under this sun actually receives, mirroring the fragment shader's own terms
+  // so the exposure answers to the light as well as to the albedo. A world lit by a low sun with
+  // no air to fill its shadows needs opening up further than its albedo alone would say.
+  const lambert = Math.max(0.02, sunDirection.y);
+  const backscatter = (sunDirection.y * 0.5 + 0.5) ** 2.2;
+  const flatSunlight = sunIntensity * (lambert * 0.84 + backscatter * 0.16) * 2.4;
+  const skyLuminance =
+    skyHorizonColor.r * 0.2126 + skyHorizonColor.g * 0.7152 + skyHorizonColor.b * 0.0722;
+  const flatAmbient = (0.11 + geology.hazeDensity * 0.5) * skyLuminance;
+  // The target is a display-space mid-tone rather than a photometric one: this renderer writes
+  // shader output straight to the framebuffer with no tone curve, the same as every other surface
+  // in the scene, so the number to aim at is what a mid-grey looks like on the glass.
+  material.setFloat(
+    "exposure",
+    Math.min(5, Math.max(0.6, 0.42 / Math.max(rampLuminance * (flatSunlight + flatAmbient), 0.02))),
+  );
   material.setFloat("strataStrength", geology.strataStrength);
   material.setFloat("strataSpacing", Math.max(0.18, geology.strataSpacing));
   material.setFloat("windStreaks", geology.windStreaks);

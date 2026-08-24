@@ -91,6 +91,14 @@ export interface SurfaceGeology {
   liquidColor: Rgb;
   provenance: "inferred" | "measured";
   provinces: readonly TerrainProvince[];
+  /**
+   * What colour the sky is from the ground, which is a fact about the air rather than about the
+   * rock beneath it — and not something the surface palette can be asked for. Left to the
+   * inference, Titan's came out blue: its equilibrium temperature marks it as a deep-frozen world,
+   * and frozen worlds get their atmosphere tinted toward ice, so the orange smog moon whose sky
+   * hides its own sun was given a clear blue one.
+   */
+  skyColor: Rgb;
   /** Bottom-to-top colour ramp for the exposed ground, sampled by altitude. */
   ramp: readonly [Rgb, Rgb, Rgb, Rgb, Rgb];
   /** Depth of the fines mantle: 0 is bare rock, 1 an ocean of dust. */
@@ -153,6 +161,7 @@ const MEASURED_GEOLOGY: Readonly<Record<number, MeasuredGeology>> = {
   // Mercury — crater-saturated crust darkened by graphite, cut by kilometre-high lobate scarps
   // where the whole planet contracted as it cooled, with smooth volcanic plains between.
   199: {
+    skyColor: rgb(0.003, 0.004, 0.008),
     provinces: provinces(
       ["impact-highlands", 0.52],
       ["flood-basalt", 0.28],
@@ -193,6 +202,7 @@ const MEASURED_GEOLOGY: Readonly<Record<number, MeasuredGeology>> = {
   // resurfacing, nothing erodes without water, and Venera's own photographs show flat, layered,
   // platy slabs in an orange light that the CO2 column filters out of the sunlight above.
   299: {
+    skyColor: rgb(0.3, 0.185, 0.062),
     provinces: provinces(
       ["flood-basalt", 0.46],
       ["volcanic-shield", 0.28],
@@ -232,6 +242,7 @@ const MEASURED_GEOLOGY: Readonly<Record<number, MeasuredGeology>> = {
   // Earth — the one surface anyone has stood on. Folded ranges, a vegetated lowland, standing
   // water, and an impact record almost entirely erased by weather and plate tectonics.
   399: {
+    skyColor: rgb(0.28, 0.45, 0.85),
     provinces: provinces(
       ["folded-mountains", 0.4],
       ["coastal-shelf", 0.32],
@@ -244,7 +255,9 @@ const MEASURED_GEOLOGY: Readonly<Record<number, MeasuredGeology>> = {
       rgb(0.33, 0.3, 0.235),
       rgb(0.72, 0.735, 0.755),
     ],
-    regolithColor: rgb(0.19, 0.155, 0.105),
+    // Soil under a biosphere, not bare mineral fines: what settles on Earth's flats and fills its
+    // hollows is vegetated, and it is the single strongest colour cue the planet has.
+    regolithColor: rgb(0.09, 0.115, 0.05),
     bedrockColor: rgb(0.21, 0.2, 0.19),
     frostColor: rgb(0.82, 0.86, 0.9),
     frostCoverage: 0.22,
@@ -252,7 +265,7 @@ const MEASURED_GEOLOGY: Readonly<Record<number, MeasuredGeology>> = {
     regolithDepth: 0.55,
     boulderDensity: 0.3,
     boulderScale: 1.0,
-    relief: 3.6,
+    relief: 5.2,
     featureScale: 1.0,
     strataStrength: 0.42,
     strataSpacing: 1.1,
@@ -271,6 +284,7 @@ const MEASURED_GEOLOGY: Readonly<Record<number, MeasuredGeology>> = {
   // The Moon — the crater density ceiling for the inner system, under metres of impact-ground
   // regolith, with dark basalt maria flooding the near-side basins.
   301: {
+    skyColor: rgb(0.003, 0.004, 0.008),
     provinces: provinces(
       ["impact-highlands", 0.48],
       ["flood-basalt", 0.32],
@@ -311,6 +325,7 @@ const MEASURED_GEOLOGY: Readonly<Record<number, MeasuredGeology>> = {
   // ochre dust, wind-carved yardang ridges, the deepest canyon system known, the largest
   // volcanoes known, and permanent ice confined to roughly a hundredth of the surface.
   499: {
+    skyColor: rgb(0.6, 0.36, 0.23),
     provinces: provinces(
       ["yardang-badlands", 0.28],
       ["dune-sea", 0.22],
@@ -352,6 +367,7 @@ const MEASURED_GEOLOGY: Readonly<Record<number, MeasuredGeology>> = {
   // Phobos — a dark, grooved, regolith-covered fragment, its surface dominated by Stickney's
   // ejecta rather than by anything endogenic.
   401: {
+    skyColor: rgb(0.003, 0.004, 0.008),
     provinces: provinces(["impact-highlands", 0.7], ["regolith-plain", 0.3]),
     ramp: [
       rgb(0.014, 0.013, 0.012),
@@ -382,6 +398,7 @@ const MEASURED_GEOLOGY: Readonly<Record<number, MeasuredGeology>> = {
     },
   },
   402: {
+    skyColor: rgb(0.003, 0.004, 0.008),
     provinces: provinces(["regolith-plain", 0.62], ["impact-highlands", 0.38]),
     ramp: [
       rgb(0.016, 0.015, 0.014),
@@ -415,6 +432,7 @@ const MEASURED_GEOLOGY: Readonly<Record<number, MeasuredGeology>> = {
   // Io — sulfur and sulfur dioxide over silicate, resurfaced fast enough that not one impact
   // crater has ever been identified on it, with tectonic peaks taller than anything on Earth.
   501: {
+    skyColor: rgb(0.03, 0.028, 0.016),
     provinces: provinces(
       ["lava-fields", 0.38],
       ["volcanic-shield", 0.27],
@@ -457,6 +475,7 @@ const MEASURED_GEOLOGY: Readonly<Record<number, MeasuredGeology>> = {
   // Europa — the smoothest solid surface known: bright water ice crazed by double ridges and
   // rafted into chaos blocks, with total relief of only a few hundred metres.
   502: {
+    skyColor: rgb(0.004, 0.005, 0.009),
     provinces: provinces(["fractured-ice", 0.74], ["glacial-plain", 0.26]),
     ramp: [
       rgb(0.185, 0.155, 0.135),
@@ -472,10 +491,11 @@ const MEASURED_GEOLOGY: Readonly<Record<number, MeasuredGeology>> = {
     craterDensity: 0.03,
     regolithDepth: 0.3,
     boulderDensity: 0.55,
-    boulderScale: 1.9,
-    // A tenth of the inner planets' relief. Europa's whole topography fits inside one Martian dune.
-    relief: 0.9,
-    featureScale: 1.4,
+    boulderScale: 1.25,
+    // A fraction of the inner planets' relief: Europa is the smoothest solid body known, and what
+    // little it has is in the ridges rather than in any regional slope.
+    relief: 1.6,
+    featureScale: 0.85,
     strataStrength: 0.3,
     strataSpacing: 0.5,
     windStreaks: 0,
@@ -493,6 +513,7 @@ const MEASURED_GEOLOGY: Readonly<Record<number, MeasuredGeology>> = {
   // Ganymede — dark, ancient, cratered terrain cut across by bright grooved bands where the
   // crust pulled apart.
   503: {
+    skyColor: rgb(0.004, 0.005, 0.009),
     provinces: provinces(
       ["fractured-ice", 0.42],
       ["impact-highlands", 0.34],
@@ -532,6 +553,7 @@ const MEASURED_GEOLOGY: Readonly<Record<number, MeasuredGeology>> = {
   // Callisto — the most heavily cratered surface in the Solar System, its ice darkened to a
   // lag of dust and its small craters erased by sublimation.
   504: {
+    skyColor: rgb(0.003, 0.004, 0.008),
     provinces: provinces(["impact-highlands", 0.66], ["regolith-plain", 0.34]),
     ramp: [
       rgb(0.028, 0.026, 0.024),
@@ -567,6 +589,7 @@ const MEASURED_GEOLOGY: Readonly<Record<number, MeasuredGeology>> = {
   // Enceladus — the brightest surface in the Solar System: fresh plume fallout over a young
   // south-polar terrain of tiger-stripe fractures.
   602: {
+    skyColor: rgb(0.005, 0.007, 0.011),
     provinces: provinces(
       ["fractured-ice", 0.48],
       ["glacial-plain", 0.34],
@@ -606,6 +629,7 @@ const MEASURED_GEOLOGY: Readonly<Record<number, MeasuredGeology>> = {
   // Titan — sand seas of organic grains covering a fifth of the moon, fluvial valleys cut by
   // methane rain, polar lakes, and an orange haze thick enough to hide the Sun.
   606: {
+    skyColor: rgb(0.42, 0.24, 0.075),
     provinces: provinces(
       ["dune-sea", 0.46],
       ["yardang-badlands", 0.2],
@@ -627,8 +651,8 @@ const MEASURED_GEOLOGY: Readonly<Record<number, MeasuredGeology>> = {
     regolithDepth: 0.9,
     boulderDensity: 0.28,
     boulderScale: 0.8,
-    relief: 1.6,
-    featureScale: 1.5,
+    relief: 2.8,
+    featureScale: 1.05,
     strataStrength: 0.35,
     strataSpacing: 0.9,
     windStreaks: 0.7,
@@ -647,6 +671,7 @@ const MEASURED_GEOLOGY: Readonly<Record<number, MeasuredGeology>> = {
   // Iapetus — two hemispheres in one body: a dark dust-mantled leading side and bright trailing
   // ice, split by an equatorial ridge 13 km high.
   608: {
+    skyColor: rgb(0.003, 0.004, 0.008),
     provinces: provinces(
       ["impact-highlands", 0.5],
       ["folded-mountains", 0.28],
@@ -686,6 +711,7 @@ const MEASURED_GEOLOGY: Readonly<Record<number, MeasuredGeology>> = {
   // Triton — nitrogen frost over a cantaloupe terrain of dimpled cells, with active plumes and
   // almost no craters on a surface younger than 100 Myr.
   801: {
+    skyColor: rgb(0.05, 0.055, 0.075),
     provinces: provinces(
       ["glacial-plain", 0.44],
       ["fractured-ice", 0.36],
@@ -725,6 +751,7 @@ const MEASURED_GEOLOGY: Readonly<Record<number, MeasuredGeology>> = {
   // Charon — grey water ice, a tectonic chasm system four times the length of the Grand Canyon,
   // and a north polar cap stained red by tholins escaping from Pluto.
   901: {
+    skyColor: rgb(0.003, 0.004, 0.008),
     provinces: provinces(
       ["canyon-rift", 0.38],
       ["impact-highlands", 0.34],
@@ -764,6 +791,7 @@ const MEASURED_GEOLOGY: Readonly<Record<number, MeasuredGeology>> = {
   // Pluto — nitrogen ice convecting into cells tens of kilometres across on Sputnik Planitia,
   // walled by water-ice mountains and bordered by tholin-dark uplands.
   999: {
+    skyColor: rgb(0.075, 0.08, 0.1),
     provinces: provinces(
       ["glacial-plain", 0.4],
       ["folded-mountains", 0.24],
@@ -804,6 +832,7 @@ const MEASURED_GEOLOGY: Readonly<Record<number, MeasuredGeology>> = {
   // Ceres — a dark carbonaceous crust at 9% albedo, pocked by craters and spotted with the
   // brightest salt deposits in the belt.
   2_000_001: {
+    skyColor: rgb(0.003, 0.004, 0.008),
     provinces: provinces(["impact-highlands", 0.58], ["regolith-plain", 0.28], ["salt-pan", 0.14]),
     ramp: [
       rgb(0.018, 0.017, 0.016),
@@ -862,10 +891,11 @@ const icyMoonGeology = (
   bedrockColor: scale(rgb(0.32, 0.33, 0.35), brightness),
   frostColor: scale(rgb(0.93, 0.96, 1), Math.min(1, brightness * 1.05)),
   frostCoverage: 0.55 + brightness * 0.3,
+  skyColor: rgb(0.003, 0.004, 0.008),
   craterDensity: cratering,
   regolithDepth: 0.44,
   boulderDensity: 0.36,
-  boulderScale: 1.45,
+  boulderScale: 1.1,
   relief,
   featureScale: 1.2,
   strataStrength: 0.24,
@@ -1104,6 +1134,9 @@ const inferredGeology = (recipe: RockyWorldRecipe): SurfaceGeology => {
     liquidLevel: surface.waterLevel > 0 ? surface.waterLevel : null,
     liquidColor: surface.waterColor,
     hazeDensity: clamp01(air * 0.7 + surface.cloudCover * 0.2),
+    // The recipe's atmosphere colour is what this world's air would scatter; with no air to
+    // scatter in, the sky is simply space.
+    skyColor: mix(rgb(0.003, 0.004, 0.008), recipe.atmosphere.color, clamp01(air * 1.6) ** 0.6),
     detail,
     provenance: "inferred",
     seed: recipe.seed,
@@ -1152,6 +1185,7 @@ const unresolvedGeology = (recipe: RockyWorldRecipe): SurfaceGeology => ({
   liquidLevel: null,
   liquidColor: rgb(0.1, 0.12, 0.14),
   hazeDensity: 0,
+  skyColor: rgb(0.003, 0.004, 0.008),
   detail: {
     chemistry: "silicate",
     chemistryScale: 12,
