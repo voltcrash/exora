@@ -3,6 +3,9 @@ import type {
   ExoplanetProfile,
   PlanetResponse,
   PlanetSearchResponse,
+  SmallBodyLookup,
+  SmallBodyParameter,
+  SmallBodySearchResponse,
   StarProfile,
   StarResponse,
   StarSearchResponse,
@@ -30,10 +33,15 @@ const OBJECT_LOOKUP_TIMEOUT_MS = 8_000;
 const PLANET_COLLECTION_TIMEOUT_MS = 8_000;
 const STAR_COLLECTION_TIMEOUT_MS = 10_000;
 const EPHEMERIS_TIMEOUT_MS = 20_000;
+const SMALL_BODY_TIMEOUT_MS = 15_000;
 
 interface CollectionOptions {
   fetcher?: Fetcher;
   signal?: AbortSignal;
+}
+
+interface SmallBodySearchOptions extends CollectionOptions {
+  lookup?: SmallBodyLookup;
 }
 
 /**
@@ -202,6 +210,84 @@ const isEphemerisResponse = (value: unknown): value is EphemerisResponse => {
     typeof candidate.meta.sourceVersion === "string" &&
     typeof candidate.meta.cached === "boolean" &&
     typeof candidate.meta.stale === "boolean",
+  );
+};
+
+const isSmallBodyParameter = (value: unknown): value is SmallBodyParameter => {
+  if (!value || typeof value !== "object") return false;
+  const candidate = value as Partial<SmallBodyParameter>;
+  return (
+    typeof candidate.name === "string" &&
+    typeof candidate.title === "string" &&
+    typeof candidate.value === "string" &&
+    (candidate.uncertainty === null || typeof candidate.uncertainty === "string") &&
+    (candidate.units === null || typeof candidate.units === "string") &&
+    (candidate.reference === null || typeof candidate.reference === "string")
+  );
+};
+
+const isNullableBoolean = (value: unknown): boolean => value === null || typeof value === "boolean";
+const isNullableNumber = (value: unknown): boolean =>
+  value === null || (typeof value === "number" && Number.isFinite(value));
+
+const isSmallBodySearchResponse = (value: unknown): value is SmallBodySearchResponse => {
+  if (!value || typeof value !== "object") return false;
+  const candidate = value as Partial<SmallBodySearchResponse>;
+  const status = candidate.meta?.status;
+  const profile = candidate.data;
+  const profileValid = Boolean(
+    profile &&
+    ["asteroid", "comet"].includes(profile.kind) &&
+    typeof profile.designation === "string" &&
+    typeof profile.fullName === "string" &&
+    typeof profile.spkId === "string" &&
+    isNullableBoolean(profile.nearEarth) &&
+    isNullableBoolean(profile.potentiallyHazardous) &&
+    Array.isArray(profile.orbit?.elements) &&
+    profile.orbit.elements.every(isSmallBodyParameter) &&
+    Array.isArray(profile.physicalParameters) &&
+    profile.physicalParameters.every(isSmallBodyParameter) &&
+    Array.isArray(profile.closeApproaches) &&
+    profile.closeApproaches.every(
+      (approach) =>
+        typeof approach.body === "string" &&
+        typeof approach.calendarDate === "string" &&
+        Number.isFinite(approach.distanceAu) &&
+        isNullableNumber(approach.distanceMinimumAu) &&
+        isNullableNumber(approach.distanceMaximumAu) &&
+        isNullableNumber(approach.julianDate) &&
+        isNullableNumber(approach.relativeVelocityKilometersPerSecond) &&
+        isNullableNumber(approach.timeUncertaintySeconds),
+    ),
+  );
+  return Boolean(
+    ["ambiguous", "match", "not-found"].includes(status ?? "") &&
+    candidate.meta?.source === "NASA/JPL Small-Body Database (SBDB) API" &&
+    typeof candidate.meta.sourceVersion === "string" &&
+    typeof candidate.meta.query === "string" &&
+    typeof candidate.meta.retrievedAt === "string" &&
+    ["auto", "designation", "spk"].includes(candidate.meta.lookup ?? "") &&
+    typeof candidate.meta.cached === "boolean" &&
+    typeof candidate.meta.stale === "boolean" &&
+    Array.isArray(candidate.matches) &&
+    candidate.matches.every(
+      (match) => typeof match.designation === "string" && typeof match.name === "string",
+    ) &&
+    (status === "match" ? profileValid : profile === null),
+  );
+};
+
+export const searchSmallBodies = async (
+  query: string,
+  { lookup = "auto", ...options }: SmallBodySearchOptions = {},
+): Promise<SmallBodySearchResponse> => {
+  const parameters = new URLSearchParams({ lookup, q: query.trim() });
+  return requestCollection(
+    `/api/small-bodies?${parameters.toString()}`,
+    options,
+    SMALL_BODY_TIMEOUT_MS,
+    "JPL small-body search",
+    isSmallBodySearchResponse,
   );
 };
 

@@ -236,6 +236,64 @@ const stubArchive = ({ missing = [] as string[] } = {}) => {
       });
     }
 
+    if (url.pathname === "/api/small-bodies") {
+      const query = url.searchParams.get("q") ?? "";
+      return Response.json({
+        data: {
+          closeApproaches: [
+            {
+              body: "Earth",
+              calendarDate: "2029-Apr-13 21:46",
+              distanceAu: 0.000254,
+              distanceMaximumAu: 0.000256,
+              distanceMinimumAu: 0.000252,
+              julianDate: 2462239.407,
+              relativeVelocityKilometersPerSecond: 7.42,
+              timeUncertaintySeconds: 3.1,
+            },
+          ],
+          designation: "99942",
+          fullName: "99942 Apophis (2004 MN4)",
+          kind: "asteroid",
+          nearEarth: true,
+          orbit: {
+            conditionCode: "0",
+            dataArcDays: 7600,
+            elements: [
+              {
+                name: "a",
+                reference: null,
+                title: "semi-major axis",
+                uncertainty: "1e-10",
+                units: "au",
+                value: "0.9224",
+              },
+            ],
+            epochJulianDate: 2461000.5,
+            firstObservation: "2004-03-15",
+            lastObservation: "2026-08-01",
+            solutionDate: "2026-08-02 12:00:00",
+            solutionId: "220",
+          },
+          orbitClass: { code: "ATE", name: "Aten" },
+          physicalParameters: [],
+          potentiallyHazardous: true,
+          spkId: "2099942",
+        },
+        matches: [],
+        meta: {
+          cached: true,
+          lookup: "auto",
+          query,
+          retrievedAt: "2026-08-24T12:00:00.000Z",
+          source: "NASA/JPL Small-Body Database (SBDB) API",
+          sourceVersion: "1.3",
+          stale: false,
+          status: "match",
+        },
+      });
+    }
+
     if (url.pathname.startsWith("/api/planets/")) {
       return Response.json({
         data: requested === "featured" ? featuredPlanet : namedPlanet(requested),
@@ -497,6 +555,24 @@ test("the Home System catalog filters mission asteroids and opens measured geome
     .element(page.getByLabelText("Permanent identifiers"))
     .toHaveTextContent("SPK 20101955");
   expect(window.location.search).toBe("?asteroid=101955%20Bennu");
+});
+
+test("the Home System catalog searches JPL SBDB without inventing missing physical data", async () => {
+  const calls = stubArchive();
+  mountApp();
+
+  await userEvent.click(page.getByRole("button", { name: "Open our Solar System" }));
+  await userEvent.fill(page.getByPlaceholder("Name, designation, or SPK ID"), "Apophis");
+  await userEvent.click(page.getByRole("button", { name: "SEARCH JPL SBDB" }));
+
+  await expect
+    .element(page.getByRole("heading", { name: "99942 Apophis (2004 MN4)" }))
+    .toBeVisible();
+  await expect.element(page.getByText("POTENTIALLY HAZARDOUS", { exact: true })).toBeVisible();
+  await expect
+    .element(page.getByText("No physical parameters are available in this SBDB record."))
+    .toBeVisible();
+  expect(calls.some((path) => path.includes("/api/small-bodies?"))).toBe(true);
 });
 
 test("the Home System catalog opens a measured comet with explicitly simulated activity", async () => {

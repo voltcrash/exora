@@ -3,6 +3,7 @@ import { createDatabaseClient } from "./database.ts";
 import { NasaPlanetRepository } from "./nasa-archive.ts";
 import { JplHorizonsRepository } from "./horizons.ts";
 import { PostgresPlanetRepository } from "./postgres-catalog.ts";
+import { JplSbdbRepository } from "./sbdb.ts";
 import { SimbadStarRepository } from "./simbad-archive.ts";
 
 const connectionString = process.env.DATABASE_URL?.trim();
@@ -20,5 +21,6 @@ const repository = database ? new PostgresPlanetRepository(database) : new NasaP
 export const app = createApp({
   horizonsRepository: new JplHorizonsRepository(),
   repository,
+  sbdbRepository: new JplSbdbRepository(),
   starRepository: new SimbadStarRepository(),
 });

@@ -4,6 +4,8 @@ import type {
   ExoplanetProfile,
   PlanetResponse,
   PlanetSearchResponse,
+  SmallBodyLookup,
+  SmallBodySearchResponse,
   StarProfile,
   StarResponse,
   StarSearchResponse,
@@ -33,6 +35,13 @@ import {
   type RateLimiter,
 } from "./rate-limit.ts";
 import {
+  JplSbdbRepository,
+  SBDB_API_VERSION,
+  SBDB_SOURCE,
+  type SbdbRepository,
+  SbdbError,
+} from "./sbdb.ts";
+import {
   SimbadArchiveError,
   SimbadStarRepository,
   STAR_DISCOVERY_CATEGORIES,
@@ -46,6 +55,8 @@ interface CreateAppOptions {
   /** Overridable so a test can exercise the limit without issuing a hundred requests. */
   rateLimiter?: RateLimiter;
   repository?: PlanetRepository;
+  sbdbRateLimiter?: RateLimiter;
+  sbdbRepository?: SbdbRepository;
   starRepository?: StarRepository;
 }
 
@@ -119,6 +130,8 @@ export const createApp = ({
   horizonsRepository = new JplHorizonsRepository(),
   rateLimiter = createRateLimiter(DEFAULT_RATE_LIMIT),
   repository = new NasaPlanetRepository(),
+  sbdbRateLimiter = createRateLimiter({ limit: 20, windowMs: 60_000 }),
+  sbdbRepository = new JplSbdbRepository(),
   starRepository = new SimbadStarRepository(),
 }: CreateAppOptions = {}) => {
   const app = new Hono();
@@ -225,6 +238,60 @@ export const createApp = ({
         source: HORIZONS_SOURCE,
         sourceVersion: HORIZONS_API_VERSION,
         stale: result.stale,
+      },
+    });
+  });
+
+  app.get("/api/small-bodies", async (context) => {
+    const decision = sbdbRateLimiter.check(
+      clientKey({
+        forwardedFor: context.req.header("x-forwarded-for"),
+        realIp: context.req.header("x-real-ip"),
+      }),
+      Date.now(),
+    );
+    context.header("SmallBody-RateLimit-Limit", String(decision.limit));
+    context.header("SmallBody-RateLimit-Remaining", String(decision.remaining));
+    if (!decision.allowed) {
+      context.header("Retry-After", String(decision.retryAfterSeconds));
+      return context.json(
+        apiError("RATE_LIMITED", "Too many small-body searches. Please wait before trying again."),
+        429,
+      );
+    }
+
+    const query = context.req.query("q")?.trim() ?? "";
+    const lookup = (context.req.query("lookup")?.trim() || "auto") as SmallBodyLookup;
+    if (query.length < 1 || query.length > MAX_NAME_LENGTH || query.includes("*")) {
+      return context.json(
+        apiError(
+          "INVALID_REQUEST",
+          "Small-body search must contain 1 to 100 characters and cannot use wildcards.",
+        ),
+        400,
+      );
+    }
+    if (!(["auto", "designation", "spk"] as const).includes(lookup)) {
+      return context.json(apiError("INVALID_REQUEST", "Small-body lookup mode is invalid."), 400);
+    }
+    if (lookup === "spk" && !/^\d+$/.test(query)) {
+      return context.json(apiError("INVALID_REQUEST", "SPK identifiers must be numeric."), 400);
+    }
+
+    const result = await sbdbRepository.search(query, lookup);
+    context.header("Cache-Control", "public, max-age=300, stale-while-revalidate=86400");
+    return context.json<SmallBodySearchResponse>({
+      data: result.data,
+      matches: result.matches,
+      meta: {
+        cached: result.cached,
+        lookup,
+        query,
+        retrievedAt: result.retrievedAt,
+        source: SBDB_SOURCE,
+        sourceVersion: SBDB_API_VERSION,
+        stale: result.stale,
+        status: result.status,
       },
     });
   });
@@ -407,6 +474,16 @@ export const createApp = ({
         apiError(
           "UPSTREAM_UNAVAILABLE",
           "JPL Horizons is temporarily unavailable and no cached ephemeris covers this time.",
+        ),
+        502,
+      );
+    }
+
+    if (error instanceof SbdbError) {
+      return context.json(
+        apiError(
+          "UPSTREAM_UNAVAILABLE",
+          "JPL SBDB is temporarily unavailable and no cached small-body record covers this search.",
         ),
         502,
       );

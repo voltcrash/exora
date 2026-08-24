@@ -241,6 +241,72 @@ export interface EphemerisResponse {
   };
 }
 
+export type SmallBodyKind = "asteroid" | "comet";
+export type SmallBodyLookup = "auto" | "designation" | "spk";
+
+/** One SBDB value kept with the uncertainty, units, and citation JPL attached to it. */
+export interface SmallBodyParameter {
+  name: string;
+  reference: string | null;
+  title: string;
+  uncertainty: string | null;
+  units: string | null;
+  value: string;
+}
+
+export interface SmallBodyCloseApproach {
+  body: string;
+  calendarDate: string;
+  distanceAu: number;
+  distanceMaximumAu: number | null;
+  distanceMinimumAu: number | null;
+  julianDate: number | null;
+  relativeVelocityKilometersPerSecond: number | null;
+  timeUncertaintySeconds: number | null;
+}
+
+export interface SmallBodyProfile {
+  closeApproaches: SmallBodyCloseApproach[];
+  designation: string;
+  fullName: string;
+  kind: SmallBodyKind;
+  nearEarth: boolean | null;
+  orbit: {
+    conditionCode: string | null;
+    dataArcDays: number | null;
+    elements: SmallBodyParameter[];
+    epochJulianDate: number | null;
+    firstObservation: string | null;
+    lastObservation: string | null;
+    solutionDate: string | null;
+    solutionId: string | null;
+  };
+  orbitClass: { code: string; name: string } | null;
+  physicalParameters: SmallBodyParameter[];
+  potentiallyHazardous: boolean | null;
+  spkId: string;
+}
+
+export interface SmallBodyMatch {
+  designation: string;
+  name: string;
+}
+
+export interface SmallBodySearchResponse {
+  data: SmallBodyProfile | null;
+  matches: SmallBodyMatch[];
+  meta: {
+    cached: boolean;
+    lookup: SmallBodyLookup;
+    query: string;
+    retrievedAt: string;
+    source: "NASA/JPL Small-Body Database (SBDB) API";
+    sourceVersion: string;
+    stale: boolean;
+    status: "ambiguous" | "match" | "not-found";
+  };
+}
+
 export interface ApiErrorResponse {
   error: {
     code: "INVALID_REQUEST" | "NOT_FOUND" | "RATE_LIMITED" | "UPSTREAM_UNAVAILABLE";

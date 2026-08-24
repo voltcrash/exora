@@ -2073,6 +2073,41 @@ h1 em {
   border-color: rgb(255 165 76 / 58%);
 }
 
+.solar-search-field {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 7px;
+}
+
+.solar-search-field button,
+.sbdb-ambiguity button {
+  border: 1px solid rgb(255 165 76 / 28%);
+  border-radius: 11px;
+  color: #ffd1a6;
+  background: rgb(255 136 48 / 8%);
+  cursor: pointer;
+  font: 7px var(--mono);
+  letter-spacing: 0.07em;
+}
+
+.solar-search-field button {
+  min-width: 112px;
+  padding: 0 11px;
+}
+
+.solar-search-field button:hover,
+.solar-search-field button:focus-visible,
+.sbdb-ambiguity button:hover,
+.sbdb-ambiguity button:focus-visible {
+  border-color: rgb(255 165 76 / 62%);
+  background: rgb(255 136 48 / 14%);
+}
+
+.solar-search-field button:disabled {
+  opacity: 0.42;
+  cursor: default;
+}
+
 .solar-catalog-filters {
   display: flex;
   flex-wrap: wrap;
@@ -2096,6 +2131,240 @@ h1 em {
   border-color: rgb(255 165 76 / 52%);
   color: #ffd1a6;
   background: rgb(255 136 48 / 10%);
+}
+
+.sbdb-search-state,
+.sbdb-ambiguity,
+.sbdb-result {
+  margin: 0 26px 22px;
+  border: 1px solid rgb(139 230 234 / 18%);
+  border-radius: 16px;
+  background: linear-gradient(130deg, rgb(20 65 69 / 18%), rgb(255 255 255 / 2%));
+}
+
+.sbdb-search-state {
+  display: grid;
+  gap: 5px;
+  padding: 16px 18px;
+  color: #8cb9bd;
+  font: 8px/1.5 var(--mono);
+  letter-spacing: 0.06em;
+}
+
+.sbdb-search-state strong {
+  color: var(--cyan);
+}
+
+.sbdb-search-state.error {
+  border-color: rgb(255 123 90 / 26%);
+}
+
+.sbdb-search-state.error strong {
+  color: #ffad8c;
+}
+
+.sbdb-ambiguity {
+  padding: 18px;
+}
+
+.sbdb-ambiguity > div {
+  display: grid;
+  gap: 4px;
+}
+
+.sbdb-ambiguity small,
+.sbdb-result header small {
+  color: #79aeb3;
+  font: 7px var(--mono);
+  letter-spacing: 0.1em;
+}
+
+.sbdb-ambiguity h3,
+.sbdb-result h3 {
+  margin: 0;
+  color: #dff8fa;
+  font-size: 18px;
+  font-weight: 500;
+}
+
+.sbdb-ambiguity p,
+.sbdb-result header p {
+  margin: 2px 0 0;
+  color: #789a9e;
+  font: 8px/1.5 var(--mono);
+}
+
+.sbdb-ambiguity ol {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+  margin: 14px 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+.sbdb-ambiguity button {
+  width: 100%;
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 11px 12px;
+  text-align: left;
+}
+
+.sbdb-ambiguity button span {
+  flex: none;
+  color: #89c5c9;
+}
+
+.sbdb-result {
+  overflow: hidden;
+}
+
+.sbdb-result > header {
+  display: grid;
+  grid-template-columns: 88px 1fr;
+  align-items: center;
+  gap: 16px;
+  padding: 18px;
+  border-bottom: 1px solid rgb(139 230 234 / 12%);
+}
+
+.sbdb-result > header .solar-body-portrait {
+  width: 76px;
+  height: 76px;
+  font-size: 28px;
+}
+
+.sbdb-result > header > div {
+  display: grid;
+  gap: 5px;
+}
+
+.sbdb-badges {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 5px;
+  margin-top: 4px;
+}
+
+.sbdb-badges span {
+  padding: 4px 6px;
+  border: 1px solid rgb(139 230 234 / 18%);
+  border-radius: 999px;
+  color: #81b5ba;
+  font: 6px var(--mono);
+  letter-spacing: 0.07em;
+}
+
+.sbdb-badges span.hazard {
+  border-color: rgb(255 143 97 / 38%);
+  color: #ffad88;
+}
+
+.sbdb-data-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.sbdb-data-grid > section {
+  min-width: 0;
+  padding: 16px 18px 20px;
+  border-right: 1px solid rgb(139 230 234 / 10%);
+}
+
+.sbdb-data-grid > section:last-child {
+  border-right: 0;
+}
+
+.sbdb-data-grid h4 {
+  margin: 0 0 10px;
+  color: #acd8db;
+  font: 8px var(--mono);
+  font-weight: 500;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+}
+
+.sbdb-solution-note,
+.sbdb-missing {
+  margin: 0 0 11px;
+  color: #65888c;
+  font: 6px/1.5 var(--mono);
+  letter-spacing: 0.05em;
+}
+
+.sbdb-data-grid dl {
+  display: grid;
+  gap: 8px;
+  margin: 0;
+}
+
+.sbdb-data-grid dl > div {
+  display: grid;
+  gap: 2px;
+}
+
+.sbdb-data-grid dt {
+  color: #688d91;
+  font: 6px var(--mono);
+  text-transform: uppercase;
+}
+
+.sbdb-data-grid dd {
+  margin: 0;
+  overflow-wrap: anywhere;
+  color: #d7eff1;
+  font: 8px/1.35 var(--mono);
+}
+
+.sbdb-data-grid dl small {
+  color: #59777a;
+  font: 6px/1.35 var(--mono);
+}
+
+.sbdb-approaches {
+  display: grid;
+  gap: 10px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.sbdb-approaches li {
+  display: grid;
+  gap: 3px;
+}
+
+.sbdb-approaches strong,
+.sbdb-approaches span,
+.sbdb-approaches small {
+  font-family: var(--mono);
+}
+
+.sbdb-approaches strong {
+  color: #d7eff1;
+  font-size: 8px;
+}
+
+.sbdb-approaches span {
+  color: #8ab8bc;
+  font-size: 7px;
+}
+
+.sbdb-approaches small {
+  color: #5e7e81;
+  font-size: 6px;
+  line-height: 1.45;
+}
+
+.sbdb-result > footer {
+  padding: 11px 18px;
+  border-top: 1px solid rgb(139 230 234 / 10%);
+  color: #5e7e81;
+  background: rgb(0 0 0 / 12%);
+  font: 6px/1.5 var(--mono);
+  letter-spacing: 0.05em;
 }
 
 .solar-catalog-section > h3 {
@@ -4080,6 +4349,43 @@ h1 em {
 
   .solar-catalog-filters {
     justify-content: start;
+  }
+
+  .solar-search-field,
+  .sbdb-ambiguity ol,
+  .sbdb-data-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .solar-search-field button {
+    min-height: 36px;
+  }
+
+  .sbdb-search-state,
+  .sbdb-ambiguity,
+  .sbdb-result {
+    margin-inline: 18px;
+  }
+
+  .sbdb-result > header {
+    grid-template-columns: 58px 1fr;
+    gap: 10px;
+    padding: 14px;
+  }
+
+  .sbdb-result > header .solar-body-portrait {
+    width: 52px;
+    height: 52px;
+    font-size: 19px;
+  }
+
+  .sbdb-result h3 {
+    font-size: 14px;
+  }
+
+  .sbdb-data-grid > section {
+    border-right: 0;
+    border-bottom: 1px solid rgb(139 230 234 / 10%);
   }
 
   .approach-status {

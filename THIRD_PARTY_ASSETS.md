@@ -436,3 +436,29 @@ an explicitly labelled two-body propagation using the returned position and velo
 presented as a second Horizons solution. The orbit ribbons remain the existing simplified catalog
 orbits and are labelled separately. If Horizons is unavailable, only a still-valid stale cache
 entry for the exact target and epoch may be served, and the interface marks it `STALE CACHE`.
+
+## Live JPL small-body catalog
+
+API contract and deterministic fixtures retrieved **2026-08-24** from the
+[NASA/JPL Small-Body Database API](https://ssd-api.jpl.nasa.gov/doc/sbdb.html), version **1.3**.
+Credit: NASA/JPL-Caltech Solar System Dynamics and CNEOS. License/use terms: factual NASA/JPL
+scientific data; no imagery or shape asset is redistributed by this integration. The browser calls
+only Exora's backend. The backend validates the source/version signature, rate-limits callers,
+coalesces identical work, caches popular authored objects longer than arbitrary searches, and can
+serve an explicitly marked stale record during an upstream outage.
+
+The versioned Eros contract fixture records object identity, orbit classification and solution,
+uncertainty-bearing orbital and physical parameters, and Earth close approaches. It is a reduced
+deterministic excerpt of the API response: no test calls the live service.
+
+| Dataset                         | Mission / archive                                             | Permanent identifier                                     | Original URL                                                                                      |
+| ------------------------------- | ------------------------------------------------------------- | -------------------------------------------------------- | ------------------------------------------------------------------------------------------------- |
+| 433 Eros SBDB contract fixture  | JPL SBDB orbit solution 659; NEAR-derived physical parameters | SPK `20000433`                                           | https://ssd-api.jpl.nasa.gov/sbdb.api?spk=20000433&phys-par=1&full-prec=1&ca-data=1&ca-body=Earth |
+| Ambiguous-name contract fixture | JPL SBDB designation resolver                                 | Designations `2465`, `1986 P1`, `1986 P1-A`, `1986 P1-B` | https://ssd-api.jpl.nasa.gov/sbdb.api?sstr=Wilson                                                 |
+| Not-found contract fixture      | JPL SBDB documented missing-object envelope                   | None                                                     | https://ssd-api.jpl.nasa.gov/sbdb.api?sstr=definitely-not-a-small-body-xyz                        |
+
+Physical values retain JPL's source reference when present. Missing parameters stay missing.
+Close-approach displays retain nominal distance, minimum/maximum distance bounds, relative velocity,
+and time uncertainty when JPL supplies them. Exora shows at most the six approaches nearest the
+retrieval date so a centuries-long solution does not masquerade as a short, curated risk forecast.
+The SBDB PHA flag is reproduced as a classification; it is not an impact prediction.
