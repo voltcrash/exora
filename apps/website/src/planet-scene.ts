@@ -29,7 +29,7 @@ import type {
 } from "@exora/worldgen";
 import { type RenderQualityProfile, shaderDefines } from "./render-quality.ts";
 import { buildCraterField, sampleTerrainHeight } from "./planet-terrain.ts";
-import { type SurfaceGeology, deriveSurfaceGeology } from "./surface-geology.ts";
+import { type SurfaceGeology, cloudDeckGeology, deriveSurfaceGeology } from "./surface-geology.ts";
 import { createSurfaceScatter } from "./surface-scatter.ts";
 import { type SurfaceVista, createSurfaceVista } from "./surface-vista.ts";
 import type { MountedWorld, SceneHost, WorldConsole } from "./scene-host.ts";
@@ -1933,70 +1933,6 @@ const createSeededRandom = (seed: number): (() => number) => {
   };
 };
 
-const terrainHash = (x: number, z: number, seed: number): number => {
-  const value = Math.sin(x * 127.1 + z * 311.7 + seed * 0.000_071) * 43_758.545_312_3;
-  return value - Math.floor(value);
-};
-
-const smoothTerrainNoise = (x: number, z: number, seed: number): number => {
-  const cellX = Math.floor(x);
-  const cellZ = Math.floor(z);
-  const fractionX = x - cellX;
-  const fractionZ = z - cellZ;
-  const blendX = fractionX * fractionX * (3 - 2 * fractionX);
-  const blendZ = fractionZ * fractionZ * (3 - 2 * fractionZ);
-  const near =
-    terrainHash(cellX, cellZ, seed) * (1 - blendX) + terrainHash(cellX + 1, cellZ, seed) * blendX;
-  const far =
-    terrainHash(cellX, cellZ + 1, seed) * (1 - blendX) +
-    terrainHash(cellX + 1, cellZ + 1, seed) * blendX;
-  return near * (1 - blendZ) + far * blendZ;
-};
-
-const terrainNoise = (x: number, z: number, seed: number): number => {
-  const warpX = smoothTerrainNoise(x * 0.021, z * 0.021, seed ^ 0x51f2d3) - 0.5;
-  const warpZ = smoothTerrainNoise(x * 0.021, z * 0.021, seed ^ 0xa1c8e7) - 0.5;
-  x += warpX * 13;
-  z += warpZ * 13;
-  let frequency = 0.055;
-  let amplitude = 1;
-  let height = 0;
-  let normalizer = 0;
-
-  for (let octave = 0; octave < 5; octave += 1) {
-    const sample = smoothTerrainNoise(x * frequency, z * frequency, seed + octave * 1_013);
-    height += (sample * 2 - 1) * amplitude;
-    normalizer += amplitude;
-    frequency *= 2.08;
-    amplitude *= 0.5;
-  }
-
-  const ridgeSample = smoothTerrainNoise(x * 0.092, z * 0.092, seed ^ 0x68bc21eb);
-  const ridge = 1 - Math.abs(ridgeSample * 2 - 1);
-  const broadMass = smoothTerrainNoise(x * 0.018, z * 0.018, seed ^ 0x218bc4) * 2 - 1;
-  return (height / normalizer) * 1.32 + ridge ** 3 * 1.05 + broadMass * 0.72 - 0.43;
-};
-
-/**
- * The cloud deck a giant's "surface" excursion stands on.
- *
- * A gas or ice giant has no ground, and this has never claimed otherwise: it is the top of a
- * convecting cloud layer, rolling in long swells. Rocky worlds no longer come through here — they
- * are built from measured or inferred geology by `surface-vista.ts`, which is what this function
- * used to stand in for by scaling one noise field by three recipe numbers.
- */
-const cloudDeckHeight = (x: number, z: number, recipe: WorldRecipe): number => {
-  const base = terrainNoise(x, z, recipe.seed);
-  const horizonLift = Math.max(0, (z - 2) / 36) * 1.7;
-  return recipe.renderer === "ice-giant"
-    ? base * 0.68 + Math.sin(z * 0.1 + recipe.seed) * 0.3 + horizonLift * 0.82
-    : base * 0.52 + Math.sin(z * 0.13 + recipe.seed) * 0.46 + horizonLift * 0.7;
-};
-
-/** Cloud-deck height in world space, matching how the giant surface mesh is placed. */
-const cloudDeckGroundHeight = (x: number, z: number, recipe: WorldRecipe): number =>
-  SURFACE_GROUND_BASE_Y + cloudDeckHeight(x, z - SURFACE_GROUND_ORIGIN_Z, recipe);
-
 const mixRgb = (from: Rgb, to: Rgb, amount: number): Color4 =>
   new Color4(
     from[0] + (to[0] - from[0]) * amount,
@@ -2154,8 +2090,8 @@ const createSurfaceEnvironment = (
   meshes.push(surfaceSky.mesh);
 
   // Rocky worlds get real ground: measured or inferred geology, landform provinces, baked sun
-  // shadowing and triplanar material. A giant has no ground at all, so it keeps the rolling cloud
-  // deck below — which is what its "surface" excursion has always actually been standing on.
+  // shadowing and triplanar material. A giant has no ground at all, so it gets the top of its own
+  // convecting cloud layer instead — the same horizon, air and light, none of the rock.
   const vista = geology
     ? createSurfaceVista(scene, {
         geology,
@@ -2193,83 +2129,19 @@ const createSurfaceEnvironment = (
       vista,
     });
     if (scatter) meshes.push(scatter);
-  } else {
-    const deckLowColor =
-      recipe.renderer === "gas-giant"
-        ? recipe.cloudBands.deepColor
-        : recipe.renderer === "ice-giant"
-          ? recipe.atmosphereBands.deepColor
-          : recipe.surface.lowColor;
-    const deckHighColor =
-      recipe.renderer === "gas-giant"
-        ? recipe.cloudBands.lightColor
-        : recipe.renderer === "ice-giant"
-          ? recipe.atmosphereBands.lightColor
-          : recipe.surface.highColor;
-    const subdivisions = profile.tier === "desktop" ? 96 : 52;
-    const ground = MeshBuilder.CreateGround(
-      "surfaceTerrain",
-      { width: 72, height: 82, subdivisions, updatable: true },
-      scene,
-    );
-    ground.parent = root;
-    ground.position.set(0, SURFACE_GROUND_BASE_Y, SURFACE_GROUND_ORIGIN_Z);
-    ground.isPickable = false;
-    meshes.push(ground);
-
-    const positions = ground.getVerticesData("position");
-    const indices = ground.getIndices();
-    if (positions && indices) {
-      const normals: number[] = [];
-      for (let index = 0; index < positions.length; index += 3) {
-        const x = positions[index] ?? 0;
-        const z = positions[index + 2] ?? 0;
-        positions[index + 1] = cloudDeckHeight(x, z, recipe);
-      }
-
-      VertexData.ComputeNormals(positions, indices, normals);
-      const colors: number[] = [];
-      for (let index = 0; index < positions.length; index += 3) {
-        const height = positions[index + 1] ?? 0;
-        const normalY = normals[index + 1] ?? 1;
-        const altitude = Math.min(1, Math.max(0, 0.38 + height * 0.11));
-        const biome = smoothTerrainNoise(
-          (positions[index] ?? 0) * 0.075,
-          (positions[index + 2] ?? 0) * 0.075,
-          recipe.seed ^ 0x7193a,
-        );
-        const color =
-          altitude < 0.52
-            ? mixRgb(deckLowColor, deckHighColor, altitude / 0.52)
-            : mixRgb(deckHighColor, deckHighColor, (altitude - 0.52) / 0.48);
-        const shade = 0.62 + normalY * 0.38 + (biome - 0.5) * 0.08;
-        colors.push(color.r * shade, color.g * shade, color.b * shade, 1);
-      }
-      ground.updateVerticesData("position", positions);
-      ground.setVerticesData("normal", normals);
-      ground.setVerticesData("color", colors, false, 4);
-    }
-
-    const groundMaterial = new StandardMaterial("surfaceTerrainMaterial", scene);
-    groundMaterial.diffuseColor = Color3.White();
-    groundMaterial.emissiveColor = toColor3(deckHighColor).scale(0.22);
-    groundMaterial.specularColor = new Color3(0.025, 0.035, 0.04);
-    groundMaterial.roughness = 0.7;
-    groundMaterial.freeze();
-    ground.material = groundMaterial;
   }
 
   const cloudLayers: Mesh[] = [];
   /**
-   * Drifting haze banks, for the giants only.
+   * No drifting haze banks any more, on any world.
    *
-   * A rocky world's sky is drawn by the dome above and its distance by the ground's own aerial
-   * perspective, both of which know what that world's air is made of. These flattened emissive
-   * spheres knew neither: on the Moon one hung over a black airless sky as a lit ellipse, and on
-   * Titan they read as saucers cut out of the smog. A giant's excursion has no ground and no
-   * aerial perspective, so there they are still the cloud layer the viewer is standing in.
+   * Every excursion's sky is drawn by the dome above it and its distance by the vista's own aerial
+   * perspective, and both of those know what that world's air is made of. These flattened emissive
+   * spheres knew neither: on the Moon one hung over a black airless sky as a lit ellipse, and over
+   * Jupiter's cloud deck they read as saucers cut out of the sky. Kept as an empty list so the
+   * render loop and the world's own teardown keep their shape.
    */
-  const hazeCount = recipe.renderer === "rocky" ? 0 : 5;
+  const hazeCount = 0;
   for (let index = 0; index < hazeCount; index += 1) {
     const haze = MeshBuilder.CreateSphere(
       `surfaceHaze-${index}`,
@@ -2342,7 +2214,7 @@ const createSurfaceEnvironment = (
   root.setEnabled(false);
   return {
     cloudLayers,
-    groundHeightAt: vista ? vista.heightAt : (x, z) => cloudDeckGroundHeight(x, z, recipe),
+    groundHeightAt: vista ? vista.heightAt : () => SURFACE_GROUND_BASE_Y,
     meshes,
     root,
     sky: surfaceSky.material,
@@ -2443,15 +2315,16 @@ export const createPlanetWorld = (
   orbitalMeshes.push(starfield.mesh);
   // Measured geology for a Solar System body, inferred geology for a catalogue world, and nothing
   // at all for a giant — which has no ground for a visitor to stand on in the first place.
-  const surfaceGeology = deriveSurfaceGeology(
-    recipe,
-    planetProfile.solarSystem
-      ? {
-          naifId: planetProfile.solarSystem.naifId,
-          surfaceStatus: planetProfile.solarSystem.surfaceStatus,
-        }
-      : null,
-  );
+  const surfaceGeology =
+    deriveSurfaceGeology(
+      recipe,
+      planetProfile.solarSystem
+        ? {
+            naifId: planetProfile.solarSystem.naifId,
+            surfaceStatus: planetProfile.solarSystem.surfaceStatus,
+          }
+        : null,
+    ) ?? cloudDeckGeology(recipe);
   const surfaceEnvironment = createSurfaceEnvironment(
     scene,
     recipe,

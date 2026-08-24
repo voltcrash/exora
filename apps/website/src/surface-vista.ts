@@ -284,6 +284,7 @@ void main(void) {
   float mantle = clamp(fines * (1.0 - slope * 1.7), 0.0, 1.0);
   albedo = mix(albedo, regolithColor * (0.86 + grain * 0.42 + macro * 0.2), mantle * 0.72);
 
+#ifndef CLOUD_DECK
   // Bedding planes, visible only where rock is exposed — a scarp is a stack of layers, not a slope.
   float bedding = fract((vWorldPosition.y + macro * strataSpacing * 0.7) / max(strataSpacing, 0.05));
   float bed = smoothstep(0.44, 0.5, abs(bedding - 0.5));
@@ -294,6 +295,7 @@ void main(void) {
   vec2 downwind = vec2(dot(ground, windAxis), dot(ground, vec2(-windAxis.y, windAxis.x)));
   float streak = smoothstep(0.52, 0.78, fbm2(vec2(downwind.x * 0.012, downwind.y * 0.24)));
   albedo = mix(albedo, regolithColor * 1.22, streak * windStreaks * 0.32 * (1.0 - slope * 1.6));
+#endif
 
 #ifdef GROUND_CHEMISTRY
   // Mineral grain from the chemistry map, applied relative to its own luminance so a dark carbon
@@ -344,11 +346,22 @@ void main(void) {
   // Rock is not a mirror; frost and ice come much closer to being one.
   float specularStrength = 0.035 + frostMask * 0.45;
 
+#ifdef CLOUD_DECK
+  // A cloud is lit through rather than off. Most of what reaches the eye has been scattered
+  // forward inside the layer, which is why a cloud top is brightest just around the sun and why
+  // its shaded side never goes dark the way a rock's does.
+  float through = pow(clamp(dot(shadingNormal, sunDirection) * 0.5 + 0.5, 0.0, 1.0), 1.3);
+  vec3 color = albedo * (sunColor * sunIntensity * mix(through, direct, 0.4) * 0.95 + ambient * 1.5);
+  color += albedo * sunColor * pow(max(dot(-viewDirection, sunDirection), 0.0), 4.0) * 0.22;
+#else
   vec3 color = albedo * (sunlight + ambient) + bounce;
   color += sunColor * sunIntensity * specular * specularStrength;
+#endif
+#ifndef CLOUD_DECK
   // Grazing light picks out every grain, which is what makes a low sun read as low.
   float grazing = pow(1.0 - clamp(dot(shadingNormal, viewDirection), 0.0, 1.0), 4.0);
   color += mix(skyHorizonColor, sunColor, 0.5) * grazing * 0.028 * (sunVisibility * 0.7 + 0.3);
+#endif
 
   // Incandescence, from below, pulsing on its own clock rather than the frame's.
   float glow = molten * (0.72 + 0.2 * sin(time * 0.8 + macro * 14.0) + 0.14 * sin(time * 2.3 + grain * 9.0));
@@ -374,7 +387,10 @@ void main(void) {
   // the haze above does nothing, so this is the only thing hiding the edge — and it has to.
   float rim = max(abs(ground.x), abs(ground.y));
   float dissolve = smoothstep(horizonStart, horizonEnd, rim);
-  color = mix(color, mix(skyHorizonColor, skyZenithColor, 0.15), dissolve);
+  // Matched to what the sky dome actually paints along its own horizon, which is its horizon
+  // colour plus the band it brightens by there — a rim that fades to anything else leaves a
+  // visible seam where the ground stops.
+  color = mix(color, skyHorizonColor * (1.0 + hazeDensity * 0.32), dissolve);
 
   float dither = (hash21(gl_FragCoord.xy) - 0.5) / 255.0;
   gl_FragColor = vec4(color + dither, 1.0);
@@ -517,7 +533,11 @@ void main(void) {
   color = mix(color, airColor, clamp(optical, 0.0, 0.96));
 
   float rim = max(abs(ground.x), abs(ground.y));
-  color = mix(color, mix(skyHorizonColor, skyZenithColor, 0.15), smoothstep(horizonStart, horizonEnd, rim));
+  color = mix(
+    color,
+    skyHorizonColor * (1.0 + hazeDensity * 0.32),
+    smoothstep(horizonStart, horizonEnd, rim)
+  );
 
   float dither = (hash21(gl_FragCoord.xy) - 0.5) / 255.0;
   gl_FragColor = vec4(color + dither, 1.0);
@@ -879,9 +899,13 @@ export const createSurfaceVista = (
   // dominant fill cost, and in a headset it is paid twice over. The macro and grain fields only
   // shape colour, so an octave less is invisible where an unsteady frame rate is not.
   const noiseOctaves = profile.tier === "desktop" ? profile.fbmOctaves - 1 : 2;
+  const isCloud = geology.medium === "cloud";
   const defines = [`#define FBM_OCTAVES ${Math.max(2, noiseOctaves)}`];
-  if (profile.surfaceMicrodetail) defines.push("#define GROUND_DETAIL");
-  if (profile.surfaceColorDetail) defines.push("#define GROUND_CHEMISTRY");
+  // A cloud deck has no rock in it, so the mineral maps have nothing to say about it — and every
+  // one of them read as stone laid over the sky.
+  if (isCloud) defines.push("#define CLOUD_DECK");
+  if (profile.surfaceMicrodetail && !isCloud) defines.push("#define GROUND_DETAIL");
+  if (profile.surfaceColorDetail && !isCloud) defines.push("#define GROUND_CHEMISTRY");
 
   const material = new ShaderMaterial(
     "surfaceTerrainMaterial",

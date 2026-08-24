@@ -1,5 +1,5 @@
 import type { ExoplanetProfile, StarProfile } from "@exora/contracts";
-import type { WorldRecipe } from "@exora/worldgen";
+import type { Rgb, WorldRecipe } from "@exora/worldgen";
 import { SOLAR_SYSTEM_MOON_GROUPS, SOLAR_SYSTEM_MOONS } from "./solar-moons.ts";
 import { measuredSurfaceAppearance } from "./surface-geology.ts";
 
@@ -891,8 +891,28 @@ export const tuneSolarWorldRecipe = (
 
   if (base.renderer === "gas-giant") {
     const saturn = identity.naifId === 699;
+    /**
+     * Band colours, stated rather than drawn.
+     *
+     * A known giant's orbital view is a mission mosaic, so nothing ever checked the palette the
+     * inference gave it — and the inference picks between plausible families at random, which
+     * left Jupiter's own cloud deck rendering in neutral grey. From above that never showed;
+     * standing on it, the colour is the whole subject.
+     */
+    const cloudBands = saturn
+      ? {
+          deepColor: [0.16, 0.14, 0.1] as Rgb,
+          lightColor: [0.96, 0.89, 0.71] as Rgb,
+          midColor: [0.63, 0.53, 0.34] as Rgb,
+        }
+      : {
+          deepColor: [0.11, 0.08, 0.07] as Rgb,
+          lightColor: [0.92, 0.82, 0.63] as Rgb,
+          midColor: [0.52, 0.33, 0.19] as Rgb,
+        };
     return {
       ...base,
+      cloudBands: { ...base.cloudBands, ...cloudBands },
       rings: {
         bands: saturn ? 12 : 4,
         color: saturn ? [0.82, 0.74, 0.59] : [0.44, 0.34, 0.25],
@@ -904,12 +924,20 @@ export const tuneSolarWorldRecipe = (
     };
   }
 
+  // Uranus is a nearly featureless pale cyan; Neptune a deep blue with bright methane cloud.
+  const uranus = identity.naifId === 799;
   return {
     ...base,
+    atmosphereBands: {
+      ...base.atmosphereBands,
+      deepColor: uranus ? [0.07, 0.17, 0.2] : [0.02, 0.08, 0.24],
+      hazeColor: uranus ? [0.3, 0.56, 0.6] : [0.12, 0.31, 0.66],
+      lightColor: uranus ? [0.7, 0.88, 0.9] : [0.56, 0.73, 0.95],
+    },
     rings: {
       ...base.rings,
-      color: identity.naifId === 799 ? [0.45, 0.66, 0.68] : [0.3, 0.4, 0.52],
-      opacity: identity.naifId === 799 ? 0.09 : 0.045,
+      color: uranus ? [0.45, 0.66, 0.68] : [0.3, 0.4, 0.52],
+      opacity: uranus ? 0.09 : 0.045,
     },
   };
 };

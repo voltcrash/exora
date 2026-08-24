@@ -1,8 +1,15 @@
 import { deriveWorldRecipe } from "@exora/worldgen";
 import { expect, test } from "vite-plus/test";
-import { EARTH, MARS, MERCURY, VENUS, tuneSolarWorldRecipe } from "./solar-system.ts";
+import {
+  EARTH,
+  MARS,
+  MERCURY,
+  SOLAR_SYSTEM_WORLDS,
+  VENUS,
+  tuneSolarWorldRecipe,
+} from "./solar-system.ts";
 import { SOLAR_SYSTEM_MOONS } from "./solar-moons.ts";
-import { deriveSurfaceGeology, hasMeasuredGeology } from "./surface-geology.ts";
+import { cloudDeckGeology, deriveSurfaceGeology, hasMeasuredGeology } from "./surface-geology.ts";
 
 const geologyFor = (profile: Parameters<typeof tuneSolarWorldRecipe>[0]) => {
   const recipe = tuneSolarWorldRecipe(profile, deriveWorldRecipe(profile));
@@ -156,4 +163,34 @@ test("a giant has no ground to stand on and so has no geology", () => {
     kind: "gas-giant",
   });
   expect(deriveSurfaceGeology(gasGiant, null)).toBeNull();
+});
+
+/**
+ * A giant has no ground, and the excursion has never pretended otherwise — what a visitor stands
+ * on is the top of the convecting cloud layer whose bands the orbital view shows from above. It
+ * shares the vista's geometry and light and none of its geology.
+ */
+test("a giant's excursion stands on cloud, with no rock in it anywhere", () => {
+  const jupiter = SOLAR_SYSTEM_WORLDS.find((world) => world.name === "Jupiter");
+  if (!jupiter) throw new Error("Expected a Jupiter profile.");
+  const recipe = tuneSolarWorldRecipe(jupiter, deriveWorldRecipe(jupiter));
+  const geology = cloudDeckGeology(recipe);
+  if (!geology) throw new Error("Expected a cloud deck.");
+
+  expect(geology.medium).toBe("cloud");
+  expect(geology.craterDensity).toBe(0);
+  expect(geology.boulderDensity).toBe(0);
+  expect(geology.strataStrength).toBe(0);
+  expect(geology.liquidLevel).toBeNull();
+  expect(geology.detail.chemistryStrength).toBe(0);
+  // Jupiter's own bands, not whichever family the inference happened to draw for it.
+  const [red, green, blue] = geology.ramp[4];
+  expect(red).toBeGreaterThan(blue * 1.2);
+  expect(green).toBeGreaterThan(blue);
+});
+
+test("a rocky world never resolves to a cloud deck, and every geology says which it is", () => {
+  expect(cloudDeckGeology(tuneSolarWorldRecipe(MARS, deriveWorldRecipe(MARS)))).toBeNull();
+  expect(geologyFor(MARS).geology.medium).toBe("rock");
+  expect(geologyFor(MERCURY).geology.medium).toBe("rock");
 });

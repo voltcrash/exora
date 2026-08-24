@@ -65,6 +65,16 @@ export interface SurfaceDetailChoice {
 }
 
 export interface SurfaceGeology {
+  /**
+   * What a visitor is standing on.
+   *
+   * `rock` is ground. `cloud` is a giant's cloud deck — the top of a convecting layer, which is
+   * the only thing an excursion to a gas or ice giant can stand on, and which has never claimed
+   * to be anything else. It shares the vista's geometry and light and none of its materials: a
+   * cloud has no bedrock, no bedding, no loose rock, and it scatters light through itself rather
+   * than reflecting it off a surface.
+   */
+  medium: "cloud" | "rock";
   /** Loose fines that collect in hollows and mantle shallow slopes. */
   regolithColor: Rgb;
   /** Freshly broken rock, seen on scarps and steep slopes where fines cannot rest. */
@@ -1107,6 +1117,78 @@ const DETAIL_BY_PALETTE: Readonly<Record<string, SurfaceDetailChoice>> = {
   },
 };
 
+/**
+ * The cloud deck a giant's excursion stands on.
+ *
+ * Not terrain and not presented as terrain: it is the top of the convecting layer whose bands the
+ * orbital view shows from above, given the same horizon, air and light as everything else so it
+ * reads as a place rather than as a fogged plane. Its swells run along the world's own banding,
+ * because that is what a jet stream does to a cloud layer.
+ */
+export const cloudDeckGeology = (recipe: WorldRecipe): SurfaceGeology | null => {
+  const bands =
+    recipe.renderer === "gas-giant"
+      ? {
+          deep: recipe.cloudBands.deepColor,
+          light: recipe.cloudBands.lightColor,
+          mid: recipe.cloudBands.midColor,
+        }
+      : recipe.renderer === "ice-giant"
+        ? {
+            deep: recipe.atmosphereBands.deepColor,
+            light: recipe.atmosphereBands.lightColor,
+            mid: recipe.atmosphereBands.hazeColor,
+          }
+        : null;
+  if (!bands) return null;
+
+  return {
+    medium: "cloud",
+    // Long swells running with the banding, over a broader roll: cloud streets over convection.
+    provinces: provinces(["dune-sea", 0.56], ["glacial-plain", 0.44]),
+    ramp: [
+      scale(bands.deep, 0.5),
+      mix(bands.deep, bands.mid, 0.3),
+      mix(bands.deep, bands.mid, 0.75),
+      bands.mid,
+      mix(bands.mid, bands.light, 0.7),
+    ],
+    regolithColor: bands.light,
+    bedrockColor: mix(bands.deep, bands.mid, 0.4),
+    frostColor: bands.light,
+    frostCoverage: 0,
+    craterDensity: 0,
+    regolithDepth: 1,
+    boulderDensity: 0,
+    boulderScale: 1,
+    relief: 5.5,
+    featureScale: 2.6,
+    strataStrength: 0,
+    strataSpacing: 1,
+    windStreaks: 0,
+    // Bands run east-west, so the swells lie across the direction a visitor faces.
+    windDirection: Math.PI / 2,
+    lavaGlow: 0,
+    lavaColor: rgb(0, 0, 0),
+    liquidLevel: null,
+    liquidColor: rgb(0, 0, 0),
+    liquidShallowColor: rgb(0, 0, 0),
+    hazeDensity: 0.52,
+    skyColor: recipe.atmosphere.color,
+    detail: {
+      chemistry: "ice",
+      chemistryScale: 8,
+      chemistryStrength: 0,
+      primary: "ice",
+      primaryScale: 8,
+      secondary: "ice",
+      secondaryScale: 8,
+    },
+    provenance: "inferred",
+    seed: recipe.seed,
+  };
+};
+
 const inferredGeology = (recipe: RockyWorldRecipe): SurfaceGeology => {
   const random = createSeededRandom((recipe.seed ^ 0x5f_35_6b_21) >>> 0);
   const { surface, terrain } = recipe;
@@ -1115,6 +1197,7 @@ const inferredGeology = (recipe: RockyWorldRecipe): SurfaceGeology => {
   const detail = DETAIL_BY_PALETTE[terrain.paletteFamily] ?? DETAIL_BY_PALETTE["silicate-neutral"]!;
 
   return {
+    medium: "rock",
     provinces: inferProvinces(recipe, random),
     ramp,
     // Fines are ground out by impacts on an airless world and blown into a mantle on a windy
@@ -1165,6 +1248,7 @@ export interface SolarBodyIdentity {
  * orbital view already uses for the same reason.
  */
 const unresolvedGeology = (recipe: RockyWorldRecipe): SurfaceGeology => ({
+  medium: "rock",
   provinces: provinces(["regolith-plain", 1]),
   ramp: [
     rgb(0.29, 0.31, 0.33),
