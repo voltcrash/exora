@@ -40,6 +40,18 @@ const formatDiameter = (kilometers: number): string => {
   return `${kilometers.toLocaleString("en-US", { maximumFractionDigits: 0 })} KM`;
 };
 
+const BlackHoleName = ({ name }: { name: string }) => {
+  const separator = name.lastIndexOf(" ");
+
+  return separator === -1 ? (
+    <em>{name}</em>
+  ) : (
+    <>
+      {name.slice(0, separator)} <em>{name.slice(separator + 1)}</em>
+    </>
+  );
+};
+
 export const BlackHoleExperience = ({
   blackHole,
   chromeHidden,
@@ -112,7 +124,9 @@ export const BlackHoleExperience = ({
             <span>OBSERVED BLACK HOLE</span>
             <span>{blackHoleKindLabel(blackHole)}</span>
           </p>
-          <h1 id="black-hole-name">{blackHole.name}</h1>
+          <h1 id="black-hole-name">
+            <BlackHoleName name={blackHole.name} />
+          </h1>
           <div className="world-tags">
             <span>{blackHole.milestone}</span>
             <span>{blackHole.host}</span>
