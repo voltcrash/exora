@@ -1,6 +1,6 @@
 import { expect, test } from "vite-plus/test";
 import { togglesClearView, type ClearViewShortcutEvent } from "./clear-view-shortcut.ts";
-import type { ShortcutTarget } from "./search-shortcut.ts";
+import type { ShortcutTarget } from "./discover-shortcut.ts";
 
 const element = (tagName: string, type?: string): ShortcutTarget => ({
   isContentEditable: false,

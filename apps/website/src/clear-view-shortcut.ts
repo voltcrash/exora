@@ -8,10 +8,10 @@
  * control on the page from the keyboard.
  *
  * Kept free of DOM types so the rule is unit-testable without a document, in the same spirit as
- * `search-shortcut.ts`, whose reading of what counts as a text field it borrows.
+ * `discover-shortcut.ts`, whose reading of what counts as a text field it borrows.
  */
 
-import { isTextEntryTarget, type ShortcutTarget } from "./search-shortcut.ts";
+import { isTextEntryTarget, type ShortcutTarget } from "./discover-shortcut.ts";
 
 /** The parts of a key press the shortcut reads, plus what the press landed on. */
 export interface ClearViewShortcutEvent {
@@ -28,9 +28,8 @@ export interface ClearViewShortcutEvent {
 /**
  * Whether this key press should toggle the interface away or back.
  *
- * Unlike the `/` shortcut, Shift counts here. `/` needs Shift on most keyboard layouts to be
- * typed at all, whereas Tab is one key on every layout there is — so a shifted Tab is not this
- * shortcut being asked for, it is the browser's own backward traversal being asked for.
+ * Shift counts here because a shifted Tab is the browser's own backward traversal being asked
+ * for, not this shortcut being asked for.
  */
 export const togglesClearView = (event: ClearViewShortcutEvent): boolean => {
   if (event.key !== "Tab") return false;

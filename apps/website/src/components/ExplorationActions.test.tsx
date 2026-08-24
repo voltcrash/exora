@@ -79,10 +79,12 @@ const explorationActions = (markup: string): string[] => {
 };
 
 test("the Discover entry on the world view names itself", () => {
-  const buttons = explorationActions(planetMarkup());
+  const markup = planetMarkup();
+  const buttons = explorationActions(markup);
 
   expect(buttons).toHaveLength(1);
   expect(buttons[0]).toContain('aria-label="Open Discover"');
+  expect(markup).toContain('<kbd aria-label="Backspace or Delete">⌫</kbd>');
 });
 
 test("the Discover entry on the star view names itself", () => {

@@ -213,7 +213,7 @@ export const DiscoverScreen = ({
             onClick={onClose}
           >
             <span>RETURN TO VIEW</span>
-            <kbd>ESC</kbd>
+            <kbd aria-label="Backspace or Delete">⌫</kbd>
             <i aria-hidden="true">×</i>
           </button>
         </header>

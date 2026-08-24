@@ -16,7 +16,7 @@ import { featuredPlanet } from "./planet-profile.ts";
 import { hasRenderer } from "./planet-utils.tsx";
 import { canonicalUrlForSearch } from "./canonical-url.ts";
 import { togglesClearView } from "./clear-view-shortcut.ts";
-import { opensSearchShortcut } from "./search-shortcut.ts";
+import { togglesDiscoverShortcut } from "./discover-shortcut.ts";
 import { TRAVEL_CROSS_MS, TRAVEL_REVEAL_MS, type TravelPhase } from "./travel-transition.ts";
 import { useSceneHost } from "./use-scene-host.ts";
 import { findSolarStar, findSolarWorld } from "./solar-system.ts";
@@ -193,44 +193,45 @@ export const App = () => {
     return () => window.removeEventListener("popstate", loadFromLocation);
   }, [loadFromLocation]);
 
-  // The `/` shortcut Discover advertises with its `<kbd>`. It opens directly on worlds because
-  // the key remains the fastest path from the renderer to a named-object search.
-  //
-  // It belongs here rather than inside the catalog, because the catalog is only mounted once it
-  // is already open: a listener living there could never see the press that is supposed to open
-  // it. It stands down for as long as the interface is hidden: a cleared view opening a dialog
-  // over itself would be no kind of clearing.
+  // Backspace — labelled Delete on Apple keyboards — is the one-key toggle for Discover. The
+  // listener belongs to the page so the same key can both mount and unmount the full-screen
+  // surface. It yields to text entry and to recovery/loading screens where Discover cannot open.
   useEffect(() => {
-    if (chromeHidden) return;
-
-    const openDiscoverWithShortcut = (event: KeyboardEvent): void => {
+    const toggleDiscoverWithShortcut = (event: KeyboardEvent): void => {
       const target = event.target;
       if (
-        !opensSearchShortcut({
+        !togglesDiscoverShortcut({
           altKey: event.altKey,
           ctrlKey: event.ctrlKey,
           key: event.key,
           metaKey: event.metaKey,
+          repeat: event.repeat,
+          shiftKey: event.shiftKey,
           target: target instanceof HTMLElement ? target : null,
         })
       ) {
         return;
       }
+      if (!discoverOpen && !onMainScreen) return;
 
-      // Only once the press is known to be the shortcut is suppressing the browser's own
-      // quick-find the right thing to do.
+      // Backspace has historically meant browser navigation when focus belongs to the page.
+      // Suppress it only once the press is known to belong to Discover.
       event.preventDefault();
-      setDiscoverSection("worlds");
+      if (discoverOpen) {
+        setDiscoverOpen(false);
+        return;
+      }
+      setDiscoverSection("overview");
       setDiscoverOpen(true);
     };
 
-    document.addEventListener("keydown", openDiscoverWithShortcut);
-    return () => document.removeEventListener("keydown", openDiscoverWithShortcut);
-  }, [chromeHidden]);
+    document.addEventListener("keydown", toggleDiscoverWithShortcut);
+    return () => document.removeEventListener("keydown", toggleDiscoverWithShortcut);
+  }, [discoverOpen, onMainScreen]);
 
   // Tab puts the interface away and brings it back. It is the whole of the way back, because the
   // button that hides the interface is hidden along with it — which is why that button wears the
-  // key on its face, the way the catalog trigger wears `/`.
+  // key on its face, the way the Discover trigger wears its deletion-key symbol.
   //
   // Taking the browser's focus key is only defensible taken narrowly, so `togglesClearView`
   // declines everywhere the key already means something: over a dialog, inside a text field, in a

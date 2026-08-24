@@ -773,13 +773,28 @@ test("the World Forge opens and builds a world the page then shows", async () =>
   expect(window.location.search).toContain("custom=");
 });
 
-test("the `/` shortcut opens Discover on the world catalog", async () => {
+test("Backspace toggles Discover open and closed", async () => {
   stubArchive();
   mountApp();
 
-  await userEvent.keyboard("/");
+  await userEvent.keyboard("{Backspace}");
+  await expect.element(page.getByRole("dialog", { name: /All of space/ })).toBeVisible();
+
+  await userEvent.keyboard("{Backspace}");
+  await expect.element(page.getByRole("dialog")).not.toBeInTheDocument();
+});
+
+test("Backspace edits a Discover search field instead of closing the screen", async () => {
+  stubArchive();
+  mountApp();
+
+  await openDiscoverSection("Exoplanets");
+  const search = page.getByPlaceholder(/Type a name or catalog ID/i);
+  await userEvent.fill(search, "Kepler");
+  await userEvent.keyboard("{Backspace}");
+
+  await expect.element(search).toHaveValue("Keple");
   await expect.element(page.getByRole("dialog")).toBeVisible();
-  await expect.element(page.getByRole("region", { name: "Exoplanet catalog" })).toBeVisible();
 });
 
 test("Tab toggles the interface away and back, and only on the main screen", async () => {
@@ -806,10 +821,13 @@ test("Tab toggles the interface away and back, and only on the main screen", asy
   await userEvent.click(clearView);
   for (const panel of panels) await expect.element(panel).not.toBeVisible();
 
-  // The `/` shortcut stands down while the view is cleared, so the one key that could still have
-  // opened a dialog over it does nothing.
-  await userEvent.keyboard("/");
-  expect(document.querySelector("dialog")).toBeNull();
+  // Discover remains reachable when the chrome is hidden, and closing it returns to that same
+  // uncluttered renderer rather than silently restoring the panels behind it.
+  await userEvent.keyboard("{Backspace}");
+  await expect.element(page.getByRole("dialog")).toBeVisible();
+  await userEvent.keyboard("{Backspace}");
+  await expect.element(page.getByRole("dialog")).not.toBeInTheDocument();
+  for (const panel of panels) await expect.element(panel).not.toBeVisible();
 
   await userEvent.keyboard("{Tab}");
   for (const panel of panels) await expect.element(panel).toBeVisible();
