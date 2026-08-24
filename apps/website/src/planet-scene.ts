@@ -1187,7 +1187,7 @@ void main(void) {
 }
 `;
 
-export type ViewMode = "orbit" | "surface" | "transition";
+export type ViewMode = "orbit" | "subsystem" | "surface" | "transition";
 
 interface PlanetWorldOptions {
   onFirstFrame: () => void;

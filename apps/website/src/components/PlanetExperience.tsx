@@ -10,6 +10,7 @@ import type { PlanetLoadResult } from "../api-client.ts";
 import { warmDestinations } from "../destination-cache.ts";
 import type { ViewMode } from "../planet-scene.ts";
 import { formatNumber, formatPlanetName } from "../planet-utils.tsx";
+import type { PlanetarySubsystem } from "../planetary-subsystems.ts";
 import type { SceneHost, XrStatus } from "../scene-host.ts";
 import { findSolarWorld, tuneSolarWorldRecipe } from "../solar-system.ts";
 import { SURFACE_TRANSITION_MS, type TravelPhase } from "../travel-transition.ts";
@@ -62,6 +63,8 @@ export const PlanetExperience = ({
   const [fps, setFps] = useState("--");
   const [qualityTier, setQualityTier] = useState("AUTO");
   const [sceneState, setSceneState] = useState<"loading" | "ready" | "error">("loading");
+  const [sceneMode, setSceneMode] = useState<"subsystem" | "world">("world");
+  const [subsystem, setSubsystem] = useState<PlanetarySubsystem | null>(null);
   const [viewMode, setViewMode] = useState<ViewMode>("orbit");
   const [xrStatus, setXrStatus] = useState<XrStatus>("checking");
   const [hostJumpState, setHostJumpState] = useState<"idle" | "loading" | "error">("idle");
@@ -69,12 +72,33 @@ export const PlanetExperience = ({
   const planet = result.planet;
   const solar = result.mode === "solar";
   const solarIdentity = planet.solarSystem;
+  const subsystemActive = sceneMode === "subsystem" && subsystem !== null;
   const isMoon = solarIdentity?.bodyType === "moon";
   const observation = planet.observation;
   const recipe = useMemo(
     () => recipeOverride ?? tuneSolarWorldRecipe(planet, deriveWorldRecipe(planet)),
     [planet, recipeOverride],
   );
+
+  // The authored moon catalog is substantial and only nine Solar System destinations can use it.
+  // Keep it out of the landing route's eager bundle; a world is already coherent while this small
+  // optional layer arrives, and the switch appears as soon as its data is ready.
+  useEffect(() => {
+    let active = true;
+    if (!solar) {
+      setSubsystem(null);
+      return () => {
+        active = false;
+      };
+    }
+
+    void import("../planetary-subsystems.ts").then(({ findPlanetarySubsystem }) => {
+      if (active) setSubsystem(findPlanetarySubsystem(planet.name));
+    });
+    return () => {
+      active = false;
+    };
+  }, [planet.name, solar]);
 
   // Whether the page is between destinations, and whether this view's own panels belong to the
   // world being left. The flight replaces the loading card entirely: while one is in the air the
@@ -135,33 +159,49 @@ export const PlanetExperience = ({
 
     let abandoned = false;
     setSceneState("loading");
-    setViewMode("orbit");
+    setViewMode(subsystemActive ? "subsystem" : "orbit");
 
-    void import("../planet-scene.ts")
-      .then(({ createPlanetWorld }) =>
-        host.mountWorld(() =>
-          createPlanetWorld(host, {
-            planet,
-            recipe,
-            onViewModeChange: setViewMode,
-            onSelectHostStar: result.mode === "custom" ? undefined : () => void openHostStar(),
-            onSelectSystem: result.mode === "custom" ? undefined : () => void openHostSystem(),
-            // The console inside the headset can travel anywhere the browser catalog can, so the
-            // same selection handlers the DOM dialogs use are handed to the scene.
-            onSelectPlanet: (destination) => onSelectPlanet(destination, false),
-            onSelectStar: (destination) => onSelectStar(destination, false),
-            onForgeWorld: onGeneratePlanet,
-            onForgeStar: onGenerateStar,
-            onFirstFrame: () => {
-              if (!abandoned) setSceneState("ready");
-            },
-          }),
-        ),
-      )
-      .catch((error: unknown) => {
-        console.error(error);
-        if (!abandoned) setSceneState("error");
-      });
+    const mount = subsystemActive
+      ? import("../subsystem-scene.ts").then(({ createSubsystemWorld }) =>
+          host.mountWorld(() =>
+            createSubsystemWorld(host, {
+              onFirstFrame: () => {
+                if (!abandoned) setSceneState("ready");
+              },
+              onSelectMoon: (name) => {
+                const destination = findSolarWorld(name);
+                if (destination) onSelectPlanet(destination, true);
+              },
+              planet,
+              subsystem,
+            }),
+          ),
+        )
+      : import("../planet-scene.ts").then(({ createPlanetWorld }) =>
+          host.mountWorld(() =>
+            createPlanetWorld(host, {
+              planet,
+              recipe,
+              onViewModeChange: setViewMode,
+              onSelectHostStar: result.mode === "custom" ? undefined : () => void openHostStar(),
+              onSelectSystem: result.mode === "custom" ? undefined : () => void openHostSystem(),
+              // The console inside the headset can travel anywhere the browser catalog can, so the
+              // same selection handlers the DOM dialogs use are handed to the scene.
+              onSelectPlanet: (destination) => onSelectPlanet(destination, false),
+              onSelectStar: (destination) => onSelectStar(destination, false),
+              onForgeWorld: onGeneratePlanet,
+              onForgeStar: onGenerateStar,
+              onFirstFrame: () => {
+                if (!abandoned) setSceneState("ready");
+              },
+            }),
+          ),
+        );
+
+    void mount.catch((error: unknown) => {
+      console.error(error);
+      if (!abandoned) setSceneState("error");
+    });
 
     return () => {
       abandoned = true;
@@ -177,6 +217,8 @@ export const PlanetExperience = ({
     planet,
     recipe,
     result.mode,
+    subsystem,
+    subsystemActive,
   ]);
 
   const massUnit =
@@ -211,7 +253,7 @@ export const PlanetExperience = ({
 
   return (
     <div
-      className={`experience-shell view-${viewMode} ${settled ? "scene-ready" : ""} ${sceneState === "error" ? "scene-error" : ""} ${travelling ? "travelling" : ""} ${chromeHidden ? "chrome-hidden" : ""}`}
+      className={`experience-shell view-${viewMode} ${subsystemActive ? "subsystem-experience" : ""} ${settled ? "scene-ready" : ""} ${sceneState === "error" ? "scene-error" : ""} ${travelling ? "travelling" : ""} ${chromeHidden ? "chrome-hidden" : ""}`}
       // The dark over a descent is one timeline with the camera flying it, so the stylesheet is
       // told how long that is rather than keeping its own copy of the number.
       style={{ "--surface-transition": `${SURFACE_TRANSITION_MS}ms` } as CSSProperties}
@@ -327,21 +369,96 @@ export const PlanetExperience = ({
           <p className="world-summary">{solar ? planet.solarSystem?.summary : recipe.summary}</p>
           <p className="visual-note">
             <span aria-hidden="true" />{" "}
-            {solar
-              ? solarIdentity?.surfaceStatus === "unresolved"
-                ? "UNRESOLVED SURFACE · PHYSICALLY CONSTRAINED NEUTRAL VISUALIZATION"
-                : solarIdentity?.surfaceStatus === "modeled"
-                  ? "MEASURED PROPORTIONS · UNRESOLVED NEUTRAL SURFACE"
-                  : solarIdentity?.texture?.topography
-                    ? "DAWN GLOBAL MOSAIC + MEASURED TOPOGRAPHY · EXORA LIGHTING"
-                    : solarIdentity?.texture
-                      ? isMoon
-                        ? "NASA MISSION MOSAIC · MEASURED ROTATION + EXORA LIGHTING"
-                        : "SPACECRAFT GLOBAL MOSAIC · EXORA ATMOSPHERE + LIGHTING"
-                      : "KNOWN PLANET · PHYSICALLY TUNED ATMOSPHERIC VISUALIZATION"
-              : "PLAUSIBLE VISUALIZATION FROM OBSERVED DATA"}
+            {subsystemActive
+              ? "JPL MEAN ORBITS · LOG-COMPRESSED DISTANCE · BODY SIZES EXAGGERATED"
+              : solar
+                ? solarIdentity?.surfaceStatus === "unresolved"
+                  ? "UNRESOLVED SURFACE · PHYSICALLY CONSTRAINED NEUTRAL VISUALIZATION"
+                  : solarIdentity?.surfaceStatus === "modeled"
+                    ? "MEASURED PROPORTIONS · UNRESOLVED NEUTRAL SURFACE"
+                    : solarIdentity?.texture?.topography
+                      ? "DAWN GLOBAL MOSAIC + MEASURED TOPOGRAPHY · EXORA LIGHTING"
+                      : solarIdentity?.texture
+                        ? isMoon
+                          ? "NASA MISSION MOSAIC · MEASURED ROTATION + EXORA LIGHTING"
+                          : "SPACECRAFT GLOBAL MOSAIC · EXORA ATMOSPHERE + LIGHTING"
+                        : "KNOWN PLANET · PHYSICALLY TUNED ATMOSPHERIC VISUALIZATION"
+                : "PLAUSIBLE VISUALIZATION FROM OBSERVED DATA"}
           </p>
         </section>
+
+        {subsystem ? (
+          <div className="subsystem-mobile-controls">
+            <button
+              type="button"
+              aria-pressed={subsystemActive}
+              onClick={() => setSceneMode(subsystemActive ? "world" : "subsystem")}
+            >
+              <span aria-hidden="true">{subsystemActive ? "◉" : "⌾"}</span>
+              <span>
+                <strong>
+                  {subsystemActive ? `${planet.name} close view` : `${planet.name} system`}
+                </strong>
+                <small>{subsystemActive ? "RETURN TO WORLD" : "EXPLORE MOONS + FIELDS"}</small>
+              </span>
+            </button>
+            {subsystemActive ? (
+              <>
+                <p>
+                  <span>
+                    SYSTEM SCALE · JPL MEAN ORBITS · LOG-COMPRESSED DISTANCE · BODY SIZES
+                    EXAGGERATED
+                  </span>
+                  <strong>UNRESOLVED SURFACES · NO INVENTED GEOGRAPHY</strong>
+                  <small>Neutral minor-moon silhouettes · simulated fields and transients</small>
+                </p>
+                <details>
+                  <summary>{subsystem.moons.length} SELECTED MOONS · ORBIT DATA</summary>
+                  <ul>
+                    {subsystem.moons.map((candidate) => (
+                      <li key={candidate.naifId}>
+                        <strong>{candidate.name}</strong>
+                        <small>
+                          NAIF {candidate.naifId} · {candidate.surface} ·{" "}
+                          {candidate.retrograde ? "retrograde" : "prograde"}
+                        </small>
+                      </li>
+                    ))}
+                  </ul>
+                </details>
+                <details>
+                  <summary>RINGS · FIELDS · RESONANCES</summary>
+                  <ul>
+                    {subsystem.rings.map((ring) => (
+                      <li key={ring.name}>
+                        <strong>{ring.name}</strong>
+                        <small>MEASURED BOUNDARIES</small>
+                      </li>
+                    ))}
+                    {subsystem.lagrangePoints.map((point) => (
+                      <li key={`${point.reference}-${point.label}`}>
+                        <strong>{point.label}</strong>
+                        <small>{point.reference} · DERIVED MARKER</small>
+                      </li>
+                    ))}
+                    {subsystem.magnetosphere ? (
+                      <li>
+                        <strong>MAGNETOSPHERE</strong>
+                        <small>{subsystem.magnetosphere.evidence} BOUNDARY</small>
+                      </li>
+                    ) : null}
+                    {subsystem.torus ? (
+                      <li>
+                        <strong>{subsystem.torus.moon} PLASMA TORUS</strong>
+                        <small>{subsystem.torus.evidence} STRUCTURE · SIMULATED DENSITY</small>
+                      </li>
+                    ) : null}
+                  </ul>
+                </details>
+              </>
+            ) : null}
+          </div>
+        ) : null}
 
         <aside
           className="telemetry"
@@ -365,6 +482,144 @@ export const PlanetExperience = ({
               <i />
             </span>
           </div>
+          {subsystem ? (
+            <div className="telemetry-detail host-system-detail subsystem-switch-detail">
+              <span>PLANETARY SUBSYSTEM</span>
+              <button
+                className="system-jump subsystem-jump"
+                type="button"
+                aria-pressed={subsystemActive}
+                onClick={() => setSceneMode(subsystemActive ? "world" : "subsystem")}
+              >
+                <span aria-hidden="true">{subsystemActive ? "◉" : "⌾"}</span>
+                <strong>
+                  {subsystemActive ? `${planet.name} close view` : `${planet.name} system`}
+                </strong>
+                <small>{subsystemActive ? "RETURN TO WORLD" : "EXPLORE MOONS + FIELDS ↗"}</small>
+              </button>
+              <small>
+                {subsystem.moons.length} selected moon{subsystem.moons.length === 1 ? "" : "s"} ·{" "}
+                {subsystem.rings.length
+                  ? `${subsystem.rings.length} ring layers`
+                  : "no known rings"}{" "}
+                · {subsystem.resonances.length} resonance
+                {subsystem.resonances.length === 1 ? "" : "s"}
+              </small>
+            </div>
+          ) : null}
+          {subsystemActive && subsystem ? (
+            <>
+              <div className="telemetry-detail subsystem-science-detail">
+                <span>ORBIT EVIDENCE</span>
+                <strong>MEASURED</strong>
+                <small>
+                  JPL mean elements preserve parent-relative distance, inclination, period, and
+                  retrograde direction.
+                </small>
+              </div>
+              <div className="telemetry-detail subsystem-science-detail">
+                <span>TRANSIENT LAYERS</span>
+                <strong>SIMULATED</strong>
+                <small>
+                  Field boundaries, auroral brightness, plasma density, and plume particles are
+                  explanatory visualizations.
+                </small>
+              </div>
+              <div className="telemetry-detail subsystem-science-detail">
+                <span>MINOR MOONS</span>
+                <strong>UNRESOLVED SURFACES</strong>
+                <small>Neutral silhouettes only; no surface geography has been invented.</small>
+              </div>
+              <div className="telemetry-detail subsystem-members">
+                <span>SELECTED MOONS · MEAN ELEMENTS</span>
+                <ul>
+                  {subsystem.moons.map((candidate) => {
+                    const destination = findSolarWorld(candidate.name);
+                    return (
+                      <li key={candidate.naifId}>
+                        {destination ? (
+                          <button
+                            type="button"
+                            onClick={() => onSelectPlanet(destination, true)}
+                            aria-label={`Visit ${candidate.name}, NAIF ${candidate.naifId}`}
+                          >
+                            <strong>{candidate.name}</strong>
+                            <small>VISIT ↗</small>
+                          </button>
+                        ) : (
+                          <span>
+                            <strong>{candidate.name}</strong>
+                            <small>UNRESOLVED</small>
+                          </span>
+                        )}
+                        <small>
+                          NAIF {candidate.naifId} ·{" "}
+                          {formatNumber(candidate.orbitalSemiMajorAxisKilometers, 0)} km ·{" "}
+                          {candidate.retrograde ? "retrograde" : "prograde"} · i{" "}
+                          {candidate.inclinationDegrees}°
+                          {candidate.shepherds ? ` · shepherds ${candidate.shepherds}` : ""}
+                        </small>
+                      </li>
+                    );
+                  })}
+                </ul>
+              </div>
+              <div className="telemetry-detail subsystem-resonances">
+                <span>MAJOR RESONANCES</span>
+                {subsystem.resonances.length ? (
+                  subsystem.resonances.map((resonance) => (
+                    <p key={`${resonance.ratio}-${resonance.bodies.join("-")}`}>
+                      <strong>{resonance.ratio}</strong>
+                      <small>{resonance.bodies.join(" · ")}</small>
+                    </p>
+                  ))
+                ) : (
+                  <small>No principal resonance authored for this view.</small>
+                )}
+              </div>
+              <div className="telemetry-detail subsystem-layer-key">
+                <span>VISIBLE SYSTEM LAYERS</span>
+                <ul>
+                  {subsystem.rings.map((ring) => (
+                    <li key={ring.name}>
+                      <strong>{ring.name}</strong>
+                      <small>MEASURED BOUNDARIES</small>
+                    </li>
+                  ))}
+                  {subsystem.lagrangePoints.map((point) => (
+                    <li key={`${point.reference}-${point.label}`}>
+                      <strong>{point.label}</strong>
+                      <small>{point.reference} · DERIVED MARKER</small>
+                    </li>
+                  ))}
+                  {subsystem.magnetosphere ? (
+                    <li>
+                      <strong>MAGNETOSPHERE</strong>
+                      <small>{subsystem.magnetosphere.evidence} BOUNDARY</small>
+                    </li>
+                  ) : null}
+                  {subsystem.aurora ? (
+                    <li>
+                      <strong>AURORAL REGIONS</strong>
+                      <small>{subsystem.aurora.evidence} LATITUDE · SIMULATED BRIGHTNESS</small>
+                    </li>
+                  ) : null}
+                  {subsystem.torus ? (
+                    <li>
+                      <strong>{subsystem.torus.moon} PLASMA TORUS</strong>
+                      <small>{subsystem.torus.evidence} STRUCTURE · SIMULATED DENSITY</small>
+                    </li>
+                  ) : null}
+                  {subsystem.plumes.map((plume) => (
+                    <li key={plume.moon}>
+                      <strong>{plume.moon} PLUME</strong>
+                      <small>{plume.evidence} EVIDENCE · SIMULATED PARTICLES</small>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            </>
+          ) : null}
           <dl>
             <div>
               <dt>Mass</dt>
@@ -519,7 +774,13 @@ export const PlanetExperience = ({
           </span>
           <span>
             <kbd>SCROLL</kbd>
-            <small>{viewMode === "surface" ? "RETURN" : "ZOOM / APPROACH"}</small>
+            <small>
+              {viewMode === "surface"
+                ? "RETURN"
+                : viewMode === "subsystem"
+                  ? "SCALE SYSTEM"
+                  : "ZOOM / APPROACH"}
+            </small>
           </span>
           <span className="performance-readout">
             <strong>{fps}</strong>
@@ -549,7 +810,9 @@ export const PlanetExperience = ({
         </div>
         <p>CALCULATING WORLD</p>
         <small>
-          {planet.name.toUpperCase()} · SEED {recipe.seed.toString(16).toUpperCase()}
+          {subsystemActive
+            ? `${planet.name.toUpperCase()} SUBSYSTEM`
+            : `${planet.name.toUpperCase()} · SEED ${recipe.seed.toString(16).toUpperCase()}`}
         </small>
       </div>
     </div>

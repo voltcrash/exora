@@ -19,7 +19,10 @@ import { resetSkyCatalogForTesting } from "./sky-catalog.ts";
 import { createStarWorld } from "./star-scene.ts";
 import { createSolarRegionWorld } from "./solar-region-scene.ts";
 import { findSolarRegion } from "./solar-regions.ts";
+import { findPlanetarySubsystem } from "./planetary-subsystems.ts";
+import { JUPITER } from "./solar-system.ts";
 import { createSystemWorld } from "./system-scene.ts";
+import { createSubsystemWorld } from "./subsystem-scene.ts";
 import { deriveRenderQuality } from "./render-quality.ts";
 import { openWorldScope } from "./world-scope.ts";
 
@@ -259,6 +262,36 @@ test.each(["Oort Cloud", "Heliosphere"])(
   },
   30_000,
 );
+
+test("a planetary subsystem renders measured tracks and releases every explanatory layer", async () => {
+  const { engine, host, scene } = createHarness();
+  const before = sceneCounts(scene);
+  const firstFrame = vi.fn();
+  const scope = openWorldScope(scene);
+  const subsystem = findPlanetarySubsystem("Jupiter");
+  if (!subsystem) throw new Error("Expected Jupiter subsystem fixture.");
+  const world = createSubsystemWorld(host, {
+    onFirstFrame: firstFrame,
+    onSelectMoon: vi.fn(),
+    planet: JUPITER,
+    subsystem,
+  });
+  scope.seal();
+  await settleSky();
+
+  expect(sceneCounts(scene).meshes).toBeGreaterThan(before.meshes + subsystem.moons.length * 2);
+  expect(scene.getMeshByName("Io-mapped-mission-mosaic")).not.toBeNull();
+  expect(scene.getMeshByName("Metis-unresolved-neutral-silhouette")).not.toBeNull();
+  expect(scene.getMeshByName("jupiter-measured-io-plasma-torus")).not.toBeNull();
+  expect(scene.getMeshByName("Europa-tentative-simulated-plume")).not.toBeNull();
+  expect(() => scene.render()).not.toThrow();
+  expect(firstFrame).toHaveBeenCalledOnce();
+
+  world.dispose();
+  scope.dispose();
+  expect(sceneCounts(scene)).toEqual(before);
+  engine.dispose();
+}, 30_000);
 
 test.each(planets)(
   "$kind world renders one headless frame and releases its scene contents",

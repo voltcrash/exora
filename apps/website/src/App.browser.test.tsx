@@ -97,6 +97,13 @@ vi.mock("./planet-scene.ts", () => ({
   },
 }));
 
+vi.mock("./subsystem-scene.ts", () => ({
+  createSubsystemWorld: (_host: unknown, options: { onFirstFrame: () => void }) => {
+    options.onFirstFrame();
+    return mountedWorld();
+  },
+}));
+
 vi.mock("./star-scene.ts", () => ({
   createStarWorld: (_host: unknown, options: { onFirstFrame: () => void }) => {
     options.onFirstFrame();
@@ -505,6 +512,40 @@ test("the Home System catalog opens the Oort Cloud with an explicit inferred-mod
     .element(page.getByLabelText("Permanent anchor identifiers"))
     .toHaveTextContent("NAIF 10");
   expect(window.location.search).toBe("?region=Oort%20Cloud");
+});
+
+test("a Solar System planet switches into its dedicated parent-centered subsystem", async () => {
+  stubArchive();
+  mountApp("?planet=Jupiter");
+
+  await expect.element(page.getByRole("heading", { level: 1 })).toHaveTextContent("Jupiter");
+  const subsystem = page.getByRole("button", { name: /Jupiter system/ });
+  await expect.element(subsystem).toBeVisible();
+  await userEvent.click(subsystem);
+
+  await expect
+    .element(
+      page.getByText(
+        window.innerWidth < 960
+          ? /SYSTEM SCALE · JPL MEAN ORBITS/
+          : "JPL MEAN ORBITS · LOG-COMPRESSED DISTANCE · BODY SIZES EXAGGERATED",
+        { exact: window.innerWidth >= 960 },
+      ),
+    )
+    .toBeVisible();
+  await expect
+    .element(
+      page.getByText(
+        window.innerWidth < 960
+          ? /UNRESOLVED SURFACES · NO INVENTED GEOGRAPHY/
+          : "UNRESOLVED SURFACES",
+        { exact: window.innerWidth >= 960 },
+      ),
+    )
+    .toBeVisible();
+  await expect
+    .element(page.getByRole("button", { name: /Jupiter close view/ }))
+    .toHaveAttribute("aria-pressed", "true");
 });
 
 test("a dialog closes on Escape and returns the page", async () => {
