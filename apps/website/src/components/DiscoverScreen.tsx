@@ -239,38 +239,66 @@ export const DiscoverScreen = ({
         <main className="discover-main">
           {section === "overview" ? (
             <div className="discover-overview">
-              <div className="discover-orbit-map" aria-hidden="true">
-                <span className="discover-orbit orbit-one" />
-                <span className="discover-orbit orbit-two" />
-                <span className="discover-orbit orbit-three" />
-                <span className="discover-map-core" />
-                <span className="discover-map-object object-one" />
-                <span className="discover-map-object object-two" />
-                <span className="discover-map-object object-three" />
-              </div>
-              <div className="discover-portal-grid">
-                {sections.map((item) => (
-                  <button
-                    className={`discover-portal-card ${item.accent}`}
-                    key={item.id}
-                    type="button"
-                    onClick={() => setSection(item.id)}
-                  >
-                    <span className="discover-card-topline">
-                      <small>{item.eyebrow}</small>
-                      <span aria-hidden="true">↗</span>
-                    </span>
-                    <span className="discover-card-glyph" aria-hidden="true">
-                      {item.glyph}
-                    </span>
-                    <span className="discover-card-copy">
-                      <strong>{item.label}</strong>
-                      <span>{item.description}</span>
-                    </span>
-                    <small className="discover-card-source">SOURCE · {item.source}</small>
-                  </button>
-                ))}
-              </div>
+              <section className="discover-orbit-panel" aria-labelledby="discover-orbit-title">
+                <div className="discover-orbit-intro">
+                  <p>
+                    <span aria-hidden="true" /> LIVE CELESTIAL INDEX
+                  </p>
+                  <h2 id="discover-orbit-title">Begin with a point of light.</h2>
+                  <span>
+                    Five trajectories connect the known, the distant, and the worlds not made yet.
+                  </span>
+                </div>
+                <div className="discover-orbit-map" aria-hidden="true">
+                  <span className="discover-orbit orbit-one" />
+                  <span className="discover-orbit orbit-two" />
+                  <span className="discover-orbit orbit-three" />
+                  <span className="discover-map-core" />
+                  <span className="discover-map-object object-one" />
+                  <span className="discover-map-object object-two" />
+                  <span className="discover-map-object object-three" />
+                  <small>LOCAL REFERENCE · SOL</small>
+                </div>
+                <div className="discover-orbit-readout" aria-hidden="true">
+                  <span>OBSERVATORY ONLINE</span>
+                  <span>CATALOGS 03</span>
+                  <span>GENERATIVE LAB 01</span>
+                </div>
+              </section>
+
+              <nav className="discover-directory" aria-label="Choose a trajectory">
+                <header className="discover-directory-header">
+                  <div>
+                    <p>SELECT TRAJECTORY</p>
+                    <h2>Where to next?</h2>
+                  </div>
+                  <span>05 DESTINATIONS</span>
+                </header>
+                <div className="discover-portal-grid">
+                  {sections.map((item, index) => (
+                    <button
+                      className={`discover-portal-card ${item.accent}`}
+                      key={item.id}
+                      type="button"
+                      onClick={() => setSection(item.id)}
+                    >
+                      <small className="discover-card-index">0{index + 1}</small>
+                      <span className="discover-card-glyph" aria-hidden="true">
+                        {item.glyph}
+                      </span>
+                      <span className="discover-card-copy">
+                        <small>{item.eyebrow}</small>
+                        <strong>{item.label}</strong>
+                        <span>{item.description}</span>
+                      </span>
+                      <span className="discover-card-action" aria-hidden="true">
+                        <small>{item.source}</small>
+                        <i>↗</i>
+                      </span>
+                    </button>
+                  ))}
+                </div>
+              </nav>
               <footer className="discover-overview-footer">
                 <span>SEARCH REAL CATALOGS</span>
                 <span>TRAVEL IN ONE STEP</span>

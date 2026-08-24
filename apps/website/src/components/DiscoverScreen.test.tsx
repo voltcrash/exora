@@ -29,6 +29,9 @@ test("one Discover directory exposes every exploration surface", () => {
   expect(markup).toContain("Black Holes");
   expect(markup).toContain("World Forge");
   expect(markup).toContain('aria-label="Discover destinations"');
+  expect(markup).toContain('aria-label="Choose a trajectory"');
+  expect(markup).toContain("Begin with a point of light.");
+  expect(markup).toContain("Where to next?");
 });
 
 test("the black-hole destination exposes the five sourced landmarks", () => {
