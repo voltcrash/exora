@@ -34,11 +34,10 @@ interface MissionControlProps {
  * each one was: three of them are controls and two of them are reading matter, and a tray of five
  * cells made no distinction between pressing something and being told something.
  *
- * So the deck is now the three controls alone — clear view, Discover, the immersive entry — with
- * Discover in the middle because it is the only one that goes somewhere, flanked by the two that
- * change how this world is being shown. The frame counter went to the archive panel's signal
- * bars; the legend, and the alert that replaces it, sit above the deck as copy rather than as
- * cells that look pressable and are not.
+ * So the deck is now the three controls alone — Discover, clear view, the immersive entry — in
+ * the same order a visitor moves from navigation to presentation to the optional headset mode.
+ * The frame counter went to the archive panel's signal bars; the legend, and the alert that
+ * replaces it, sit outside the deck as copy rather than as cells that look pressable and are not.
  */
 export const MissionControl = ({
   hints,
@@ -69,6 +68,8 @@ export const MissionControl = ({
     )}
 
     <div className="control-deck">
+      <DiscoverTrigger onClick={onOpenDiscover} />
+
       <div className="deck-group deck-utility">
         <button
           className="clear-view"
@@ -85,9 +86,7 @@ export const MissionControl = ({
         </button>
       </div>
 
-      <DiscoverTrigger onClick={onOpenDiscover} />
-
-      {/* Rendered only where there is a scene to enter: an absent group leaves no seam behind. */}
+      {/* Rendered only where there is a scene to enter: an absent group leaves no empty slot. */}
       {xr ? (
         <div className="deck-group deck-actions">
           <button

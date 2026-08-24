@@ -1221,9 +1221,8 @@ button {
 }
 
 /*
- * The deck's leading cell, and the only control on it that goes somewhere else. It keeps a lit
- * surface for that reason: among four controls that only change the current view, the way out of
- * the current view has to stay the one that is found first.
+ * The deck's leading control, and the only one on it that goes somewhere else. It keeps a lit
+ * surface for that reason: the way out of the current view stays the first thing found.
  */
 .discover-trigger {
   min-width: 184px;
@@ -2510,21 +2509,9 @@ h1 em {
   pointer-events: auto;
 }
 
-/*
- * The groups retain a little breathing room around Discover without ruling the navigation deck
- * into separate cells.
- */
 .deck-group {
   display: flex;
   align-items: stretch;
-}
-
-.deck-utility {
-  padding-right: 7px;
-}
-
-.deck-actions {
-  padding-left: 7px;
 }
 
 /*

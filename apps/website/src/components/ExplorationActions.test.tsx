@@ -71,7 +71,7 @@ const starMarkup = (): string =>
     />,
   );
 
-/** Every button on the bottom-centre control deck, in the order the markup places them. */
+/** Every button on the top navigation deck, in the order the markup places them. */
 const deckButtons = (markup: string): string[] => {
   const start = markup.indexOf('class="control-deck"');
   expect(start).toBeGreaterThan(-1);
@@ -79,21 +79,19 @@ const deckButtons = (markup: string): string[] => {
   return [...deck.matchAll(/<button[^>]*>/g)].map(([tag]) => tag);
 };
 
-/** The name each of those buttons answers to, sorted so two views can be compared directly. */
+/** The name each of those buttons answers to, preserving the navigation and keyboard order. */
 const deckNames = (markup: string): string[] =>
-  deckButtons(markup)
-    .map((button) => /aria-label="([^"]+)"/.exec(button)?.[1] ?? "")
-    .sort();
+  deckButtons(markup).map((button) => /aria-label="([^"]+)"/.exec(button)?.[1] ?? "");
 
 test("the world view gathers every control onto one named deck", () => {
   const markup = planetMarkup();
 
-  // Discover, clear view and the immersive entry: the whole of what this view can be told, and
-  // all of it in one place rather than the three corners these used to hold.
+  // Discover, clear view and the immersive entry: navigation first, presentation second and the
+  // optional headset mode last, matching both the visible and keyboard order.
   expect(deckNames(markup)).toEqual([
+    "Open Discover",
     "Hide the interface",
     "Immersive mode: CHECKING HEADSET",
-    "Open Discover",
   ]);
   expect(markup).toContain('<kbd aria-label="Backspace or Delete">⌫</kbd>');
 
@@ -104,9 +102,9 @@ test("the world view gathers every control onto one named deck", () => {
 
 test("the star view gathers the same controls onto the same deck", () => {
   expect(deckNames(starMarkup())).toEqual([
+    "Open Discover",
     "Hide the interface",
     "Immersive mode: CHECKING HEADSET",
-    "Open Discover",
   ]);
 });
 
