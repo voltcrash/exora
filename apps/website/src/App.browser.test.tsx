@@ -840,6 +840,21 @@ test("Tab toggles the interface away and back, and only on the main screen", asy
   for (const panel of panels) await expect.element(panel).toBeVisible();
 });
 
+test("terrain view fades every interface region", async () => {
+  stubArchive();
+  mountApp();
+  await expect.element(page.getByRole("heading", { level: 1 })).toBeVisible();
+
+  const shell = document.querySelector<HTMLElement>(".experience-shell");
+  expect(shell).not.toBeNull();
+  shell!.classList.replace("view-orbit", "view-surface");
+  await new Promise((resolve) => window.setTimeout(resolve, 300));
+
+  const regions = document.querySelectorAll<HTMLElement>(".topbar, .hud > *, .mission-control");
+  expect(regions.length).toBeGreaterThan(2);
+  for (const region of regions) expect(getComputedStyle(region).opacity).toBe("0.34");
+});
+
 test("Tab keeps traversing focus wherever the shortcut stands down", async () => {
   stubArchive();
   mountApp();

@@ -1086,14 +1086,16 @@ button {
   transition: opacity var(--travel-cross, 190ms) ease-in;
 }
 
-.view-surface .world-intro,
-.view-surface .telemetry {
+.view-surface .topbar,
+.view-surface .hud > *,
+.view-surface .mission-control {
   opacity: 0.34;
   transition: opacity 240ms ease;
 }
 
-.view-surface .world-intro:hover,
-.view-surface .telemetry:hover {
+.view-surface .topbar:hover,
+.view-surface .hud > *:hover,
+.view-surface .mission-control:hover {
   opacity: 0.88;
 }
 
