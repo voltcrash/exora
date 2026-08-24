@@ -1597,6 +1597,27 @@ button {
   text-shadow: 0 2px 28px rgb(0 0 0 / 92%);
 }
 
+/*
+ * The Sun and system views can carry a complete catalog in this column.
+ *
+ * The viewport itself deliberately never scrolls because wheel gestures over the canvas zoom the
+ * scene. Bound these two long introductions to their HUD row instead, then make that surface own
+ * vertical gestures. Short introductions retain the shared bottom alignment; long ones become a
+ * contained scroller whose last world stays above the mission controls.
+ */
+.star-experience .world-intro,
+.system-experience .world-intro {
+  max-height: 100%;
+  overflow-x: hidden;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  pointer-events: auto;
+  scrollbar-color: rgb(139 230 234 / 28%) transparent;
+  scrollbar-gutter: stable;
+  scrollbar-width: thin;
+  touch-action: pan-y;
+}
+
 .eyebrow {
   display: flex;
   align-items: center;

@@ -746,6 +746,38 @@ test("the Solar System diorama distinguishes cached JPL positions from catalog p
   await expect.element(page.getByText("SIMPLIFIED CATALOG", { exact: true })).toBeVisible();
 });
 
+test("the Sun's complete world list scrolls inside its left panel", async () => {
+  stubArchive();
+  mountApp("?star=Sun");
+
+  await expect.element(page.getByRole("heading", { name: "Known worlds" })).toBeVisible();
+  const intro = document.querySelector<HTMLElement>(".star-experience .world-intro");
+  expect(intro).not.toBeNull();
+  expect(getComputedStyle(intro!).overflowY).toBe("auto");
+  expect(getComputedStyle(intro!).overscrollBehaviorY).toBe("contain");
+  expect(intro!.scrollHeight).toBeGreaterThan(intro!.clientHeight);
+
+  intro!.scrollTo({ top: intro!.scrollHeight });
+  expect(intro!.scrollTop).toBeGreaterThan(0);
+  await expect.element(page.getByRole("button", { name: /Makemake/ })).toBeVisible();
+});
+
+test("the Solar System's complete object list scrolls inside its left panel", async () => {
+  stubArchive();
+  mountApp("?system=Sun");
+
+  await expect.element(page.getByRole("heading", { name: "Worlds in the diorama" })).toBeVisible();
+  const intro = document.querySelector<HTMLElement>(".system-experience .world-intro");
+  expect(intro).not.toBeNull();
+  expect(getComputedStyle(intro!).overflowY).toBe("auto");
+  expect(getComputedStyle(intro!).overscrollBehaviorY).toBe("contain");
+  expect(intro!.scrollHeight).toBeGreaterThan(intro!.clientHeight);
+
+  intro!.scrollTo({ top: intro!.scrollHeight });
+  expect(intro!.scrollTop).toBeGreaterThan(0);
+  await expect.element(page.getByRole("button", { name: /Makemake/ })).toBeVisible();
+});
+
 test("a dialog closes on Escape and returns the page", async () => {
   stubArchive();
   mountApp();
