@@ -30,7 +30,12 @@ export const FrameRateSignal = ({ fps, qualityTier }: FrameRateSignalProps) => (
     </span>
     <span className="frame-rate-count">
       <strong>{fps}</strong>
-      <small>{qualityTier === undefined ? "FPS" : `FPS · ${qualityTier}`}</small>
+      {/* The tier is wrapped so a phone can drop it and keep the unit: on that screen the panel
+          is a third of the width and its heading is the panel's own name. */}
+      <small>
+        FPS
+        {qualityTier === undefined ? null : <span>{` · ${qualityTier}`}</span>}
+      </small>
     </span>
   </span>
 );
