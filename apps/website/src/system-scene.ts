@@ -38,7 +38,7 @@ import { VertexData } from "@babylonjs/core/Meshes/mesh.vertexData.js";
 import { TransformNode } from "@babylonjs/core/Meshes/transformNode.js";
 import "@babylonjs/core/Meshes/instancedMesh.js";
 import type { Scene } from "@babylonjs/core/scene.js";
-import type { ExoplanetProfile, StarProfile } from "@exora/contracts";
+import type { EphemerisVector, ExoplanetProfile, StarProfile } from "@exora/contracts";
 import {
   deriveHostStar,
   deriveWorldRecipe,
@@ -51,6 +51,7 @@ import {
 import type { RenderQualityProfile } from "./render-quality.ts";
 import type { MountedWorld, SceneHost, WorldConsole } from "./scene-host.ts";
 import { skyViewpointFrom } from "./sky-catalog.ts";
+import { propagateEphemerisVector } from "./solar-ephemeris.ts";
 import { tuneSolarWorldRecipe } from "./solar-system.ts";
 import { createStellarSurface } from "./star-surface.ts";
 import { createStarfield } from "./star-visuals.ts";
@@ -100,6 +101,10 @@ export interface SystemWorldOptions {
 export interface SystemWorld extends MountedWorld {
   /** The layout the diorama was drawn from, so the interface can print what was compressed. */
   layout: SystemLayout;
+  /** Switches between seeded catalog phases and validated heliocentric Horizons vectors. */
+  setEphemeris: (vectors: readonly EphemerisVector[] | null) => void;
+  /** Advances the displayed instant from the last authoritative Horizons state-vector anchor. */
+  setEphemerisTime: (epoch: Date) => void;
 }
 
 const toColor3 = ([red, green, blue]: Rgb): Color3 => new Color3(red, green, blue);
@@ -242,8 +247,8 @@ const buildOrbitRibbon = (scene: Scene, name: string, path: readonly Vector3[]):
 
 interface DrawnWorld {
   body: Mesh;
+  bodyPlane: TransformNode;
   orbit: PlacedOrbit;
-  plane: TransformNode;
 }
 
 const buildWorld = (
@@ -258,16 +263,16 @@ const buildWorld = (
   const recipe = tuneSolarWorldRecipe(planet, deriveWorldRecipe(planet));
   const color = dioramaBodyColor(recipe);
 
-  const plane = new TransformNode(`diorama-plane-${planet.id}`, scene);
-  plane.parent = root;
-  plane.rotation.x = orbit.tiltRadians;
+  const orbitPlane = new TransformNode(`diorama-plane-${planet.id}`, scene);
+  orbitPlane.parent = root;
+  orbitPlane.rotation.x = orbit.tiltRadians;
 
   const ribbon = buildOrbitRibbon(
     scene,
     `diorama-orbit-${planet.id}`,
     buildOrbitPath(layout.mapping, orbit.elements, profile.systemOrbitSegments),
   );
-  ribbon.parent = plane;
+  ribbon.parent = orbitPlane;
   const ribbonMaterial = new StandardMaterial(`diorama-orbit-material-${planet.id}`, scene);
   ribbonMaterial.disableLighting = true;
   ribbonMaterial.emissiveColor = Color3.Lerp(color, new Color3(0.42, 0.68, 0.78), 0.55);
@@ -284,7 +289,10 @@ const buildWorld = (
     { diameter: orbit.bodyRadiusSceneUnits * 2, segments: profile.systemBodySegments },
     scene,
   );
-  body.parent = plane;
+  const bodyPlane = new TransformNode(`diorama-body-plane-${planet.id}`, scene);
+  bodyPlane.parent = root;
+  bodyPlane.rotation.x = orbit.tiltRadians;
+  body.parent = bodyPlane;
   body.applyFog = false;
   body.isPickable = true;
   const bodyMaterial = new StandardMaterial(`diorama-world-material-${planet.id}`, scene);
@@ -323,7 +331,7 @@ const buildWorld = (
     target.actionManager = manager;
   }
 
-  return { body, orbit, plane };
+  return { body, bodyPlane, orbit };
 };
 
 export const createSystemWorld = (
@@ -428,6 +436,7 @@ export const createSystemWorld = (
   // rather than every world stacked along one radius waiting for the render loop.
   const applyPositions = (elapsedSeconds: number): void => {
     for (const world of drawn) {
+      world.bodyPlane.rotation.x = world.orbit.tiltRadians;
       const state = orbitStateAt(world.orbit, elapsedSeconds, layout.daysPerSecond);
       const radius = mapDistance(layout.mapping, state.radiusAu);
       world.body.position.set(
@@ -439,13 +448,36 @@ export const createSystemWorld = (
   };
   applyPositions(0);
 
+  let ephemerisByNaif: ReadonlyMap<number, EphemerisVector> | null = null;
+  let ephemerisTime = new Date(0);
+  const applyEphemerisPositions = (): void => {
+    if (!ephemerisByNaif) return;
+    for (const world of drawn) {
+      const naifId = world.orbit.planet.solarSystem?.naifId;
+      const vector = naifId === undefined ? undefined : ephemerisByNaif.get(naifId);
+      if (!vector) continue;
+      const position = propagateEphemerisVector(vector, ephemerisTime);
+      const radiusAu = Math.hypot(position.x, position.y, position.z);
+      if (!Number.isFinite(radiusAu) || radiusAu <= 0) continue;
+      const displayRadius = mapDistance(layout.mapping, radiusAu);
+      // Horizons' ecliptic X/Y plane becomes the scene's horizontal X/Z plane; ecliptic Z is up.
+      world.bodyPlane.rotation.x = 0;
+      world.body.position.set(
+        (position.x / radiusAu) * displayRadius,
+        (position.z / radiusAu) * displayRadius,
+        (position.y / radiusAu) * displayRadius,
+      );
+    }
+  };
+
   let elapsed = 0;
   const renderObserver = scene.onBeforeRenderObservable.add(() => {
     elapsed += Math.min(engine.getDeltaTime() / 1_000, 0.05);
     const eye = scene.activeCamera?.globalPosition ?? camera.globalPosition;
     stellarSurface?.update(elapsed, eye);
     starfield.update(elapsed, eye);
-    applyPositions(elapsed);
+    if (ephemerisByNaif) applyEphemerisPositions();
+    else applyPositions(elapsed);
   });
 
   const firstFrameObserver = scene.onAfterRenderObservable.addOnce(onFirstFrame);
@@ -519,6 +551,16 @@ export const createSystemWorld = (
     console: consoleContributions,
     focusXrRig: placeXrCamera,
     layout,
+    setEphemeris: (vectors) => {
+      ephemerisByNaif = vectors ? new Map(vectors.map((vector) => [vector.naifId, vector])) : null;
+      if (vectors?.[0]) ephemerisTime = new Date(vectors[0].epoch);
+      if (ephemerisByNaif) applyEphemerisPositions();
+      else applyPositions(elapsed);
+    },
+    setEphemerisTime: (epoch) => {
+      ephemerisTime = epoch;
+      applyEphemerisPositions();
+    },
     restoreDesktopView: () => camera.attachControl(canvas, true),
     // Meshes, materials, action managers and the point light all belong to the world scope the
     // host opened around this build. What is left here is what lives outside the scene graph.

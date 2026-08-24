@@ -398,3 +398,41 @@ from a different HYG release means a new filename, and the URL in `sky-catalog.t
   large fraction of the distance.
 - **Every star is one point of one size.** Apparent magnitude drives colour intensity, not point
   size, so the sky is flatter than the real one at the bright end.
+
+## Live Solar System ephemerides
+
+Retrieved and contract-checked on **2026-08-24**. No ephemeris file is shipped to the browser.
+Exora's backend requests geometric heliocentric state vectors from the NASA/JPL Horizons API,
+validates signature source `NASA/JPL Horizons API` and payload version `1.2`, then caches the
+normalized answer. Every returned vector retains the permanent identity and Horizons' own
+major-body kernel or small-body orbital-solution label (for example `DE441` or `JPL#103`). Credit:
+NASA/JPL-Caltech Solar System Dynamics Group. Use terms: NASA/JPL factual scientific data; see the
+[JPL Image Use Policy](https://www.jpl.nasa.gov/jpl-image-use-policy/). Original API documentation:
+https://ssd-api.jpl.nasa.gov/doc/horizons.html.
+
+All requests set center `500@10` (Sun body center), `EPHEM_TYPE=VECTORS`, `OUT_UNITS=AU-D`,
+`REF_PLANE=ECLIPTIC`, `REF_SYSTEM=ICRF`, `VEC_CORR=NONE`, and `VEC_TABLE=2`. The UTC epoch is the
+visitor's requested time. The links below are the original dynamic dataset URLs up to that epoch
+parameter; Exora supplies `TLIST` server-side and never exposes JPL as a browser dependency.
+
+| Body     | Mission / archive                        | Permanent NAIF / SPK ID        | Original URL                                                                          |
+| -------- | ---------------------------------------- | ------------------------------ | ------------------------------------------------------------------------------------- |
+| Mercury  | JPL Horizons major-body ephemeris        | NAIF/SPK `199`                 | https://ssd.jpl.nasa.gov/api/horizons.api?format=json&COMMAND=%27199%27               |
+| Venus    | JPL Horizons major-body ephemeris        | NAIF/SPK `299`                 | https://ssd.jpl.nasa.gov/api/horizons.api?format=json&COMMAND=%27299%27               |
+| Earth    | JPL Horizons major-body ephemeris        | NAIF/SPK `399`                 | https://ssd.jpl.nasa.gov/api/horizons.api?format=json&COMMAND=%27399%27               |
+| Mars     | JPL Horizons major-body ephemeris        | NAIF/SPK `499`                 | https://ssd.jpl.nasa.gov/api/horizons.api?format=json&COMMAND=%27499%27               |
+| Jupiter  | JPL Horizons major-body ephemeris        | NAIF/SPK `599`                 | https://ssd.jpl.nasa.gov/api/horizons.api?format=json&COMMAND=%27599%27               |
+| Saturn   | JPL Horizons major-body ephemeris        | NAIF/SPK `699`                 | https://ssd.jpl.nasa.gov/api/horizons.api?format=json&COMMAND=%27699%27               |
+| Uranus   | JPL Horizons major-body ephemeris        | NAIF/SPK `799`                 | https://ssd.jpl.nasa.gov/api/horizons.api?format=json&COMMAND=%27799%27               |
+| Neptune  | JPL Horizons major-body ephemeris        | NAIF/SPK `899`                 | https://ssd.jpl.nasa.gov/api/horizons.api?format=json&COMMAND=%27899%27               |
+| Pluto    | JPL Horizons major-body ephemeris        | NAIF/SPK `999`                 | https://ssd.jpl.nasa.gov/api/horizons.api?format=json&COMMAND=%27999%27               |
+| Ceres    | JPL Horizons small-body orbital solution | NAIF `2000001`; SPK `20000001` | https://ssd.jpl.nasa.gov/api/horizons.api?format=json&COMMAND=%27DES%3D20000001%3B%27 |
+| Eris     | JPL Horizons small-body orbital solution | NAIF/SPK `20136199`            | https://ssd.jpl.nasa.gov/api/horizons.api?format=json&COMMAND=%27DES%3D20136199%3B%27 |
+| Haumea   | JPL Horizons small-body orbital solution | NAIF/SPK `20136108`            | https://ssd.jpl.nasa.gov/api/horizons.api?format=json&COMMAND=%27DES%3D20136108%3B%27 |
+| Makemake | JPL Horizons small-body orbital solution | NAIF/SPK `20136472`            | https://ssd.jpl.nasa.gov/api/horizons.api?format=json&COMMAND=%27DES%3D20136472%3B%27 |
+
+The exact requested snapshot is measured/model-solved JPL data. Playback away from that anchor is
+an explicitly labelled two-body propagation using the returned position and velocity; it is not
+presented as a second Horizons solution. The orbit ribbons remain the existing simplified catalog
+orbits and are labelled separately. If Horizons is unavailable, only a still-valid stale cache
+entry for the exact target and epoch may be served, and the interface marks it `STALE CACHE`.

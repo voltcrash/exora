@@ -1,5 +1,6 @@
 import type {
   ApiErrorResponse,
+  EphemerisResponse,
   ExoplanetProfile,
   PlanetResponse,
   PlanetSearchResponse,
@@ -9,6 +10,14 @@ import type {
 } from "@exora/contracts";
 import { Hono, type Context } from "hono";
 import { cors } from "hono/cors";
+import {
+  HORIZONS_API_VERSION,
+  HORIZONS_SOURCE,
+  HORIZONS_TARGETS,
+  HorizonsError,
+  type HorizonsRepository,
+  JplHorizonsRepository,
+} from "./horizons.ts";
 import {
   NasaArchiveError,
   NasaPlanetRepository,
@@ -32,6 +41,8 @@ import {
 } from "./simbad-archive.ts";
 
 interface CreateAppOptions {
+  horizonsRateLimiter?: RateLimiter;
+  horizonsRepository?: HorizonsRepository;
   /** Overridable so a test can exercise the limit without issuing a hundred requests. */
   rateLimiter?: RateLimiter;
   repository?: PlanetRepository;
@@ -104,6 +115,8 @@ const starCollection = (
 };
 
 export const createApp = ({
+  horizonsRateLimiter = createRateLimiter({ limit: 8, windowMs: 60_000 }),
+  horizonsRepository = new JplHorizonsRepository(),
   rateLimiter = createRateLimiter(DEFAULT_RATE_LIMIT),
   repository = new NasaPlanetRepository(),
   starRepository = new SimbadStarRepository(),
@@ -149,6 +162,72 @@ export const createApp = ({
   app.get("/api/health", (context) =>
     context.json({ service: "exora-api", status: "ok" as const }),
   );
+
+  app.get("/api/ephemerides", async (context) => {
+    const decision = horizonsRateLimiter.check(
+      clientKey({
+        forwardedFor: context.req.header("x-forwarded-for"),
+        realIp: context.req.header("x-real-ip"),
+      }),
+      Date.now(),
+    );
+    context.header("Ephemeris-RateLimit-Limit", String(decision.limit));
+    context.header("Ephemeris-RateLimit-Remaining", String(decision.remaining));
+    if (!decision.allowed) {
+      context.header("Retry-After", String(decision.retryAfterSeconds));
+      return context.json(
+        apiError("RATE_LIMITED", "Too many ephemeris requests. Please wait before trying again."),
+        429,
+      );
+    }
+
+    const at = context.req.query("at")?.trim() ?? "";
+    const epoch = new Date(at);
+    const minimum = Date.UTC(1900, 0, 1);
+    const maximum = Date.UTC(2101, 0, 1);
+    const isoDate = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d{1,3})?(?:Z|[+-]\d{2}:\d{2})$/;
+    if (
+      !isoDate.test(at) ||
+      !Number.isFinite(epoch.getTime()) ||
+      epoch.getTime() < minimum ||
+      epoch.getTime() >= maximum
+    ) {
+      return context.json(
+        apiError("INVALID_REQUEST", "Ephemeris time must be an ISO date between 1900 and 2100."),
+        400,
+      );
+    }
+
+    const requestedIds = context.req.query("ids")?.trim();
+    const naifIds = requestedIds
+      ? requestedIds.split(",").map((value) => Number.parseInt(value, 10))
+      : HORIZONS_TARGETS.map(({ naifId }) => naifId);
+    const supportedIds = new Set<number>(HORIZONS_TARGETS.map(({ naifId }) => naifId));
+    if (
+      naifIds.length < 1 ||
+      naifIds.length > HORIZONS_TARGETS.length ||
+      new Set(naifIds).size !== naifIds.length ||
+      naifIds.some((naifId) => !Number.isInteger(naifId) || !supportedIds.has(naifId))
+    ) {
+      return context.json(apiError("INVALID_REQUEST", "Ephemeris target list is invalid."), 400);
+    }
+
+    const result = await horizonsRepository.positions(naifIds, epoch);
+    context.header("Cache-Control", "public, max-age=300, stale-while-revalidate=86400");
+    return context.json<EphemerisResponse>({
+      data: result.value,
+      meta: {
+        cached: result.cached,
+        center: "Sun (10)",
+        coordinateFrame: "Ecliptic J2000",
+        epoch: epoch.toISOString(),
+        retrievedAt: result.retrievedAt,
+        source: HORIZONS_SOURCE,
+        sourceVersion: HORIZONS_API_VERSION,
+        stale: result.stale,
+      },
+    });
+  });
 
   app.get("/api/planets", async (context) => {
     const query = context.req.query("q")?.trim() ?? "";
@@ -319,6 +398,16 @@ export const createApp = ({
     if (error instanceof SimbadArchiveError) {
       return context.json(
         apiError("UPSTREAM_UNAVAILABLE", "SIMBAD star archive is temporarily unavailable."),
+        502,
+      );
+    }
+
+    if (error instanceof HorizonsError) {
+      return context.json(
+        apiError(
+          "UPSTREAM_UNAVAILABLE",
+          "JPL Horizons is temporarily unavailable and no cached ephemeris covers this time.",
+        ),
         502,
       );
     }

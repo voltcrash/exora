@@ -1,8 +1,9 @@
 import type { ExoplanetProfile, StarProfile } from "@exora/contracts";
-import { expect, test } from "vite-plus/test";
+import { expect, test, vi } from "vite-plus/test";
 import { createApp } from "../src/app.ts";
 import { NasaArchiveError, type PlanetRepository } from "../src/nasa-archive.ts";
 import { createRateLimiter } from "../src/rate-limit.ts";
+import type { HorizonsRepository } from "../src/horizons.ts";
 import { SimbadArchiveError, type StarRepository } from "../src/simbad-archive.ts";
 
 const planet: ExoplanetProfile = {
@@ -83,6 +84,74 @@ test("returns service health", async () => {
 
   expect(response.status).toBe(200);
   expect(await response.json()).toEqual({ service: "exora-api", status: "ok" });
+});
+
+const ephemerisRepository: HorizonsRepository = {
+  positions: async (_naifIds, epoch) => ({
+    cached: true,
+    retrievedAt: "2026-08-24T12:00:00.000Z",
+    stale: false,
+    value: [
+      {
+        epoch: epoch.toISOString(),
+        name: "Earth",
+        naifId: 399,
+        positionAu: { x: 1, y: 0, z: 0 },
+        solution: "DE441",
+        spkId: "399",
+        velocityAuPerDay: { x: 0, y: 0.0172, z: 0 },
+      },
+    ],
+  }),
+};
+
+test("returns cached heliocentric Horizons vectors through the backend", async () => {
+  const response = await createApp({ horizonsRepository: ephemerisRepository, repository }).request(
+    "/api/ephemerides?at=2026-08-24T12%3A00%3A00.000Z&ids=399",
+  );
+
+  expect(response.status).toBe(200);
+  expect(response.headers.get("Cache-Control")).toContain("stale-while-revalidate");
+  expect(await response.json()).toMatchObject({
+    data: [{ naifId: 399, spkId: "399" }],
+    meta: {
+      cached: true,
+      center: "Sun (10)",
+      coordinateFrame: "Ecliptic J2000",
+      source: "NASA/JPL Horizons API",
+      sourceVersion: "1.2",
+      stale: false,
+    },
+  });
+});
+
+test("rejects invalid ephemeris dates and targets without reaching Horizons", async () => {
+  const positions = vi.spyOn(ephemerisRepository, "positions");
+  const app = createApp({ horizonsRepository: ephemerisRepository, repository });
+  const badDate = await app.request("/api/ephemerides?at=not-a-date&ids=399");
+  const badTarget = await app.request(
+    "/api/ephemerides?at=2026-08-24T12%3A00%3A00.000Z&ids=399,123456",
+  );
+
+  expect(badDate.status).toBe(400);
+  expect(badTarget.status).toBe(400);
+  expect(positions).not.toHaveBeenCalled();
+  positions.mockRestore();
+});
+
+test("applies a smaller request budget to the upstream-expensive ephemeris route", async () => {
+  const app = createApp({
+    horizonsRateLimiter: createRateLimiter({ limit: 1, windowMs: 60_000 }),
+    horizonsRepository: ephemerisRepository,
+    repository,
+  });
+  const path = "/api/ephemerides?at=2026-08-24T12%3A00%3A00.000Z&ids=399";
+  const first = await app.request(path);
+  const refused = await app.request(path);
+
+  expect(first.status).toBe(200);
+  expect(refused.status).toBe(429);
+  expect(refused.headers.get("Retry-After")).toBeTruthy();
 });
 
 test("returns normalized planet search results", async () => {

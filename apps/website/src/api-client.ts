@@ -1,4 +1,5 @@
 import type {
+  EphemerisResponse,
   ExoplanetProfile,
   PlanetResponse,
   PlanetSearchResponse,
@@ -28,6 +29,7 @@ const OBJECT_LOOKUP_TIMEOUT_MS = 8_000;
  */
 const PLANET_COLLECTION_TIMEOUT_MS = 8_000;
 const STAR_COLLECTION_TIMEOUT_MS = 10_000;
+const EPHEMERIS_TIMEOUT_MS = 20_000;
 
 interface CollectionOptions {
   fetcher?: Fetcher;
@@ -170,6 +172,65 @@ const isStarSearchResponse = (value: unknown): value is StarSearchResponse => {
     typeof candidate.meta?.query === "string" &&
     candidate.meta.source === "SIMBAD",
   );
+};
+
+const isFiniteVector = (value: unknown): boolean =>
+  Boolean(
+    value &&
+    typeof value === "object" &&
+    ["x", "y", "z"].every((axis) => Number.isFinite((value as Record<string, unknown>)[axis])),
+  );
+
+const isEphemerisResponse = (value: unknown): value is EphemerisResponse => {
+  if (!value || typeof value !== "object") return false;
+  const candidate = value as Partial<EphemerisResponse>;
+  return Boolean(
+    Array.isArray(candidate.data) &&
+    candidate.data.length > 0 &&
+    candidate.data.every(
+      (vector) =>
+        Number.isInteger(vector.naifId) &&
+        typeof vector.spkId === "string" &&
+        typeof vector.solution === "string" &&
+        typeof vector.epoch === "string" &&
+        isFiniteVector(vector.positionAu) &&
+        isFiniteVector(vector.velocityAuPerDay),
+    ) &&
+    candidate.meta?.source === "NASA/JPL Horizons API" &&
+    candidate.meta.center === "Sun (10)" &&
+    candidate.meta.coordinateFrame === "Ecliptic J2000" &&
+    typeof candidate.meta.sourceVersion === "string" &&
+    typeof candidate.meta.cached === "boolean" &&
+    typeof candidate.meta.stale === "boolean",
+  );
+};
+
+export const loadSolarEphemeris = async (
+  epoch: Date,
+  naifIds: readonly number[],
+  options: CollectionOptions = {},
+): Promise<EphemerisResponse> => {
+  const parameters = new URLSearchParams({
+    at: epoch.toISOString(),
+    ids: naifIds.join(","),
+  });
+  const response = await requestCollection(
+    `/api/ephemerides?${parameters.toString()}`,
+    options,
+    EPHEMERIS_TIMEOUT_MS,
+    "JPL ephemeris",
+    isEphemerisResponse,
+  );
+  const expected = new Set(naifIds);
+  if (
+    response.data.length !== expected.size ||
+    response.data.some(
+      (vector) => !expected.has(vector.naifId) || vector.epoch !== response.meta.epoch,
+    )
+  ) {
+    throw new Error("JPL ephemeris returned a different target set or epoch.");
+  }
+  return response;
 };
 
 const requestPlanet = async (

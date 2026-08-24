@@ -2408,6 +2408,136 @@ h1 em {
   background: rgb(94 214 220 / 8%);
 }
 
+.ephemeris-control {
+  width: min(390px, 100%);
+  display: grid;
+  gap: 9px;
+  margin-top: 14px;
+  padding: 11px;
+  border: 1px solid rgb(139 230 234 / 22%);
+  border-radius: 13px;
+  background: rgb(4 14 18 / 72%);
+  backdrop-filter: blur(14px);
+  pointer-events: auto;
+}
+
+.ephemeris-heading,
+.ephemeris-time-row,
+.ephemeris-playback {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+}
+
+.ephemeris-heading {
+  justify-content: space-between;
+}
+
+.ephemeris-heading span {
+  display: grid;
+  gap: 2px;
+}
+
+.ephemeris-heading small,
+.ephemeris-time-row label > span,
+.ephemeris-playback label > span {
+  color: var(--faint);
+  font: 6px/1.2 var(--mono);
+  letter-spacing: 0.09em;
+}
+
+.ephemeris-heading h2 {
+  margin: 0;
+  color: #d3f5f8;
+  font-size: 13px;
+  font-weight: 500;
+  text-transform: uppercase;
+}
+
+.ephemeris-heading strong {
+  padding: 4px 6px;
+  border: 1px solid rgb(139 230 234 / 25%);
+  border-radius: 999px;
+  color: var(--cyan);
+  font: 6px/1 var(--mono);
+  letter-spacing: 0.07em;
+}
+
+.ephemeris-heading strong.stale {
+  border-color: rgb(255 156 121 / 36%);
+  color: #ffb08e;
+}
+
+.ephemeris-time-row {
+  align-items: end;
+}
+
+.ephemeris-time-row label {
+  min-width: 0;
+  flex: 1;
+  display: grid;
+  gap: 4px;
+}
+
+.ephemeris-time-row input,
+.ephemeris-playback select,
+.ephemeris-time-row button,
+.ephemeris-playback button {
+  min-height: 30px;
+  border: 1px solid rgb(139 230 234 / 25%);
+  border-radius: 8px;
+  color: #dff9fb;
+  background: rgb(8 24 28 / 88%);
+  font: 7px/1 var(--mono);
+}
+
+.ephemeris-time-row input,
+.ephemeris-playback select {
+  min-width: 0;
+  padding: 6px 7px;
+  color-scheme: dark;
+}
+
+.ephemeris-time-row button,
+.ephemeris-playback button {
+  padding: 6px 8px;
+  cursor: pointer;
+}
+
+.ephemeris-time-row button:hover,
+.ephemeris-time-row button:focus-visible,
+.ephemeris-playback button:hover,
+.ephemeris-playback button:focus-visible,
+.ephemeris-playback button[aria-pressed="true"] {
+  border-color: rgb(139 230 234 / 62%);
+  color: white;
+  background: rgb(75 177 184 / 20%);
+}
+
+.ephemeris-time-row button:disabled,
+.ephemeris-playback button:disabled {
+  opacity: 0.38;
+  cursor: default;
+}
+
+.ephemeris-playback {
+  flex-wrap: wrap;
+}
+
+.ephemeris-playback label {
+  display: grid;
+  grid-template-columns: auto 58px;
+  align-items: center;
+  gap: 5px;
+}
+
+.ephemeris-control > p {
+  margin: 0;
+  color: #729398;
+  font: 6px/1.45 var(--mono);
+  letter-spacing: 0.055em;
+}
+
 /* One long, unpunctuated line per world naming exactly what had to be assumed to draw its orbit. */
 .orbit-provenance {
   overflow: hidden;
@@ -3928,6 +4058,21 @@ h1 em {
 }
 
 @media (max-width: 640px) {
+  .system-experience .world-intro {
+    max-height: calc(100vh - 180px);
+    overflow-y: auto;
+    scrollbar-color: rgb(139 230 234 / 28%) transparent;
+  }
+
+  .ephemeris-time-row {
+    display: grid;
+    grid-template-columns: 1fr auto;
+  }
+
+  .ephemeris-time-row label {
+    grid-column: 1 / -1;
+  }
+
   .solar-catalog-tools {
     grid-template-columns: 1fr;
     margin-inline: 18px;

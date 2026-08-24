@@ -34,6 +34,8 @@ const mountedWorld = () => ({
   dispose: () => undefined,
   focusXrRig: () => undefined,
   restoreDesktopView: () => undefined,
+  setEphemeris: () => undefined,
+  setEphemerisTime: () => undefined,
 });
 
 vi.mock("./scene-host.ts", () => {
@@ -207,6 +209,32 @@ const stubArchive = ({ missing = [] as string[] } = {}) => {
     const requested = decodeURIComponent(url.pathname.split("/").pop() ?? "");
 
     if (missing.includes(requested)) return new Response(null, { status: 404 });
+
+    if (url.pathname === "/api/ephemerides") {
+      const epoch = url.searchParams.get("at") ?? "2026-08-24T00:00:00.000Z";
+      const ids = (url.searchParams.get("ids") ?? "399").split(",").map(Number);
+      return Response.json({
+        data: ids.map((naifId) => ({
+          epoch,
+          name: `Body ${naifId}`,
+          naifId,
+          positionAu: { x: 1, y: naifId / 1_000, z: 0 },
+          solution: "DE441/JPL small-body solution",
+          spkId: String(naifId),
+          velocityAuPerDay: { x: 0, y: 0.01, z: 0 },
+        })),
+        meta: {
+          cached: true,
+          center: "Sun (10)",
+          coordinateFrame: "Ecliptic J2000",
+          epoch,
+          retrievedAt: epoch,
+          source: "NASA/JPL Horizons API",
+          sourceVersion: "1.2",
+          stale: false,
+        },
+      });
+    }
 
     if (url.pathname.startsWith("/api/planets/")) {
       return Response.json({
@@ -546,6 +574,24 @@ test("a Solar System planet switches into its dedicated parent-centered subsyste
   await expect
     .element(page.getByRole("button", { name: /Jupiter close view/ }))
     .toHaveAttribute("aria-pressed", "true");
+});
+
+test("the Solar System diorama distinguishes cached JPL positions from catalog phases", async () => {
+  stubArchive();
+  mountApp("?system=Sun");
+
+  await expect.element(page.getByRole("heading", { level: 1 })).toHaveTextContent("Sun");
+  await expect.element(page.getByText("SIMPLIFIED CATALOG", { exact: true })).toBeVisible();
+  await userEvent.click(page.getByRole("button", { name: "NOW" }));
+
+  await expect.element(page.getByText("SERVER-CACHED JPL", { exact: true })).toBeVisible();
+  await expect.element(page.getByRole("button", { name: /PLAY/ })).toBeEnabled();
+  await userEvent.click(page.getByRole("button", { name: /REVERSE/ }));
+  await expect
+    .element(page.getByRole("button", { name: /REVERSE/ }))
+    .toHaveAttribute("aria-pressed", "true");
+  await userEvent.click(page.getByRole("button", { name: "CATALOG ORBITS" }));
+  await expect.element(page.getByText("SIMPLIFIED CATALOG", { exact: true })).toBeVisible();
 });
 
 test("a dialog closes on Escape and returns the page", async () => {

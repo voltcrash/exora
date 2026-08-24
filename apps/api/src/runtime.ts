@@ -1,6 +1,7 @@
 import { createApp } from "./app.ts";
 import { createDatabaseClient } from "./database.ts";
 import { NasaPlanetRepository } from "./nasa-archive.ts";
+import { JplHorizonsRepository } from "./horizons.ts";
 import { PostgresPlanetRepository } from "./postgres-catalog.ts";
 import { SimbadStarRepository } from "./simbad-archive.ts";
 
@@ -16,4 +17,8 @@ export const database = connectionString
 
 const repository = database ? new PostgresPlanetRepository(database) : new NasaPlanetRepository();
 
-export const app = createApp({ repository, starRepository: new SimbadStarRepository() });
+export const app = createApp({
+  horizonsRepository: new JplHorizonsRepository(),
+  repository,
+  starRepository: new SimbadStarRepository(),
+});

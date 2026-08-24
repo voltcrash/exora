@@ -209,6 +209,38 @@ export interface StarSearchResponse {
   };
 }
 
+export interface EphemerisVector {
+  /** The UTC instant requested by Exora and evaluated by Horizons. */
+  epoch: string;
+  name: string;
+  /** Permanent NAIF body code used by Exora's authored Solar System catalog. */
+  naifId: number;
+  /** Permanent Horizons/SPK identity, retained separately where the small-body code differs. */
+  spkId: string;
+  /** Heliocentric ecliptic-J2000 geometric position, in astronomical units. */
+  positionAu: { x: number; y: number; z: number };
+  /** Horizons' permanent major-body kernel or small-body orbital-solution label. */
+  solution: string;
+  /** Heliocentric ecliptic-J2000 geometric velocity, in astronomical units per day. */
+  velocityAuPerDay: { x: number; y: number; z: number };
+}
+
+export interface EphemerisResponse {
+  data: EphemerisVector[];
+  meta: {
+    /** True only when every vector came from Exora's server-side cache. */
+    cached: boolean;
+    center: "Sun (10)";
+    coordinateFrame: "Ecliptic J2000";
+    epoch: string;
+    retrievedAt: string;
+    source: "NASA/JPL Horizons API";
+    sourceVersion: string;
+    /** True when expired cache entries were served because Horizons could not answer. */
+    stale: boolean;
+  };
+}
+
 export interface ApiErrorResponse {
   error: {
     code: "INVALID_REQUEST" | "NOT_FOUND" | "RATE_LIMITED" | "UPSTREAM_UNAVAILABLE";

@@ -749,6 +749,52 @@ const questProfile = deriveRenderQuality({
   deviceMemory: 6,
 });
 
+test("the Solar System diorama accepts and clears authoritative Horizons positions", () => {
+  const { engine, host, scene } = createHarness();
+  const scope = openWorldScope(scene);
+  const solarWorld = {
+    ...systemPlanets[0]!,
+    solarSystem: {
+      axialTiltDegrees: 23.4,
+      bodyType: "planet" as const,
+      naifId: 399,
+      orbitalInclinationDegrees: 0,
+      parent: "Sun",
+      rotationPeriodHours: 24,
+      summary: "Test Earth",
+    },
+  };
+  const world = createSystemWorld(host, {
+    hostName: "Sun",
+    onFirstFrame: () => undefined,
+    planets: [solarWorld],
+  });
+  scope.seal();
+  const body = scene.meshes.find((mesh) => mesh.name === `diorama-world-${solarWorld.id}`);
+  if (!body) throw new Error("Expected the Solar System world to be drawn.");
+
+  world.setEphemeris([
+    {
+      epoch: "2026-08-24T00:00:00.000Z",
+      name: "Earth",
+      naifId: 399,
+      positionAu: { x: 0, y: 1, z: 0.1 },
+      solution: "DE441",
+      spkId: "399",
+      velocityAuPerDay: { x: -0.017, y: 0, z: 0 },
+    },
+  ]);
+  expect(body.position.z).toBeGreaterThan(0);
+  expect(body.position.y).toBeGreaterThan(0);
+  world.setEphemerisTime(new Date("2026-08-25T00:00:00.000Z"));
+  expect(() => scene.render()).not.toThrow();
+  world.setEphemeris(null);
+
+  world.dispose();
+  scope.dispose();
+  engine.dispose();
+});
+
 test("a seven-world diorama costs less than the one world it travels to", () => {
   // The claim requirement the whole budget rests on: a system is affordable precisely because
   // none of it is drawn at the detail a single arrived-at world gets. Asserted against the planet

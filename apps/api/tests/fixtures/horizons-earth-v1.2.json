@@ -1,0 +1,7 @@
+{
+  "signature": {
+    "version": "1.2",
+    "source": "NASA/JPL Horizons API"
+  },
+  "result": "\n*******************************************************************************\nTarget body name: Earth (399)                     {source: DE441}\nCenter body name: Sun (10)                        {source: DE441}\nOutput units    : AU-D\nOutput type     : GEOMETRIC cartesian states\nReference frame : Ecliptic of J2000.0\n*******************************************************************************\n            JDTDB,            Calendar Date (TDB),                      X,                      Y,                      Z,                     VX,                     VY,                     VZ,\n$$SOE\n2460000.500000000, A.D. 2023-Feb-25 00:00:00.0000, -9.026747984245221E-01,  4.058472768982778E-01, -1.632985998557919E-05, -7.330685698046913E-03, -1.576267443031454E-02,  2.203687453954070E-07,\n$$EOE\n"
+}

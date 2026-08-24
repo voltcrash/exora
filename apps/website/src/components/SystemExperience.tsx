@@ -1,10 +1,11 @@
-import type { ExoplanetProfile, StarProfile } from "@exora/contracts";
+import type { EphemerisResponse, ExoplanetProfile, StarProfile } from "@exora/contracts";
 import type { CustomStar, CustomWorld } from "@exora/worldgen";
-import { useEffect, useState } from "react";
-import type { SystemLoadResult } from "../api-client.ts";
+import { useEffect, useRef, useState } from "react";
+import { loadSolarEphemeris, type SystemLoadResult } from "../api-client.ts";
 import { reachStar } from "../destination-cache.ts";
 import { formatNumber } from "../planet-utils.tsx";
 import type { SceneHost, XrStatus } from "../scene-host.ts";
+import { isEphemerisDerivedAt } from "../solar-ephemeris.ts";
 import {
   bodyScaleLabel,
   elementProvenance,
@@ -40,6 +41,18 @@ const xrButtonCopy: Record<XrStatus, string> = {
   unavailable: "VR UNAVAILABLE",
 };
 
+const localDateTimeValue = (date: Date): string => {
+  const local = new Date(date.getTime() - date.getTimezoneOffset() * 60_000);
+  return local.toISOString().slice(0, 19);
+};
+
+const PLAYBACK_RATES = [
+  { label: "1×", secondsPerSecond: 1 },
+  { label: "60×", secondsPerSecond: 60 },
+  { label: "1 h/s", secondsPerSecond: 3_600 },
+  { label: "1 d/s", secondsPerSecond: 86_400 },
+] as const;
+
 /**
  * The whole host system, as somewhere to stand rather than a list to read.
  *
@@ -71,12 +84,56 @@ export const SystemExperience = ({
   const [sceneState, setSceneState] = useState<"loading" | "ready" | "error">("loading");
   const [xrStatus, setXrStatus] = useState<XrStatus>("checking");
   const [starJumpState, setStarJumpState] = useState<"error" | "idle" | "loading">("idle");
+  const [ephemeris, setEphemeris] = useState<EphemerisResponse | null>(null);
+  const [ephemerisRequest, setEphemerisRequest] = useState<"error" | "idle" | "loading">("idle");
+  const [displayedAt, setDisplayedAt] = useState(() => new Date());
+  const [playing, setPlaying] = useState(false);
+  const [playbackRate, setPlaybackRate] = useState(3_600);
+  const [playbackDirection, setPlaybackDirection] = useState<1 | -1>(1);
+  const worldRef = useRef<SystemWorld | null>(null);
+  const ephemerisRef = useRef<EphemerisResponse | null>(null);
+  const displayedAtRef = useRef(displayedAt);
+  const requestSequence = useRef(0);
   const { cached, hostStar, planets } = result;
   const solar = planets.length > 0 && planets.every((planet) => planet.solarSystem);
   // A jump in the air owns the screen: this view's panels go with the world being left, and its
   // loading card stays down, because the flight is what stands in for it now.
   const travelling = travelPhase === "departing" || travelPhase === "crossing";
   const settled = sceneState !== "loading" || travelPhase !== "idle";
+
+  const activateEphemeris = async (epoch: Date): Promise<void> => {
+    if (!solar || ephemerisRequest === "loading") return;
+    const request = requestSequence.current + 1;
+    requestSequence.current = request;
+    setPlaying(false);
+    setEphemerisRequest("loading");
+    try {
+      const response = await loadSolarEphemeris(
+        epoch,
+        planets.flatMap(({ solarSystem }) => (solarSystem ? [solarSystem.naifId] : [])),
+      );
+      if (requestSequence.current !== request) return;
+      ephemerisRef.current = response;
+      displayedAtRef.current = epoch;
+      setEphemeris(response);
+      setDisplayedAt(epoch);
+      worldRef.current?.setEphemeris(response.data);
+      worldRef.current?.setEphemerisTime(epoch);
+      setEphemerisRequest("idle");
+    } catch (error) {
+      console.error(error);
+      if (requestSequence.current === request) setEphemerisRequest("error");
+    }
+  };
+
+  const useCatalogPositions = (): void => {
+    requestSequence.current += 1;
+    setPlaying(false);
+    setEphemeris(null);
+    ephemerisRef.current = null;
+    setEphemerisRequest("idle");
+    worldRef.current?.setEphemeris(null);
+  };
 
   const openHostStar = async (): Promise<void> => {
     if (starJumpState === "loading") return;
@@ -98,6 +155,28 @@ export const SystemExperience = ({
   }, [hostStar]);
 
   useEffect(() => host?.onXrStatus(setXrStatus), [host]);
+
+  useEffect(() => {
+    if (!playing || !ephemeris) return;
+    let previous = performance.now();
+    const timer = window.setInterval(() => {
+      const now = performance.now();
+      const elapsed = now - previous;
+      previous = now;
+      setDisplayedAt((current) => {
+        const requestedTime = current.getTime() + elapsed * playbackRate * playbackDirection;
+        const minimum = Date.UTC(1900, 0, 1);
+        const maximum = Date.UTC(2100, 11, 31, 23, 59, 59);
+        const boundedTime = Math.min(maximum, Math.max(minimum, requestedTime));
+        if (boundedTime !== requestedTime) setPlaying(false);
+        const next = new Date(boundedTime);
+        displayedAtRef.current = next;
+        worldRef.current?.setEphemerisTime(next);
+        return next;
+      });
+    }, 100);
+    return () => window.clearInterval(timer);
+  }, [ephemeris, playbackDirection, playbackRate, playing]);
 
   useEffect(() => {
     if (!host) return;
@@ -136,6 +215,11 @@ export const SystemExperience = ({
       )
       .then((world: SystemWorld | null) => {
         if (!world || abandoned) return;
+        worldRef.current = world;
+        if (ephemerisRef.current) {
+          world.setEphemeris(ephemerisRef.current.data);
+          world.setEphemerisTime(displayedAtRef.current);
+        }
         setLayout(world.layout);
       })
       .catch((error: unknown) => {
@@ -145,6 +229,7 @@ export const SystemExperience = ({
 
     return () => {
       abandoned = true;
+      worldRef.current = null;
     };
   }, [
     cached,
@@ -255,8 +340,124 @@ export const SystemExperience = ({
               : `Every confirmed world of ${hostStar}, on the orbit the archive measured for it and turning at its own measured period. Select a world to travel to it, or the star at the centre to stand at the star itself.`}
           </p>
           <p className="visual-note">
-            <span aria-hidden="true" /> ORBITS MEASURED · LAYOUT DERIVED · APPEARANCE INFERRED
+            <span aria-hidden="true" />{" "}
+            {ephemeris
+              ? "BODY POSITIONS: JPL HORIZONS · ORBIT TRACKS: SIMPLIFIED CATALOG"
+              : "ORBITS MEASURED · PHASES SEEDED · APPEARANCE INFERRED"}
           </p>
+
+          {solar ? (
+            <section className="ephemeris-control" aria-labelledby="ephemeris-title">
+              <div className="ephemeris-heading">
+                <span>
+                  <small>POSITION MODE</small>
+                  <h2 id="ephemeris-title">Live ephemeris</h2>
+                </span>
+                <strong className={ephemeris?.meta.stale ? "stale" : undefined} role="status">
+                  {ephemerisRequest === "loading"
+                    ? "CONTACTING JPL…"
+                    : ephemerisRequest === "error"
+                      ? "JPL UNAVAILABLE"
+                      : ephemeris?.meta.stale
+                        ? "STALE CACHE"
+                        : ephemeris?.meta.cached
+                          ? "SERVER-CACHED JPL"
+                          : ephemeris
+                            ? "FRESH JPL VECTOR"
+                            : "SIMPLIFIED CATALOG"}
+                </strong>
+              </div>
+              <div className="ephemeris-time-row">
+                <label>
+                  <span>LOCAL DATE &amp; TIME</span>
+                  <input
+                    type="datetime-local"
+                    min="1900-01-01T00:00:00"
+                    max="2100-12-31T23:59:59"
+                    step="1"
+                    value={localDateTimeValue(displayedAt)}
+                    onChange={(event) => {
+                      const selected = new Date(event.currentTarget.value);
+                      if (!Number.isFinite(selected.getTime())) return;
+                      setPlaying(false);
+                      displayedAtRef.current = selected;
+                      setDisplayedAt(selected);
+                      worldRef.current?.setEphemerisTime(selected);
+                    }}
+                  />
+                </label>
+                <button
+                  type="button"
+                  disabled={ephemerisRequest === "loading"}
+                  onClick={() => void activateEphemeris(displayedAt)}
+                >
+                  APPLY JPL
+                </button>
+                <button
+                  type="button"
+                  disabled={ephemerisRequest === "loading"}
+                  onClick={() => void activateEphemeris(new Date())}
+                >
+                  NOW
+                </button>
+              </div>
+              <div className="ephemeris-playback" aria-label="Ephemeris playback controls">
+                <button
+                  type="button"
+                  disabled={!ephemeris}
+                  aria-pressed={playing && playbackDirection === 1}
+                  onClick={() => {
+                    setPlaybackDirection(1);
+                    setPlaying(true);
+                  }}
+                >
+                  ▶ PLAY
+                </button>
+                <button
+                  type="button"
+                  disabled={!ephemeris || !playing}
+                  onClick={() => setPlaying(false)}
+                >
+                  ‖ PAUSE
+                </button>
+                <button
+                  type="button"
+                  disabled={!ephemeris}
+                  aria-pressed={playing && playbackDirection === -1}
+                  onClick={() => {
+                    setPlaybackDirection(-1);
+                    setPlaying(true);
+                  }}
+                >
+                  ◀ REVERSE
+                </button>
+                <label>
+                  <span>RATE</span>
+                  <select
+                    value={playbackRate}
+                    onChange={(event) => setPlaybackRate(Number(event.currentTarget.value))}
+                  >
+                    {PLAYBACK_RATES.map((rate) => (
+                      <option key={rate.secondsPerSecond} value={rate.secondsPerSecond}>
+                        {rate.label}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+                <button type="button" disabled={!ephemeris} onClick={useCatalogPositions}>
+                  CATALOG ORBITS
+                </button>
+              </div>
+              <p>
+                {ephemeris
+                  ? isEphemerisDerivedAt(ephemeris.data, displayedAt)
+                    ? `DERIVED BETWEEN LOOKUPS · TWO-BODY PROPAGATION FROM ${new Date(ephemeris.meta.epoch).toISOString().replace(".000Z", "Z")} JPL ANCHOR`
+                    : `MEASURED STATE VECTORS · ${ephemeris.meta.coordinateFrame.toUpperCase()} · CENTER ${ephemeris.meta.center.toUpperCase()}`
+                  : "CATALOG ORBIT SHAPES · SEEDED PHASES · NOT A DATE-SOLVED CONFIGURATION"}
+                {ephemeris?.meta.stale ? " · HORIZONS WAS OFFLINE; EXPIRED CACHE RETAINED" : ""}
+              </p>
+            </section>
+          ) : null}
 
           <section className="known-worlds" aria-labelledby="system-worlds-title">
             <div>
@@ -360,15 +561,19 @@ export const SystemExperience = ({
           </div>
           <div className="telemetry-detail">
             <span>ORBITAL PHASE</span>
-            <strong>NOT MEASURED</strong>
+            <strong>{ephemeris ? "JPL HORIZONS" : "NOT MEASURED"}</strong>
             <small>
-              No catalog records where a world is on its orbit. Starting positions are seeded from
-              each planet&rsquo;s identifier.
+              {ephemeris
+                ? isEphemerisDerivedAt(ephemeris.data, displayedAt)
+                  ? "Playback is derived from the last JPL state-vector anchor; apply the shown time for a new authoritative solution."
+                  : "Geometric heliocentric state vectors from the validated Horizons API response."
+                : "No catalog records where a world is on its orbit. Starting positions are seeded from each planet’s identifier."}
             </small>
           </div>
           <p className="source-note">
-            NASA Exoplanet Archive · pscomppars ·{" "}
-            {result.planets[0]?.source.retrievedOn ?? "unsynchronized"}
+            {ephemeris
+              ? `NASA/JPL Horizons API ${ephemeris.meta.sourceVersion} · ${ephemeris.meta.cached ? "SERVER CACHE" : "FRESH RESPONSE"}`
+              : `NASA Exoplanet Archive · pscomppars · ${result.planets[0]?.source.retrievedOn ?? "unsynchronized"}`}
           </p>
         </aside>
       </main>
