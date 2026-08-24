@@ -402,6 +402,8 @@ export const App = () => {
     setDiscoverOpen(true);
   }, []);
 
+  const closeDiscover = useCallback((): void => setDiscoverOpen(false), []);
+
   const subject =
     activeObject && activeObject.type !== "missing"
       ? activeObject.type === "asteroid"
@@ -589,7 +591,7 @@ export const App = () => {
           <DiscoverScreen
             initialForgeMode={activeObject.type === "star" ? "star" : "planet"}
             initialSection={discoverSection}
-            onClose={() => setDiscoverOpen(false)}
+            onClose={closeDiscover}
             onGeneratePlanet={generatePlanet}
             onGenerateStar={generateStar}
             onSelectAsteroid={selectAsteroid}

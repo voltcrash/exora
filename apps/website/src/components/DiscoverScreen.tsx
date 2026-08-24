@@ -123,13 +123,20 @@ export const DiscoverScreen = ({
     const dialog = dialogRef.current;
     const previousFocus =
       document.activeElement instanceof HTMLElement ? document.activeElement : null;
+    const closeOnEscape = (event: KeyboardEvent): void => {
+      if (event.key !== "Escape") return;
+      event.preventDefault();
+      onClose();
+    };
     dialog?.showModal();
     closeRef.current?.focus();
+    document.addEventListener("keydown", closeOnEscape);
     return () => {
+      document.removeEventListener("keydown", closeOnEscape);
       dialog?.close();
       previousFocus?.focus();
     };
-  }, []);
+  }, [onClose]);
 
   const copy = sectionCopy[section];
 
