@@ -29,6 +29,7 @@
   max-height: none;
   margin: 0;
   padding: 0;
+  border: 0;
   display: grid;
   grid-template-columns: 248px minmax(0, 1fr);
   overflow: hidden;
