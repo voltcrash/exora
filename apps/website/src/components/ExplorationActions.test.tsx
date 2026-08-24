@@ -93,7 +93,8 @@ test("the world view gathers every control onto one named deck", () => {
     "Hide the interface",
     "Immersive mode: CHECKING HEADSET",
   ]);
-  expect(markup).toContain('<kbd aria-label="Backspace or Delete">⌫</kbd>');
+  expect(markup).toContain('<kbd class="shortcut-icon" aria-label="Backspace or Delete">⌫</kbd>');
+  expect(markup).toContain('<kbd class="shortcut-icon" aria-label="Tab">⇥</kbd>');
 
   // Nothing is left in the top bar but the way home.
   const header = markup.slice(markup.indexOf("<header"), markup.indexOf("</header>"));

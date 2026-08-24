@@ -82,7 +82,9 @@ export const MissionControl = ({
             <small>CLEAR VIEW</small>
             <strong>HIDE INTERFACE</strong>
           </span>
-          <kbd>TAB</kbd>
+          <kbd className="shortcut-icon" aria-label="Tab">
+            ⇥
+          </kbd>
         </button>
       </div>
 

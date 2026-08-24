@@ -989,9 +989,14 @@ button {
   border: 1px solid rgb(139 230 234 / 18%);
   border-radius: 7px;
   color: #81979c;
-  font-family: var(--mono);
-  font-size: 8px;
   text-align: center;
+}
+
+/* macOS key symbols share one readable face even though their surrounding controls differ. */
+.control-deck .shortcut-icon {
+  font-family: sans-serif;
+  font-size: 15px;
+  line-height: 1;
 }
 
 .forge-trigger {
@@ -2239,13 +2244,11 @@ h1 em {
 }
 
 .clear-view kbd {
-  min-width: 24px;
+  min-width: 26px;
   padding: 4px;
   border: 1px solid var(--line);
   border-radius: 6px;
   color: var(--muted);
-  font-family: var(--mono);
-  font-size: 8px;
   text-align: center;
 }
 

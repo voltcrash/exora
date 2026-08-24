@@ -20,6 +20,8 @@ export const DiscoverTrigger = ({ onClick }: DiscoverTriggerProps) => (
       <small>EXPLORE &amp; CREATE</small>
       <strong>DISCOVER</strong>
     </span>
-    <kbd aria-label="Backspace or Delete">⌫</kbd>
+    <kbd className="shortcut-icon" aria-label="Backspace or Delete">
+      ⌫
+    </kbd>
   </button>
 );
