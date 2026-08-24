@@ -27,7 +27,7 @@ interface MissionControlProps {
 }
 
 /**
- * MISSION CONTROL — the deck at the bottom centre, and the line of copy over it.
+ * MISSION CONTROL — the navigation deck at the top right, and the instruction line at the bottom.
  *
  * Discover, the gesture legend, the frame counter, the clear-view switch and the immersive entry
  * each used to hold a different corner of the screen. Gathering them cost nothing but showed what

@@ -2480,9 +2480,9 @@ h1 em {
  * border, blur, shadow — and what sits inside it is now only what can be pressed: three controls,
  * flat until hovered, reading as one instrument rather than three adjacent cards.
  *
- * The legend and the renderer's alert are not pressable and no longer look it. They remain copy
- * rather than cells in the navigation surface, while the controls sit beside the identity mark
- * like the opposite end of a conventional top bar.
+ * The legend and the renderer's alert are not pressable and no longer look it. The controls sit
+ * beside the identity mark like the opposite end of a conventional top bar; the ordinary
+ * instruction line is independently anchored at the bottom edge of the viewport.
  */
 .mission-control {
   top: 22px;
@@ -2632,22 +2632,28 @@ h1 em {
 }
 
 /*
- * THE LEGEND — every gesture this scene answers to, on one line over the deck.
+ * THE LEGEND — every gesture this scene answers to, on one bottom-centred line.
  *
  * It was a cell on the deck, boxed and ruled like the controls beside it, which is what made a
- * caption look pressable. Off the surface it can be what it is: a line of small copy standing
- * over the instrument, close enough to be read on the way to it and quiet enough to be read past.
+ * caption look pressable. Off the surface it can be what it is: a line of small copy along the
+ * lower edge, quiet enough to be read past and now free to sit lower without the deck beneath it.
  *
  * The seams between the gestures go with the box. Copy is divided by punctuation, so a middot
  * does the work a hairline was doing, and the line wraps rather than reflowing the deck under it.
  */
 .interaction-hint {
+  position: fixed;
+  bottom: 20px;
+  left: 50%;
+  width: max-content;
+  max-width: calc(100vw - 32px);
   display: flex;
   flex-wrap: wrap;
   align-items: baseline;
   justify-content: center;
   column-gap: 9px;
   row-gap: 4px;
+  transform: translateX(-50%);
   /* Read over whatever the world is doing underneath, which at a terminator or over an ice cap
      is not dark. The shadow is what keeps 8px of copy legible without a panel to sit on. */
   text-shadow: 0 1px 12px rgb(0 0 0 / 92%);
