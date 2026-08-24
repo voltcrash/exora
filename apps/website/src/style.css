@@ -2630,38 +2630,53 @@ h1 em {
   box-shadow: 0 0 12px rgb(255 107 50 / 70%);
 }
 
+/*
+ * THE LEGEND — every gesture this scene answers to, on one line over the deck.
+ *
+ * It was a cell on the deck, boxed and ruled like the controls beside it, which is what made a
+ * caption look pressable. Off the surface it can be what it is: a line of small copy standing
+ * over the instrument, close enough to be read on the way to it and quiet enough to be read past.
+ *
+ * The seams between the gestures go with the box. Copy is divided by punctuation, so a middot
+ * does the work a hairline was doing, and the line wraps rather than reflowing the deck under it.
+ */
 .interaction-hint {
   display: flex;
-  align-items: center;
+  flex-wrap: wrap;
+  align-items: baseline;
+  justify-content: center;
+  column-gap: 9px;
+  row-gap: 4px;
+  /* Read over whatever the world is doing underneath, which at a terminator or over an ice cap
+     is not dark. The shadow is what keeps 8px of copy legible without a panel to sit on. */
+  text-shadow: 0 1px 12px rgb(0 0 0 / 92%);
 }
 
 .interaction-hint > span {
-  min-height: 46px;
   display: flex;
-  align-items: center;
-  gap: 7px;
-  padding: 0 11px;
-  color: var(--muted);
+  align-items: baseline;
+  gap: 5px;
   white-space: nowrap;
 }
 
-/* Fainter than the seams between groups: these divide one legend, not one duty from the next. */
-.interaction-hint > span + span {
-  border-left: 1px solid rgb(229 244 247 / 7%);
+.interaction-hint > span + span::before {
+  content: "·";
+  color: rgb(229 244 247 / 26%);
 }
 
-.interaction-hint kbd,
-.interaction-hint strong {
-  color: #e0e8ea;
+.interaction-hint kbd {
+  color: #dbe6e8;
   font-family: var(--mono);
   font-size: 9px;
   font-weight: 500;
+  letter-spacing: 0.06em;
 }
 
 .interaction-hint small {
-  color: var(--faint);
+  color: rgb(220 230 231 / 58%);
   font-family: var(--mono);
-  font-size: 7px;
+  font-size: 8px;
+  letter-spacing: 0.08em;
 }
 
 .enter-vr {
@@ -5420,8 +5435,8 @@ h1 em {
     padding-inline: 12px;
   }
 
-  /* The legend is the deck's widest cell and the one a narrow screen can most afford to lose:
-     the gestures it names are the ones a pointer discovers by trying them. */
+  /* The line a narrow screen can most afford to lose: every gesture it names belongs to a
+     keyboard or a pointer, and the screens this width down are worked with a thumb. */
   .interaction-hint {
     display: none;
   }
