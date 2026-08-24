@@ -257,22 +257,6 @@ export const PlanetExperience = ({
       <div className="viewport-grid" aria-hidden="true" />
       <div className="surface-veil" aria-hidden="true" />
 
-      <div
-        className="approach-status"
-        role={viewMode === "surface" ? "status" : undefined}
-        aria-hidden={viewMode !== "surface"}
-        aria-live="polite"
-      >
-        <span className="approach-reticle" aria-hidden="true" />
-        <span>
-          <small>{recipe.renderer === "rocky" ? "SURFACE APPROACH" : "ATMOSPHERIC APPROACH"}</small>
-          <strong>
-            {recipe.renderer === "rocky" ? "TERRAIN VISTA ACTIVE" : "CLOUD DECK VISTA ACTIVE"}
-          </strong>
-        </span>
-        <span>SCROLL OUT TO ORBIT</span>
-      </div>
-
       <header className="topbar">
         <a className="brand" href="/" aria-label="Exora home">
           <span className="brand-mark" aria-hidden="true" />
