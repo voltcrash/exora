@@ -303,8 +303,8 @@ export const JUPITER = planet({
   summary:
     "The largest planet: a fast-spinning hydrogen giant whose jets, storms, and Great Red Spot reshape themselves in real time.",
   texture: {
-    credit: "NASA Voyager / JPL-Caltech",
-    page: "https://science.nasa.gov/3d-resources/jupiter/",
+    credit: "NASA Cassini ISS / JPL-Caltech / Space Science Institute",
+    page: "https://science.nasa.gov/photojournal/cassinis-best-maps-of-jupiter-cylindrical-map/",
   },
 });
 

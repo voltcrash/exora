@@ -22,6 +22,8 @@ interface MoonParameters {
   retrograde?: boolean;
   sourceSlug: string;
   summary: string;
+  /** Page the shipped mosaic was retrieved from, when it is not NASA's 3D Resources mirror. */
+  textureSourceUrl?: string;
 }
 
 const moon = ({
@@ -43,6 +45,7 @@ const moon = ({
   retrograde = false,
   sourceSlug,
   summary,
+  textureSourceUrl,
 }: MoonParameters): ExoplanetProfile => ({
   hostStar: "Sun",
   id: `solar-system-${id}`,
@@ -84,12 +87,7 @@ const moon = ({
     texture: {
       credit,
       path: `/textures/solar-system/${id}.jpg`,
-      sourceUrl:
-        id === "moon"
-          ? "https://svs.gsfc.nasa.gov/4720/"
-          : id === "triton"
-            ? "https://science.nasa.gov/photojournal/map-of-triton/"
-            : `https://science.nasa.gov/3d-resources/${sourceSlug}/`,
+      sourceUrl: textureSourceUrl ?? `https://science.nasa.gov/3d-resources/${sourceSlug}/`,
     },
   },
   source: {
@@ -118,6 +116,7 @@ export const MOON = moon({
   sourceSlug: "moon",
   summary:
     "Earth's tide-raising companion: a geologically preserved world of basaltic maria, ancient highlands, and polar water ice.",
+  textureSourceUrl: "https://svs.gsfc.nasa.gov/4720/",
 });
 
 export const PHOBOS = moon({
@@ -161,7 +160,7 @@ export const DEIMOS = moon({
 });
 
 export const IO = moon({
-  credit: "NASA Voyager / Galileo / JPL-Caltech",
+  credit: "NASA Galileo SSI / Voyager / USGS Astrogeology",
   discoveryYear: 1610,
   equilibriumTemperatureKelvin: 110,
   gmKm3PerSecond2: 5_959.91547,
@@ -178,10 +177,12 @@ export const IO = moon({
   sourceSlug: "jupiter-io-a",
   summary:
     "The most volcanically active world known, kneaded by Jupiter's tides into a sulfur-painted landscape of lava lakes and plumes.",
+  textureSourceUrl:
+    "https://astrogeology.usgs.gov/search/map/io_galileo_ssi_global_color_merge_mosaic_1km",
 });
 
 export const EUROPA = moon({
-  credit: "NASA Voyager / Galileo / JPL-Caltech",
+  credit: "NASA Galileo SSI / Voyager / USGS Astrogeology",
   discoveryYear: 1610,
   equilibriumTemperatureKelvin: 102,
   gmKm3PerSecond2: 3_202.7121,
@@ -198,10 +199,12 @@ export const EUROPA = moon({
   sourceSlug: "jupiter-europa",
   summary:
     "A bright fractured ice shell hiding a global saltwater ocean, making Europa one of the Solar System's strongest habitats to investigate.",
+  textureSourceUrl:
+    "https://astrogeology.usgs.gov/search/map/europa_voyager_galileo_ssi_global_mosaic_500m",
 });
 
 export const GANYMEDE = moon({
-  credit: "NASA Voyager / Galileo / JPL-Caltech",
+  credit: "NASA Galileo SSI / Voyager / USGS Astrogeology",
   discoveryYear: 1610,
   equilibriumTemperatureKelvin: 110,
   gmKm3PerSecond2: 9_887.83275,
@@ -218,10 +221,12 @@ export const GANYMEDE = moon({
   sourceSlug: "jupiter-ganymede",
   summary:
     "The Solar System's largest moon—bigger than Mercury—and the only moon known to generate its own magnetic field.",
+  textureSourceUrl:
+    "https://astrogeology.usgs.gov/search/map/ganymede_voyager_galileo_ssi_color_global_mosaic_1_4km",
 });
 
 export const CALLISTO = moon({
-  credit: "NASA Voyager / Galileo / JPL-Caltech",
+  credit: "NASA Galileo SSI / Voyager / USGS Astrogeology",
   discoveryYear: 1610,
   equilibriumTemperatureKelvin: 134,
   gmKm3PerSecond2: 7_179.2834,
@@ -238,6 +243,8 @@ export const CALLISTO = moon({
   sourceSlug: "jupiter-callisto",
   summary:
     "An ancient, dark ice-rock world saturated with impact scars, preserving one of the oldest surfaces in the Solar System.",
+  textureSourceUrl:
+    "https://astrogeology.usgs.gov/search/map/callisto_galileo_voyager_global_mosaic_1km",
 });
 
 export const MIMAS = moon({
@@ -261,7 +268,7 @@ export const MIMAS = moon({
 });
 
 export const ENCELADUS = moon({
-  credit: "NASA Cassini / JPL-Caltech / SSI",
+  credit: "NASA Cassini ISS / USGS Astrogeology",
   discoveryYear: 1789,
   equilibriumTemperatureKelvin: 75,
   gmKm3PerSecond2: 7.21037,
@@ -278,10 +285,11 @@ export const ENCELADUS = moon({
   sourceSlug: "saturn-enceladus",
   summary:
     "A brilliant ice moon venting an ocean into space through south-polar tiger stripes—the source of Saturn's E ring.",
+  textureSourceUrl: "https://astrogeology.usgs.gov/search/map/enceladus_cassini_global_mosaic_110m",
 });
 
 export const TETHYS = moon({
-  credit: "NASA Cassini / JPL-Caltech / SSI",
+  credit: "NASA Cassini ISS / USGS Astrogeology",
   discoveryYear: 1684,
   equilibriumTemperatureKelvin: 86,
   gmKm3PerSecond2: 41.21353,
@@ -298,10 +306,11 @@ export const TETHYS = moon({
   sourceSlug: "saturn-tethys",
   summary:
     "An almost pure water-ice moon split by the immense Ithaca Chasma and marked by the giant Odysseus impact basin.",
+  textureSourceUrl: "https://astrogeology.usgs.gov/search/map/tethys_cassini_global_mosaic_293m",
 });
 
 export const DIONE = moon({
-  credit: "NASA Cassini / JPL-Caltech / SSI",
+  credit: "NASA Cassini ISS / Voyager / USGS Astrogeology",
   discoveryYear: 1684,
   equilibriumTemperatureKelvin: 87,
   gmKm3PerSecond2: 73.11607,
@@ -318,10 +327,12 @@ export const DIONE = moon({
   sourceSlug: "saturn-dione",
   summary:
     "A dense icy moon with bright tectonic cliffs, a heavily cratered face, and subtle hints of an ocean deep below.",
+  textureSourceUrl:
+    "https://astrogeology.usgs.gov/search/map/dione_cassini_voyager_global_mosaic_154m",
 });
 
 export const RHEA = moon({
-  credit: "NASA Cassini / JPL-Caltech / SSI",
+  credit: "NASA Cassini ISS / Voyager / USGS Astrogeology",
   discoveryYear: 1672,
   equilibriumTemperatureKelvin: 76,
   gmKm3PerSecond2: 153.94175,
@@ -338,6 +349,8 @@ export const RHEA = moon({
   sourceSlug: "saturn-rhea",
   summary:
     "Saturn's second-largest moon, an old ice-rock body covered in craters, wispy fractures, and a trace oxygen atmosphere.",
+  textureSourceUrl:
+    "https://astrogeology.usgs.gov/search/map/rhea_cassini_voyager_global_mosaic_417m",
 });
 
 export const TITAN = moon({
@@ -481,7 +494,7 @@ export const OBERON = moon({
 });
 
 export const TRITON = moon({
-  credit: "NASA Voyager 2 / JPL-Caltech",
+  credit: "NASA Voyager 2 / USGS Astrogeology",
   discoveryYear: 1846,
   equilibriumTemperatureKelvin: 38,
   gmKm3PerSecond2: 1_428.49546,
@@ -499,6 +512,8 @@ export const TRITON = moon({
   sourceSlug: "neptune-triton",
   summary:
     "A captured Kuiper Belt world orbiting backward, with a young nitrogen-ice surface, cantaloupe terrain, and active geysers.",
+  textureSourceUrl:
+    "https://astrogeology.usgs.gov/search/map/triton_voyager_2_global_color_mosaic_600m",
 });
 
 export const CHARON = moon({

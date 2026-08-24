@@ -44,40 +44,82 @@ global mosaic exists. These equirectangular maps are sampled directly on the sph
 Exora's day/night, atmosphere, cloud, and ring passes. The map is never claimed to be live imagery:
 it is the cited mission mosaic prepared for planetary visualization.
 
-| Body    | Shipped file                        | Source data / preparation                        | Source page                                                                  |
-| ------- | ----------------------------------- | ------------------------------------------------ | ---------------------------------------------------------------------------- |
-| Mercury | `textures/solar-system/mercury.jpg` | MESSENGER MDIS global mosaic / USGS Astrogeology | `astrogeology.usgs.gov/search/map/mercury_messenger_mdis_global_mosaic_250m` |
-| Venus   | `textures/solar-system/venus.jpg`   | Magellan radar / NASA JPL-Caltech                | `science.nasa.gov/3d-resources/venus/`                                       |
-| Earth   | `textures/solar-system/earth.jpg`   | MODIS Blue Marble / NASA Goddard                 | `visibleearth.nasa.gov/images/57723/the-blue-marble`                         |
-| Mars    | `textures/solar-system/mars.jpg`    | Viking imagery / USGS / NASA JPL-Caltech         | `science.nasa.gov/3d-resources/mars/`                                        |
-| Jupiter | `textures/solar-system/jupiter.jpg` | Voyager imagery / NASA JPL-Caltech               | `science.nasa.gov/3d-resources/jupiter/`                                     |
-| Saturn  | `textures/solar-system/saturn.jpg`  | NASA/JPL Solar System Simulator visualization    | `science.nasa.gov/3d-resources/saturn/`                                      |
-| Neptune | `textures/solar-system/neptune.jpg` | NASA/JPL Solar System Simulator visualization    | `science.nasa.gov/3d-resources/neptune/`                                     |
-| Pluto   | `textures/solar-system/pluto.jpg`   | New Horizons MVIC global color map / NASA/JHUAPL | `science.nasa.gov/resource/pluto-global-color-map/`                          |
+Where a mission product exists at a resolution the renderer can actually spend, Exora resamples the
+published full-resolution mosaic itself rather than shipping a small browse derivative. Preparation
+for every such file is identical and is recorded once here: the source GeoTIFF is downloaded from
+the USGS Astrogeology PDS Annex (`asc-pds-services.s3.us-west-2.amazonaws.com/mosaic/`) or from
+NASA's Photojournal asset host, then resampled once to the shipped pixel size with a Lanczos-3
+kernel and encoded as MozJPEG. No sharpening, level stretch, gap fill, tint, or colourisation is
+applied at any point, so a shipped map differs from its source only in sample count and in JPEG
+quantisation.
+
+| Body    | Shipped file                        | Source data / preparation                                       | Source page                                                                    |
+| ------- | ----------------------------------- | --------------------------------------------------------------- | ------------------------------------------------------------------------------ |
+| Mercury | `textures/solar-system/mercury.jpg` | MESSENGER MDIS global mosaic / USGS Astrogeology                | `astrogeology.usgs.gov/search/map/mercury_messenger_mdis_global_mosaic_250m`   |
+| Venus   | `textures/solar-system/venus.jpg`   | Magellan radar / NASA JPL-Caltech                               | `science.nasa.gov/3d-resources/venus/`                                         |
+| Earth   | `textures/solar-system/earth.jpg`   | MODIS Blue Marble / NASA Goddard                                | `visibleearth.nasa.gov/images/57723/the-blue-marble`                           |
+| Mars    | `textures/solar-system/mars.jpg`    | Viking imagery / USGS / NASA JPL-Caltech                        | `science.nasa.gov/3d-resources/mars/`                                          |
+| Jupiter | `textures/solar-system/jupiter.jpg` | Cassini ISS cylindrical map (PIA07782) / NASA JPL-Caltech / SSI | `science.nasa.gov/photojournal/cassinis-best-maps-of-jupiter-cylindrical-map/` |
+| Saturn  | `textures/solar-system/saturn.jpg`  | NASA/JPL Solar System Simulator visualization                   | `science.nasa.gov/3d-resources/saturn/`                                        |
+| Neptune | `textures/solar-system/neptune.jpg` | NASA/JPL Solar System Simulator visualization                   | `science.nasa.gov/3d-resources/neptune/`                                       |
+| Pluto   | `textures/solar-system/pluto.jpg`   | New Horizons MVIC global color map / NASA/JHUAPL                | `science.nasa.gov/resource/pluto-global-color-map/`                            |
 
 ### Principal moon mosaics
 
 The 21 principal moons below are the complete set for which NASA's current public visualization
-library provides a prepared global mission map. The Moon uses the 2025 LRO color map made
-specifically for 3D rendering; Triton uses USGS's global color mosaic; the remaining files come
-from NASA's mirrored 3D Resources set. Mission coverage gaps remain visible instead of being
-filled with invented geography.
+library provides a prepared global mission map. Nine of them — the four Galilean moons, four of
+Saturn's icy moons, and Triton — are resampled from the published full-resolution USGS Astrogeology
+controlled mosaics using the preparation described above. The Moon uses the 2025 LRO color map made
+specifically for 3D rendering; the remaining files come from NASA's mirrored 3D Resources set.
+Mission coverage gaps remain visible instead of being filled with invented geography: Triton's
+unimaged northern hemisphere, Europa's unimaged polar caps, and Ganymede's polar seams read as
+absent data rather than as terrain.
 
-| System  | Shipped files                                                                                   | Source data / preparation                      | Source pages                                   |
-| ------- | ----------------------------------------------------------------------------------------------- | ---------------------------------------------- | ---------------------------------------------- |
-| Earth   | `moon.jpg`                                                                                      | LRO WAC 2025 global color map / NASA GSFC SVS  | `svs.gsfc.nasa.gov/4720/`                      |
-| Mars    | `phobos.jpg`, `deimos.jpg`                                                                      | Viking mission maps / NASA JPL-Caltech         | `science.nasa.gov/3d-resources/`               |
-| Jupiter | `io.jpg`, `europa.jpg`, `ganymede.jpg`, `callisto.jpg`                                          | Voyager and Galileo mission mosaics / NASA     | `science.nasa.gov/3d-resources/`               |
-| Saturn  | `mimas.jpg`, `enceladus.jpg`, `tethys.jpg`, `dione.jpg`, `rhea.jpg`, `titan.jpg`, `iapetus.jpg` | Cassini mission mosaics / NASA JPL-Caltech SSI | `science.nasa.gov/3d-resources/`               |
-| Uranus  | `miranda.jpg`, `ariel.jpg`, `umbriel.jpg`, `titania.jpg`, `oberon.jpg`                          | Voyager 2 mission mosaics / NASA JPL-Caltech   | `science.nasa.gov/3d-resources/`               |
-| Neptune | `triton.jpg`                                                                                    | Voyager 2 global color mosaic / NASA JPL USGS  | `science.nasa.gov/photojournal/map-of-triton/` |
-| Pluto   | `charon.jpg`                                                                                    | New Horizons mission mosaic / NASA JHUAPL SwRI | `science.nasa.gov/3d-resources/`               |
+| System  | Shipped files                                                          | Source data / preparation                                             | Source pages                                                                 |
+| ------- | ---------------------------------------------------------------------- | --------------------------------------------------------------------- | ---------------------------------------------------------------------------- |
+| Earth   | `moon.jpg`                                                             | LRO WAC 2025 global color map / NASA GSFC SVS                         | `svs.gsfc.nasa.gov/4720/`                                                    |
+| Mars    | `phobos.jpg`, `deimos.jpg`                                             | Viking mission maps / NASA JPL-Caltech                                | `science.nasa.gov/3d-resources/`                                             |
+| Jupiter | `io.jpg`, `europa.jpg`, `ganymede.jpg`, `callisto.jpg`                 | Galileo SSI and Voyager controlled mosaics / USGS Astrogeology        | `astrogeology.usgs.gov/search/map/` (per-body slugs below)                   |
+| Saturn  | `enceladus.jpg`, `tethys.jpg`, `dione.jpg`, `rhea.jpg`                 | Cassini ISS (Voyager gap fill) controlled mosaics / USGS Astrogeology | `astrogeology.usgs.gov/search/map/` (per-body slugs below)                   |
+| Saturn  | `mimas.jpg`, `titan.jpg`, `iapetus.jpg`                                | Cassini mission mosaics / NASA JPL-Caltech SSI                        | `science.nasa.gov/3d-resources/`                                             |
+| Uranus  | `miranda.jpg`, `ariel.jpg`, `umbriel.jpg`, `titania.jpg`, `oberon.jpg` | Voyager 2 mission mosaics / NASA JPL-Caltech                          | `science.nasa.gov/3d-resources/`                                             |
+| Neptune | `triton.jpg`                                                           | Voyager 2 global color mosaic / USGS Astrogeology                     | `astrogeology.usgs.gov/search/map/triton_voyager_2_global_color_mosaic_600m` |
+| Pluto   | `charon.jpg`                                                           | New Horizons mission mosaic / NASA JHUAPL SwRI                        | `science.nasa.gov/3d-resources/`                                             |
+
+The USGS Astrogeology mosaics are the source products behind each Astropedia entry, retrieved from
+the PDS Annex and resampled as described above. Every one is a US Government work published without
+additional licence terms; Astropedia asks users to cite the product authors, which the per-body
+credit line in `solar-moons.ts` does.
+
+| Shipped file    | Astropedia product                                       | Source GeoTIFF under `mosaic/`                           | Shipped size |
+| --------------- | -------------------------------------------------------- | -------------------------------------------------------- | ------------ |
+| `io.jpg`        | `io_galileo_ssi_global_color_merge_mosaic_1km`           | `Io_Galileo_SSI_Global_Mosaic_ClrMerge_1km.tif`          | 4096 × 2048  |
+| `europa.jpg`    | `europa_voyager_galileo_ssi_global_mosaic_500m`          | `Europa_Voyager_GalileoSSI_global_mosaic_500m.tif`       | 4096 × 2048  |
+| `ganymede.jpg`  | `ganymede_voyager_galileo_ssi_color_global_mosaic_1_4km` | `Ganymede_Voyager_GalileoSSI_Global_ClrMosaic_1435m.tif` | 4096 × 2048  |
+| `callisto.jpg`  | `callisto_galileo_voyager_global_mosaic_1km`             | `Callisto_Voyager_GalileoSSI_global_mosaic_1km.tif`      | 4096 × 2048  |
+| `enceladus.jpg` | `enceladus_cassini_global_mosaic_110m`                   | `Enceladus_Cassini_mosaic_global_110m.tif`               | 4096 × 2048  |
+| `tethys.jpg`    | `tethys_cassini_global_mosaic_293m`                      | `Tethys_Cassini_mosaic_global_293m.tif`                  | 4096 × 2048  |
+| `dione.jpg`     | `dione_cassini_voyager_global_mosaic_154m`               | `Dione_Cassini_Voyager_mosaic_global_154m.tif`           | 4096 × 2048  |
+| `rhea.jpg`      | `rhea_cassini_voyager_global_mosaic_417m`                | `Rhea_Cassini_Voyager_mosaic_global_417m.tif`            | 4096 × 2048  |
+| `triton.jpg`    | `triton_voyager_2_global_color_mosaic_600m`              | `Triton_Voyager2_ClrMosaic_GlobalFill_600m.tif`          | 4096 × 2048  |
+
+Jupiter's map is Cassini's 2000 flyby cylindrical mosaic, retrieved as the full-resolution
+Photojournal TIFF for PIA07782 and resampled to its native 3600 × 1800. Its unimaged polar bands
+are left at the neutral value the published product carries.
 
 The NASA 3D Resources copies were taken from NASA's public `NASA-3D-Resources` GitHub mirror.
 NASA states that the hub's assets are free to download and use subject to the NASA Images and
 Media Usage Guidelines. The Mercury browse mosaic is published by USGS as public domain. Uranus
 has no comparable resolved global color mosaic, so Exora keeps its physically tuned ice-giant
-shader instead of inventing surface geography.
+shader instead of inventing surface geography. Saturn and Neptune keep their JPL Solar System
+Simulator maps: no higher-resolution global cylindrical map of either planet is published, and the
+Hubble OPAL global maps that do exist carry ring-shadow gaps that would render as holes.
+
+Three moons deliberately keep their lower-resolution NASA 3D Resources map. Iapetus's USGS mosaic
+is photometrically normalised, which removes the leading/trailing albedo dichotomy that is the
+body's defining feature; Titan's Cassini ISS mosaic images the surface through the 938 nm methane
+window rather than the orange haze an observer would see; Charon's USGS mosaic leaves the entire
+southern hemisphere unimaged, where the shipped map is gap-filled and in colour.
 
 ### Remaining dwarf planets
 
