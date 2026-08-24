@@ -3,11 +3,13 @@ import { expect, test } from "vite-plus/test";
 import { FrameRateSignal } from "./FrameRateSignal.tsx";
 
 test("keeps the signal bars beside a finite frame-rate reading", () => {
-  const markup = renderToStaticMarkup(<FrameRateSignal fps="51" qualityTier="DESKTOP" />);
+  const markup = renderToStaticMarkup(<FrameRateSignal fps="51" />);
 
   expect(markup).toContain('class="frame-rate-reading"');
   expect(markup).toMatch(/class="signal-bars"[^>]*>.*<\/span><strong>51<\/strong>/);
-  expect(markup).toContain("FPS<span> · DESKTOP</span>");
+  expect(markup).toContain("<small>FPS</small>");
+  expect(markup).not.toContain("DESKTOP");
+  expect(markup).not.toContain("MOBILE");
 });
 
 test("prints a compact infinity symbol before a reading is available", () => {

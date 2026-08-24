@@ -67,7 +67,6 @@ export const SystemExperience = ({
   travelPhase,
 }: SystemExperienceProps) => {
   const [fps, setFps] = useState("--");
-  const [qualityTier, setQualityTier] = useState("AUTO");
   const [layout, setLayout] = useState<SystemLayout | null>(null);
   const [sceneState, setSceneState] = useState<"loading" | "ready" | "error">("loading");
   const [xrStatus, setXrStatus] = useState<XrStatus>("checking");
@@ -168,7 +167,6 @@ export const SystemExperience = ({
 
   useEffect(() => {
     if (!host) return;
-    setQualityTier(host.qualityTier.toUpperCase());
     const fpsTimer = window.setInterval(() => setFps(Math.round(host.getFps()).toString()), 1_000);
     return () => window.clearInterval(fpsTimer);
   }, [host]);
@@ -439,7 +437,7 @@ export const SystemExperience = ({
               <small>DIORAMA SCALE</small>
               What the picture compressed
             </span>
-            <FrameRateSignal fps={fps} qualityTier={qualityTier} />
+            <FrameRateSignal fps={fps} />
           </div>
           {/*
             The three numbers a reader needs before reading anything off the layout. None of them

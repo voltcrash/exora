@@ -61,7 +61,6 @@ export const BlackHoleExperience = ({
   travelPhase,
 }: BlackHoleExperienceProps) => {
   const [fps, setFps] = useState("--");
-  const [qualityTier, setQualityTier] = useState("AUTO");
   const [sceneState, setSceneState] = useState<"loading" | "ready" | "error">("loading");
   const [xrStatus, setXrStatus] = useState<XrStatus>("checking");
   const travelling = travelPhase === "departing" || travelPhase === "crossing";
@@ -72,7 +71,6 @@ export const BlackHoleExperience = ({
 
   useEffect(() => {
     if (!host) return;
-    setQualityTier(host.qualityTier.toUpperCase());
     const fpsTimer = window.setInterval(() => setFps(Math.round(host.getFps()).toString()), 1_000);
     return () => window.clearInterval(fpsTimer);
   }, [host]);
@@ -145,7 +143,7 @@ export const BlackHoleExperience = ({
               <small>{blackHole.source.archive}</small>
               Measured horizon record
             </span>
-            <FrameRateSignal fps={fps} qualityTier={qualityTier} />
+            <FrameRateSignal fps={fps} />
           </div>
           <dl>
             <div>

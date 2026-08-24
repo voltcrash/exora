@@ -36,7 +36,6 @@ export const SmallBodyExperience = ({
   travelPhase,
 }: SmallBodyExperienceProps) => {
   const [fps, setFps] = useState("--");
-  const [qualityTier, setQualityTier] = useState("AUTO");
   const [sceneState, setSceneState] = useState<"error" | "loading" | "ready">("loading");
   const [xrStatus, setXrStatus] = useState<XrStatus>("checking");
   const travelling = travelPhase === "departing" || travelPhase === "crossing";
@@ -52,7 +51,6 @@ export const SmallBodyExperience = ({
 
   useEffect(() => {
     if (!host) return;
-    setQualityTier(host.qualityTier.toUpperCase());
     document.body.dataset.qualityTier = host.qualityTier;
     const timer = window.setInterval(() => setFps(Math.round(host.getFps()).toString()), 1_000);
     return () => window.clearInterval(timer);
@@ -148,7 +146,7 @@ export const SmallBodyExperience = ({
               </small>
               Measured parameters
             </span>
-            <FrameRateSignal fps={fps} qualityTier={qualityTier} />
+            <FrameRateSignal fps={fps} />
           </div>
           <dl>
             <div>

@@ -3,8 +3,6 @@ import { frameRateStrength } from "../frame-rate.ts";
 interface FrameRateSignalProps {
   /** The host's last frame-rate reading, or a non-finite value before one has been taken. */
   fps: string;
-  /** Printed under the count by the views that pick a render tier. */
-  qualityTier?: string | undefined;
 }
 
 /**
@@ -20,7 +18,7 @@ interface FrameRateSignalProps {
  * meter still gets the reading — and stays out of a live region, because a figure that changes
  * every second is not worth announcing over whatever else is being read.
  */
-export const FrameRateSignal = ({ fps, qualityTier }: FrameRateSignalProps) => {
+export const FrameRateSignal = ({ fps }: FrameRateSignalProps) => {
   const displayedFps = fps.trim() !== "" && Number.isFinite(Number(fps)) ? fps : "∞";
 
   return (
@@ -35,12 +33,7 @@ export const FrameRateSignal = ({ fps, qualityTier }: FrameRateSignalProps) => {
           </span>
           <strong>{displayedFps}</strong>
         </span>
-        {/* The tier is wrapped so a phone can drop it and keep the unit: on that screen the panel
-            is a third of the width and its heading is the panel's own name. */}
-        <small>
-          FPS
-          {qualityTier === undefined ? null : <span>{` · ${qualityTier}`}</span>}
-        </small>
+        <small>FPS</small>
       </span>
     </span>
   );

@@ -42,7 +42,6 @@ export const StarExperience = ({
 }: StarExperienceProps) => {
   const worldRef = useRef<StarWorld | null>(null);
   const [fps, setFps] = useState("--");
-  const [qualityTier, setQualityTier] = useState("AUTO");
   const [sceneState, setSceneState] = useState<"loading" | "ready" | "error">("loading");
   const [xrStatus, setXrStatus] = useState<XrStatus>("checking");
   const [systemPlanets, setSystemPlanets] = useState<ExoplanetProfile[]>([]);
@@ -127,7 +126,6 @@ export const StarExperience = ({
 
   useEffect(() => {
     if (!host) return;
-    setQualityTier(host.qualityTier.toUpperCase());
     const fpsTimer = window.setInterval(() => setFps(Math.round(host.getFps()).toString()), 1_000);
     return () => window.clearInterval(fpsTimer);
   }, [host]);
@@ -280,7 +278,7 @@ export const StarExperience = ({
                   ? "Home-star parameters"
                   : "Observed properties"}
             </span>
-            <FrameRateSignal fps={fps} qualityTier={qualityTier} />
+            <FrameRateSignal fps={fps} />
           </div>
           <dl>
             {custom ? (

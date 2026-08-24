@@ -5745,12 +5745,6 @@ h1 em {
     font-size: 10px;
   }
 
-  /* The heading is 146px wide here and shares it with the frame readout, so the readout gives up
-     what it can spare. The tier qualifies the count; the count, and the meter beside it, stay. */
-  .frame-rate-count small span {
-    display: none;
-  }
-
   .telemetry dl {
     gap: 5px;
     margin: 0;

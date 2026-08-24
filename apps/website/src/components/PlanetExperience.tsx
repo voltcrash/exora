@@ -49,7 +49,6 @@ export const PlanetExperience = ({
   travelPhase,
 }: PlanetExperienceProps) => {
   const [fps, setFps] = useState("--");
-  const [qualityTier, setQualityTier] = useState("AUTO");
   const [sceneState, setSceneState] = useState<"loading" | "ready" | "error">("loading");
   const [sceneMode, setSceneMode] = useState<"subsystem" | "world">("world");
   const [subsystem, setSubsystem] = useState<PlanetarySubsystem | null>(null);
@@ -131,7 +130,6 @@ export const PlanetExperience = ({
 
   useEffect(() => {
     if (!host) return;
-    setQualityTier(host.qualityTier.toUpperCase());
     document.body.dataset.qualityTier = host.qualityTier;
     const fpsTimer = window.setInterval(() => {
       setFps(Math.round(host.getFps()).toString());
@@ -391,7 +389,7 @@ export const PlanetExperience = ({
                   ? "Planetary parameters"
                   : "Observed properties"}
             </span>
-            <FrameRateSignal fps={fps} qualityTier={qualityTier} />
+            <FrameRateSignal fps={fps} />
           </div>
           {subsystem ? (
             <div className="telemetry-detail host-system-detail subsystem-switch-detail">
