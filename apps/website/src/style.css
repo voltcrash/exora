@@ -2161,7 +2161,7 @@ h1 em {
 .frame-rate-signal {
   flex: 0 0 auto;
   display: flex;
-  align-items: center;
+  align-items: flex-start;
   gap: 8px;
 }
 
