@@ -35,8 +35,15 @@ import { getSurfaceDetailTextures } from "./texture-cache.ts";
  *    never closes at all, and the far rim stays as sharp as the near.
  */
 
-/** Half-width of the ground patch, in scene units. */
-const HALF_EXTENT = 150;
+/**
+ * Half-width of the ground patch, in scene units — which are metres to anyone standing in it.
+ *
+ * Pushed out this far for the headset above all: an immersive visitor is standing at eye height on
+ * ground that runs to the edge of their vision in every direction, and a horizon a hundred metres
+ * off reads as a plateau rather than as a world. The grading below means the extra reach costs no
+ * extra vertices — only coarser triangles out where nothing can resolve them anyway.
+ */
+const HALF_EXTENT = 240;
 
 /**
  * How the grid's vertices are spread from the middle of the patch to its rim.
@@ -868,7 +875,11 @@ export const createSurfaceVista = (
     profile.anisotropicFiltering,
   );
 
-  const defines = [`#define FBM_OCTAVES ${Math.max(3, profile.fbmOctaves - 1)}`];
+  // Two fractal fields per fragment over ground that fills most of the frame is the vista's
+  // dominant fill cost, and in a headset it is paid twice over. The macro and grain fields only
+  // shape colour, so an octave less is invisible where an unsteady frame rate is not.
+  const noiseOctaves = profile.tier === "desktop" ? profile.fbmOctaves - 1 : 2;
+  const defines = [`#define FBM_OCTAVES ${Math.max(2, noiseOctaves)}`];
   if (profile.surfaceMicrodetail) defines.push("#define GROUND_DETAIL");
   if (profile.surfaceColorDetail) defines.push("#define GROUND_CHEMISTRY");
 
@@ -1097,7 +1108,7 @@ export const createSurfaceVista = (
       { fragment: "exoraLiquid", vertex: "exoraLiquid" },
       {
         attributes: ["position", "color", "uv"],
-        defines: [`#define FBM_OCTAVES ${Math.max(3, profile.fbmOctaves - 1)}`],
+        defines: [`#define FBM_OCTAVES ${Math.max(2, noiseOctaves)}`],
         uniforms: [
           "world",
           "worldViewProjection",

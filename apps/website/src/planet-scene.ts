@@ -2617,11 +2617,23 @@ export const createPlanetWorld = (
 
       if (isInXr) {
         activeCamera.position.addInPlace(movementDelta);
+        // A wearer walking the terrain has to stay on it. Without this the rig keeps whatever
+        // height it started at and the ground rises through the floor or drops away underfoot,
+        // which in a headset is not a visual glitch — it is the thing that makes people ill.
+        const rig = host.xrCamera();
+        if (rig && viewState === "surface") {
+          const standing =
+            surfaceEnvironment.groundHeightAt(rig.position.x, rig.position.z) + rig.realWorldHeight;
+          rig.position.y += (standing - rig.position.y) * Math.min(1, deltaSeconds * 6);
+        }
       } else {
         camera.target.addInPlace(movementDelta);
         if (viewState === "surface") {
-          camera.target.x = Math.min(30, Math.max(-30, camera.target.x));
-          camera.target.z = Math.min(53, Math.max(-14, camera.target.z));
+          // How far a visitor may walk from where they landed. Well inside the patch, so the eye
+          // never approaches the rim where the ground dissolves — and near enough the middle that
+          // the host star stays far beyond every piece of ground between it and the viewer.
+          camera.target.x = Math.min(55, Math.max(-55, camera.target.x));
+          camera.target.z = Math.min(76, Math.max(-40, camera.target.z));
           surfaceTarget.copyFrom(camera.target);
         } else {
           orbitTarget.copyFrom(camera.target);
