@@ -16,6 +16,7 @@ type ForgeMode = "planet" | "star";
 const FORGE_MODES: readonly ForgeMode[] = ["planet", "star"];
 
 interface WorldForgeProps {
+  embedded?: boolean;
   initialMode: ForgeMode;
   onClose: () => void;
   onGeneratePlanet: (world: CustomWorld) => void;
@@ -120,6 +121,7 @@ const stellarColor = (temperatureKelvin: number): string => {
 };
 
 export const WorldForge = ({
+  embedded = false,
   initialMode,
   onClose,
   onGeneratePlanet,
@@ -137,7 +139,7 @@ export const WorldForge = ({
   // `setMode` on the pass that opened the dialog.
   useEffect(() => {
     const dialog = dialogRef.current;
-    dialog?.showModal();
+    if (!embedded) dialog?.showModal();
     // Focus has to wait for the dialog to be in the top layer before it will take.
     const focusName = window.setTimeout(() => nameRef.current?.focus(), 0);
 
@@ -145,7 +147,7 @@ export const WorldForge = ({
       window.clearTimeout(focusName);
       dialog?.close();
     };
-  }, []);
+  }, [embedded]);
 
   const update = <Key extends keyof CustomPlanetParameters>(
     key: Key,
@@ -175,12 +177,15 @@ export const WorldForge = ({
   return (
     <dialog
       ref={dialogRef}
-      className="planet-builder"
-      aria-labelledby="builder-title"
-      onCancel={onClose}
-      onClose={onClose}
+      className={`planet-builder${embedded ? " embedded-forge" : ""}`}
+      open={embedded || undefined}
+      role={embedded ? "region" : undefined}
+      aria-label={embedded ? "World Forge" : undefined}
+      aria-labelledby={embedded ? undefined : "builder-title"}
+      onCancel={embedded ? undefined : onClose}
+      onClose={embedded ? undefined : onClose}
       onClick={(event) => {
-        if (event.target === dialogRef.current) onClose();
+        if (!embedded && event.target === dialogRef.current) onClose();
       }}
     >
       <form
@@ -190,20 +195,22 @@ export const WorldForge = ({
           else onGenerateStar(generateCustomStar(starParameters));
         }}
       >
-        <div className="builder-header">
-          <div>
-            <p>EXORA WORLD FORGE · CELESTIAL SYNTHESIS</p>
-            <h2 id="builder-title">Design a celestial object</h2>
+        {!embedded ? (
+          <div className="builder-header">
+            <div>
+              <p>EXORA WORLD FORGE · CELESTIAL SYNTHESIS</p>
+              <h2 id="builder-title">Design a celestial object</h2>
+            </div>
+            <button
+              className="catalog-close"
+              type="button"
+              aria-label="Close world forge"
+              onClick={onClose}
+            >
+              ×
+            </button>
           </div>
-          <button
-            className="catalog-close"
-            type="button"
-            aria-label="Close world forge"
-            onClick={onClose}
-          >
-            ×
-          </button>
-        </div>
+        ) : null}
 
         <div className="forge-tabs" {...tabs.tabListProps}>
           <button

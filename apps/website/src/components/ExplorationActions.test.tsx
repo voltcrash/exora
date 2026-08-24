@@ -6,10 +6,8 @@ import { PlanetExperience } from "./PlanetExperience.tsx";
 import { StarExperience } from "./StarExperience.tsx";
 
 /**
- * The top bar's three destinations shed their text below 760px and keep only a glyph, and every
- * one of those glyphs is `aria-hidden` — so a button with nothing but its visible label had no
- * accessible name at all on a phone, which is where most of these are pressed. The name has to
- * come from an attribute the media query cannot reach.
+ * Discover sheds its text on narrow phones and keeps only a decorative orbital mark. The name
+ * therefore has to come from an attribute the media query cannot reach.
  *
  * `renderToStaticMarkup` is enough: no effect runs, no scene mounts, and the header is the part
  * of the tree that renders from props alone.
@@ -43,9 +41,7 @@ const planetMarkup = (): string =>
       onGeneratePlanet={vi.fn()}
       onGenerateStar={vi.fn()}
       onHideChrome={vi.fn()}
-      onOpenBuilder={vi.fn()}
-      onOpenCatalog={vi.fn()}
-      onOpenStars={vi.fn()}
+      onOpenDiscover={vi.fn()}
       onSelectHostStar={vi.fn()}
       onSelectPlanet={vi.fn()}
       onSelectStar={vi.fn()}
@@ -64,9 +60,7 @@ const starMarkup = (): string =>
       onGeneratePlanet={vi.fn()}
       onGenerateStar={vi.fn()}
       onHideChrome={vi.fn()}
-      onOpenBuilder={vi.fn()}
-      onOpenPlanets={vi.fn()}
-      onOpenStars={vi.fn()}
+      onOpenDiscover={vi.fn()}
       onSelectPlanet={vi.fn()}
       onSelectStar={vi.fn()}
       onSelectSystem={vi.fn()}
@@ -84,30 +78,18 @@ const explorationActions = (markup: string): string[] => {
   return [...group.matchAll(/<button[^>]*>/g)].map(([tag]) => tag);
 };
 
-test("every top-bar destination on the world view names itself", () => {
+test("the Discover entry on the world view names itself", () => {
   const buttons = explorationActions(planetMarkup());
 
-  expect(buttons).toHaveLength(4);
-  for (const button of buttons) expect(button).toMatch(/aria-label="[^"]+"/);
-
-  expect(buttons.join("")).toContain('aria-label="Open NASA exoplanet catalog"');
-  expect(buttons.join("")).toContain('aria-label="Open our Solar System"');
-  expect(buttons.join("")).toContain('aria-label="Open SIMBAD star catalog"');
-  expect(buttons.join("")).toContain('aria-label="Open World Forge"');
+  expect(buttons).toHaveLength(1);
+  expect(buttons[0]).toContain('aria-label="Open Discover"');
 });
 
-test("every top-bar destination on the star view names itself", () => {
+test("the Discover entry on the star view names itself", () => {
   const buttons = explorationActions(starMarkup());
 
-  expect(buttons).toHaveLength(4);
-  for (const button of buttons) expect(button).toMatch(/aria-label="[^"]+"/);
-
-  // The planet button loses its text at 640px rather than 760px, so it was unnamed on a narrower
-  // phone than the other two but unnamed all the same.
-  expect(buttons.join("")).toContain('aria-label="Open NASA exoplanet catalog"');
-  expect(buttons.join("")).toContain('aria-label="Open our Solar System"');
-  expect(buttons.join("")).toContain('aria-label="Open SIMBAD star catalog"');
-  expect(buttons.join("")).toContain('aria-label="Open World Forge"');
+  expect(buttons).toHaveLength(1);
+  expect(buttons[0]).toContain('aria-label="Open Discover"');
 });
 
 test("the same destination is named the same way from either view", () => {

@@ -15,6 +15,7 @@ import {
 } from "../system-layout.ts";
 import type { SystemWorld } from "../system-scene.ts";
 import type { TravelPhase } from "../travel-transition.ts";
+import { DiscoverTrigger } from "./DiscoverTrigger.tsx";
 
 interface SystemExperienceProps {
   chromeHidden: boolean;
@@ -22,10 +23,7 @@ interface SystemExperienceProps {
   onGeneratePlanet: (world: CustomWorld) => void;
   onGenerateStar: (star: CustomStar) => void;
   onHideChrome: () => void;
-  onOpenBuilder: () => void;
-  onOpenPlanets: () => void;
-  onOpenStars: () => void;
-  onOpenSolarSystem?: () => void;
+  onOpenDiscover: () => void;
   onSelectHostStar: (hostStar: string) => Promise<boolean>;
   onSelectPlanet: (planet: ExoplanetProfile, cached: boolean) => void;
   onSelectStar: (star: StarProfile, cached: boolean) => void;
@@ -68,10 +66,7 @@ export const SystemExperience = ({
   onGeneratePlanet,
   onGenerateStar,
   onHideChrome,
-  onOpenBuilder,
-  onOpenPlanets,
-  onOpenStars,
-  onOpenSolarSystem,
+  onOpenDiscover,
   onSelectHostStar,
   onSelectPlanet,
   onSelectStar,
@@ -262,59 +257,7 @@ export const SystemExperience = ({
           </span>
         </a>
         <div className="exploration-actions">
-          <button
-            className="solar-trigger"
-            type="button"
-            aria-label="Open our Solar System"
-            onClick={onOpenSolarSystem}
-          >
-            <span className="solar-symbol" aria-hidden="true">
-              ☉
-            </span>
-            <span>
-              <small>HOME SYSTEM</small>
-              <strong>SOLAR SYSTEM</strong>
-            </span>
-          </button>
-          <button
-            className="catalog-trigger compact-trigger"
-            type="button"
-            aria-label="Open NASA exoplanet catalog"
-            onClick={onOpenPlanets}
-          >
-            <span className="catalog-radar" aria-hidden="true" />
-            <span>
-              <small>NASA CATALOG</small>
-              <strong>PLANETS</strong>
-            </span>
-          </button>
-          <button
-            id="open-star-catalog"
-            className="star-trigger"
-            type="button"
-            aria-label="Open SIMBAD star catalog"
-            onClick={onOpenStars}
-          >
-            <span className="star-symbol" aria-hidden="true">
-              ✦
-            </span>
-            <span>
-              <small>SIMBAD CATALOG</small>
-              <strong>EXPLORE STARS</strong>
-            </span>
-          </button>
-          <button
-            className="forge-trigger"
-            type="button"
-            aria-label="Open World Forge"
-            onClick={onOpenBuilder}
-          >
-            <span aria-hidden="true">＋</span>
-            <span>
-              <small>WORLD FORGE</small>
-              <strong>CREATE OBJECT</strong>
-            </span>
-          </button>
+          <DiscoverTrigger onClick={onOpenDiscover} />
         </div>
       </header>
 

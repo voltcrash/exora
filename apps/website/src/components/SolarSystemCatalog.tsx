@@ -22,6 +22,7 @@ import {
 } from "../solar-system.ts";
 
 interface SolarSystemCatalogProps {
+  embedded?: boolean;
   onClose: () => void;
   onSelectAsteroid: (asteroid: AsteroidProfile) => void;
   onSelectComet: (comet: CometProfile) => void;
@@ -35,6 +36,7 @@ const parameterReading = ({ uncertainty, units, value }: SmallBodyParameter): st
   value + (uncertainty ? " ± " + uncertainty : "") + (units ? " " + units : "");
 
 export const SolarSystemCatalog = ({
+  embedded = false,
   onClose,
   onSelectAsteroid,
   onSelectComet,
@@ -127,12 +129,12 @@ export const SolarSystemCatalog = ({
 
   useEffect(() => {
     const dialog = dialogRef.current;
-    dialog?.showModal();
+    if (!embedded) dialog?.showModal();
     return () => {
       sbdbAbort.current?.abort();
       dialog?.close();
     };
-  }, []);
+  }, [embedded]);
 
   const searchJpl = async (value: string, lookup: SmallBodyLookup = "auto"): Promise<void> => {
     const requested = value.trim();
@@ -157,29 +159,34 @@ export const SolarSystemCatalog = ({
   return (
     <dialog
       ref={dialogRef}
-      className="planet-catalog solar-system-catalog"
-      aria-labelledby="solar-system-title"
-      onCancel={onClose}
-      onClose={onClose}
+      className={`planet-catalog solar-system-catalog${embedded ? " embedded-catalog" : ""}`}
+      open={embedded || undefined}
+      role={embedded ? "region" : undefined}
+      aria-label={embedded ? "Solar System catalog" : undefined}
+      aria-labelledby={embedded ? undefined : "solar-system-title"}
+      onCancel={embedded ? undefined : onClose}
+      onClose={embedded ? undefined : onClose}
       onClick={(event) => {
-        if (event.target === dialogRef.current) onClose();
+        if (!embedded && event.target === dialogRef.current) onClose();
       }}
     >
       <div className="catalog-scroll-region">
-        <div className="catalog-header">
-          <div>
-            <p>HOME COORDINATES · NASA/JPL SOLAR SYSTEM DYNAMICS</p>
-            <h2 id="solar-system-title">It’s time to go home</h2>
+        {!embedded ? (
+          <div className="catalog-header">
+            <div>
+              <p>HOME COORDINATES · NASA/JPL SOLAR SYSTEM DYNAMICS</p>
+              <h2 id="solar-system-title">It’s time to go home</h2>
+            </div>
+            <button
+              className="catalog-close"
+              type="button"
+              aria-label="Close Solar System catalog"
+              onClick={onClose}
+            >
+              ×
+            </button>
           </div>
-          <button
-            className="catalog-close"
-            type="button"
-            aria-label="Close Solar System catalog"
-            onClick={onClose}
-          >
-            ×
-          </button>
-        </div>
+        ) : null}
         <div className="solar-system-hero">
           <span>THE SOLAR SYSTEM</span>
           <strong>Known worlds. Real surfaces. Our cosmic address.</strong>

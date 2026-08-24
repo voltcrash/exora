@@ -4,13 +4,14 @@ import type { SceneHost } from "../scene-host.ts";
 import { cometActivityAtDistance, type CometProfile } from "../solar-comets.ts";
 import { findSolarStar, findSolarWorld } from "../solar-system.ts";
 import type { TravelPhase } from "../travel-transition.ts";
+import { DiscoverTrigger } from "./DiscoverTrigger.tsx";
 
 interface CometExperienceProps {
   chromeHidden: boolean;
   comet: CometProfile;
   host: SceneHost | null;
   onHideChrome: () => void;
-  onOpenSolarSystem: () => void;
+  onOpenDiscover: () => void;
   onSelectPlanet: (planet: ExoplanetProfile, cached: boolean) => void;
   onSelectStar: (star: StarProfile, cached: boolean) => void;
   travelPhase: TravelPhase;
@@ -21,7 +22,7 @@ export const CometExperience = ({
   comet,
   host,
   onHideChrome,
-  onOpenSolarSystem,
+  onOpenDiscover,
   onSelectPlanet,
   onSelectStar,
   travelPhase,
@@ -88,20 +89,7 @@ export const CometExperience = ({
           </span>
         </a>
         <div className="exploration-actions">
-          <button
-            className="solar-trigger"
-            type="button"
-            aria-label="Open our Solar System"
-            onClick={onOpenSolarSystem}
-          >
-            <span className="solar-symbol" aria-hidden="true">
-              ☉
-            </span>
-            <span>
-              <small>HOME SYSTEM</small>
-              <strong>SOLAR SYSTEM</strong>
-            </span>
-          </button>
+          <DiscoverTrigger onClick={onOpenDiscover} />
         </div>
       </header>
       <main className="hud">

@@ -8,6 +8,7 @@ import { useTabList } from "../use-tab-list.ts";
 import { StarCatalogVisual } from "./CatalogVisual.tsx";
 
 interface StarCatalogProps {
+  embedded?: boolean;
   onClose: () => void;
   onSelect: (star: StarProfile, cached: boolean) => void;
 }
@@ -103,7 +104,7 @@ const StarResult = memo(
   ),
 );
 
-export const StarCatalog = ({ onClose, onSelect }: StarCatalogProps) => {
+export const StarCatalog = ({ embedded = false, onClose, onSelect }: StarCatalogProps) => {
   const dialogRef = useRef<HTMLDialogElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
   const surpriseControllerRef = useRef<AbortController | null>(null);
@@ -121,13 +122,13 @@ export const StarCatalog = ({ onClose, onSelect }: StarCatalogProps) => {
   // state to synchronise: it opens with the component and closes when the page takes it away.
   useEffect(() => {
     const dialog = dialogRef.current;
-    dialog?.showModal();
+    if (!embedded) dialog?.showModal();
 
     return () => {
       surpriseControllerRef.current?.abort();
       dialog?.close();
     };
-  }, []);
+  }, [embedded]);
 
   useEffect(() => {
     if (activeCategory) {
@@ -231,29 +232,34 @@ export const StarCatalog = ({ onClose, onSelect }: StarCatalogProps) => {
   return (
     <dialog
       ref={dialogRef}
-      className="planet-catalog star-catalog"
-      aria-labelledby="star-catalog-title"
-      onCancel={onClose}
-      onClose={onClose}
+      className={`planet-catalog star-catalog${embedded ? " embedded-catalog" : ""}`}
+      open={embedded || undefined}
+      role={embedded ? "region" : undefined}
+      aria-label={embedded ? "Star catalog" : undefined}
+      aria-labelledby={embedded ? undefined : "star-catalog-title"}
+      onCancel={embedded ? undefined : onClose}
+      onClose={embedded ? undefined : onClose}
       onClick={(event) => {
-        if (event.target === dialogRef.current) onClose();
+        if (!embedded && event.target === dialogRef.current) onClose();
       }}
     >
       <div className="catalog-scroll-region">
-        <div className="catalog-header">
-          <div>
-            <p>DISCOVERY PORTAL · SIMBAD STELLAR ARCHIVE</p>
-            <h2 id="star-catalog-title">Choose a star to discover</h2>
+        {!embedded ? (
+          <div className="catalog-header">
+            <div>
+              <p>DISCOVERY PORTAL · SIMBAD STELLAR ARCHIVE</p>
+              <h2 id="star-catalog-title">Choose a star to discover</h2>
+            </div>
+            <button
+              className="catalog-close"
+              type="button"
+              aria-label="Close star catalog"
+              onClick={onClose}
+            >
+              ×
+            </button>
           </div>
-          <button
-            className="catalog-close"
-            type="button"
-            aria-label="Close star catalog"
-            onClick={onClose}
-          >
-            ×
-          </button>
-        </div>
+        ) : null}
         <button
           className="surprise-journey"
           type="button"

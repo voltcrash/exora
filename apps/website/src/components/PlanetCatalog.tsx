@@ -18,6 +18,7 @@ import {
 import { PlanetCatalogVisual } from "./CatalogVisual.tsx";
 
 interface PlanetCatalogProps {
+  embedded?: boolean;
   onClose: () => void;
   onSelect: (planet: ExoplanetProfile, cached: boolean) => void;
 }
@@ -163,7 +164,7 @@ const PlanetResult = memo(
   },
 );
 
-export const PlanetCatalog = ({ onClose, onSelect }: PlanetCatalogProps) => {
+export const PlanetCatalog = ({ embedded = false, onClose, onSelect }: PlanetCatalogProps) => {
   const dialogRef = useRef<HTMLDialogElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
   const surpriseControllerRef = useRef<AbortController | null>(null);
@@ -184,13 +185,13 @@ export const PlanetCatalog = ({ onClose, onSelect }: PlanetCatalogProps) => {
   // state to synchronise: it opens with the component and closes when the page takes it away.
   useEffect(() => {
     const dialog = dialogRef.current;
-    dialog?.showModal();
+    if (!embedded) dialog?.showModal();
 
     return () => {
       surpriseControllerRef.current?.abort();
       dialog?.close();
     };
-  }, []);
+  }, [embedded]);
 
   useEffect(() => {
     const normalizedQuery = query.trim();
@@ -340,29 +341,34 @@ export const PlanetCatalog = ({ onClose, onSelect }: PlanetCatalogProps) => {
     <dialog
       ref={dialogRef}
       id="planet-catalog"
-      className="planet-catalog"
-      aria-labelledby="catalog-title"
-      onCancel={onClose}
-      onClose={onClose}
+      className={`planet-catalog${embedded ? " embedded-catalog" : ""}`}
+      open={embedded || undefined}
+      role={embedded ? "region" : undefined}
+      aria-label={embedded ? "Exoplanet catalog" : undefined}
+      aria-labelledby={embedded ? undefined : "catalog-title"}
+      onCancel={embedded ? undefined : onClose}
+      onClose={embedded ? undefined : onClose}
       onClick={(event) => {
-        if (event.target === dialogRef.current) onClose();
+        if (!embedded && event.target === dialogRef.current) onClose();
       }}
     >
       <div className="catalog-scroll-region">
-        <div className="catalog-header">
-          <div>
-            <p>DISCOVERY PORTAL · NASA EXOPLANET ARCHIVE</p>
-            <h2 id="catalog-title">Choose a world to discover</h2>
+        {!embedded ? (
+          <div className="catalog-header">
+            <div>
+              <p>DISCOVERY PORTAL · NASA EXOPLANET ARCHIVE</p>
+              <h2 id="catalog-title">Choose a world to discover</h2>
+            </div>
+            <button
+              className="catalog-close"
+              type="button"
+              aria-label="Close planet catalog"
+              onClick={onClose}
+            >
+              ×
+            </button>
           </div>
-          <button
-            className="catalog-close"
-            type="button"
-            aria-label="Close planet catalog"
-            onClick={onClose}
-          >
-            ×
-          </button>
-        </div>
+        ) : null}
         <button
           className="surprise-journey"
           type="button"

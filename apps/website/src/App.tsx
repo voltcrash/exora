@@ -24,17 +24,10 @@ import { findSolarAsteroid, type AsteroidProfile } from "./solar-asteroids.ts";
 import { findSolarComet, type CometProfile } from "./solar-comets.ts";
 import { findSolarRegion, type SolarRegionProfile } from "./solar-regions.ts";
 import { findSolarMission, type SolarMissionProfile } from "./solar-missions.ts";
+import type { DiscoverSection } from "./components/DiscoverScreen.tsx";
 
-const PlanetCatalog = lazy(() =>
-  import("./components/PlanetCatalog.tsx").then((module) => ({ default: module.PlanetCatalog })),
-);
-const StarCatalog = lazy(() =>
-  import("./components/StarCatalog.tsx").then((module) => ({ default: module.StarCatalog })),
-);
-const SolarSystemCatalog = lazy(() =>
-  import("./components/SolarSystemCatalog.tsx").then((module) => ({
-    default: module.SolarSystemCatalog,
-  })),
+const DiscoverScreen = lazy(() =>
+  import("./components/DiscoverScreen.tsx").then((module) => ({ default: module.DiscoverScreen })),
 );
 const StarExperience = lazy(() =>
   import("./components/StarExperience.tsx").then((module) => ({ default: module.StarExperience })),
@@ -54,10 +47,6 @@ const MissionExperience = lazy(() =>
     default: module.MissionExperience,
   })),
 );
-const WorldForge = lazy(() =>
-  import("./components/CustomPlanetBuilder.tsx").then((module) => ({ default: module.WorldForge })),
-);
-
 type ActiveObject =
   | { asteroid: AsteroidProfile; type: "asteroid" }
   | { comet: CometProfile; type: "comet" }
@@ -147,10 +136,8 @@ export const App = () => {
     restart: restartSceneHost,
     status: sceneHostStatus,
   } = useSceneHost(canvas);
-  const [catalogOpen, setCatalogOpen] = useState(false);
-  const [starCatalogOpen, setStarCatalogOpen] = useState(false);
-  const [solarSystemCatalogOpen, setSolarSystemCatalogOpen] = useState(false);
-  const [builderOpen, setBuilderOpen] = useState(false);
+  const [discoverOpen, setDiscoverOpen] = useState(false);
+  const [discoverSection, setDiscoverSection] = useState<DiscoverSection>("overview");
   const [activeObject, setActiveObject] = useState<ActiveObject | null>(() => {
     const parameters = new URLSearchParams(window.location.search);
     return parameters.has("asteroid") ||
@@ -177,10 +164,9 @@ export const App = () => {
   const [travelPhase, setTravelPhase] = useState<TravelPhase>("idle");
   useEffect(() => sceneHost?.onTravelPhase(setTravelPhase), [sceneHost]);
 
-  // Every one of these covers the canvas with a modal dialog, so for as long as one is open the
-  // scene behind it is being rendered for nobody — and worse, keeping it moving forces the
-  // browser to rebuild the scrim's backdrop blur every frame. Parking the loop reclaims both.
-  const overlayOpen = builderOpen || catalogOpen || starCatalogOpen || solarSystemCatalogOpen;
+  // Discover covers the canvas completely, so for as long as it is open the scene behind it is
+  // being rendered for nobody. Parking the loop gives that work back to the interface.
+  const overlayOpen = discoverOpen;
   useEffect(() => {
     if (!sceneHost || !overlayOpen) return;
     return sceneHost.suspendRendering();
@@ -207,7 +193,8 @@ export const App = () => {
     return () => window.removeEventListener("popstate", loadFromLocation);
   }, [loadFromLocation]);
 
-  // The `/` shortcut the catalog button advertises with its `<kbd>`.
+  // The `/` shortcut Discover advertises with its `<kbd>`. It opens directly on worlds because
+  // the key remains the fastest path from the renderer to a named-object search.
   //
   // It belongs here rather than inside the catalog, because the catalog is only mounted once it
   // is already open: a listener living there could never see the press that is supposed to open
@@ -216,7 +203,7 @@ export const App = () => {
   useEffect(() => {
     if (chromeHidden) return;
 
-    const openCatalogWithShortcut = (event: KeyboardEvent): void => {
+    const openDiscoverWithShortcut = (event: KeyboardEvent): void => {
       const target = event.target;
       if (
         !opensSearchShortcut({
@@ -233,11 +220,12 @@ export const App = () => {
       // Only once the press is known to be the shortcut is suppressing the browser's own
       // quick-find the right thing to do.
       event.preventDefault();
-      setCatalogOpen(true);
+      setDiscoverSection("worlds");
+      setDiscoverOpen(true);
     };
 
-    document.addEventListener("keydown", openCatalogWithShortcut);
-    return () => document.removeEventListener("keydown", openCatalogWithShortcut);
+    document.addEventListener("keydown", openDiscoverWithShortcut);
+    return () => document.removeEventListener("keydown", openDiscoverWithShortcut);
   }, [chromeHidden]);
 
   // Tab puts the interface away and brings it back. It is the whole of the way back, because the
@@ -292,9 +280,8 @@ export const App = () => {
   // function on every render would tear the renderer down and rebuild it mid-session.
   const selectPlanet = useCallback((planet: ExoplanetProfile, cached: boolean): void => {
     window.history.pushState({}, "", `?planet=${encodeURIComponent(planet.name)}`);
-    setCatalogOpen(false);
+    setDiscoverOpen(false);
     setCustomRecipe(null);
-    setSolarSystemCatalogOpen(false);
     setActiveObject({
       result: { cached, mode: planet.solarSystem ? "solar" : "live", planet },
       type: "planet",
@@ -303,8 +290,7 @@ export const App = () => {
 
   const selectStar = useCallback((star: StarProfile, cached: boolean): void => {
     window.history.pushState({}, "", `?star=${encodeURIComponent(star.name)}`);
-    setStarCatalogOpen(false);
-    setSolarSystemCatalogOpen(false);
+    setDiscoverOpen(false);
     setCustomRecipe(null);
     setSystemHostName(null);
     setActiveObject({
@@ -315,7 +301,7 @@ export const App = () => {
 
   const selectAsteroid = useCallback((asteroid: AsteroidProfile): void => {
     window.history.pushState({}, "", `?asteroid=${encodeURIComponent(asteroid.name)}`);
-    setSolarSystemCatalogOpen(false);
+    setDiscoverOpen(false);
     setCustomRecipe(null);
     setSystemHostName(null);
     setActiveObject({ asteroid, type: "asteroid" });
@@ -323,7 +309,7 @@ export const App = () => {
 
   const selectComet = useCallback((comet: CometProfile): void => {
     window.history.pushState({}, "", `?comet=${encodeURIComponent(comet.name)}`);
-    setSolarSystemCatalogOpen(false);
+    setDiscoverOpen(false);
     setCustomRecipe(null);
     setSystemHostName(null);
     setActiveObject({ comet, type: "comet" });
@@ -331,7 +317,7 @@ export const App = () => {
 
   const selectRegion = useCallback((region: SolarRegionProfile): void => {
     window.history.pushState({}, "", `?region=${encodeURIComponent(region.name)}`);
-    setSolarSystemCatalogOpen(false);
+    setDiscoverOpen(false);
     setCustomRecipe(null);
     setSystemHostName(null);
     setActiveObject({ region, type: "region" });
@@ -339,7 +325,7 @@ export const App = () => {
 
   const selectMission = useCallback((mission: SolarMissionProfile): void => {
     window.history.pushState({}, "", `?mission=${encodeURIComponent(mission.name)}`);
-    setSolarSystemCatalogOpen(false);
+    setDiscoverOpen(false);
     setCustomRecipe(null);
     setSystemHostName(null);
     setActiveObject({ mission, type: "mission" });
@@ -386,7 +372,7 @@ export const App = () => {
 
   const generatePlanet = useCallback(({ planet, recipe }: CustomWorld): void => {
     window.history.pushState({}, "", `?custom=${encodeURIComponent(planet.name)}`);
-    setBuilderOpen(false);
+    setDiscoverOpen(false);
     setCustomRecipe(recipe);
     setActiveObject({
       result: { cached: false, mode: "custom", planet },
@@ -396,7 +382,7 @@ export const App = () => {
 
   const generateStar = useCallback(({ star }: CustomStar): void => {
     window.history.pushState({}, "", `?customStar=${encodeURIComponent(star.name)}`);
-    setBuilderOpen(false);
+    setDiscoverOpen(false);
     setCustomRecipe(null);
     setActiveObject({
       result: { cached: false, mode: "custom", star },
@@ -409,6 +395,11 @@ export const App = () => {
     setCustomRecipe(null);
     setSystemHostName(null);
     setActiveObject(defaultPlanetObject());
+  }, []);
+
+  const openDiscover = useCallback((): void => {
+    setDiscoverSection("overview");
+    setDiscoverOpen(true);
   }, []);
 
   const subject =
@@ -497,7 +488,7 @@ export const App = () => {
           chromeHidden={chromeHidden}
           host={sceneHost}
           onHideChrome={() => setChromeHidden(true)}
-          onOpenSolarSystem={() => setSolarSystemCatalogOpen(true)}
+          onOpenDiscover={openDiscover}
           onSelectAsteroid={selectAsteroid}
           onSelectStar={selectStar}
           travelPhase={travelPhase}
@@ -509,7 +500,7 @@ export const App = () => {
           comet={activeObject.comet}
           host={sceneHost}
           onHideChrome={() => setChromeHidden(true)}
-          onOpenSolarSystem={() => setSolarSystemCatalogOpen(true)}
+          onOpenDiscover={openDiscover}
           onSelectPlanet={selectPlanet}
           onSelectStar={selectStar}
           travelPhase={travelPhase}
@@ -521,7 +512,7 @@ export const App = () => {
             chromeHidden={chromeHidden}
             host={sceneHost}
             onHideChrome={() => setChromeHidden(true)}
-            onOpenSolarSystem={() => setSolarSystemCatalogOpen(true)}
+            onOpenDiscover={openDiscover}
             onSelectStar={selectStar}
             region={activeObject.region}
             travelPhase={travelPhase}
@@ -536,7 +527,7 @@ export const App = () => {
             mission={activeObject.mission}
             onHideChrome={() => setChromeHidden(true)}
             onOpenParent={openMissionParent}
-            onOpenSolarSystem={() => setSolarSystemCatalogOpen(true)}
+            onOpenDiscover={openDiscover}
             travelPhase={travelPhase}
           />
         </Suspense>
@@ -549,10 +540,7 @@ export const App = () => {
           onGeneratePlanet={generatePlanet}
           onGenerateStar={generateStar}
           onHideChrome={() => setChromeHidden(true)}
-          onOpenCatalog={() => setCatalogOpen(true)}
-          onOpenBuilder={() => setBuilderOpen(true)}
-          onOpenStars={() => setStarCatalogOpen(true)}
-          onOpenSolarSystem={() => setSolarSystemCatalogOpen(true)}
+          onOpenDiscover={openDiscover}
           onSelectHostStar={selectHostStar}
           onSelectPlanet={selectPlanet}
           onSelectStar={selectStar}
@@ -573,10 +561,7 @@ export const App = () => {
             onSelectHostStar={selectHostStar}
             onSelectPlanet={selectPlanet}
             onSelectStar={selectStar}
-            onOpenBuilder={() => setBuilderOpen(true)}
-            onOpenPlanets={() => setCatalogOpen(true)}
-            onOpenStars={() => setStarCatalogOpen(true)}
-            onOpenSolarSystem={() => setSolarSystemCatalogOpen(true)}
+            onOpenDiscover={openDiscover}
             travelPhase={travelPhase}
           />
         </Suspense>
@@ -594,44 +579,25 @@ export const App = () => {
             onSelectPlanet={selectPlanet}
             onSelectStar={selectStar}
             onSelectSystem={selectSystem}
-            onOpenPlanets={() => setCatalogOpen(true)}
-            onOpenStars={() => setStarCatalogOpen(true)}
-            onOpenBuilder={() => setBuilderOpen(true)}
-            onOpenSolarSystem={() => setSolarSystemCatalogOpen(true)}
+            onOpenDiscover={openDiscover}
             travelPhase={travelPhase}
           />
         </Suspense>
       )}
-      {catalogOpen ? (
+      {discoverOpen && activeObject && activeObject.type !== "missing" ? (
         <Suspense fallback={null}>
-          <PlanetCatalog onClose={() => setCatalogOpen(false)} onSelect={selectPlanet} />
-        </Suspense>
-      ) : null}
-      {starCatalogOpen ? (
-        <Suspense fallback={null}>
-          <StarCatalog onClose={() => setStarCatalogOpen(false)} onSelect={selectStar} />
-        </Suspense>
-      ) : null}
-      {solarSystemCatalogOpen ? (
-        <Suspense fallback={null}>
-          <SolarSystemCatalog
-            onClose={() => setSolarSystemCatalogOpen(false)}
+          <DiscoverScreen
+            initialForgeMode={activeObject.type === "star" ? "star" : "planet"}
+            initialSection={discoverSection}
+            onClose={() => setDiscoverOpen(false)}
+            onGeneratePlanet={generatePlanet}
+            onGenerateStar={generateStar}
             onSelectAsteroid={selectAsteroid}
             onSelectComet={selectComet}
             onSelectMission={selectMission}
             onSelectPlanet={selectPlanet}
             onSelectRegion={selectRegion}
             onSelectStar={selectStar}
-          />
-        </Suspense>
-      ) : null}
-      {builderOpen && activeObject && activeObject.type !== "missing" ? (
-        <Suspense fallback={null}>
-          <WorldForge
-            initialMode={activeObject.type === "star" ? "star" : "planet"}
-            onClose={() => setBuilderOpen(false)}
-            onGeneratePlanet={generatePlanet}
-            onGenerateStar={generateStar}
           />
         </Suspense>
       ) : null}

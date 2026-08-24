@@ -9,6 +9,7 @@ import type {
   SurfaceMissionSite,
 } from "../solar-missions.ts";
 import type { TravelPhase } from "../travel-transition.ts";
+import { DiscoverTrigger } from "./DiscoverTrigger.tsx";
 
 interface MissionExperienceProps {
   chromeHidden: boolean;
@@ -16,7 +17,7 @@ interface MissionExperienceProps {
   mission: SolarMissionProfile;
   onHideChrome: () => void;
   onOpenParent: (parent: SolarMissionProfile["parent"]) => void;
-  onOpenSolarSystem: () => void;
+  onOpenDiscover: () => void;
   travelPhase: TravelPhase;
 }
 
@@ -30,7 +31,7 @@ export const MissionExperience = ({
   mission,
   onHideChrome,
   onOpenParent,
-  onOpenSolarSystem,
+  onOpenDiscover,
   travelPhase,
 }: MissionExperienceProps) => {
   const [fps, setFps] = useState("--");
@@ -125,15 +126,7 @@ export const MissionExperience = ({
           </span>
         </a>
         <div className="exploration-actions">
-          <button className="solar-trigger" type="button" onClick={onOpenSolarSystem}>
-            <span className="solar-symbol" aria-hidden="true">
-              ☉
-            </span>
-            <span>
-              <small>HOME SYSTEM</small>
-              <strong>MISSIONS</strong>
-            </span>
-          </button>
+          <DiscoverTrigger onClick={onOpenDiscover} />
         </div>
       </header>
       <main className="hud">

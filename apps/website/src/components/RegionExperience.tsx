@@ -4,12 +4,13 @@ import type { SceneHost } from "../scene-host.ts";
 import type { SolarRegionProfile } from "../solar-regions.ts";
 import { findSolarStar } from "../solar-system.ts";
 import type { TravelPhase } from "../travel-transition.ts";
+import { DiscoverTrigger } from "./DiscoverTrigger.tsx";
 
 interface RegionExperienceProps {
   chromeHidden: boolean;
   host: SceneHost | null;
   onHideChrome: () => void;
-  onOpenSolarSystem: () => void;
+  onOpenDiscover: () => void;
   onSelectStar: (star: StarProfile, cached: boolean) => void;
   region: SolarRegionProfile;
   travelPhase: TravelPhase;
@@ -22,7 +23,7 @@ export const RegionExperience = ({
   chromeHidden,
   host,
   onHideChrome,
-  onOpenSolarSystem,
+  onOpenDiscover,
   onSelectStar,
   region,
   travelPhase,
@@ -83,20 +84,7 @@ export const RegionExperience = ({
           </span>
         </a>
         <div className="exploration-actions">
-          <button
-            className="solar-trigger"
-            type="button"
-            aria-label="Open our Solar System"
-            onClick={onOpenSolarSystem}
-          >
-            <span className="solar-symbol" aria-hidden="true">
-              ☉
-            </span>
-            <span>
-              <small>HOME SYSTEM</small>
-              <strong>SOLAR SYSTEM</strong>
-            </span>
-          </button>
+          <DiscoverTrigger onClick={onOpenDiscover} />
         </div>
       </header>
       <main className="hud">

@@ -412,6 +412,14 @@ const mountApp = (search = ""): void => {
   root.render(<App />);
 };
 
+const openDiscoverSection = async (
+  name: "Exoplanets" | "Solar System" | "Stars" | "World Forge",
+): Promise<void> => {
+  await userEvent.click(page.getByRole("button", { name: "Open Discover" }));
+  await expect.element(page.getByRole("dialog", { name: /All of space/ })).toBeVisible();
+  await userEvent.click(page.getByRole("button", { name: new RegExp(name) }).first());
+};
+
 beforeEach(() => {
   document.head.querySelector('link[rel="canonical"]')?.remove();
   const canonical = document.createElement("link");
@@ -435,25 +443,17 @@ test("the landing page reaches a rendered world", async () => {
   await expect.element(page.getByRole("heading", { level: 1 })).toBeVisible();
   // The loading overlay is fixed at z-index 10 over everything, so a control being visible is
   // also the assertion that the first frame was reported and the overlay stood down.
-  await expect
-    .element(page.getByRole("button", { name: "Open NASA exoplanet catalog" }))
-    .toBeVisible();
+  await expect.element(page.getByRole("button", { name: "Open Discover" })).toBeVisible();
 });
 
-test("every top-bar destination is reachable and named at this width", async () => {
+test("Discover is reachable and named at this width", async () => {
   stubArchive();
   mountApp();
 
   // The regression this exists for: below 760px the labels are hidden and the glyphs left behind
   // are aria-hidden, so on the mobile instance these buttons resolve by name only because each
   // one carries an aria-label. A Node test cannot see that, because no stylesheet has run.
-  for (const name of [
-    "Open NASA exoplanet catalog",
-    "Open SIMBAD star catalog",
-    "Open World Forge",
-  ]) {
-    await expect.element(page.getByRole("button", { name })).toBeVisible();
-  }
+  await expect.element(page.getByRole("button", { name: "Open Discover" })).toBeVisible();
 });
 
 test("a deep link to a named world resolves to that world", async () => {
@@ -556,7 +556,7 @@ test("the catalog opens, searches, and travels to a result", async () => {
   const calls = stubArchive();
   mountApp();
 
-  await userEvent.click(page.getByRole("button", { name: "Open NASA exoplanet catalog" }));
+  await openDiscoverSection("Exoplanets");
   const dialog = page.getByRole("dialog");
   await expect.element(dialog).toBeVisible();
 
@@ -577,10 +577,8 @@ test("the star catalog opens and travels to a star", async () => {
   stubArchive();
   mountApp();
 
-  await userEvent.click(page.getByRole("button", { name: "Open SIMBAD star catalog" }));
-  await expect
-    .element(page.getByRole("heading", { name: "Choose a star to discover" }))
-    .toBeVisible();
+  await openDiscoverSection("Stars");
+  await expect.element(page.getByRole("heading", { name: "Follow the light." })).toBeVisible();
 
   // The star catalog opens on its curated collections with no results loaded, so reaching one
   // means searching for it.
@@ -597,8 +595,8 @@ test("the Home System catalog filters mission asteroids and opens measured geome
   stubArchive();
   mountApp();
 
-  await userEvent.click(page.getByRole("button", { name: "Open our Solar System" }));
-  await expect.element(page.getByRole("heading", { name: "It’s time to go home" })).toBeVisible();
+  await openDiscoverSection("Solar System");
+  await expect.element(page.getByRole("heading", { name: "Start close to home." })).toBeVisible();
 
   await userEvent.click(page.getByRole("button", { name: "ASTEROIDS" }));
   await userEvent.fill(page.getByPlaceholder("Name, designation, or SPK ID"), "20101955");
@@ -618,7 +616,7 @@ test("the Home System mission filter opens measured sites as an optional layer",
   stubArchive();
   mountApp();
 
-  await userEvent.click(page.getByRole("button", { name: "Open our Solar System" }));
+  await openDiscoverSection("Solar System");
   await userEvent.click(page.getByRole("button", { exact: true, name: "MISSIONS" }));
   await userEvent.fill(page.getByPlaceholder("Name, designation, or SPK ID"), "Apollo");
   const apollo = page.getByRole("button", { name: /Apollo landing sites/ });
@@ -639,7 +637,7 @@ test("the Home System catalog searches JPL SBDB without inventing missing physic
   const calls = stubArchive();
   mountApp();
 
-  await userEvent.click(page.getByRole("button", { name: "Open our Solar System" }));
+  await openDiscoverSection("Solar System");
   await userEvent.fill(page.getByPlaceholder("Name, designation, or SPK ID"), "Apophis");
   await userEvent.click(page.getByRole("button", { name: "SEARCH JPL SBDB" }));
 
@@ -657,7 +655,7 @@ test("the Home System catalog opens a measured comet with explicitly simulated a
   stubArchive();
   mountApp();
 
-  await userEvent.click(page.getByRole("button", { name: "Open our Solar System" }));
+  await openDiscoverSection("Solar System");
   await userEvent.click(page.getByRole("button", { exact: true, name: "COMETS" }));
   await userEvent.fill(page.getByPlaceholder("Name, designation, or SPK ID"), "1000012");
   const rosettaComet = page.getByRole("button", { name: /67P\/Churyumov/ });
@@ -679,7 +677,7 @@ test("the Home System catalog opens the Oort Cloud with an explicit inferred-mod
   stubArchive();
   mountApp();
 
-  await userEvent.click(page.getByRole("button", { name: "Open our Solar System" }));
+  await openDiscoverSection("Solar System");
   await userEvent.click(page.getByRole("button", { exact: true, name: "REGIONS" }));
   await userEvent.fill(page.getByPlaceholder("Name, designation, or SPK ID"), "Oort");
   const oortCloud = page.getByRole("button", { name: /Oort Cloud/ });
@@ -752,11 +750,10 @@ test("a dialog closes on Escape and returns the page", async () => {
   stubArchive();
   mountApp();
 
-  await userEvent.click(page.getByRole("button", { name: "Open NASA exoplanet catalog" }));
+  await openDiscoverSection("Exoplanets");
   await expect.element(page.getByRole("dialog")).toBeVisible();
 
-  // `showModal` puts the dialog in the top layer, where Escape is the browser's own behaviour
-  // rather than anything the component implements. That only exists in a real engine.
+  // Discover owns Escape so the same close path works from every embedded workspace.
   await userEvent.keyboard("{Escape}");
   expect(document.querySelector("dialog[open]")).toBeNull();
 });
@@ -765,9 +762,9 @@ test("the World Forge opens and builds a world the page then shows", async () =>
   stubArchive();
   mountApp();
 
-  await userEvent.click(page.getByRole("button", { name: "Open World Forge" }));
+  await openDiscoverSection("World Forge");
   await expect
-    .element(page.getByRole("heading", { name: "Design a celestial object" }))
+    .element(page.getByRole("heading", { name: "Make the next discovery." }))
     .toBeVisible();
 
   await userEvent.click(page.getByRole("button", { name: /GENERATE/i }).first());
@@ -776,12 +773,13 @@ test("the World Forge opens and builds a world the page then shows", async () =>
   expect(window.location.search).toContain("custom=");
 });
 
-test("the `/` shortcut opens the catalog", async () => {
+test("the `/` shortcut opens Discover on the world catalog", async () => {
   stubArchive();
   mountApp();
 
   await userEvent.keyboard("/");
   await expect.element(page.getByRole("dialog")).toBeVisible();
+  await expect.element(page.getByRole("region", { name: "Exoplanet catalog" })).toBeVisible();
 });
 
 test("Tab toggles the interface away and back, and only on the main screen", async () => {
@@ -839,7 +837,7 @@ test("Tab keeps traversing focus wherever the shortcut stands down", async () =>
 
   // A dialog is not the main screen: it traps focus for its own controls, and Tab has to keep
   // moving between them rather than hiding an interface nobody can see behind the scrim.
-  await userEvent.click(page.getByRole("button", { name: "Open NASA exoplanet catalog" }));
+  await openDiscoverSection("Exoplanets");
   await expect.element(page.getByRole("dialog")).toBeVisible();
 
   await userEvent.keyboard("{Tab}");
@@ -858,21 +856,21 @@ test("an open overlay parks the renderer, and closing it starts the loop again",
   // the forge drop frames while a reader was only scrolling a list or dragging a slider.
   expect(stubbedHost().renderSuspensions).toBe(0);
 
-  await userEvent.click(page.getByRole("button", { name: "Open NASA exoplanet catalog" }));
+  await openDiscoverSection("Exoplanets");
   await expect.element(page.getByRole("dialog")).toBeVisible();
   expect(stubbedHost().renderSuspensions).toBe(1);
 
-  await userEvent.click(page.getByRole("button", { name: "Close planet catalog" }));
+  await userEvent.click(page.getByRole("button", { name: "Close Discover" }));
   await expect.element(page.getByRole("dialog")).not.toBeInTheDocument();
   expect(stubbedHost().renderSuspensions).toBe(0);
 
   // The forge is a separate overlay over the same canvas and has to hold the loop just as the
   // catalog did — the release is per-overlay, not a single global flag someone can leave set.
-  await userEvent.click(page.getByRole("button", { name: "Open World Forge" }));
+  await openDiscoverSection("World Forge");
   await expect.element(page.getByRole("dialog")).toBeVisible();
   expect(stubbedHost().renderSuspensions).toBe(1);
 
-  await userEvent.click(page.getByRole("button", { name: "Close world forge" }));
+  await userEvent.click(page.getByRole("button", { name: "Close Discover" }));
   await expect.element(page.getByRole("dialog")).not.toBeInTheDocument();
   expect(stubbedHost().renderSuspensions).toBe(0);
 });
@@ -882,7 +880,7 @@ test("overlay scrolling stays inside a contained surface without a viewport blur
   mountApp();
   await expect.element(page.getByRole("heading", { level: 1 })).toBeVisible();
 
-  await userEvent.click(page.getByRole("button", { name: "Open NASA exoplanet catalog" }));
+  await openDiscoverSection("Exoplanets");
   const catalog = document.querySelector<HTMLDialogElement>(".planet-catalog");
   const catalogScroller = catalog?.querySelector<HTMLElement>(".catalog-scroll-region");
   expect(getComputedStyle(catalog!).overflowY).toBe("hidden");
@@ -890,8 +888,8 @@ test("overlay scrolling stays inside a contained surface without a viewport blur
   expect(getComputedStyle(catalogScroller!).contain).toContain("paint");
   expect(getComputedStyle(catalog!, "::backdrop").backdropFilter).toBe("none");
 
-  await userEvent.click(page.getByRole("button", { name: "Close planet catalog" }));
-  await userEvent.click(page.getByRole("button", { name: "Open World Forge" }));
+  await userEvent.click(page.getByRole("button", { name: "Close Discover" }));
+  await openDiscoverSection("World Forge");
   const forge = document.querySelector<HTMLDialogElement>(".planet-builder");
   const forgeScroller = forge?.querySelector<HTMLFormElement>("form");
   expect(getComputedStyle(forge!).overflowY).toBe("hidden");

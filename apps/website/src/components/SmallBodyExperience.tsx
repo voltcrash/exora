@@ -6,13 +6,14 @@ import type { AsteroidProfile } from "../solar-asteroids.ts";
 import { findSolarAsteroid } from "../solar-asteroids.ts";
 import { findSolarStar } from "../solar-system.ts";
 import type { TravelPhase } from "../travel-transition.ts";
+import { DiscoverTrigger } from "./DiscoverTrigger.tsx";
 
 interface SmallBodyExperienceProps {
   asteroid: AsteroidProfile;
   chromeHidden: boolean;
   host: SceneHost | null;
   onHideChrome: () => void;
-  onOpenSolarSystem: () => void;
+  onOpenDiscover: () => void;
   onSelectAsteroid: (asteroid: AsteroidProfile) => void;
   onSelectStar: (star: StarProfile, cached: boolean) => void;
   travelPhase: TravelPhase;
@@ -36,7 +37,7 @@ export const SmallBodyExperience = ({
   chromeHidden,
   host,
   onHideChrome,
-  onOpenSolarSystem,
+  onOpenDiscover,
   onSelectAsteroid,
   onSelectStar,
   travelPhase,
@@ -115,20 +116,7 @@ export const SmallBodyExperience = ({
           </span>
         </a>
         <div className="exploration-actions">
-          <button
-            className="solar-trigger"
-            type="button"
-            aria-label="Open our Solar System"
-            onClick={onOpenSolarSystem}
-          >
-            <span className="solar-symbol" aria-hidden="true">
-              ☉
-            </span>
-            <span>
-              <small>HOME SYSTEM</small>
-              <strong>SOLAR SYSTEM</strong>
-            </span>
-          </button>
+          <DiscoverTrigger onClick={onOpenDiscover} />
         </div>
       </header>
 
