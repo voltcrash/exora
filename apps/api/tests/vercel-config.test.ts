@@ -29,3 +29,14 @@ test("the deployment applies its browser security policy to every response", asy
   expect(headers["permissions-policy"]).toContain("camera=(self)");
   expect(headers["permissions-policy"]).toContain("microphone=()");
 });
+
+test("large destination models are cached at the edge and revalidated in the background", async () => {
+  const path = new URL("../../../vercel.json", import.meta.url);
+  const config = JSON.parse(await readFile(path, "utf8")) as VercelConfig;
+  const modelRule = config.headers.find(({ source }) => source === "/models/(.*)");
+  const headers = Object.fromEntries(
+    modelRule?.headers.map(({ key, value }) => [key.toLowerCase(), value]) ?? [],
+  );
+
+  expect(headers["cache-control"]).toBe("public, max-age=604800, stale-while-revalidate=2592000");
+});
