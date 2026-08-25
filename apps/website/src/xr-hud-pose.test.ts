@@ -1,9 +1,9 @@
 import { expect, test } from "vite-plus/test";
 import {
   HUD_DISTANCE,
-  HUD_PITCH_RADIANS,
+  HUD_FILL_OVERSCAN,
   hudPose,
-  yawDirection,
+  hudProjectionFillScale,
   type XrVector,
 } from "./xr-hud-pose.ts";
 
@@ -29,11 +29,10 @@ const expectVector = (actual: XrVector, expected: XrVector): void => {
   expect(actual.z).toBeCloseTo(expected.z, 6);
 };
 
-test("rests below the eyes at the full viewing distance", () => {
+test("rests on the optical axis at the full viewing distance", () => {
   const pose = hudPose(EYE, LEVEL.forward, LEVEL.up);
 
-  expect(pose.position.y).toBeLessThan(EYE.y);
-  expect(pose.position.y).toBeCloseTo(EYE.y - HUD_DISTANCE * Math.sin(HUD_PITCH_RADIANS), 6);
+  expect(pose.position.y).toBeCloseTo(EYE.y, 6);
   const offset = {
     x: pose.position.x - EYE.x,
     y: pose.position.y - EYE.y,
@@ -42,33 +41,21 @@ test("rests below the eyes at the full viewing distance", () => {
   expect(length(offset)).toBeCloseTo(HUD_DISTANCE, 6);
 });
 
-test("fills the forward view rather than clearing it", () => {
-  const pose = hudPose(EYE, LEVEL.forward, LEVEL.up);
-  const offset = {
-    x: pose.position.x - EYE.x,
-    y: pose.position.y - EYE.y,
-    z: pose.position.z - EYE.z,
-  };
-  // Discover covers the window on the flat page and the view in a headset, so a level gaze has to
-  // land on the screen: the drop below the horizon stays well inside its ~24.5 degree half-height.
-  const centreDegrees = (Math.asin(-offset.y / HUD_DISTANCE) * 180) / Math.PI;
-  expect(centreDegrees).toBeGreaterThan(0);
-  expect(centreDegrees).toBeLessThan(24.5);
-});
-
-test("ignores head pitch, so looking down brings the panel into view", () => {
-  const level = hudPose(EYE, LEVEL.forward, LEVEL.up);
+test("follows head pitch so the full-screen surface stays in view", () => {
   for (const degrees of [-40, -20, 15, 55]) {
     const head = pitchedHead(degrees);
-    expect(hudPose(EYE, head.forward, head.up)).toEqual(level);
+    const pose = hudPose(EYE, head.forward, head.up);
+    expect(pose.position.y).toBeCloseTo(
+      EYE.y + HUD_DISTANCE * Math.sin((degrees * Math.PI) / 180),
+      6,
+    );
   }
 });
 
 test("follows head yaw", () => {
   const pose = hudPose(EYE, { x: 1, y: 0, z: 0 }, LEVEL.up);
-  const reach = HUD_DISTANCE * Math.cos(HUD_PITCH_RADIANS);
 
-  expect(pose.position.x).toBeCloseTo(EYE.x + reach, 6);
+  expect(pose.position.x).toBeCloseTo(EYE.x + HUD_DISTANCE, 6);
   expect(pose.position.z).toBeCloseTo(EYE.z, 6);
 });
 
@@ -77,18 +64,11 @@ test("follows the wearer rather than being left behind", () => {
   const pose = hudPose(walked, LEVEL.forward, LEVEL.up);
 
   expect(pose.position.x).toBeCloseTo(walked.x, 6);
-  expect(pose.position.z).toBeCloseTo(walked.z + HUD_DISTANCE * Math.cos(HUD_PITCH_RADIANS), 6);
-});
-
-test("keeps the yaw when the head looks straight down or straight up", () => {
-  // Pitched fully down the up axis carries the facing direction; fully up it carries its negation.
-  expectVector(yawDirection({ x: 0, y: -1, z: 0 }, { x: 0, y: 0, z: 1 }), { x: 0, y: 0, z: 1 });
-  expectVector(yawDirection({ x: 0, y: 1, z: 0 }, { x: 0, y: 0, z: -1 }), { x: 0, y: 0, z: 1 });
-  expectVector(yawDirection({ x: 0, y: -1, z: 0 }, { x: -1, y: 0, z: 0 }), { x: -1, y: 0, z: 0 });
+  expect(pose.position.z).toBeCloseTo(walked.z + HUD_DISTANCE, 6);
 });
 
 test("falls back to a usable direction rather than a NaN transform", () => {
-  const pose = hudPose(EYE, { x: 0, y: -1, z: 0 }, { x: 0, y: 1, z: 0 });
+  const pose = hudPose(EYE, { x: 0, y: 0, z: 0 }, { x: 0, y: 0, z: 0 });
 
   for (const value of [pose.position.x, pose.position.y, pose.position.z]) {
     expect(Number.isFinite(value)).toBe(true);
@@ -113,10 +93,32 @@ test("faces the eyes squarely", () => {
   expect(dot(pose.look, pose.up)).toBeCloseTo(0, 6);
 });
 
-test("reduces to a level head-on panel when the pitch is removed", () => {
-  const pose = hudPose(EYE, LEVEL.forward, LEVEL.up, HUD_DISTANCE, 0);
+test("produces a level head-on panel for a level gaze", () => {
+  const pose = hudPose(EYE, LEVEL.forward, LEVEL.up, HUD_DISTANCE);
 
   expectVector(pose.position, { x: 0, y: EYE.y, z: HUD_DISTANCE });
   expectVector(pose.look, { x: 0, y: 0, z: -1 });
   expectVector(pose.up, { x: 0, y: 1, z: 0 });
+});
+
+test("scales the panel to fill the headset projection", () => {
+  const aspect = 16 / 10;
+  const projection = [1 / aspect, 0, 0, 0, 0, 1];
+  const panel = { height: 1.7, width: 2.72 };
+  const scale = hudProjectionFillScale(projection, panel.width, panel.height);
+
+  expect(scale.x).toBeCloseTo(((2 * HUD_DISTANCE * aspect) / panel.width) * HUD_FILL_OVERSCAN, 6);
+  expect(scale.y).toBeCloseTo(((2 * HUD_DISTANCE) / panel.height) * HUD_FILL_OVERSCAN, 6);
+  expect(panel.width * scale.x).toBeGreaterThanOrEqual(2 * HUD_DISTANCE * aspect);
+  expect(panel.height * scale.y).toBeGreaterThanOrEqual(2 * HUD_DISTANCE);
+});
+
+test("uses the wider projection axis and safely ignores invalid matrices", () => {
+  const wideProjection = [0.5, 0, 0, 0, 0, 1];
+  const scale = hudProjectionFillScale(wideProjection, 2.72, 1.7, HUD_DISTANCE, 1);
+
+  expect(scale.x).toBeCloseTo((2 * HUD_DISTANCE) / 0.5 / 2.72, 6);
+  expect(scale.y).toBeCloseTo((2 * HUD_DISTANCE) / 1.7, 6);
+  expect(hudProjectionFillScale([], 2.72, 1.7)).toEqual({ x: 1, y: 1 });
+  expect(hudProjectionFillScale(wideProjection, 0, 1.7)).toEqual({ x: 1, y: 1 });
 });

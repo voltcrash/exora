@@ -6,10 +6,9 @@
  * feel like part of the world rather than a sticker on the visor:
  *
  * - it **fills the view when it is open**. Discover covers the canvas completely in the browser,
- *   and it does the same here: a wide plane squarely in front of the wearer, dropped only a few
- *   degrees below a level gaze so its centre sits where the eyes rest. It follows the head's
- *   position and yaw but not its pitch, so walking, turning and teleporting never leave it
- *   behind. `xr-hud-pose.ts` works out the pose.
+ *   and it does the same here: a wide plane squarely in front of the wearer, scaled from the live
+ *   eye projections and attached to the complete head pose. Walking, looking and teleporting
+ *   therefore never expose the world around the modal. `xr-hud-pose.ts` works out the transform.
  * - it is **summoned**, not permanent. A face button opens Discover and dismisses it again, and
  *   while it is dismissed the session carries no floating chrome of any kind — no pads, no pills,
  *   nothing between the wearer and the world.
@@ -35,7 +34,7 @@ import type { WebXRDefaultExperience } from "@babylonjs/core/XR/webXRDefaultExpe
 import type { WebXRInputSource } from "@babylonjs/core/XR/webXRInputSource.js";
 import type { WebXRAbstractMotionController } from "@babylonjs/core/XR/motionController/webXRAbstractMotionController.js";
 import type { Scene } from "@babylonjs/core/scene.js";
-import { HUD_DISTANCE, HUD_PITCH_RADIANS, hudPose } from "./xr-hud-pose.ts";
+import { HUD_DISTANCE, hudPose, hudProjectionFillScale } from "./xr-hud-pose.ts";
 import {
   CONTENT_LEFT,
   hitTestPanel,
@@ -49,9 +48,8 @@ import {
 } from "./xr-panel-layout.ts";
 
 /**
- * Physical size of the screen: wide enough at `HUD_DISTANCE` to subtend roughly 73° by 49°, which
- * is as close to full-screen as a headset can be given without the corners falling outside the
- * display's own field of view.
+ * Base physical size of the screen. The live eye projections scale this up to cover the headset;
+ * keeping a stable base makes canvas-pixel hit testing and the open animation straightforward.
  */
 const PANEL_SIZE = { height: 1.7, width: 2.72 };
 /** Supersampling keeps text and fine rules crisp once the screen is angled in the headset. */
@@ -676,6 +674,7 @@ export const createXrPanel = (scene: Scene, anisotropy = 4): XrPanel => {
   let currentView: XrPanelView | null = null;
   let hovered: XrCell | null = null;
   let openProgress = 0;
+  const projectionScale = { x: 1, y: 1 };
   let visible = false;
 
   const paint = (view: XrPanelView): void => {
@@ -770,12 +769,33 @@ export const createXrPanel = (scene: Scene, anisotropy = 4): XrPanel => {
     headForward.copyFrom(poseCamera.getDirection(Axis.Z)).normalize();
     headUp.copyFrom(poseCamera.getDirection(Axis.Y)).normalize();
 
-    const pose = hudPose(eyePosition, headForward, headUp, HUD_DISTANCE, HUD_PITCH_RADIANS);
+    const pose = hudPose(eyePosition, headForward, headUp, HUD_DISTANCE);
     root.position.set(pose.position.x, pose.position.y, pose.position.z);
     lookDirection.set(pose.look.x, pose.look.y, pose.look.z);
     panelUp.set(pose.up.x, pose.up.y, pose.up.z);
     Quaternion.FromLookDirectionLHToRef(lookDirection, panelUp, orientation);
     root.rotationQuaternion = orientation;
+
+    projectionScale.x = 1;
+    projectionScale.y = 1;
+    for (const eye of eyes.length > 0 ? eyes : [camera]) {
+      const scale = hudProjectionFillScale(
+        eye.getProjectionMatrix().asArray(),
+        PANEL_SIZE.width,
+        PANEL_SIZE.height,
+        HUD_DISTANCE,
+      );
+      projectionScale.x = Math.max(projectionScale.x, scale.x);
+      projectionScale.y = Math.max(projectionScale.y, scale.y);
+    }
+  };
+
+  const scalePanel = (animationScale: number): void => {
+    root.scaling.set(
+      projectionScale.x * animationScale,
+      projectionScale.y * animationScale,
+      animationScale,
+    );
   };
 
   const summon = (): void => {
@@ -787,7 +807,7 @@ export const createXrPanel = (scene: Scene, anisotropy = 4): XrPanel => {
     material.alpha = 1;
     highlightMaterial.alpha = 0.26;
     root.setEnabled(true);
-    root.scaling.setAll(0.92);
+    scalePanel(0.92);
     pulse(0.25, 20);
   };
 
@@ -850,11 +870,14 @@ export const createXrPanel = (scene: Scene, anisotropy = 4): XrPanel => {
   const update = (deltaSeconds: number): void => {
     if (!visible) return;
     placeHud();
+    let animationScale = 1;
     if (openProgress < 1) {
       openProgress = Math.min(1, openProgress + deltaSeconds / OPEN_SECONDS);
       const eased = openProgress * openProgress * (3 - 2 * openProgress);
-      root.scaling.setAll(0.88 + eased * 0.12);
+      animationScale = 0.88 + eased * 0.12;
     }
+    // Projection matrices may change when a runtime adjusts its viewport or active field of view.
+    scalePanel(animationScale);
   };
 
   return {

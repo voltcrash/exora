@@ -1,16 +1,14 @@
 /**
  * Where the in-headset Discover screen rests relative to the wearer's head.
  *
- * Discover fills the browser window, so in a session it is placed to fill the view: squarely in
- * front of the eyes, dropped just far enough that its centre sits where a resting gaze lands
- * rather than dead level. The screen tracks the head's position and yaw but deliberately ignores
- * its pitch. Tracking yaw is what separates this from a world-locked plane — it keeps the
- * guarantee that walking, turning and teleporting never leave the screen behind — while dropping
- * the pitch is what stops it from swinging around every time the wearer glances up or down.
+ * Discover fills the browser window, so in a session it is placed to fill the headset view too.
+ * The screen follows the complete head pose while it is open: position, yaw, pitch and roll. That
+ * keeps its centre on the optical axis and lets `xr-panel.ts` cover the current eye projections
+ * without leaving strips of the world visible around a supposedly full-screen modal.
  *
- * The arithmetic is plain numbers rather than Babylon vectors, so the sign conventions and the
- * looking-straight-down degeneracy can be checked without a headset or a GPU. Babylon's left-handed
- * basis is assumed throughout: +X right, +Y up, +Z forward.
+ * The arithmetic is plain numbers rather than Babylon vectors, so projection coverage and pose
+ * fallbacks can be checked without a headset or a GPU. Babylon's left-handed basis is assumed
+ * throughout: +X right, +Y up, +Z forward.
  */
 
 export interface XrVector {
@@ -27,62 +25,77 @@ export interface XrHudPose {
   up: XrVector;
 }
 
-/** Eye-to-screen distance. Held constant across the pitch so reach and text size are unchanged. */
+/** Eye-to-screen distance. Held constant so controller reach and text size remain predictable. */
 export const HUD_DISTANCE = 1.85;
-/**
- * How far below the horizon the screen's centre rests.
- *
- * The screen subtends roughly 73 by 49 degrees at this distance, so a small drop puts its middle
- * on the eye line a seated wearer actually holds — a few degrees under level — without moving any
- * part of it out of comfortable reading range.
- */
-export const HUD_PITCH_RADIANS = (9 * Math.PI) / 180;
+/** Slight overscan hides raster rounding and the separation between the two eye projections. */
+export const HUD_FILL_OVERSCAN = 1.02;
 
-/** Below this, a direction's horizontal part is numerical noise and its yaw has to come elsewhere. */
-const YAW_EPSILON = 1e-4;
+const VECTOR_EPSILON = 1e-4;
 
 /**
- * The head's facing direction flattened onto the horizontal plane.
- *
- * Looking straight up or down leaves nothing to flatten, but the yaw survives in the head's up
- * axis: pitched fully down it points along the facing direction, fully up it points against it.
+ * Returns a normalized direction, falling back only for a malformed tracking pose.
  */
-export const yawDirection = (forward: XrVector, up: XrVector): XrVector => {
-  let x = forward.x;
-  let z = forward.z;
-  let length = Math.hypot(x, z);
-
-  if (length < YAW_EPSILON) {
-    const sign = forward.y < 0 ? 1 : -1;
-    x = sign * up.x;
-    z = sign * up.z;
-    length = Math.hypot(x, z);
-  }
-  // Both axes vertical is not a pose a head can hold, but a fallback beats a NaN transform.
-  if (length < YAW_EPSILON) return { x: 0, y: 0, z: 1 };
-
-  return { x: x / length, y: 0, z: z / length };
+const direction = (value: XrVector, fallback: XrVector): XrVector => {
+  const length = Math.hypot(value.x, value.y, value.z);
+  if (length < VECTOR_EPSILON) return fallback;
+  return { x: value.x / length, y: value.y / length, z: value.z / length };
 };
 
-/** Places the screen in front of the head on its yaw, tilted back to face the eyes squarely. */
+/** Places the screen squarely in front of the current headset pose. */
 export const hudPose = (
   eye: XrVector,
   forward: XrVector,
   up: XrVector,
   distance = HUD_DISTANCE,
-  pitch = HUD_PITCH_RADIANS,
 ): XrHudPose => {
-  const facing = yawDirection(forward, up);
-  const cos = Math.cos(pitch);
-  const sin = Math.sin(pitch);
+  const facing = direction(forward, { x: 0, y: 0, z: 1 });
+  const panelUp = direction(up, { x: 0, y: 1, z: 0 });
 
   return {
-    look: { x: -facing.x * cos, y: sin, z: -facing.z * cos },
+    look: { x: -facing.x, y: -facing.y, z: -facing.z },
     position: {
-      x: eye.x + facing.x * distance * cos,
-      y: eye.y - distance * sin,
-      z: eye.z + facing.z * distance * cos,
+      x: eye.x + facing.x * distance,
+      y: eye.y + facing.y * distance,
+      z: eye.z + facing.z * distance,
     },
-    up: { x: facing.x * sin, y: cos, z: facing.z * sin },
+    up: panelUp,
+  };
+};
+
+/**
+ * Axis scales that make the panel fill one headset eye's perspective projection.
+ *
+ * Perspective matrices store the horizontal and vertical focal scales at indices 0 and 5. At a
+ * known distance their reciprocals give the half-frustum dimensions. Scaling each axis to its own
+ * ratio keeps the complete panel reachable instead of cropping its edge controls on a projection
+ * whose aspect ratio differs from the canvas.
+ */
+export const hudProjectionFillScale = (
+  projection: ArrayLike<number>,
+  panelWidth: number,
+  panelHeight: number,
+  distance = HUD_DISTANCE,
+  overscan = HUD_FILL_OVERSCAN,
+): { x: number; y: number } => {
+  const horizontalFocalScale = Math.abs(projection[0] ?? 0);
+  const verticalFocalScale = Math.abs(projection[5] ?? 0);
+  if (
+    horizontalFocalScale < VECTOR_EPSILON ||
+    verticalFocalScale < VECTOR_EPSILON ||
+    panelWidth < VECTOR_EPSILON ||
+    panelHeight < VECTOR_EPSILON ||
+    distance < VECTOR_EPSILON
+  ) {
+    return { x: 1, y: 1 };
+  }
+
+  const frustumWidth = (2 * distance) / horizontalFocalScale;
+  const frustumHeight = (2 * distance) / verticalFocalScale;
+  const margin = Math.max(1, overscan);
+  const x = (frustumWidth / panelWidth) * margin;
+  const y = (frustumHeight / panelHeight) * margin;
+  return {
+    x: Number.isFinite(x) ? Math.max(1, x) : 1,
+    y: Number.isFinite(y) ? Math.max(1, y) : 1,
   };
 };
