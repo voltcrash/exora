@@ -17,11 +17,14 @@ test("AR wraps and fits the existing foreground while ignoring its virtual sky",
   const presentation = createWorldPresentation(scene);
   const subject = MeshBuilder.CreateBox("subject", { size: 2 }, scene);
   subject.position.y = 2;
+  const atmosphere = MeshBuilder.CreateSphere("atmosphere", { diameter: 2 }, scene);
+  atmosphere.position.y = 2;
+  atmosphere.freezeWorldMatrix();
   const sky = markAsVirtualBackground(MeshBuilder.CreateSphere("sky", { diameter: 1_000 }, scene));
 
   presentation.capture({
     lights: [],
-    meshes: [presentation.proxy, subject, sky],
+    meshes: [presentation.proxy, subject, atmosphere, sky],
     transformNodes: [...scene.transformNodes],
   });
 
@@ -38,11 +41,18 @@ test("AR wraps and fits the existing foreground while ignoring its virtual sky",
   // not participate in fitting, and the original lower edge (y=1) lands on the physical plane.
   expect(presentation.proxy.scaling.x).toBeCloseTo(0.34);
   expect(presentation.proxy.position.asArray()).toEqual([1, -0.34, 3]);
+  const placedAtmosphere = atmosphere.getAbsolutePosition();
+  expect(placedAtmosphere.x).toBeCloseTo(1);
+  expect(placedAtmosphere.y).toBeCloseTo(0.34);
+  expect(placedAtmosphere.z).toBeCloseTo(3);
+  expect(atmosphere.isWorldMatrixFrozen).toBe(false);
 
   presentation.endAr();
   subject.computeWorldMatrix(true);
   expect(subject.getAbsolutePosition().asArray()).toEqual([0, 2, 0]);
   expect(presentation.proxy.scaling.asArray()).toEqual([1, 1, 1]);
+  expect(atmosphere.getAbsolutePosition().asArray()).toEqual([0, 2, 0]);
+  expect(atmosphere.isWorldMatrixFrozen).toBe(true);
 
   presentation.dispose();
   scene.dispose();

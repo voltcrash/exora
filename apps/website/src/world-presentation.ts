@@ -99,6 +99,7 @@ export const createWorldPresentation = (scene: Scene): WorldPresentation => {
   let placed = false;
   let surfaceY = 0;
   let captured = false;
+  let frozenMeshes: readonly AbstractMesh[] = [];
 
   drag.onDragEndObservable.add(() => {
     surfaceY = proxy.position.y + minimumY * proxy.scaling.y;
@@ -119,6 +120,7 @@ export const createWorldPresentation = (scene: Scene): WorldPresentation => {
     capture: ({ lights, meshes, transformNodes }) => {
       if (captured) return;
       captured = true;
+      frozenMeshes = meshes.filter((mesh) => mesh.isWorldMatrixFrozen);
 
       const foreground = meshes.filter(
         (mesh) => mesh !== proxy && mesh.layerMask !== VIRTUAL_BACKGROUND_LAYER_MASK,
@@ -161,6 +163,11 @@ export const createWorldPresentation = (scene: Scene): WorldPresentation => {
       scene.onBeforeRenderObservable.remove(scaleObserver);
     },
     beginAr: () => {
+      // A frozen matrix deliberately ignores parent-transform changes. The orbital atmosphere
+      // uses one on desktop, which otherwise leaves that shell at its original scene-scale pose
+      // while AR shrinks and places the planet underneath it. Let every captured mesh follow the
+      // presentation proxy for AR; `endAr` restores the original optimization.
+      for (const mesh of frozenMeshes) mesh.unfreezeWorldMatrix();
       placed = false;
       proxy.position.setAll(0);
       proxy.rotationQuaternion = null;
@@ -181,6 +188,10 @@ export const createWorldPresentation = (scene: Scene): WorldPresentation => {
       proxy.rotation.setAll(0);
       proxy.scaling.setAll(1);
       proxy.setEnabled(true);
+      for (const mesh of frozenMeshes) {
+        mesh.computeWorldMatrix(true);
+        mesh.freezeWorldMatrix();
+      }
     },
     isPlaced: () => placed,
     place: (position) => {
