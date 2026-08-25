@@ -7,6 +7,10 @@ import { acquireSceneHost } from "./scene-host.ts";
 import { featuredPlanet } from "./planet-profile.ts";
 import "./style.css";
 
+const planetSceneStub = vi.hoisted(() => ({
+  setViewMode: null as ((mode: "orbit" | "surface" | "transition") => void) | null,
+}));
+
 /**
  * The suite for the things a Node test cannot answer.
  *
@@ -120,7 +124,14 @@ const stubbedHost = (): {
   };
 
 vi.mock("./planet-scene.ts", () => ({
-  createPlanetWorld: (_host: unknown, options: { onFirstFrame: () => void }) => {
+  createPlanetWorld: (
+    _host: unknown,
+    options: {
+      onFirstFrame: () => void;
+      onViewModeChange: (mode: "orbit" | "surface" | "transition") => void;
+    },
+  ) => {
+    planetSceneStub.setViewMode = options.onViewModeChange;
     options.onFirstFrame();
     return mountedWorld();
   },
@@ -455,6 +466,7 @@ const openDiscoverSection = async (
 };
 
 beforeEach(() => {
+  planetSceneStub.setViewMode = null;
   stubbedHost().setDiscoverVisibility(false);
   stubbedHost().setInXr(false);
   document.head.querySelector('link[rel="canonical"]')?.remove();
@@ -964,7 +976,9 @@ test("terrain view fades every interface region and reveals the hovered one", as
 
   const shell = document.querySelector<HTMLElement>(".experience-shell");
   expect(shell).not.toBeNull();
-  shell!.classList.replace("view-orbit", "view-surface");
+  expect(planetSceneStub.setViewMode).not.toBeNull();
+  planetSceneStub.setViewMode?.("surface");
+  await expect.poll(() => shell!.classList.contains("view-surface")).toBe(true);
   const canvas = document.querySelector<HTMLCanvasElement>("canvas");
   expect(canvas).not.toBeNull();
   await page.elementLocator(canvas!).hover();
