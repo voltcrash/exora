@@ -39,6 +39,9 @@ const mountedWorld = () => ({
 });
 
 vi.mock("./scene-host.ts", () => {
+  let discoverOpen = false;
+  let insideHeadset = false;
+  const discoverListeners = new Set<(open: boolean) => void>();
   const host = {
     // Travel is flown by the real renderer's camera, which this suite does not have one of. The
     // page's own half of a jump — panels leaving with the world, the dark over the swap — is
@@ -52,10 +55,15 @@ vi.mock("./scene-host.ts", () => {
     enterImmersive: async () => undefined,
     getFps: () => 60,
     isArSupported: () => false,
-    isInXr: () => false,
+    isInXr: () => insideHeadset,
     isVrSupported: () => false,
     prefersReducedMotion: () => false,
     mountWorld: async (build: () => unknown) => build(),
+    onDiscoverVisibility: (listener: (open: boolean) => void) => {
+      discoverListeners.add(listener);
+      listener(discoverOpen);
+      return () => discoverListeners.delete(listener);
+    },
     onRendererStatus: (listener: (status: string) => void) => {
       listener("ready");
       return () => undefined;
@@ -72,6 +80,15 @@ vi.mock("./scene-host.ts", () => {
     qualityTier: "desktop",
     refreshConsole: () => undefined,
     setConsoleNavigator: () => undefined,
+    setDiscoverElement: () => undefined,
+    setDiscoverVisibility: (open: boolean) => {
+      if (discoverOpen === open) return;
+      discoverOpen = open;
+      for (const listener of discoverListeners) listener(open);
+    },
+    setInXr: (value: boolean) => {
+      insideHeadset = value;
+    },
     /** How many overlays are currently holding the loop parked, for the assertions below. */
     renderSuspensions: 0,
     suspendRendering: () => {
@@ -91,8 +108,16 @@ vi.mock("./scene-host.ts", () => {
 });
 
 /** The stub above, reached through the module the app imports it from. */
-const stubbedHost = (): { renderSuspensions: number } =>
-  acquireSceneHost(document.createElement("canvas")) as unknown as { renderSuspensions: number };
+const stubbedHost = (): {
+  renderSuspensions: number;
+  setDiscoverVisibility: (open: boolean) => void;
+  setInXr: (value: boolean) => void;
+} =>
+  acquireSceneHost(document.createElement("canvas")) as unknown as {
+    renderSuspensions: number;
+    setDiscoverVisibility: (open: boolean) => void;
+    setInXr: (value: boolean) => void;
+  };
 
 vi.mock("./planet-scene.ts", () => ({
   createPlanetWorld: (_host: unknown, options: { onFirstFrame: () => void }) => {
@@ -430,6 +455,8 @@ const openDiscoverSection = async (
 };
 
 beforeEach(() => {
+  stubbedHost().setDiscoverVisibility(false);
+  stubbedHost().setInXr(false);
   document.head.querySelector('link[rel="canonical"]')?.remove();
   const canonical = document.createElement("link");
   canonical.rel = "canonical";
@@ -852,6 +879,7 @@ test("the World Forge opens and builds a world the page then shows", async () =>
 test("Backspace toggles Discover open and closed", async () => {
   stubArchive();
   mountApp();
+  await expect.element(page.getByRole("heading", { level: 1 })).toBeVisible();
 
   await userEvent.keyboard("{Backspace}");
   await expect.element(page.getByRole("dialog", { name: /Start close to home/ })).toBeVisible();
@@ -1009,6 +1037,17 @@ test("an open overlay parks the renderer, and closing it starts the loop again",
 
   await userEvent.click(page.getByRole("button", { name: "Close Discover" }));
   await expect.element(page.getByRole("dialog")).not.toBeInTheDocument();
+  expect(stubbedHost().renderSuspensions).toBe(0);
+});
+
+test("Discover keeps the renderer running inside an immersive session", async () => {
+  stubArchive();
+  stubbedHost().setInXr(true);
+  mountApp();
+  await expect.element(page.getByRole("heading", { level: 1 })).toBeVisible();
+
+  await openDiscoverSection("Exoplanets");
+  await expect.element(page.getByRole("dialog")).toBeVisible();
   expect(stubbedHost().renderSuspensions).toBe(0);
 });
 

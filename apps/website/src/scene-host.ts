@@ -28,6 +28,7 @@ import { MeshBuilder } from "@babylonjs/core/Meshes/meshBuilder.js";
 import "@babylonjs/core/Meshes/instancedMesh.js";
 import { Scene, ScenePerformancePriority } from "@babylonjs/core/scene.js";
 import type { WebXRCamera } from "@babylonjs/core/XR/webXRCamera.js";
+import type { WebXRControllerMovement } from "@babylonjs/core/XR/features/WebXRControllerMovement.pure.js";
 import { WebXRDefaultExperience } from "@babylonjs/core/XR/webXRDefaultExperience.js";
 import "@babylonjs/core/XR/features/WebXRControllerMovement.js";
 import "@babylonjs/core/XR/features/WebXRControllerPointerSelection.js";
@@ -70,7 +71,8 @@ import {
   TRAVEL_RECALL_MS,
   type TravelPhase,
 } from "./travel-transition.ts";
-import { createXrConsole, type XrConsole, type XrConsoleHost } from "./xr-console.ts";
+import type { XrConsoleHost } from "./xr-console.ts";
+import { createXrDiscoverSurface, type XrDiscoverSurface } from "./xr-discover-surface.ts";
 import {
   chooseImmersiveDestination,
   getVariantLaunchUrl,
@@ -194,8 +196,14 @@ export interface SceneHost {
   mountWorld: <World extends MountedWorld>(
     build: () => Promise<World> | World,
   ) => Promise<World | null>;
+  /** Subscribes to the shared desktop/VR Discover state. */
+  onDiscoverVisibility: (listener: (open: boolean) => void) => () => void;
   /** Repaints the console, for when a world's own entries change after it was mounted. */
   refreshConsole: () => void;
+  /** Supplies the actual React dialog mirrored onto the VR window. */
+  setDiscoverElement: (element: HTMLDialogElement | null) => void;
+  /** Keeps React and the controller-summoned VR window on the same open state. */
+  setDiscoverVisibility: (visible: boolean) => void;
   /** Registers the page-level destinations the console falls back to. See `ConsoleNavigator`. */
   setConsoleNavigator: (navigator: ConsoleNavigator | null) => void;
   /** Subscribes to immersive status, called immediately with the current one. */
@@ -349,12 +357,30 @@ const createSceneHost = (canvas: HTMLCanvasElement): SceneHost => {
   let xrCameraLayerMask = 0x0fff_ffff;
   let disposed = false;
   let xr: WebXRDefaultExperience | null = null;
-  let xrConsole: XrConsole | null = null;
+  let xrDiscoverSurface: XrDiscoverSurface | null = null;
+  let xrMovement: WebXRControllerMovement | null = null;
+  let discoverElement: HTMLDialogElement | null = null;
   let currentWorld: MountedWorld | null = null;
   let currentScope: WorldScope | null = null;
   let mountToken = 0;
   let worldBuildGate = Promise.resolve();
   let sessionFoveation = profile.xrFixedFoveation;
+  /** Whether the in-headset Discover screen currently owns the view. */
+  let discoverOpen = false;
+  const discoverListeners = new Set<(open: boolean) => void>();
+  const syncDiscoverElementPresentation = (): void => {
+    discoverElement?.toggleAttribute(
+      "data-xr-mirrored",
+      isInXr && activeImmersiveMode === "vr" && discoverOpen,
+    );
+  };
+  const setDiscoverOpen = (open: boolean): void => {
+    if (discoverOpen === open) return;
+    discoverOpen = open;
+    if (xrMovement) xrMovement.movementEnabled = !open;
+    syncDiscoverElementPresentation();
+    for (const listener of discoverListeners) listener(open);
+  };
   let qualitySampleSeconds = 0;
 
   let xrStatus: XrStatus = "checking";
@@ -409,6 +435,8 @@ const createSceneHost = (canvas: HTMLCanvasElement): SceneHost => {
   const adaptSessionFoveation = (fps: number): void => {
     const sessionManager = xr?.baseExperience.sessionManager;
     if (!sessionManager?.isFixedFoveationSupported) return;
+    // Keep the UI text sharp while Discover is open and park the adaptive ladder until it closes.
+    if (discoverOpen) return;
     const next = adaptFixedFoveation(sessionFoveation, fps, profile);
     if (next === sessionFoveation) return;
     sessionFoveation = next;
@@ -423,7 +451,7 @@ const createSceneHost = (canvas: HTMLCanvasElement): SceneHost => {
     if (rigAwaitingWorld && isInXr && activeImmersiveMode === "vr") {
       rigAwaitingWorld = false;
       currentWorld?.focusXrRig(false);
-      xrConsole?.recall();
+      xrDiscoverSurface?.recall();
     }
 
     if (veilAlpha !== veilTarget || veil.isEnabled()) {
@@ -441,7 +469,7 @@ const createSceneHost = (canvas: HTMLCanvasElement): SceneHost => {
 
     // Locomotion owns the XR rig after entry. Rewriting its position here causes visible
     // snap-backs on room-scale headsets, so only the head-locked console needs a frame update.
-    if (isInXr && activeImmersiveMode === "vr") xrConsole?.update(deltaSeconds);
+    if (isInXr && activeImmersiveMode === "vr") xrDiscoverSurface?.update(deltaSeconds);
 
     qualitySampleSeconds += deltaSeconds;
     if (qualitySampleSeconds >= 3) {
@@ -513,39 +541,6 @@ const createSceneHost = (canvas: HTMLCanvasElement): SceneHost => {
     if (!looping && !disposed) renderFrame();
   };
   window.addEventListener("resize", resize);
-
-  /**
-   * The console is built once and outlives every world, so it keeps its page, its search results
-   * and its position across a jump. Its scene-specific half is read through here.
-   */
-  let consoleNavigator: ConsoleNavigator | null = null;
-  const consoleHost: XrConsoleHost = {
-    facts: () => currentWorld?.console.facts() ?? [],
-    onExit: () => void xr?.baseExperience.exitXRAsync(),
-    onForgePlanet: (world) =>
-      (currentWorld?.console.onForgePlanet ?? consoleNavigator?.onForgePlanet)?.(world),
-    onForgeStar: (star) =>
-      (currentWorld?.console.onForgeStar ?? consoleNavigator?.onForgeStar)?.(star),
-    onTravelAsteroid: (asteroid) =>
-      (currentWorld?.console.onTravelAsteroid ?? consoleNavigator?.onTravelAsteroid)?.(asteroid),
-    onTravelBlackHole: (blackHole) =>
-      (currentWorld?.console.onTravelBlackHole ?? consoleNavigator?.onTravelBlackHole)?.(blackHole),
-    onTravelComet: (comet) =>
-      (currentWorld?.console.onTravelComet ?? consoleNavigator?.onTravelComet)?.(comet),
-    onTravelMission: (mission) =>
-      (currentWorld?.console.onTravelMission ?? consoleNavigator?.onTravelMission)?.(mission),
-    onTravelPlanet: (planet) =>
-      (currentWorld?.console.onTravelPlanet ?? consoleNavigator?.onTravelPlanet)?.(planet),
-    onTravelRegion: (region) =>
-      (currentWorld?.console.onTravelRegion ?? consoleNavigator?.onTravelRegion)?.(region),
-    onTravelStar: (star) =>
-      (currentWorld?.console.onTravelStar ?? consoleNavigator?.onTravelStar)?.(star),
-    sceneActions: () => currentWorld?.console.sceneActions() ?? [],
-    source: () => currentWorld?.console.source() ?? "",
-    subtitle: () => currentWorld?.console.subtitle() ?? "",
-    summary: () => currentWorld?.console.summary() ?? "",
-    title: () => currentWorld?.console.title() ?? "Exora",
-  };
 
   /** Undoes the scene-level settings a world is allowed to change, before the next one lands. */
   const resetSceneDefaults = (): void => {
@@ -771,6 +766,10 @@ const createSceneHost = (canvas: HTMLCanvasElement): SceneHost => {
     build: () => Promise<World> | World,
   ): Promise<World | null> => {
     const token = (mountToken += 1);
+    // Choosing a destination closes Discover, the way it closes on the flat page. In a headset
+    // this also makes the newly selected world the focus instead of leaving the catalog window in
+    // front of it after the jump.
+    xrDiscoverSurface?.setVisible(false);
     // The outgoing world keeps rendering through the flight, so the jump never shows an empty
     // sky: it is watched receding, and only the swap itself happens behind the dark.
     if (currentWorld) {
@@ -810,7 +809,6 @@ const createSceneHost = (canvas: HTMLCanvasElement): SceneHost => {
         // more, so the half-built world is swept out before the failure is reported.
         scope.seal();
         scope.dispose();
-        xrConsole?.refresh();
         void fadeVeil(0);
         // There is no destination to fly in to, so the flight is abandoned rather than landed:
         // the recovery screen that answers this has to be visible, not behind a jump that never
@@ -836,7 +834,6 @@ const createSceneHost = (canvas: HTMLCanvasElement): SceneHost => {
       currentWorld = world;
       arPresentation.setWorld(scope.presentation);
       rigAwaitingWorld = isInXr && activeImmersiveMode === "vr";
-      xrConsole?.refresh();
       void fadeVeil(0);
       arriveAtWorld(token);
       // A destination can be chosen from a dialog that is still open over the canvas — the
@@ -885,19 +882,30 @@ const createSceneHost = (canvas: HTMLCanvasElement): SceneHost => {
       }
 
       xr = createdXr;
-      createdXr.baseExperience.featuresManager.enableFeature(WebXRFeatureName.MOVEMENT, "latest", {
-        movementEnabled: true,
-        movementOrientationFollowsController: false,
-        movementOrientationFollowsViewerPose: true,
-        movementSpeed: XR_MOVE_SPEED,
-        movementThreshold: 0.16,
-        rotationEnabled: true,
-        rotationSpeed: 0.42,
-        rotationThreshold: 0.18,
-        xrInput: createdXr.input,
+      xrMovement = createdXr.baseExperience.featuresManager.enableFeature(
+        WebXRFeatureName.MOVEMENT,
+        "latest",
+        {
+          movementEnabled: true,
+          movementOrientationFollowsController: false,
+          movementOrientationFollowsViewerPose: true,
+          movementSpeed: XR_MOVE_SPEED,
+          movementThreshold: 0.16,
+          rotationEnabled: true,
+          rotationSpeed: 0.42,
+          rotationThreshold: 0.18,
+          xrInput: createdXr.input,
+        },
+      ) as WebXRControllerMovement;
+      xrDiscoverSurface = createXrDiscoverSurface(scene, profile.anisotropicFiltering);
+      xrDiscoverSurface.onVisibility((open) => {
+        setDiscoverOpen(open);
+        const sessionManager = createdXr.baseExperience.sessionManager;
+        if (!sessionManager.isFixedFoveationSupported) return;
+        sessionManager.fixedFoveation = open ? 0 : sessionFoveation;
       });
-      xrConsole = createXrConsole(scene, consoleHost, profile.anisotropicFiltering);
-      xrConsole.attach(createdXr);
+      xrDiscoverSurface.attach(createdXr);
+      xrDiscoverSurface.setElement(discoverElement);
 
       // The rig lands wherever the headset happens to face, so the view has to be aimed at the
       // subject; otherwise a VR session opens on empty starfield and looks broken. AR must leave
@@ -920,7 +928,7 @@ const createSceneHost = (canvas: HTMLCanvasElement): SceneHost => {
           if (createdXr.baseExperience.sessionManager.isFixedFoveationSupported) {
             createdXr.baseExperience.sessionManager.fixedFoveation = sessionFoveation;
           }
-          xrConsole?.setVisible(activeImmersiveMode === "vr");
+          xrDiscoverSurface?.setVisible(activeImmersiveMode === "vr");
           setXrStatus("in-xr");
         }
         if (state === WebXRState.NOT_IN_XR) {
@@ -929,7 +937,7 @@ const createSceneHost = (canvas: HTMLCanvasElement): SceneHost => {
           // Back on the flat page, an overlay that outlived the session owns the screen again.
           if (suspensions > 0) stopRenderLoop();
           rigAwaitingWorld = false;
-          xrConsole?.setVisible(false);
+          xrDiscoverSurface?.setVisible(false);
           // A session ending mid-jump would otherwise leave a fade waiting for frames that only
           // arrive inside the headset.
           veilTarget = 0;
@@ -988,9 +996,21 @@ const createSceneHost = (canvas: HTMLCanvasElement): SceneHost => {
     isInXr: () => isInXr,
     isVrSupported: () => isVrSupported,
     mountWorld,
-    refreshConsole: () => xrConsole?.refresh(),
-    setConsoleNavigator: (navigator) => {
-      consoleNavigator = navigator;
+    onDiscoverVisibility: (listener) => {
+      discoverListeners.add(listener);
+      listener(discoverOpen);
+      return () => discoverListeners.delete(listener);
+    },
+    refreshConsole: () => undefined,
+    setConsoleNavigator: () => undefined,
+    setDiscoverElement: (element) => {
+      discoverElement = element;
+      syncDiscoverElementPresentation();
+      xrDiscoverSurface?.setElement(element);
+    },
+    setDiscoverVisibility: (open) => {
+      setDiscoverOpen(open);
+      if (isInXr && activeImmersiveMode === "vr") xrDiscoverSurface?.setVisible(open);
     },
     suspendRendering,
     xrCamera: () => xr?.baseExperience.camera ?? null,
@@ -1080,8 +1100,11 @@ const createSceneHost = (canvas: HTMLCanvasElement): SceneHost => {
       currentScope?.dispose();
       currentWorld = null;
       currentScope = null;
-      xrConsole?.dispose();
-      xrConsole = null;
+      discoverListeners.clear();
+      xrDiscoverSurface?.dispose();
+      xrDiscoverSurface = null;
+      xrMovement = null;
+      discoverElement = null;
       xr?.dispose();
       xr = null;
       looping = false;

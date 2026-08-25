@@ -27,6 +27,7 @@ interface DiscoverScreenProps {
   onSelectPlanet: (planet: ExoplanetProfile, cached: boolean) => void;
   onSelectRegion: (region: SolarRegionProfile) => void;
   onSelectStar: (star: StarProfile, cached: boolean) => void;
+  surfaceRef?: (element: HTMLDialogElement | null) => void;
 }
 
 const sections: readonly {
@@ -114,6 +115,7 @@ export const DiscoverScreen = ({
   onSelectPlanet,
   onSelectRegion,
   onSelectStar,
+  surfaceRef,
 }: DiscoverScreenProps) => {
   const [section, setSection] = useState<DiscoverSection>(initialSection);
   const closeRef = useRef<HTMLButtonElement>(null);
@@ -137,6 +139,11 @@ export const DiscoverScreen = ({
       previousFocus?.focus();
     };
   }, [onClose]);
+
+  useEffect(() => {
+    surfaceRef?.(dialogRef.current);
+    return () => surfaceRef?.(null);
+  }, [surfaceRef]);
 
   const copy = sectionCopy[section];
 

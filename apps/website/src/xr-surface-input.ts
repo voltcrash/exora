@@ -1,0 +1,32 @@
+export interface SurfaceRect {
+  height: number;
+  left: number;
+  top: number;
+  width: number;
+}
+
+/** Maps Babylon's bottom-left texture coordinates into the browser's top-left client space. */
+export const texturePointToClient = (
+  u: number,
+  v: number,
+  rect: SurfaceRect,
+): { x: number; y: number } => ({
+  x: rect.left + Math.min(1, Math.max(0, u)) * rect.width,
+  y: rect.top + (1 - Math.min(1, Math.max(0, v))) * rect.height,
+});
+
+/** Converts a controller hit on a range input into the value the desktop control would choose. */
+export const rangeValueAtClientX = (
+  clientX: number,
+  rect: Pick<SurfaceRect, "left" | "width">,
+  minimum: number,
+  maximum: number,
+  step: number,
+): number => {
+  if (maximum <= minimum || rect.width <= 0) return minimum;
+  const ratio = Math.min(1, Math.max(0, (clientX - rect.left) / rect.width));
+  const raw = minimum + ratio * (maximum - minimum);
+  if (!Number.isFinite(step) || step <= 0) return raw;
+  const stepped = minimum + Math.round((raw - minimum) / step) * step;
+  return Math.min(maximum, Math.max(minimum, stepped));
+};

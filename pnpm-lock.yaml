@@ -48,6 +48,9 @@ catalogs:
     iwer:
       specifier: ^2.3.0
       version: 2.3.0
+    modern-screenshot:
+      specifier: ^4.7.0
+      version: 4.7.0
     playwright:
       specifier: ^1.62.1
       version: 1.62.1
@@ -145,6 +148,9 @@ importers:
       '@vercel/speed-insights':
         specifier: 'catalog:'
         version: 2.0.0(react@19.2.8)
+      modern-screenshot:
+        specifier: 'catalog:'
+        version: 4.7.0
       react:
         specifier: 'catalog:'
         version: 19.2.8
@@ -2898,6 +2904,9 @@ packages:
     resolution: {integrity: sha512-vVqVZQyf3WLx2Shd0qJ9xuvqgAyKPLAiqITEtqW0oIUjzo3PePDd6fW9iFz30ef7Ysp/oiWqbhszeGWW2T6Gzw==}
     engines: {node: '>=10'}
     hasBin: true
+
+  modern-screenshot@4.7.0:
+    resolution: {integrity: sha512-9YxN+ddPSMMlhylOv25VHzXrl9u67QRxoh7+SEewGtgUw7t6hHTrjptSDJUSne9oG4Xk/h2cwG15nIt4Hc9ujg==}
 
   mri@1.2.0:
     resolution: {integrity: sha512-tzzskb3bG8LvYGFF/mDTpq3jpI6Q9wc3LEmBaghu+DdCssd1FakN7Bc0hVNmEyGq1bq3RgfkCb3cmQLpNPOroA==}
@@ -6419,6 +6428,8 @@ snapshots:
       minimist: 1.2.8
 
   mkdirp@1.0.4: {}
+
+  modern-screenshot@4.7.0: {}
 
   mri@1.2.0: {}
 

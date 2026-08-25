@@ -159,6 +159,12 @@ export const App = () => {
     status: sceneHostStatus,
   } = useSceneHost(canvas);
   const [discoverOpen, setDiscoverOpen] = useState(false);
+  useEffect(() => sceneHost?.onDiscoverVisibility(setDiscoverOpen), [sceneHost]);
+  useEffect(() => sceneHost?.setDiscoverVisibility(discoverOpen), [discoverOpen, sceneHost]);
+  const discoverSurfaceRef = useCallback(
+    (element: HTMLDialogElement | null): void => sceneHost?.setDiscoverElement(element),
+    [sceneHost],
+  );
   const [activeObject, setActiveObject] = useState<ActiveObject | null>(() => {
     const parameters = new URLSearchParams(window.location.search);
     return parameters.has("blackHole") ||
@@ -190,7 +196,10 @@ export const App = () => {
   // being rendered for nobody. Parking the loop gives that work back to the interface.
   const overlayOpen = discoverOpen;
   useEffect(() => {
-    if (!sceneHost || !overlayOpen) return;
+    // In immersive VR the Discover dialog is the source texture for a Babylon surface. Parking
+    // the renderer there would freeze the very window the wearer just opened; this optimization
+    // is only for the flat page, where the DOM dialog itself owns the display.
+    if (!sceneHost || !overlayOpen || sceneHost.isInXr()) return;
     return sceneHost.suspendRendering();
   }, [overlayOpen, sceneHost]);
 
@@ -421,41 +430,6 @@ export const App = () => {
     });
   }, []);
 
-  /**
-   * The console's catalog, wired to the page rather than to the world in front of it.
-   *
-   * Registered here because these journeys belong to Exora, not to whichever destination
-   * happens to be mounted: a wearer browsing the archive from a comet is asking the page to take
-   * them somewhere, exactly as they would be from a planet. The renderer only reaches for these
-   * where the current world has nothing of its own to say. See `ConsoleNavigator`.
-   */
-  useEffect(
-    () =>
-      sceneHost?.setConsoleNavigator({
-        onForgePlanet: generatePlanet,
-        onForgeStar: generateStar,
-        onTravelAsteroid: selectAsteroid,
-        onTravelBlackHole: selectBlackHole,
-        onTravelComet: selectComet,
-        onTravelMission: selectMission,
-        onTravelPlanet: (planet) => selectPlanet(planet, false),
-        onTravelRegion: selectRegion,
-        onTravelStar: (star) => selectStar(star, false),
-      }),
-    [
-      generatePlanet,
-      generateStar,
-      sceneHost,
-      selectAsteroid,
-      selectBlackHole,
-      selectComet,
-      selectMission,
-      selectPlanet,
-      selectRegion,
-      selectStar,
-    ],
-  );
-
   const returnHome = useCallback((): void => {
     window.history.replaceState({}, "", "/");
     setCustomRecipe(null);
@@ -680,6 +654,7 @@ export const App = () => {
             onSelectPlanet={selectPlanet}
             onSelectRegion={selectRegion}
             onSelectStar={selectStar}
+            surfaceRef={discoverSurfaceRef}
           />
         </Suspense>
       ) : null}
