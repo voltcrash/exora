@@ -51,6 +51,10 @@ test("AR makes the page transparent and places from the XR select event", () => 
   expect(getComputedStyle(document.documentElement).backgroundColor).toBe("rgba(0, 0, 0, 0)");
   expect(getComputedStyle(app).backgroundColor).toBe("rgba(0, 0, 0, 0)");
 
+  const immersivePinch = new Event("gesturestart", { bubbles: true, cancelable: true });
+  document.dispatchEvent(immersivePinch);
+  expect(immersivePinch.defaultPrevented).toBe(true);
+
   const stablePosition = new Vector3(1, 2, 3);
   hitResults.notifyObservers([
     {
@@ -75,6 +79,9 @@ test("AR makes the page transparent and places from the XR select event", () => 
   presentation.end();
   expect(scene.clearColor.a).toBe(1);
   expect(document.documentElement.dataset.presentationMode).toBeUndefined();
+  const ordinaryPinch = new Event("gesturestart", { bubbles: true, cancelable: true });
+  document.dispatchEvent(ordinaryPinch);
+  expect(ordinaryPinch.defaultPrevented).toBe(false);
 
   presentation.dispose();
   scene.dispose();

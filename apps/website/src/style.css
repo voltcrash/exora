@@ -690,6 +690,14 @@ body[data-presentation-mode="ar"] #render-canvas {
   background: transparent !important;
 }
 
+html[data-presentation-mode="ar"],
+body[data-presentation-mode="ar"],
+body[data-presentation-mode="ar"] #ar-overlay,
+body[data-presentation-mode="ar"] #render-canvas {
+  overscroll-behavior: none;
+  touch-action: none;
+}
+
 /*
  * The only DOM sent into an immersive AR overlay. The page HUD remains on the flat browser page;
  * this transparent strip supplies placement guidance without covering the real camera feed or

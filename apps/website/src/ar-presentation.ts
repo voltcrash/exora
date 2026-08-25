@@ -68,6 +68,22 @@ export const createArPresentation = (scene: Scene): ArPresentation => {
   let xrSession: XRSession | null = null;
   let previousClearAlpha = scene.clearColor.a;
 
+  const preventGestureZoom = (event: Event): void => event.preventDefault();
+  const preventTouchPinchZoom = (event: TouchEvent): void => {
+    if (event.touches.length > 1) event.preventDefault();
+  };
+
+  const setPageZoomGuard = (enabled: boolean): void => {
+    const method = enabled ? "addEventListener" : "removeEventListener";
+    document[method]("gesturestart", preventGestureZoom, { capture: true, passive: false });
+    document[method]("gesturechange", preventGestureZoom, { capture: true, passive: false });
+    document[method]("gestureend", preventGestureZoom, { capture: true, passive: false });
+    document[method]("touchmove", preventTouchPinchZoom as EventListener, {
+      capture: true,
+      passive: false,
+    });
+  };
+
   const placeAtLatestHit = (): void => {
     if (!latestHit || !currentWorld || currentWorld.isPlaced()) return;
     currentWorld.place(latestHit);
@@ -105,6 +121,7 @@ export const createArPresentation = (scene: Scene): ArPresentation => {
     latestHit = null;
     reticle.setEnabled(false);
     overlay.hidden = true;
+    setPageZoomGuard(false);
     delete document.documentElement.dataset.presentationMode;
     delete document.body.dataset.presentationMode;
   };
@@ -119,6 +136,7 @@ export const createArPresentation = (scene: Scene): ArPresentation => {
       previousClearAlpha = scene.clearColor.a;
       scene.clearColor.a = 0;
       overlay.hidden = false;
+      setPageZoomGuard(true);
       guidance.textContent = instruction(false);
       document.documentElement.dataset.presentationMode = "ar";
       document.body.dataset.presentationMode = "ar";
