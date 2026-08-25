@@ -19,6 +19,7 @@ The system diorama is where that discipline is most visible, because a picture o
 - **One resolved star implementation:** Photosphere with multi-scale convection, a supergranular magnetic network, limb-brightened faculae, deterministic starspots, limb darkening, corona, and glare — shared by the star scene and by every host star hanging in a planet's sky.
 - **World Forge:** A two-mode builder for procedural planets and custom stars, seeded and reproducible, using the same recipe engine as the catalog.
 - **Persistent immersive session:** The engine, scene, camera, and WebXR session outlive any single destination. Travelling between a system, a world in it, that world's surface, and the host star swaps the contents of one scene instead of rebuilding the context, so the headset never drops back to the flat page.
+- **iPhone and Android AR:** The same immersive control prefers the established Meta Quest VR session, selects native `immersive-ar` on an AR-only phone, and uses Variant Launch's App Clip handoff on iPhone. AR presents the existing Babylon world at tabletop scale over camera passthrough, with hit-tested placement, drag repositioning, and pinch scaling — no GLB or USDZ export path.
 - **In-headset console:** A holographic panel that rebuilds every browser dialog as a page in VR — collection browsing, an in-world keyboard for search, the archive's own numbers for the object in front of you, the World Forge, and travel — so nothing requires taking the headset off.
 - **Adaptive rendering budget:** Separate desktop, mobile, and Quest profiles govern shader octaves, sphere tessellation, star count, texture detail, and render scale. Immersive sessions raise fixed foveation after three seconds below 62 FPS and relax it again above 70.
 - **Desktop WebXR emulation:** An opt-in Immersive Web Emulation Runtime installs a synthetic Quest over `navigator.xr`, so the immersive path runs unmodified in a normal tab.
@@ -85,7 +86,7 @@ When `DATABASE_URL` is present the API serves lookups and searches from Postgres
 
 WebXR requires a secure context. Localhost works for desktop development, but testing from a Quest on the local network needs HTTPS or a deployed origin.
 
-To exercise the immersive flow without a headset, open <http://localhost:5173/?xr=emulate>; `?xr=stereo` renders both eyes side by side and `?xr=off` returns to the native runtime. See the [desktop WebXR emulation guide](docs/webxr-emulation.md), and use the [Meta Quest smoke-test checklist](docs/quest-testing.md) for headset validation and performance targets.
+To exercise the immersive VR flow without a headset, open <http://localhost:5173/?xr=emulate>; `?xr=stereo` renders both eyes side by side and `?xr=off` returns to the native runtime. See the [desktop WebXR emulation guide](docs/webxr-emulation.md), use the [Meta Quest smoke-test checklist](docs/quest-testing.md) for headset validation and performance targets, and follow the [iPhone AR deployment and smoke-test guide](docs/iphone-ar.md) for Variant Launch configuration and real-device testing.
 
 ## Workspace
 
@@ -113,6 +114,7 @@ flowchart TB
     subgraph Clients
         Desktop["Desktop browser<br/>orbit controls"]
         Headset["Meta Quest<br/>WebXR immersive session"]
+        Phone["iPhone / Android<br/>WebXR AR session"]
     end
 
     subgraph Browser["Browser runtime"]
@@ -139,6 +141,7 @@ flowchart TB
 
     Desktop --> Static
     Headset --> Static
+    Phone --> Static
     Static --> UI
     UI --> Host
     Host --> Console
