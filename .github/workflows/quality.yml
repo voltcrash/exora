@@ -36,7 +36,7 @@ jobs:
         run: vp run -r test
 
       - name: Install browser used by the journey suite
-        run: vp exec --filter website -- playwright install --with-deps chromium
+        run: vp exec --filter website -- playwright install --with-deps chromium webkit
 
       - name: Run browser tests
         run: vp run website#test:browser
