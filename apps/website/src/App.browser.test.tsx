@@ -876,9 +876,8 @@ test("Tab toggles the interface away and back, and only on the main screen", asy
   mountApp();
   await expect.element(page.getByRole("heading", { level: 1 })).toBeVisible();
 
-  // Both instances offer the control: only a touch-only device is refused it, and neither of
-  // these emulates one. What the phone instance adds is that the button loses its copy at that
-  // width, so it resolves by name here only because it carries an aria-label.
+  // Both instances offer the control. What the phone instance adds is that the button loses its
+  // copy at that width, so it resolves by name here only because it carries an aria-label.
   const clearView = page.getByRole("button", { name: "Hide the interface" });
   await expect.element(clearView).toBeVisible();
 
@@ -888,12 +887,23 @@ test("Tab toggles the interface away and back, and only on the main screen", asy
   const panels = [".topbar", ".hud", ".mission-control"].map((selector) => {
     const panel = document.querySelector<HTMLElement>(selector);
     expect(panel, selector).not.toBeNull();
-    return panel!;
+    return { panel: panel!, selector };
   });
+  const mobile = window.innerWidth <= 760;
+  const expectCleared = async (): Promise<void> => {
+    for (const { panel, selector } of panels) {
+      if (mobile && selector === ".mission-control") await expect.element(panel).toBeVisible();
+      else await expect.element(panel).not.toBeVisible();
+    }
+  };
 
-  // The button and the key do the same thing, so the button goes first and the key brings it back.
+  // The button goes first. A phone keeps that one control visible so touch can bring the chrome
+  // back; desktop has Tab and clears the entire deck.
   await userEvent.click(clearView);
-  for (const panel of panels) await expect.element(panel).not.toBeVisible();
+  await expectCleared();
+  if (mobile) {
+    await expect.element(page.getByRole("button", { name: "Show the interface" })).toBeVisible();
+  }
 
   // Discover remains reachable when the chrome is hidden, and closing it returns to that same
   // uncluttered renderer rather than silently restoring the panels behind it.
@@ -901,17 +911,20 @@ test("Tab toggles the interface away and back, and only on the main screen", asy
   await expect.element(page.getByRole("dialog")).toBeVisible();
   await userEvent.keyboard("{Backspace}");
   await expect.element(page.getByRole("dialog")).not.toBeInTheDocument();
-  for (const panel of panels) await expect.element(panel).not.toBeVisible();
+  await expectCleared();
 
-  await userEvent.keyboard("{Tab}");
-  for (const panel of panels) await expect.element(panel).toBeVisible();
+  if (mobile) await userEvent.click(page.getByRole("button", { name: "Show the interface" }));
+  else await userEvent.keyboard("{Tab}");
+  for (const { panel } of panels) await expect.element(panel).toBeVisible();
 
-  // …and the same key takes them away again, which is the half a one-way restore key never had.
-  await userEvent.keyboard("{Tab}");
-  for (const panel of panels) await expect.element(panel).not.toBeVisible();
+  // …and the same control takes them away again, which is the half a one-way action never had.
+  if (mobile) await userEvent.click(page.getByRole("button", { name: "Hide the interface" }));
+  else await userEvent.keyboard("{Tab}");
+  await expectCleared();
 
-  await userEvent.keyboard("{Tab}");
-  for (const panel of panels) await expect.element(panel).toBeVisible();
+  if (mobile) await userEvent.click(page.getByRole("button", { name: "Show the interface" }));
+  else await userEvent.keyboard("{Tab}");
+  for (const { panel } of panels) await expect.element(panel).toBeVisible();
 });
 
 test("terrain view fades every interface region and reveals the hovered one", async () => {
@@ -922,6 +935,9 @@ test("terrain view fades every interface region and reveals the hovered one", as
   const shell = document.querySelector<HTMLElement>(".experience-shell");
   expect(shell).not.toBeNull();
   shell!.classList.replace("view-orbit", "view-surface");
+  const canvas = document.querySelector<HTMLCanvasElement>("canvas");
+  expect(canvas).not.toBeNull();
+  await userEvent.hover(canvas!);
   await new Promise((resolve) => window.setTimeout(resolve, 300));
 
   const regions = document.querySelectorAll<HTMLElement>(

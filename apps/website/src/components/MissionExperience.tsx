@@ -16,7 +16,7 @@ interface MissionExperienceProps {
   chromeHidden: boolean;
   host: SceneHost | null;
   mission: SolarMissionProfile;
-  onHideChrome: () => void;
+  onToggleChrome: () => void;
   onOpenParent: (parent: SolarMissionProfile["parent"]) => void;
   onOpenDiscover: () => void;
   travelPhase: TravelPhase;
@@ -30,7 +30,7 @@ export const MissionExperience = ({
   chromeHidden,
   host,
   mission,
-  onHideChrome,
+  onToggleChrome,
   onOpenParent,
   onOpenDiscover,
   travelPhase,
@@ -275,11 +275,12 @@ export const MissionExperience = ({
         </aside>
       </main>
       <MissionControl
+        chromeHidden={chromeHidden}
         hints={[
           { key: "DRAG", meaning: "ORBIT" },
           { key: "SCROLL", meaning: "SCALE" },
         ]}
-        onHideChrome={onHideChrome}
+        onToggleChrome={onToggleChrome}
         onOpenDiscover={onOpenDiscover}
         sceneFailed={sceneState === "error"}
       />

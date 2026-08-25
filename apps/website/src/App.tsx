@@ -251,8 +251,9 @@ export const App = () => {
   }, [discoverOpen, onMainScreen]);
 
   // Tab puts the interface away and brings it back. It is the whole of the way back, because the
-  // button that hides the interface is hidden along with it — which is why that button wears the
-  // key on its face, the way the Discover trigger wears its deletion-key symbol.
+  // desktop button that hides the interface is hidden along with it — which is why that button
+  // wears the key on its face, the way the Discover trigger wears its deletion-key symbol. On a
+  // touch screen the same button remains available as the way back.
   //
   // Taking the browser's focus key is only defensible taken narrowly, so `togglesClearView`
   // declines everywhere the key already means something: over a dialog, inside a text field, in a
@@ -432,6 +433,7 @@ export const App = () => {
   }, []);
 
   const closeDiscover = useCallback((): void => setDiscoverOpen(false), []);
+  const toggleChrome = useCallback((): void => setChromeHidden((hidden) => !hidden), []);
 
   const subject =
     activeObject && activeObject.type !== "missing"
@@ -521,7 +523,7 @@ export const App = () => {
             blackHole={activeObject.blackHole}
             chromeHidden={chromeHidden}
             host={sceneHost}
-            onHideChrome={() => setChromeHidden(true)}
+            onToggleChrome={toggleChrome}
             onOpenDiscover={openDiscover}
             travelPhase={travelPhase}
           />
@@ -532,7 +534,7 @@ export const App = () => {
           asteroid={activeObject.asteroid}
           chromeHidden={chromeHidden}
           host={sceneHost}
-          onHideChrome={() => setChromeHidden(true)}
+          onToggleChrome={toggleChrome}
           onOpenDiscover={openDiscover}
           onSelectAsteroid={selectAsteroid}
           onSelectStar={selectStar}
@@ -544,7 +546,7 @@ export const App = () => {
           chromeHidden={chromeHidden}
           comet={activeObject.comet}
           host={sceneHost}
-          onHideChrome={() => setChromeHidden(true)}
+          onToggleChrome={toggleChrome}
           onOpenDiscover={openDiscover}
           onSelectPlanet={selectPlanet}
           onSelectStar={selectStar}
@@ -556,7 +558,7 @@ export const App = () => {
             key={activeObject.region.id}
             chromeHidden={chromeHidden}
             host={sceneHost}
-            onHideChrome={() => setChromeHidden(true)}
+            onToggleChrome={toggleChrome}
             onOpenDiscover={openDiscover}
             onSelectStar={selectStar}
             region={activeObject.region}
@@ -570,7 +572,7 @@ export const App = () => {
             chromeHidden={chromeHidden}
             host={sceneHost}
             mission={activeObject.mission}
-            onHideChrome={() => setChromeHidden(true)}
+            onToggleChrome={toggleChrome}
             onOpenParent={openMissionParent}
             onOpenDiscover={openDiscover}
             travelPhase={travelPhase}
@@ -584,7 +586,7 @@ export const App = () => {
           result={activeObject.result}
           onGeneratePlanet={generatePlanet}
           onGenerateStar={generateStar}
-          onHideChrome={() => setChromeHidden(true)}
+          onToggleChrome={toggleChrome}
           onOpenDiscover={openDiscover}
           onSelectHostStar={selectHostStar}
           onSelectPlanet={selectPlanet}
@@ -602,7 +604,7 @@ export const App = () => {
             result={activeObject.result}
             onGeneratePlanet={generatePlanet}
             onGenerateStar={generateStar}
-            onHideChrome={() => setChromeHidden(true)}
+            onToggleChrome={toggleChrome}
             onSelectHostStar={selectHostStar}
             onSelectPlanet={selectPlanet}
             onSelectStar={selectStar}
@@ -620,7 +622,7 @@ export const App = () => {
             systemHostName={systemHostName}
             onGeneratePlanet={generatePlanet}
             onGenerateStar={generateStar}
-            onHideChrome={() => setChromeHidden(true)}
+            onToggleChrome={toggleChrome}
             onSelectPlanet={selectPlanet}
             onSelectStar={selectStar}
             onSelectSystem={selectSystem}

@@ -16,9 +16,10 @@ export interface ControlHint {
 }
 
 interface MissionControlProps {
+  chromeHidden: boolean;
   /** The legend for this view: every gesture the scene answers to, in reading order. */
   hints: ControlHint[];
-  onHideChrome: () => void;
+  onToggleChrome: () => void;
   onOpenDiscover: () => void;
   /** Whether the world under the deck failed to build. */
   sceneFailed: boolean;
@@ -40,8 +41,9 @@ interface MissionControlProps {
  * replaces it, sit outside the deck as copy rather than as cells that look pressable and are not.
  */
 export const MissionControl = ({
+  chromeHidden,
   hints,
-  onHideChrome,
+  onToggleChrome,
   onOpenDiscover,
   sceneFailed,
   xr,
@@ -74,13 +76,14 @@ export const MissionControl = ({
         <button
           className="clear-view"
           type="button"
-          aria-label="Hide the interface"
-          onClick={onHideChrome}
+          aria-label={chromeHidden ? "Show the interface" : "Hide the interface"}
+          aria-pressed={chromeHidden}
+          onClick={onToggleChrome}
         >
           <span className="clear-view-mark" aria-hidden="true" />
           <span>
-            <small>CLEAR VIEW</small>
-            <strong>HIDE INTERFACE</strong>
+            <small>{chromeHidden ? "RESTORE VIEW" : "CLEAR VIEW"}</small>
+            <strong>{chromeHidden ? "SHOW INTERFACE" : "HIDE INTERFACE"}</strong>
           </span>
           <kbd className="shortcut-icon" aria-label="Tab">
             ⇥

@@ -10,7 +10,7 @@ import { MissionControl } from "./MissionControl.tsx";
 interface RegionExperienceProps {
   chromeHidden: boolean;
   host: SceneHost | null;
-  onHideChrome: () => void;
+  onToggleChrome: () => void;
   onOpenDiscover: () => void;
   onSelectStar: (star: StarProfile, cached: boolean) => void;
   region: SolarRegionProfile;
@@ -23,7 +23,7 @@ const distanceLabel = (value: number): string =>
 export const RegionExperience = ({
   chromeHidden,
   host,
-  onHideChrome,
+  onToggleChrome,
   onOpenDiscover,
   onSelectStar,
   region,
@@ -167,11 +167,12 @@ export const RegionExperience = ({
         </aside>
       </main>
       <MissionControl
+        chromeHidden={chromeHidden}
         hints={[
           { key: "DRAG", meaning: "ORBIT" },
           { key: "SCROLL", meaning: "SCALE" },
         ]}
-        onHideChrome={onHideChrome}
+        onToggleChrome={onToggleChrome}
         onOpenDiscover={onOpenDiscover}
         sceneFailed={sceneState === "error"}
       />

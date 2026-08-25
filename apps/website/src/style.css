@@ -2193,9 +2193,9 @@ h1 em {
 /*
  * The way to put the interface away and be left with the sky.
  *
- * It advertises Tab with a `<kbd>` the way Discover advertises Backspace, and that chip is
- * the whole affordance: pressing it hides this button along with everything else, so the key has
- * to have been read before the click. Tab toggles from either side. See `.chrome-hidden`.
+ * It advertises Tab with a `<kbd>` the way Discover advertises Backspace. Desktop clears this
+ * button with everything else and uses that key to restore the interface; mobile keeps the compact
+ * button itself as the touch-accessible way back. See `.chrome-hidden`.
  */
 .clear-view,
 .enter-vr {
@@ -6056,15 +6056,33 @@ h1 em {
 }
 
 /*
- * Tab is the only way back out of a cleared view, so the button that clears it is not offered
- * where there is no key to press. A touch-only device would be left holding a hidden interface
- * with nothing on screen to restore it, and the way out would be reloading the page.
+ * A touch screen has no Tab key, so clear view remains a compact toggle there. Once pressed, its
+ * parent panel comes back alone: every other control stays out of the canvas until this button is
+ * pressed again. Travel still wins, so the restore control cannot float over a world change.
  */
-@media (pointer: coarse) and (hover: none) {
-  /* The cell goes with it: an empty cell is still a seam — a rule drawn down the side of the deck
-     with nothing beyond it. */
-  .deck-utility {
+@media (max-width: 760px), (pointer: coarse) and (hover: none) {
+  .chrome-hidden:not(.travelling) .mission-control {
+    visibility: visible;
+    opacity: 1;
+  }
+
+  .chrome-hidden .mission-control > :not(.control-deck),
+  .chrome-hidden .control-deck > :not(.deck-utility) {
     display: none;
+  }
+
+  .chrome-hidden .control-deck {
+    padding: 0;
+    border: 0;
+    background: none;
+    backdrop-filter: none;
+    box-shadow: none;
+  }
+
+  .chrome-hidden .clear-view {
+    border-color: rgb(139 230 234 / 45%);
+    background: rgb(8 22 25 / 82%);
+    backdrop-filter: blur(16px);
   }
 }
 

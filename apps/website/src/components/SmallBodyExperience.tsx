@@ -13,7 +13,7 @@ interface SmallBodyExperienceProps {
   asteroid: AsteroidProfile;
   chromeHidden: boolean;
   host: SceneHost | null;
-  onHideChrome: () => void;
+  onToggleChrome: () => void;
   onOpenDiscover: () => void;
   onSelectAsteroid: (asteroid: AsteroidProfile) => void;
   onSelectStar: (star: StarProfile, cached: boolean) => void;
@@ -29,7 +29,7 @@ export const SmallBodyExperience = ({
   asteroid,
   chromeHidden,
   host,
-  onHideChrome,
+  onToggleChrome,
   onOpenDiscover,
   onSelectAsteroid,
   onSelectStar,
@@ -224,11 +224,12 @@ export const SmallBodyExperience = ({
       </main>
 
       <MissionControl
+        chromeHidden={chromeHidden}
         hints={[
           { key: "DRAG", meaning: "ORBIT" },
           { key: "SCROLL", meaning: "SCALE" },
         ]}
-        onHideChrome={onHideChrome}
+        onToggleChrome={onToggleChrome}
         onOpenDiscover={onOpenDiscover}
         sceneFailed={sceneState === "error"}
         xr={{ host, status: xrStatus }}

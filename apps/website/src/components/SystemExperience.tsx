@@ -23,7 +23,7 @@ interface SystemExperienceProps {
   host: SceneHost | null;
   onGeneratePlanet: (world: CustomWorld) => void;
   onGenerateStar: (star: CustomStar) => void;
-  onHideChrome: () => void;
+  onToggleChrome: () => void;
   onOpenDiscover: () => void;
   onSelectHostStar: (hostStar: string) => Promise<boolean>;
   onSelectPlanet: (planet: ExoplanetProfile, cached: boolean) => void;
@@ -58,7 +58,7 @@ export const SystemExperience = ({
   host,
   onGeneratePlanet,
   onGenerateStar,
-  onHideChrome,
+  onToggleChrome,
   onOpenDiscover,
   onSelectHostStar,
   onSelectPlanet,
@@ -505,12 +505,13 @@ export const SystemExperience = ({
       </main>
 
       <MissionControl
+        chromeHidden={chromeHidden}
         hints={[
           { key: "DRAG", meaning: "ORBIT" },
           { key: "SCROLL", meaning: "ZOOM" },
           { key: "CLICK", meaning: "TRAVEL" },
         ]}
-        onHideChrome={onHideChrome}
+        onToggleChrome={onToggleChrome}
         onOpenDiscover={onOpenDiscover}
         sceneFailed={sceneState === "error"}
         xr={{ host, status: xrStatus }}

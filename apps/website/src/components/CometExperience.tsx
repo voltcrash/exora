@@ -11,7 +11,7 @@ interface CometExperienceProps {
   chromeHidden: boolean;
   comet: CometProfile;
   host: SceneHost | null;
-  onHideChrome: () => void;
+  onToggleChrome: () => void;
   onOpenDiscover: () => void;
   onSelectPlanet: (planet: ExoplanetProfile, cached: boolean) => void;
   onSelectStar: (star: StarProfile, cached: boolean) => void;
@@ -22,7 +22,7 @@ export const CometExperience = ({
   chromeHidden,
   comet,
   host,
-  onHideChrome,
+  onToggleChrome,
   onOpenDiscover,
   onSelectPlanet,
   onSelectStar,
@@ -211,11 +211,12 @@ export const CometExperience = ({
         </aside>
       </main>
       <MissionControl
+        chromeHidden={chromeHidden}
         hints={[
           { key: "DRAG", meaning: "ORBIT" },
           { key: "SCROLL", meaning: "SCALE" },
         ]}
-        onHideChrome={onHideChrome}
+        onToggleChrome={onToggleChrome}
         onOpenDiscover={onOpenDiscover}
         sceneFailed={sceneState === "error"}
       />

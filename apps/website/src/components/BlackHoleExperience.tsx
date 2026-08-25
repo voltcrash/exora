@@ -14,7 +14,7 @@ interface BlackHoleExperienceProps {
   blackHole: BlackHoleProfile;
   chromeHidden: boolean;
   host: SceneHost | null;
-  onHideChrome: () => void;
+  onToggleChrome: () => void;
   onOpenDiscover: () => void;
   travelPhase: TravelPhase;
 }
@@ -56,7 +56,7 @@ export const BlackHoleExperience = ({
   blackHole,
   chromeHidden,
   host,
-  onHideChrome,
+  onToggleChrome,
   onOpenDiscover,
   travelPhase,
 }: BlackHoleExperienceProps) => {
@@ -190,11 +190,12 @@ export const BlackHoleExperience = ({
       </main>
 
       <MissionControl
+        chromeHidden={chromeHidden}
         hints={[
           { key: "DRAG", meaning: "ORBIT" },
           { key: "SCROLL", meaning: "ZOOM" },
         ]}
-        onHideChrome={onHideChrome}
+        onToggleChrome={onToggleChrome}
         onOpenDiscover={onOpenDiscover}
         sceneFailed={sceneState === "error"}
         xr={{ host, status: xrStatus }}

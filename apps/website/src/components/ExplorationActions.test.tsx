@@ -41,7 +41,7 @@ const planetMarkup = (): string =>
       host={null}
       onGeneratePlanet={vi.fn()}
       onGenerateStar={vi.fn()}
-      onHideChrome={vi.fn()}
+      onToggleChrome={vi.fn()}
       onOpenDiscover={vi.fn()}
       onSelectHostStar={vi.fn()}
       onSelectPlanet={vi.fn()}
@@ -60,7 +60,7 @@ const starMarkup = (): string =>
       host={null}
       onGeneratePlanet={vi.fn()}
       onGenerateStar={vi.fn()}
-      onHideChrome={vi.fn()}
+      onToggleChrome={vi.fn()}
       onOpenDiscover={vi.fn()}
       onSelectPlanet={vi.fn()}
       onSelectStar={vi.fn()}
@@ -111,4 +111,29 @@ test("the star view gathers the same controls onto the same deck", () => {
 
 test("the same control is named the same way from either view", () => {
   expect(deckNames(planetMarkup())).toEqual(deckNames(starMarkup()));
+});
+
+test("the clear-view control becomes the way back when the interface is hidden", () => {
+  const markup = renderToStaticMarkup(
+    <PlanetExperience
+      chromeHidden
+      host={null}
+      onGeneratePlanet={vi.fn()}
+      onGenerateStar={vi.fn()}
+      onToggleChrome={vi.fn()}
+      onOpenDiscover={vi.fn()}
+      onSelectHostStar={vi.fn()}
+      onSelectPlanet={vi.fn()}
+      onSelectStar={vi.fn()}
+      onSelectSystem={vi.fn()}
+      recipeOverride={null}
+      result={{ cached: false, mode: "live", planet: featuredPlanet }}
+      travelPhase="idle"
+    />,
+  );
+
+  expect(deckNames(markup)).toContain("Show the interface");
+  expect(deckButtons(markup).find((button) => button.includes("Show the interface"))).toContain(
+    'aria-pressed="true"',
+  );
 });

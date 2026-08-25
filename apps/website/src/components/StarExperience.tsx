@@ -16,7 +16,7 @@ interface StarExperienceProps {
   host: SceneHost | null;
   onGeneratePlanet: (world: CustomWorld) => void;
   onGenerateStar: (star: CustomStar) => void;
-  onHideChrome: () => void;
+  onToggleChrome: () => void;
   onOpenDiscover: () => void;
   onSelectPlanet: (planet: ExoplanetProfile, cached: boolean) => void;
   onSelectStar: (star: StarProfile, cached: boolean) => void;
@@ -31,7 +31,7 @@ export const StarExperience = ({
   host,
   onGeneratePlanet,
   onGenerateStar,
-  onHideChrome,
+  onToggleChrome,
   onOpenDiscover,
   onSelectPlanet,
   onSelectStar,
@@ -370,11 +370,12 @@ export const StarExperience = ({
       </main>
 
       <MissionControl
+        chromeHidden={chromeHidden}
         hints={[
           { key: "DRAG", meaning: "ORBIT" },
           { key: "SCROLL", meaning: "ZOOM" },
         ]}
-        onHideChrome={onHideChrome}
+        onToggleChrome={onToggleChrome}
         onOpenDiscover={onOpenDiscover}
         sceneFailed={sceneState === "error"}
         xr={{ host, status: xrStatus }}
