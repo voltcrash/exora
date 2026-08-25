@@ -5,9 +5,13 @@ const xrButtonCopy: Record<XrStatus, string> = {
   checking: "CHECKING HEADSET",
   entering: "ENTERING SESSION",
   "in-xr": "SESSION ACTIVE",
-  ready: "ENTER IMMERSIVE VR",
+  "ready-ar": "PLACE IN YOUR SPACE",
+  "ready-ar-launch": "OPEN AR ON IPHONE",
+  "ready-vr": "ENTER IMMERSIVE VR",
   unavailable: "VR UNAVAILABLE",
 };
+
+const readyStatuses = new Set<XrStatus>(["ready-ar", "ready-ar-launch", "ready-vr"]);
 
 /** One key, and what it does to the scene under the deck. */
 export interface ControlHint {
@@ -101,8 +105,10 @@ export const MissionControl = ({
             // so the button's name has to come from somewhere the media query cannot reach. It
             // carries the status because the status is what the visible copy says.
             aria-label={`Immersive mode: ${xrButtonCopy[xr.status]}`}
-            disabled={xr.status !== "ready"}
-            onClick={() => void xr.host?.enterVr().catch((error: unknown) => console.error(error))}
+            disabled={!readyStatuses.has(xr.status)}
+            onClick={() =>
+              void xr.host?.enterImmersive().catch((error: unknown) => console.error(error))
+            }
           >
             <span className="button-orbit" aria-hidden="true" />
             <span>

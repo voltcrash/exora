@@ -4,6 +4,7 @@ import { expect, test, vi } from "vite-plus/test";
 import { featuredPlanet } from "../planet-profile.ts";
 import { PlanetExperience } from "./PlanetExperience.tsx";
 import { StarExperience } from "./StarExperience.tsx";
+import { MissionControl } from "./MissionControl.tsx";
 
 /**
  * Discover sheds its text on narrow phones and keeps only a decorative orbital mark. The name
@@ -111,6 +112,26 @@ test("the star view gathers the same controls onto the same deck", () => {
 
 test("the same control is named the same way from either view", () => {
   expect(deckNames(planetMarkup())).toEqual(deckNames(starMarkup()));
+});
+
+test.each([
+  ["ready-vr", "ENTER IMMERSIVE VR"],
+  ["ready-ar", "PLACE IN YOUR SPACE"],
+  ["ready-ar-launch", "OPEN AR ON IPHONE"],
+] as const)("the shared immersive control reflects the selected %s mode", (status, copy) => {
+  const markup = renderToStaticMarkup(
+    <MissionControl
+      chromeHidden={false}
+      hints={[]}
+      onOpenDiscover={vi.fn()}
+      onToggleChrome={vi.fn()}
+      sceneFailed={false}
+      xr={{ host: null, status }}
+    />,
+  );
+
+  expect(markup).toContain(copy);
+  expect(markup).not.toContain("disabled");
 });
 
 test("the clear-view control becomes the way back when the interface is hidden", () => {

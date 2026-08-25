@@ -134,6 +134,12 @@ const variantLaunchSdk = (key: string): Plugin => ({
       key
         ? [
             {
+              children:
+                "window.addEventListener('vlaunch-initialized',function(event){window.__exoraVariantLaunchDetail=event.detail;window.dispatchEvent(new Event('exora:variant-launch-ready'))})",
+              injectTo: "head" as const,
+              tag: "script",
+            },
+            {
               attrs: { src: `https://launchar.app/sdk/v1?key=${encodeURIComponent(key)}` },
               injectTo: "head" as const,
               tag: "script",

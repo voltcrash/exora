@@ -38,6 +38,7 @@ import { skyViewpointFrom } from "./sky-catalog.ts";
 import { createStellarSurface, type StellarSurface } from "./star-surface.ts";
 import { createStarfield } from "./star-visuals.ts";
 import { getSurfaceDetailTextures, surfaceDetailSelectionForPalette } from "./texture-cache.ts";
+import { markAsVirtualBackground } from "./world-presentation.ts";
 import {
   easeAway,
   easeSettle,
@@ -2010,10 +2011,12 @@ const createSurfaceSky = (
   // against it — but ground that ends up outside it is ground the sky can be drawn over, and
   // pinning the dome to the viewer puts the far side of an 82-unit patch well outside the
   // 90-unit radius it used to have.
-  const mesh = MeshBuilder.CreateSphere(
-    "surfaceSky",
-    { diameter: 1_400, segments: profile.tier === "desktop" ? 40 : 24 },
-    scene,
+  const mesh = markAsVirtualBackground(
+    MeshBuilder.CreateSphere(
+      "surfaceSky",
+      { diameter: 1_400, segments: profile.tier === "desktop" ? 40 : 24 },
+      scene,
+    ),
   );
   mesh.parent = parent;
   mesh.isPickable = false;

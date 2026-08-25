@@ -31,8 +31,11 @@ import "@babylonjs/core/XR/features/WebXRControllerMovement.js";
 import "@babylonjs/core/XR/features/WebXRControllerPointerSelection.js";
 import "@babylonjs/core/XR/features/WebXRControllerTeleportation.js";
 import "@babylonjs/core/XR/features/WebXRHandTracking.js";
+import "@babylonjs/core/XR/features/WebXRDOMOverlay.js";
+import "@babylonjs/core/XR/features/WebXRHitTest.js";
 import { WebXRFeatureName } from "@babylonjs/core/XR/webXRFeaturesManager.js";
 import { WebXRState } from "@babylonjs/core/XR/webXRTypes.js";
+import { createArPresentation } from "./ar-presentation.ts";
 import {
   adaptFixedFoveation,
   adaptHardwareScaling,
@@ -61,9 +64,24 @@ import {
   type TravelPhase,
 } from "./travel-transition.ts";
 import { createXrConsole, type XrConsole, type XrConsoleHost } from "./xr-console.ts";
+import {
+  chooseImmersiveDestination,
+  getVariantLaunchUrl,
+  onVariantLaunchReady,
+  type ImmersiveDestination,
+  type ImmersiveMode,
+} from "./variant-launch.ts";
 import { openWorldScope, type WorldScope } from "./world-scope.ts";
+import { VIRTUAL_BACKGROUND_LAYER_MASK } from "./world-presentation.ts";
 
-export type XrStatus = "checking" | "entering" | "in-xr" | "ready" | "unavailable";
+export type XrStatus =
+  | "checking"
+  | "entering"
+  | "in-xr"
+  | "ready-ar"
+  | "ready-ar-launch"
+  | "ready-vr"
+  | "unavailable";
 
 /** Locomotion speed inside a session, shared by every destination so travel never changes feel. */
 const XR_MOVE_SPEED = 2.2;
@@ -121,8 +139,9 @@ export interface SceneHost {
   /** Flies back to the view a jump left from, for a destination that turned out not to exist. */
   cancelTravel: () => void;
   dispose: () => void;
-  enterVr: () => Promise<void>;
+  enterImmersive: () => Promise<void>;
   getFps: () => number;
+  isArSupported: () => boolean;
   isInXr: () => boolean;
   isVrSupported: () => boolean;
   /**
@@ -245,6 +264,10 @@ const createSceneHost = (canvas: HTMLCanvasElement): SceneHost => {
   veil.renderingGroupId = 3;
   veil.setEnabled(false);
 
+  // AR presentation is host-owned just like the XR rig. Its reticle and DOM overlay therefore
+  // survive destination changes, while each world's transform wrapper is exchanged below.
+  const arPresentation = createArPresentation(scene);
+
   let veilAlpha = 0;
   let veilTarget = 0;
   let settleVeil: (() => void) | null = null;
@@ -280,7 +303,15 @@ const createSceneHost = (canvas: HTMLCanvasElement): SceneHost => {
     });
   };
 
+  let isArSupported = false;
   let isVrSupported = false;
+  let immersiveDestination: ImmersiveDestination = chooseImmersiveDestination({
+    ar: false,
+    launchUrl: getVariantLaunchUrl(),
+    vr: false,
+  });
+  let activeImmersiveMode: ImmersiveMode | null = null;
+  let xrCameraLayerMask = 0x0fff_ffff;
   let disposed = false;
   let xr: WebXRDefaultExperience | null = null;
   let xrConsole: XrConsole | null = null;
@@ -297,6 +328,21 @@ const createSceneHost = (canvas: HTMLCanvasElement): SceneHost => {
     xrStatus = next;
     for (const listener of statusListeners) listener(next);
   };
+
+  const readyXrStatus = (): XrStatus => {
+    if (!immersiveDestination) return "unavailable";
+    if (immersiveDestination.mode === "vr") return "ready-vr";
+    return immersiveDestination.launchUrl ? "ready-ar-launch" : "ready-ar";
+  };
+
+  const stopWatchingVariantLaunch = onVariantLaunchReady(() => {
+    immersiveDestination = chooseImmersiveDestination({
+      ar: isArSupported,
+      launchUrl: getVariantLaunchUrl(),
+      vr: isVrSupported,
+    });
+    if (!isInXr && xrStatus !== "entering") setXrStatus(readyXrStatus());
+  });
 
   let rendererStatus: RendererStatus = "ready";
   const rendererStatusListeners = new Set<(status: RendererStatus) => void>();
@@ -339,7 +385,7 @@ const createSceneHost = (canvas: HTMLCanvasElement): SceneHost => {
 
     // Inside an XR session this observer runs within the frame callback, which is the only place
     // the rig's pose may be read. The veil is still opaque here, so the move is never seen.
-    if (rigAwaitingWorld && isInXr) {
+    if (rigAwaitingWorld && isInXr && activeImmersiveMode === "vr") {
       rigAwaitingWorld = false;
       currentWorld?.focusXrRig(false);
       xrConsole?.recall();
@@ -360,7 +406,7 @@ const createSceneHost = (canvas: HTMLCanvasElement): SceneHost => {
 
     // Locomotion owns the XR rig after entry. Rewriting its position here causes visible
     // snap-backs on room-scale headsets, so only the head-locked console needs a frame update.
-    if (isInXr) xrConsole?.update(deltaSeconds);
+    if (isInXr && activeImmersiveMode === "vr") xrConsole?.update(deltaSeconds);
 
     qualitySampleSeconds += deltaSeconds;
     if (qualitySampleSeconds >= 3) {
@@ -697,6 +743,7 @@ const createSceneHost = (canvas: HTMLCanvasElement): SceneHost => {
       if (token !== mountToken || disposed) return null;
 
       currentWorld?.dispose();
+      arPresentation.setWorld(null);
       currentScope?.dispose();
       currentWorld = null;
       currentScope = null;
@@ -737,7 +784,8 @@ const createSceneHost = (canvas: HTMLCanvasElement): SceneHost => {
 
       currentScope = scope;
       currentWorld = world;
-      rigAwaitingWorld = isInXr;
+      arPresentation.setWorld(scope.presentation);
+      rigAwaitingWorld = isInXr && activeImmersiveMode === "vr";
       xrConsole?.refresh();
       void fadeVeil(0);
       arriveAtWorld(token);
@@ -802,9 +850,10 @@ const createSceneHost = (canvas: HTMLCanvasElement): SceneHost => {
       xrConsole.attach(createdXr);
 
       // The rig lands wherever the headset happens to face, so the view has to be aimed at the
-      // subject; otherwise the session opens on empty starfield and looks broken.
+      // subject; otherwise a VR session opens on empty starfield and looks broken. AR must leave
+      // the tracked camera at the physical device pose, so its world moves instead of the rig.
       createdXr.baseExperience.onInitialXRPoseSetObservable.add(() => {
-        currentWorld?.focusXrRig(true);
+        if (activeImmersiveMode === "vr") currentWorld?.focusXrRig(true);
       });
 
       createdXr.baseExperience.onStateChangedObservable.add((state) => {
@@ -821,10 +870,11 @@ const createSceneHost = (canvas: HTMLCanvasElement): SceneHost => {
           if (createdXr.baseExperience.sessionManager.isFixedFoveationSupported) {
             createdXr.baseExperience.sessionManager.fixedFoveation = sessionFoveation;
           }
-          xrConsole?.setVisible(true);
+          xrConsole?.setVisible(activeImmersiveMode === "vr");
           setXrStatus("in-xr");
         }
         if (state === WebXRState.NOT_IN_XR) {
+          const endedMode = activeImmersiveMode;
           isInXr = false;
           // Back on the flat page, an overlay that outlived the session owns the screen again.
           if (suspensions > 0) stopRenderLoop();
@@ -837,22 +887,40 @@ const createSceneHost = (canvas: HTMLCanvasElement): SceneHost => {
           veilMaterial.alpha = 0;
           veil.setEnabled(false);
           resolveVeil();
+          if (endedMode === "ar") {
+            arPresentation.end();
+            createdXr.baseExperience.camera.layerMask = xrCameraLayerMask;
+            createdXr.baseExperience.featuresManager.disableFeature(WebXRFeatureName.HIT_TEST);
+            createdXr.baseExperience.featuresManager.disableFeature(WebXRFeatureName.DOM_OVERLAY);
+          }
+          activeImmersiveMode = null;
           currentWorld?.restoreDesktopView();
-          setXrStatus(isVrSupported ? "ready" : "unavailable");
+          setXrStatus(readyXrStatus());
         }
       });
 
-      isVrSupported =
-        await createdXr.baseExperience.sessionManager.isSessionSupportedAsync("immersive-vr");
+      [isArSupported, isVrSupported] = await Promise.all([
+        createdXr.baseExperience.sessionManager
+          .isSessionSupportedAsync("immersive-ar")
+          .catch(() => false),
+        createdXr.baseExperience.sessionManager
+          .isSessionSupportedAsync("immersive-vr")
+          .catch(() => false),
+      ]);
+      immersiveDestination = chooseImmersiveDestination({
+        ar: isArSupported,
+        launchUrl: getVariantLaunchUrl(),
+        vr: isVrSupported,
+      });
       if (disposed) {
         createdXr.dispose();
         if (xr === createdXr) xr = null;
         return;
       }
-      setXrStatus(isVrSupported ? "ready" : "unavailable");
+      setXrStatus(readyXrStatus());
     })
     .catch(() => {
-      if (!disposed) setXrStatus("unavailable");
+      if (!disposed) setXrStatus(readyXrStatus());
     });
 
   return {
@@ -866,6 +934,7 @@ const createSceneHost = (canvas: HTMLCanvasElement): SceneHost => {
     cancelTravel,
     prefersReducedMotion,
     getFps: () => engine.getFps(),
+    isArSupported: () => isArSupported,
     isInXr: () => isInXr,
     isVrSupported: () => isVrSupported,
     mountWorld,
@@ -887,11 +956,55 @@ const createSceneHost = (canvas: HTMLCanvasElement): SceneHost => {
       listener(travelPhase);
       return () => travelListeners.delete(listener);
     },
-    enterVr: async () => {
-      if (!xr || !isVrSupported) return;
-      // Babylon appends the reference space and every enabled optional feature (including
-      // hand tracking) to the session request, so nothing has to be listed by hand here.
-      await xr.baseExperience.enterXRAsync("immersive-vr", "local-floor", xr.renderTarget);
+    enterImmersive: async () => {
+      const destination = immersiveDestination;
+      if (!destination) return;
+      if (destination.launchUrl) {
+        window.location.assign(destination.launchUrl);
+        return;
+      }
+      if (!xr) return;
+
+      activeImmersiveMode = destination.mode;
+      if (destination.mode === "vr") {
+        // This is the original Quest path: same session mode, reference space, render target and
+        // optional hand feature set. Capability selection above only decides to arrive here.
+        await xr.baseExperience.enterXRAsync("immersive-vr", "local-floor", xr.renderTarget);
+        return;
+      }
+
+      const features = xr.baseExperience.featuresManager;
+      try {
+        const hitTest = features.enableFeature(
+          WebXRFeatureName.HIT_TEST,
+          "latest",
+          { enableTransientHitTest: true },
+          true,
+          true,
+        );
+        features.enableFeature(
+          WebXRFeatureName.DOM_OVERLAY,
+          "latest",
+          { element: arPresentation.overlay, supressXRSelectEvents: false },
+          true,
+          false,
+        );
+        xrCameraLayerMask = xr.baseExperience.camera.layerMask;
+        xr.baseExperience.camera.layerMask &= ~VIRTUAL_BACKGROUND_LAYER_MASK;
+        arPresentation.begin(hitTest, currentScope?.presentation ?? null);
+        // Variant Launch and native mobile WebXR both implement the standard AR session. Hit
+        // testing is required; DOM overlay is optional so a device can still place/manipulate the
+        // scene through Babylon pointer events if it cannot render the instruction strip.
+        await xr.baseExperience.enterXRAsync("immersive-ar", "local", xr.renderTarget);
+      } catch (error) {
+        arPresentation.end();
+        xr.baseExperience.camera.layerMask = xrCameraLayerMask;
+        features.disableFeature(WebXRFeatureName.HIT_TEST);
+        features.disableFeature(WebXRFeatureName.DOM_OVERLAY);
+        activeImmersiveMode = null;
+        setXrStatus(readyXrStatus());
+        throw error;
+      }
     },
     dispose: () => {
       if (disposed) return;
@@ -907,8 +1020,10 @@ const createSceneHost = (canvas: HTMLCanvasElement): SceneHost => {
       statusListeners.clear();
       travelListeners.clear();
       endGlide(null, false);
+      stopWatchingVariantLaunch();
       window.removeEventListener("resize", resize);
       currentWorld?.dispose();
+      arPresentation.dispose();
       currentScope?.dispose();
       currentWorld = null;
       currentScope = null;

@@ -8,6 +8,7 @@ import { VertexData } from "@babylonjs/core/Meshes/mesh.vertexData.js";
 import type { TransformNode } from "@babylonjs/core/Meshes/transformNode.js";
 import type { Scene } from "@babylonjs/core/scene.js";
 import { loadSkyCatalog, projectSky, type SkyViewpoint } from "./sky-catalog.ts";
+import { markAsVirtualBackground } from "./world-presentation.ts";
 
 /**
  * How a star reads as a light source rather than as a lit ball.
@@ -255,7 +256,7 @@ export const createStarfield = ({
   seed,
   viewpoint = null,
 }: StarfieldOptions): Starfield => {
-  const mesh = new Mesh("starfield", scene);
+  const mesh = markAsVirtualBackground(new Mesh("starfield", scene));
 
   const material = new StandardMaterial("starfield-material", scene);
   material.disableLighting = true;

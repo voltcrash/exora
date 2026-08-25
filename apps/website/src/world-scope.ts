@@ -24,12 +24,15 @@ import type { Light } from "@babylonjs/core/Lights/light.js";
 import type { Material } from "@babylonjs/core/Materials/material.js";
 import type { Scene } from "@babylonjs/core/scene.js";
 import type { TransformNode } from "@babylonjs/core/Meshes/transformNode.js";
+import { createWorldPresentation, type WorldPresentation } from "./world-presentation.ts";
 
 export interface WorldScope {
   /** Removes everything the world added, leaving the scene as the host set it up. */
   dispose: () => void;
   /** Takes the closing reading. Must be called the instant the world has finished building. */
   seal: () => void;
+  /** The identity wrapper AR can transform without asking the world to build itself again. */
+  presentation: WorldPresentation;
 }
 
 interface SceneContents {
@@ -73,9 +76,14 @@ const disposeOwned = <Item>(
 
 export const openWorldScope = (scene: Scene): WorldScope => {
   const before = read(scene);
+  let presentation: WorldPresentation | null = null;
   let owned: SceneContents | null = null;
 
   return {
+    get presentation() {
+      if (!presentation) throw new Error("A world presentation is unavailable before sealing.");
+      return presentation;
+    },
     seal: () => {
       const after = read(scene);
       owned = {
@@ -85,11 +93,18 @@ export const openWorldScope = (scene: Scene): WorldScope => {
         meshes: addedSince(before.meshes, after.meshes),
         transformNodes: addedSince(before.transformNodes, after.transformNodes),
       };
+      // The presentation wrapper is intentionally created after the closing reading. It wraps
+      // the captured nodes, but is not itself mistaken for world-authored scene content.
+      presentation = createWorldPresentation(scene);
+      presentation.capture(owned);
     },
     dispose: () => {
       if (!owned) return;
       const contents = owned;
       owned = null;
+      presentation?.dispose();
+      presentation?.proxy.dispose(false, false);
+      presentation = null;
       // Meshes first: they own the geometry and the picking hooks that everything else feeds.
       disposeOwned(contents.meshes, scene.meshes, (mesh) => mesh.dispose(true, false));
       disposeOwned(contents.actionManagers, scene.actionManagers, (manager) => manager.dispose());
