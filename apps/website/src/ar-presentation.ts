@@ -7,11 +7,16 @@ import type { Observer } from "@babylonjs/core/Misc/observable.js";
 import type { PointerInfo } from "@babylonjs/core/Events/pointerEvents.js";
 import type { Scene } from "@babylonjs/core/scene.js";
 import type { IWebXRHitResult, WebXRHitTest } from "@babylonjs/core/XR/features/WebXRHitTest.js";
+import type { WebXRSessionManager } from "@babylonjs/core/XR/webXRSessionManager.js";
 import type { WorldPresentation } from "./world-presentation.ts";
 
 export interface ArPresentation {
   /** Connects hit testing and manipulation to the currently mounted, already-built world. */
-  begin: (hitTest: WebXRHitTest, world: WorldPresentation | null) => void;
+  begin: (
+    hitTest: WebXRHitTest,
+    sessionManager: WebXRSessionManager,
+    world: WorldPresentation | null,
+  ) => void;
   dispose: () => void;
   /** Restores the flat/VR presentation after AR ends or fails to enter. */
   end: () => void;
@@ -59,6 +64,18 @@ export const createArPresentation = (scene: Scene): ArPresentation => {
   let latestHit: Vector3 | null = null;
   let hitObserver: Observer<IWebXRHitResult[]> | null = null;
   let pointerObserver: Observer<PointerInfo> | null = null;
+  let sessionInitObserver: Observer<XRSession> | null = null;
+  let xrSession: XRSession | null = null;
+  let previousClearAlpha = scene.clearColor.a;
+
+  const placeAtLatestHit = (): void => {
+    if (!latestHit || !currentWorld || currentWorld.isPlaced()) return;
+    currentWorld.place(latestHit);
+    reticle.setEnabled(false);
+    guidance.textContent = instruction(true);
+  };
+
+  const onXrSelect = (): void => placeAtLatestHit();
 
   const resetWorld = (world: WorldPresentation | null): void => {
     currentWorld?.endAr();
@@ -66,7 +83,10 @@ export const createArPresentation = (scene: Scene): ArPresentation => {
     latestHit = null;
     reticle.setEnabled(false);
     guidance.textContent = instruction(false);
-    if (active) currentWorld?.beginAr();
+    if (active) {
+      scene.clearColor.a = 0;
+      currentWorld?.beginAr();
+    }
   };
 
   const end = (): void => {
@@ -74,28 +94,51 @@ export const createArPresentation = (scene: Scene): ArPresentation => {
     active = false;
     if (hitObserver) hitObserver.remove();
     if (pointerObserver) pointerObserver.remove();
+    if (sessionInitObserver) sessionInitObserver.remove();
+    xrSession?.removeEventListener("select", onXrSelect);
     hitObserver = null;
     pointerObserver = null;
+    sessionInitObserver = null;
+    xrSession = null;
     currentWorld?.endAr();
+    scene.clearColor.a = previousClearAlpha;
     latestHit = null;
     reticle.setEnabled(false);
     overlay.hidden = true;
+    delete document.documentElement.dataset.presentationMode;
     delete document.body.dataset.presentationMode;
   };
 
   return {
     overlay,
-    begin: (hitTest, world) => {
+    begin: (hitTest, sessionManager, world) => {
       end();
       active = true;
       currentWorld = world;
       currentWorld?.beginAr();
+      previousClearAlpha = scene.clearColor.a;
+      scene.clearColor.a = 0;
       overlay.hidden = false;
       guidance.textContent = instruction(false);
+      document.documentElement.dataset.presentationMode = "ar";
       document.body.dataset.presentationMode = "ar";
 
+      // Screen taps in a handheld WebXR session are XR `select` events, not necessarily DOM
+      // pointer events on Babylon's canvas. Variant exposes the standard event, so bind it as
+      // soon as requestSession succeeds; the pointer observer below remains useful for runtimes
+      // which also mirror screen input onto the canvas.
+      sessionInitObserver = sessionManager.onXRSessionInit.add((session) => {
+        xrSession?.removeEventListener("select", onXrSelect);
+        xrSession = session;
+        xrSession.addEventListener("select", onXrSelect);
+      });
+
       hitObserver = hitTest.onHitTestResultObservable.add((results) => {
-        const result = results[0];
+        // A transient hit-test ray follows the finger that generated it. It must not replace the
+        // stable viewer-centred reticle (the large ring seen while touching the iPhone screen).
+        // The subsequent `select` places at the latest permanent surface pose.
+        const result = results.find((candidate) => !candidate.isTransient);
+        if (!result && results.some((candidate) => candidate.isTransient)) return;
         if (!result) {
           latestHit = null;
           reticle.setEnabled(false);
@@ -116,9 +159,7 @@ export const createArPresentation = (scene: Scene): ArPresentation => {
         ) {
           return;
         }
-        currentWorld.place(latestHit);
-        reticle.setEnabled(false);
-        guidance.textContent = instruction(true);
+        placeAtLatestHit();
       });
     },
     dispose: () => {

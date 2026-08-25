@@ -249,6 +249,9 @@ const createSceneHost = (canvas: HTMLCanvasElement): SceneHost => {
     profile.tier === "desktop",
     {
       antialias: profile.tier === "desktop",
+      // Variant Launch composites the iPhone camera behind the page. The WebGL context therefore
+      // needs an alpha channel even though desktop and immersive VR still clear it opaquely.
+      alpha: true,
       doNotHandleContextLost: false,
       preserveDrawingBuffer: false,
       stencil: false,
@@ -1051,7 +1054,9 @@ const createSceneHost = (canvas: HTMLCanvasElement): SceneHost => {
         const hitTest = features.enableFeature(
           WebXRFeatureName.HIT_TEST,
           "latest",
-          { enableTransientHitTest: true },
+          // Placement uses the stable viewer-centred ray. A transient touchscreen ray follows
+          // the finger and made the reticle swell/move under a tap in Variant's iPhone viewer.
+          { enableTransientHitTest: false },
           true,
           true,
         );
@@ -1064,7 +1069,11 @@ const createSceneHost = (canvas: HTMLCanvasElement): SceneHost => {
         );
         xrCameraLayerMask = xr.baseExperience.camera.layerMask;
         xr.baseExperience.camera.layerMask &= ~VIRTUAL_BACKGROUND_LAYER_MASK;
-        arPresentation.begin(hitTest, currentScope?.presentation ?? null);
+        arPresentation.begin(
+          hitTest,
+          xr.baseExperience.sessionManager,
+          currentScope?.presentation ?? null,
+        );
         // Variant Launch and native mobile WebXR both implement the standard AR session. Hit
         // testing is required; DOM overlay is optional so a device can still place/manipulate the
         // scene through Babylon pointer events if it cannot render the instruction strip.

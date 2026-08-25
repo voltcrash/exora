@@ -678,6 +678,19 @@ button {
 }
 
 /*
+ * Variant's iPhone camera is composited underneath the web page rather than into the canvas.
+ * Every full-viewport page surface must therefore become transparent for the lifetime of AR;
+ * otherwise a perfectly healthy camera session appears as an opaque black screen.
+ */
+html[data-presentation-mode="ar"],
+body[data-presentation-mode="ar"],
+body[data-presentation-mode="ar"] #app,
+body[data-presentation-mode="ar"] .experience-shell,
+body[data-presentation-mode="ar"] #render-canvas {
+  background: transparent !important;
+}
+
+/*
  * The only DOM sent into an immersive AR overlay. The page HUD remains on the flat browser page;
  * this transparent strip supplies placement guidance without covering the real camera feed or
  * intercepting the WebXR touch rays Babylon uses for placement and manipulation.
