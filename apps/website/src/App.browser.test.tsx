@@ -71,6 +71,7 @@ vi.mock("./scene-host.ts", () => {
     profile: { hardwareScalingLevel: 1, maxIrregularBodyTriangles: 900_000, tier: "desktop" },
     qualityTier: "desktop",
     refreshConsole: () => undefined,
+    setConsoleNavigator: () => undefined,
     /** How many overlays are currently holding the loop parked, for the assertions below. */
     renderSuspensions: 0,
     suspendRendering: () => {

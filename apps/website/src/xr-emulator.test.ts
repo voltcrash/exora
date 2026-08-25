@@ -4,6 +4,7 @@ import { resolveXrEmulatorRequest } from "./xr-emulator.ts";
 test("stays off without a request or stored preference", () => {
   expect(resolveXrEmulatorRequest("", "unset")).toEqual({
     enabled: false,
+    headset: "quest2",
     persist: "unset",
     stereo: false,
   });
@@ -12,6 +13,7 @@ test("stays off without a request or stored preference", () => {
 test("enables emulation from the query string", () => {
   expect(resolveXrEmulatorRequest("?xr=emulate", "unset")).toEqual({
     enabled: true,
+    headset: "quest2",
     persist: "enabled",
     stereo: false,
   });
@@ -21,6 +23,7 @@ test("enables emulation from the query string", () => {
 test("renders both eyes when stereo is requested", () => {
   expect(resolveXrEmulatorRequest("?xr=stereo", "unset")).toEqual({
     enabled: true,
+    headset: "quest2",
     persist: "enabled",
     stereo: true,
   });
@@ -35,7 +38,18 @@ test("keeps emulating across navigations once stored", () => {
 test("returns to the native runtime on request", () => {
   expect(resolveXrEmulatorRequest("?xr=off", "enabled")).toEqual({
     enabled: false,
+    headset: "quest2",
     persist: "disabled",
+    stereo: false,
+  });
+});
+
+test("emulates the newer headset only when it is asked for", () => {
+  expect(resolveXrEmulatorRequest("?xr=emulate", "unset").headset).toBe("quest2");
+  expect(resolveXrEmulatorRequest("?xr=quest3", "unset")).toEqual({
+    enabled: true,
+    headset: "quest3",
+    persist: "enabled",
     stereo: false,
   });
 });

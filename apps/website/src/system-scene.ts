@@ -77,8 +77,22 @@ import type { XrCell } from "./xr-panel-layout.ts";
  * rather than looking down at a table.
  */
 const SYSTEM_CENTRE = new Vector3(0, 1.4, 0);
-/** Where a session opens: on the floor, just outside the widest orbit, facing the star. */
+/** Where a session opens: outside the widest orbit it can reach, facing the star. */
 const XR_SYSTEM_STAND = new Vector3(0, 0, -16.5);
+/**
+ * How far above the orbital plane the wearer's eyes open a session.
+ *
+ * A system seen from within its own plane is a line, which is why the desktop camera is pinned
+ * well above it and says so. The headset used to be the one view that ignored that: the plane
+ * runs through the room at eye height, so a standing wearer sixteen metres out looked along it
+ * within about a degree and every orbit collapsed into the same bright streak. Twenty degrees is
+ * enough to open them back into rings while still reading as standing over a system rather than
+ * looking down at a table. The in-plane pose is not lost — it is the second entry on the console,
+ * for a wearer who wants the orbits running past them at shoulder height.
+ */
+const XR_SYSTEM_ELEVATION_RADIANS = (14 * Math.PI) / 180;
+/** The eye height a wearer is assumed to arrive at, used only to aim the deck before tracking. */
+const NOMINAL_EYE_HEIGHT = 1.6;
 /** Half-width of the square cross-section each orbit is drawn as, in scene units. */
 const ORBIT_THICKNESS = 0.011;
 
@@ -482,23 +496,37 @@ export const createSystemWorld = (
 
   const firstFrameObserver = scene.onAfterRenderObservable.addOnce(onFirstFrame);
 
-  /** Puts the wearer on the floor outside the widest orbit, facing the star at the centre. */
-  const placeXrCamera = (initial: boolean): void => {
+  /** Puts the wearer outside the widest orbit it can reach, facing the star. */
+  const placeXrCamera = (initial: boolean, elevation = XR_SYSTEM_ELEVATION_RADIANS): void => {
     const rig = host.xrCamera();
     if (!rig) return;
     const headOffset = initial ? 0 : rig.realWorldHeight;
     const standoff = Math.max(XR_SYSTEM_STAND.z, -(outerReach + 3.5));
-    rig.position.set(XR_SYSTEM_STAND.x, XR_SYSTEM_STAND.y + headOffset, standoff);
-    rig.setTarget(SYSTEM_CENTRE);
+    const eyeHeight = SYSTEM_CENTRE.y + Math.abs(standoff - SYSTEM_CENTRE.z) * Math.tan(elevation);
+    // Babylon adds the wearer's tracked height to whatever is written here, so the deck is set
+    // to the height that leaves their eyes at `eyeHeight` for a wearer of ordinary stature.
+    const deckY = eyeHeight - NOMINAL_EYE_HEIGHT + headOffset;
+    rig.position.set(XR_SYSTEM_STAND.x, deckY, standoff);
+    // Aimed level, deliberately: `setTarget` rotates the tracking space itself, so pitching it at
+    // the star below would tilt the wearer's whole world and take gravity with it. The target
+    // therefore sits at the rig's own height — the system is twenty degrees under a level gaze,
+    // which is a glance down rather than a rotation.
+    rig.setTarget(new Vector3(XR_SYSTEM_STAND.x, deckY, SYSTEM_CENTRE.z));
   };
 
   const buildSceneActions = (): XrCell[] => {
     const actions: XrCell[] = [
       {
-        detail: "Stand outside the widest orbit",
+        detail: "Look down on the whole system from outside it",
         id: "recentre",
         label: "Recentre me",
         onSelect: () => placeXrCamera(false),
+      },
+      {
+        detail: "Drop to the orbital plane and walk among the orbits",
+        id: "in-plane",
+        label: "Stand in the plane",
+        onSelect: () => placeXrCamera(false, 0),
       },
     ];
 

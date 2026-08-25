@@ -17,6 +17,8 @@ export interface MissionWorld extends MountedWorld {
 interface MissionWorldOptions {
   mission: SolarMissionProfile;
   onFirstFrame: () => void;
+  /** Told whenever the layer is switched from inside the headset, so the page agrees with it. */
+  onLayerVisibilityChange?: (visible: boolean) => void;
   trajectory: MissionTrajectoryResponse | null;
 }
 
@@ -41,7 +43,7 @@ const surfacePosition = (latitude: number, longitude: number, radius: number): V
 
 export const createMissionWorld = (
   host: SceneHost,
-  { mission, onFirstFrame, trajectory }: MissionWorldOptions,
+  { mission, onFirstFrame, onLayerVisibilityChange, trajectory }: MissionWorldOptions,
 ): MissionWorld => {
   const { camera, canvas, engine, profile, scene } = host;
   scene.clearColor = new Color4(0.0004, 0.001, 0.003, 1);
@@ -162,7 +164,35 @@ export const createMissionWorld = (
     );
     rig.setTarget(Vector3.Zero());
   };
+  /**
+   * Whether the drawn trajectory is on.
+   *
+   * It starts off, because the mission layer is an addition to the natural Solar System rather
+   * than part of it. That default used to make a mission the one destination an immersive session
+   * could open on nothing at all: the switch lived on the page, which a wearer cannot reach, so
+   * the headset showed a star field, a distant Sun, and no way to ask for the thing being visited.
+   */
+  let layerVisible = false;
+  const showLayer = (visible: boolean): void => {
+    layerVisible = visible;
+    for (const mesh of layerMeshes) mesh.setEnabled(visible);
+    host.refreshConsole();
+  };
+
   const sceneActions = (): XrCell[] => [
+    {
+      badge: layerVisible ? "ON" : "OFF",
+      detail:
+        mission.kind === "trajectory"
+          ? "The flown path, drawn over the natural system"
+          : "The measured landing sites, drawn on the surface",
+      id: "mission-layer",
+      label: layerVisible ? "Hide the mission layer" : "Show the mission layer",
+      onSelect: () => {
+        showLayer(!layerVisible);
+        onLayerVisibilityChange?.(layerVisible);
+      },
+    },
     {
       detail: "Frame the mission context",
       id: "recentre-mission",
@@ -172,7 +202,7 @@ export const createMissionWorld = (
   ];
   const consoleContributions: WorldConsole = {
     facts: () => [
-      { label: "LAYER", value: "OPTIONAL" },
+      { label: "LAYER", value: layerVisible ? "VISIBLE" : "HIDDEN" },
       {
         label: "EVIDENCE",
         value: mission.kind === "trajectory" ? "HORIZONS / SPICE" : "MEASURED SITES",
@@ -196,9 +226,7 @@ export const createMissionWorld = (
     farthestView: () => camera.upperRadiusLimit ?? undefined,
     focusXrRig: placeXrCamera,
     restoreDesktopView: () => camera.attachControl(canvas, true),
-    setLayerVisible: (visible) => {
-      for (const mesh of layerMeshes) mesh.setEnabled(visible);
-    },
+    setLayerVisible: showLayer,
     dispose: () => {
       scene.onBeforeRenderObservable.remove(renderObserver);
       scene.onAfterRenderObservable.remove(firstFrameObserver);

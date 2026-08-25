@@ -421,6 +421,25 @@ export const App = () => {
     });
   }, []);
 
+  /**
+   * The console's catalog, wired to the page rather than to the world in front of it.
+   *
+   * Registered here because these four journeys belong to Exora, not to whichever destination
+   * happens to be mounted: a wearer browsing the archive from a comet is asking the page to take
+   * them somewhere, exactly as they would be from a planet. The renderer only reaches for these
+   * where the current world has nothing of its own to say. See `ConsoleNavigator`.
+   */
+  useEffect(
+    () =>
+      sceneHost?.setConsoleNavigator({
+        onForgePlanet: generatePlanet,
+        onForgeStar: generateStar,
+        onTravelPlanet: (planet) => selectPlanet(planet, false),
+        onTravelStar: (star) => selectStar(star, false),
+      }),
+    [generatePlanet, generateStar, sceneHost, selectPlanet, selectStar],
+  );
+
   const returnHome = useCallback((): void => {
     window.history.replaceState({}, "", "/");
     setCustomRecipe(null);

@@ -14,17 +14,35 @@ from a plain LAN HTTP address.
    responds: change view, recentre, travel, and exit.
 6. Walk the surface excursion with the thumbstick and confirm the wearer stays on the terrain.
 7. Exit and re-enter VR, then switch worlds and enter again.
-8. Open a system diorama on a host with several worlds — TRAPPIST-1 and Kepler-90 are the two
-   worth checking, being the most compact and the most spread out. Confirm the orbital plane sits
-   at about eye height, that the orbits read as rings rather than a flat line from a standing
-   pose, and that walking outward with the thumbstick passes between them.
+8. Open a system diorama on a host with several worlds — TRAPPIST-1, Kepler-90 and our own Sun
+   are the three worth checking, being the most compact, the most spread out, and the one with
+   the most worlds. A session opens on a deck above the plane, so confirm the orbits read as
+   rings rather than a flat line. Then take "Stand in the plane" from the panel and confirm the
+   wearer drops to the orbits themselves and can walk between them with the thumbstick.
 9. From inside the diorama, point at a world and travel to it, then use "View the whole system" on
    the panel to come back. Do the same between a world and its host star.
 10. Travel from a world to its host star from inside the headset, then on to a world in that
     star's system. The session must never end: the view fades to black, the new object fades in
     around the wearer, and the headset is never returned to the flat page or the VR entry prompt
     in between. The panel stays open on the page it was on, now describing the new object.
-11. Leave the experience running for ten minutes to catch thermal throttling or memory growth.
+11. Enter VR from each of the Solar System's own destinations — an asteroid, a comet, a region,
+    a mission and a black hole — and confirm each one offers the immersive entry on the page, and
+    that from inside it the panel's Worlds, Stars and Forge pages travel and generate rather than
+    browsing to a dead end. On a mission, confirm the panel's own switch draws the flown path,
+    and that the page agrees with it after the headset comes off.
+12. Leave the experience running for ten minutes to catch thermal throttling or memory growth.
+
+## Known gaps
+
+These work on the page and have no in-headset equivalent yet. They are omissions rather than
+faults, but a smoke test should not report them as new:
+
+- A star or diorama lists the first five of its worlds on the panel and does not page past them,
+  so a host with more — our own Sun has thirteen — cannot reach the rest without leaving VR.
+- A planet's moon subsystem is a page control only, so Jupiter's moons cannot be opened, or left,
+  from inside a session.
+- The Solar System diorama's live ephemeris clock and a comet's heliocentric-distance slider are
+  page controls with no console entries.
 
 Movement is thumbstick locomotion with smooth turning; teleportation is deliberately off, so a
 controller ray only points and selects.

@@ -32,7 +32,13 @@ import {
 } from "./api-client.ts";
 import { hasRenderer } from "./planet-utils.tsx";
 import { createXrPanel, type XrPanel } from "./xr-panel.ts";
-import { rowCapacity, type XrBlock, type XrCell, type XrPanelView } from "./xr-panel-layout.ts";
+import {
+  homeActionCapacity,
+  rowCapacity,
+  type XrBlock,
+  type XrCell,
+  type XrPanelView,
+} from "./xr-panel-layout.ts";
 import {
   adjustPlanetField,
   adjustStarField,
@@ -93,6 +99,8 @@ type ForgeTab = "build" | "shape";
 
 /** Rows a result page can show, derived from the space the tab strips and status line leave. */
 const RESULT_ROWS = rowCapacity(64 + 18 + 64 + 18 + 44 + 18) - 1;
+/** Scene entries the home page can carry and still leave room for the exit row. */
+const HOME_ACTION_ROWS = homeActionCapacity();
 
 const FOOTER_HINT = "TRIGGER SELECTS · A/X OPENS · B/Y HIDES · WRIST PAD TOGGLES";
 
@@ -670,7 +678,7 @@ export const createXrConsole = (
       case "home":
         blocks.push({
           cells: [
-            ...host.sceneActions(),
+            ...host.sceneActions().slice(0, HOME_ACTION_ROWS),
             {
               detail: "Back to the browser view",
               id: "exit",

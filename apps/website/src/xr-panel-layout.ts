@@ -127,6 +127,16 @@ export const wrapText = (text: string, maxCharacters: number, maxLines: number):
   return lines;
 };
 
+/**
+ * Scene entries a console home page can carry and still leave room for the exit row.
+ *
+ * The layout below drops whatever will not fit, last row first, and the way out of the session is
+ * the last row — so a destination generous enough with its own actions would quietly take the
+ * exit off the panel. One row is reserved for it here rather than trusted to each scene's count.
+ */
+export const homeActionCapacity = (): number =>
+  rowCapacity(PANEL_METRICS.tabHeight + PANEL_METRICS.blockGap) - 1;
+
 /** Rows a list block can show before it would run past the footer. */
 export const rowCapacity = (topOffset: number): number =>
   Math.max(

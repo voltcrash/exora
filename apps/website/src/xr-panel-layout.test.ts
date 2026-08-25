@@ -1,6 +1,7 @@
 import { expect, test } from "vite-plus/test";
 import {
   hitTestPanel,
+  homeActionCapacity,
   layoutPanel,
   PANEL_METRICS,
   rowCapacity,
@@ -125,4 +126,23 @@ test("wraps prose and ellipsizes past the line budget", () => {
 test("reports how many rows are left below a block", () => {
   expect(rowCapacity(0)).toBeGreaterThan(rowCapacity(400));
   expect(rowCapacity(10_000)).toBe(1);
+});
+
+test("a home page filled to capacity still places the way out of the session", () => {
+  const actions = Array.from({ length: homeActionCapacity() }, (_, index) =>
+    cell(`action-${index}`),
+  );
+  const exit = cell("exit");
+  const placements = layoutPanel({
+    blocks: [
+      { cells: [cell("home"), cell("worlds")], kind: "tabs" },
+      { cells: [...actions, exit], kind: "rows" },
+    ],
+    title: "Crowded destination",
+  });
+
+  const placed = placements.flatMap((placement) =>
+    "cell" in placement ? [placement.cell.id] : [],
+  );
+  expect(placed).toContain("exit");
 });

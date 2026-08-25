@@ -1,6 +1,6 @@
 import type { StarProfile } from "@exora/contracts";
 import { useEffect, useState } from "react";
-import type { SceneHost } from "../scene-host.ts";
+import type { SceneHost, XrStatus } from "../scene-host.ts";
 import type { SolarRegionProfile } from "../solar-regions.ts";
 import { findSolarStar } from "../solar-system.ts";
 import type { TravelPhase } from "../travel-transition.ts";
@@ -30,8 +30,11 @@ export const RegionExperience = ({
   travelPhase,
 }: RegionExperienceProps) => {
   const [fps, setFps] = useState("--");
+  const [xrStatus, setXrStatus] = useState<XrStatus>("checking");
   const [sceneState, setSceneState] = useState<"error" | "loading" | "ready">("loading");
   const travelling = travelPhase === "departing" || travelPhase === "crossing";
+
+  useEffect(() => host?.onXrStatus(setXrStatus), [host]);
 
   useEffect(() => {
     if (!host) return;
@@ -175,6 +178,7 @@ export const RegionExperience = ({
         onToggleChrome={onToggleChrome}
         onOpenDiscover={onOpenDiscover}
         sceneFailed={sceneState === "error"}
+        xr={{ host, status: xrStatus }}
       />
       {sceneState === "loading" ? (
         <div className="loading-screen" role="status">

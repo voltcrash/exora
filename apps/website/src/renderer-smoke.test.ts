@@ -188,6 +188,7 @@ const createHarness = (
     onTravelPhase: () => () => undefined,
     isVrSupported: () => false,
     refreshConsole: () => undefined,
+    setConsoleNavigator: () => undefined,
     xrCamera: () => null,
   } as unknown as SceneHost;
 

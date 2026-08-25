@@ -2,7 +2,7 @@ import type { MissionTrajectoryResponse } from "@exora/contracts";
 import { useEffect, useRef, useState } from "react";
 import { loadMissionTrajectory } from "../api-client.ts";
 import type { MissionWorld } from "../mission-scene.ts";
-import type { SceneHost } from "../scene-host.ts";
+import type { SceneHost, XrStatus } from "../scene-host.ts";
 import type {
   MissionMilestone,
   SolarMissionProfile,
@@ -36,6 +36,7 @@ export const MissionExperience = ({
   travelPhase,
 }: MissionExperienceProps) => {
   const [fps, setFps] = useState("--");
+  const [xrStatus, setXrStatus] = useState<XrStatus>("checking");
   const [layerVisible, setLayerVisible] = useState(false);
   const [sceneState, setSceneState] = useState<"error" | "loading" | "ready">("loading");
   const [trajectory, setTrajectory] = useState<MissionTrajectoryResponse | null>(null);
@@ -80,6 +81,12 @@ export const MissionExperience = ({
             onFirstFrame: () => {
               if (!abandoned) setSceneState("ready");
             },
+            // The same switch is on the page and on the in-headset console, so whichever one is
+            // used, the other has to agree with it — including after the wearer takes the headset
+            // off and finds the layer they turned on still on.
+            onLayerVisibilityChange: (visible) => {
+              if (!abandoned) setLayerVisible(visible);
+            },
             trajectory,
           });
           worldRef.current = world;
@@ -95,6 +102,8 @@ export const MissionExperience = ({
       worldRef.current = null;
     };
   }, [host, mission, trajectory, trajectoryState]);
+
+  useEffect(() => host?.onXrStatus(setXrStatus), [host]);
 
   useEffect(() => {
     if (!host) return;
@@ -283,6 +292,7 @@ export const MissionExperience = ({
         onToggleChrome={onToggleChrome}
         onOpenDiscover={onOpenDiscover}
         sceneFailed={sceneState === "error"}
+        xr={{ host, status: xrStatus }}
       />
       {sceneState === "loading" ? (
         <div className="loading-screen" role="status">

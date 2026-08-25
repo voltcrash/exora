@@ -15,6 +15,8 @@
  * What the host owns, no world may dispose; what a world adds, `world-scope.ts` takes back out.
  */
 
+import type { ExoplanetProfile, StarProfile } from "@exora/contracts";
+import type { CustomStar, CustomWorld } from "@exora/worldgen";
 import { ArcRotateCamera } from "@babylonjs/core/Cameras/arcRotateCamera.js";
 import "@babylonjs/core/Culling/ray.js";
 import { Engine } from "@babylonjs/core/Engines/engine.js";
@@ -92,6 +94,27 @@ const VEIL_FADE_SECONDS = 0.22;
 /** Everything a world contributes to the console, minus the parts the host answers for itself. */
 export type WorldConsole = Omit<XrConsoleHost, "onExit">;
 
+/**
+ * The page's own answer to the console's catalog, used wherever the world has no answer of its own.
+ *
+ * The in-headset console offers the same journeys the flat page does — browse the NASA and SIMBAD
+ * catalogs, forge a world — from every destination, because a wearer cannot reach the browser
+ * dialogs without taking the headset off. Only three of the nine destinations used to hand it
+ * somewhere to send the result, though, so on a comet, an asteroid, a region, a mission, a moon
+ * subsystem or a black hole those pages browsed and paged and searched perfectly well and then
+ * did nothing at all when a row was chosen.
+ *
+ * Travel is a property of the page rather than of the world being left, so it is registered once
+ * here and every destination inherits it. A world that wants to say something more specific still
+ * overrides it through its own `WorldConsole`.
+ */
+export interface ConsoleNavigator {
+  onForgePlanet?: (world: CustomWorld) => void;
+  onForgeStar?: (star: CustomStar) => void;
+  onTravelPlanet?: (planet: ExoplanetProfile) => void;
+  onTravelStar?: (star: StarProfile) => void;
+}
+
 /** A destination occupying the shared scene. */
 export interface MountedWorld {
   console: WorldConsole;
@@ -163,6 +186,8 @@ export interface SceneHost {
   ) => Promise<World | null>;
   /** Repaints the console, for when a world's own entries change after it was mounted. */
   refreshConsole: () => void;
+  /** Registers the page-level destinations the console falls back to. See `ConsoleNavigator`. */
+  setConsoleNavigator: (navigator: ConsoleNavigator | null) => void;
   /** Subscribes to immersive status, called immediately with the current one. */
   onXrStatus: (listener: (status: XrStatus) => void) => () => void;
   /** Subscribes to WebGL availability and recovery, called immediately with the current state. */
@@ -483,13 +508,18 @@ const createSceneHost = (canvas: HTMLCanvasElement): SceneHost => {
    * The console is built once and outlives every world, so it keeps its page, its search results
    * and its position across a jump. Its scene-specific half is read through here.
    */
+  let consoleNavigator: ConsoleNavigator | null = null;
   const consoleHost: XrConsoleHost = {
     facts: () => currentWorld?.console.facts() ?? [],
     onExit: () => void xr?.baseExperience.exitXRAsync(),
-    onForgePlanet: (world) => currentWorld?.console.onForgePlanet?.(world),
-    onForgeStar: (star) => currentWorld?.console.onForgeStar?.(star),
-    onTravelPlanet: (planet) => currentWorld?.console.onTravelPlanet?.(planet),
-    onTravelStar: (star) => currentWorld?.console.onTravelStar?.(star),
+    onForgePlanet: (world) =>
+      (currentWorld?.console.onForgePlanet ?? consoleNavigator?.onForgePlanet)?.(world),
+    onForgeStar: (star) =>
+      (currentWorld?.console.onForgeStar ?? consoleNavigator?.onForgeStar)?.(star),
+    onTravelPlanet: (planet) =>
+      (currentWorld?.console.onTravelPlanet ?? consoleNavigator?.onTravelPlanet)?.(planet),
+    onTravelStar: (star) =>
+      (currentWorld?.console.onTravelStar ?? consoleNavigator?.onTravelStar)?.(star),
     sceneActions: () => currentWorld?.console.sceneActions() ?? [],
     source: () => currentWorld?.console.source() ?? "",
     subtitle: () => currentWorld?.console.subtitle() ?? "",
@@ -939,6 +969,9 @@ const createSceneHost = (canvas: HTMLCanvasElement): SceneHost => {
     isVrSupported: () => isVrSupported,
     mountWorld,
     refreshConsole: () => xrConsole?.refresh(),
+    setConsoleNavigator: (navigator) => {
+      consoleNavigator = navigator;
+    },
     suspendRendering,
     xrCamera: () => xr?.baseExperience.camera ?? null,
     onXrStatus: (listener) => {
