@@ -43,7 +43,7 @@ by desktop emulation. Run this pass on a physical iPhone in a non-private Safari
    virtual sky restored.
 8. Repeat with one planet, one star, and one black hole. Then re-run the existing Meta Quest
    checklist to confirm the same control still enters `immersive-vr`, retains thumbstick
-   locomotion, and shows the in-headset console.
+   locomotion, and opens the in-headset Discover screen.
 
 If Safari never offers AR, check the Variant SDK key, authorized hostname, HTTPS certificate,
 Safari/private-browsing state, and whether a content blocker prevented `launchar.app` from

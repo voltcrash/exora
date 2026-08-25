@@ -1,11 +1,12 @@
 /**
- * Where the in-headset console rests relative to the wearer's head.
+ * Where the in-headset Discover screen rests relative to the wearer's head.
  *
- * The panel tracks the head's position and yaw but deliberately ignores its pitch, which is how the
- * Quest system keyboard behaves: it sits below the horizon, clear of the forward view, and the
- * wearer glances down to use it. Tracking yaw is what separates this from a world-locked panel — it
- * keeps the guarantee that walking, turning, and teleporting never leave the console behind, while
- * dropping the pitch is what stops it from crowding whatever the wearer is actually looking at.
+ * Discover fills the browser window, so in a session it is placed to fill the view: squarely in
+ * front of the eyes, dropped just far enough that its centre sits where a resting gaze lands
+ * rather than dead level. The screen tracks the head's position and yaw but deliberately ignores
+ * its pitch. Tracking yaw is what separates this from a world-locked plane — it keeps the
+ * guarantee that walking, turning and teleporting never leave the screen behind — while dropping
+ * the pitch is what stops it from swinging around every time the wearer glances up or down.
  *
  * The arithmetic is plain numbers rather than Babylon vectors, so the sign conventions and the
  * looking-straight-down degeneracy can be checked without a headset or a GPU. Babylon's left-handed
@@ -26,16 +27,16 @@ export interface XrHudPose {
   up: XrVector;
 }
 
-/** Eye-to-panel distance. Held constant across the pitch so reach and text size are unchanged. */
-export const HUD_DISTANCE = 1.55;
+/** Eye-to-screen distance. Held constant across the pitch so reach and text size are unchanged. */
+export const HUD_DISTANCE = 1.85;
 /**
- * How far below the horizon the panel centre rests.
+ * How far below the horizon the screen's centre rests.
  *
- * The panel subtends roughly 40 degrees at this distance, so 36 leaves its top edge some 15 degrees
- * clear of a level gaze — enough that it never crowds the forward view — while keeping it a
- * comfortable glance down rather than a full drop of the head.
+ * The screen subtends roughly 73 by 49 degrees at this distance, so a small drop puts its middle
+ * on the eye line a seated wearer actually holds — a few degrees under level — without moving any
+ * part of it out of comfortable reading range.
  */
-export const HUD_PITCH_RADIANS = (36 * Math.PI) / 180;
+export const HUD_PITCH_RADIANS = (9 * Math.PI) / 180;
 
 /** Below this, a direction's horizontal part is numerical noise and its yaw has to come elsewhere. */
 const YAW_EPSILON = 1e-4;
@@ -63,7 +64,7 @@ export const yawDirection = (forward: XrVector, up: XrVector): XrVector => {
   return { x: x / length, y: 0, z: z / length };
 };
 
-/** Places the panel below the horizon on the head's yaw, tilted back to face the eyes squarely. */
+/** Places the screen in front of the head on its yaw, tilted back to face the eyes squarely. */
 export const hudPose = (
   eye: XrVector,
   forward: XrVector,

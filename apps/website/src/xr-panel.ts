@@ -1,31 +1,30 @@
 /**
- * The holographic panel the in-headset console is drawn on.
+ * The holographic screen the in-headset Discover surface is drawn on.
  *
  * An immersive session paints only the Babylon scene, so every DOM control disappears the moment
- * the headset takes over and the panel becomes the whole interface. Two things matter for it to
+ * the headset takes over and this plane becomes the whole interface. Two things matter for it to
  * feel like part of the world rather than a sticker on the visor:
  *
- * - it **follows the head but not its pitch**. The panel tracks the wearer's position and yaw, so
- *   walking, turning, and teleporting never leave it behind or trigger visible recall jumps, but it
- *   rests below the horizon the way the Quest system keyboard does: clear of the forward view, and
- *   brought into focus by glancing down. `xr-hud-pose.ts` works out the pose.
- * - it is **summoned**, not permanent. A face button (or the pad on the wearer's wrist) recalls it
- *   below the wearer's gaze and dismisses it again, which keeps a viewing session unobstructed.
+ * - it **fills the view when it is open**. Discover covers the canvas completely in the browser,
+ *   and it does the same here: a wide plane squarely in front of the wearer, dropped only a few
+ *   degrees below a level gaze so its centre sits where the eyes rest. It follows the head's
+ *   position and yaw but not its pitch, so walking, turning and teleporting never leave it
+ *   behind. `xr-hud-pose.ts` works out the pose.
+ * - it is **summoned**, not permanent. A face button opens Discover and dismisses it again, and
+ *   while it is dismissed the session carries no floating chrome of any kind — no pads, no pills,
+ *   nothing between the wearer and the world.
  *
  * Everything is drawn from core primitives — one canvas texture on one plane — so no
  * `@babylonjs/gui` dependency is pulled into the bundle, and a controller ray picks entries by
  * turning the hit's texture coordinates back into canvas pixels.
  */
 
-import { ActionManager } from "@babylonjs/core/Actions/actionManager.js";
-import { ExecuteCodeAction } from "@babylonjs/core/Actions/directActions.js";
 import { DynamicTexture } from "@babylonjs/core/Materials/Textures/dynamicTexture.js";
 import { Texture } from "@babylonjs/core/Materials/Textures/texture.js";
 import { StandardMaterial } from "@babylonjs/core/Materials/standardMaterial.js";
 import { Color3 } from "@babylonjs/core/Maths/math.color.js";
 import { Axis } from "@babylonjs/core/Maths/math.axis.js";
 import { Quaternion, Vector3 } from "@babylonjs/core/Maths/math.vector.js";
-import type { Mesh } from "@babylonjs/core/Meshes/mesh.js";
 import { MeshBuilder } from "@babylonjs/core/Meshes/meshBuilder.js";
 import { TransformNode } from "@babylonjs/core/Meshes/transformNode.js";
 import { PointerEventTypes } from "@babylonjs/core/Events/pointerEvents.js";
@@ -36,21 +35,27 @@ import type { WebXRDefaultExperience } from "@babylonjs/core/XR/webXRDefaultExpe
 import type { WebXRInputSource } from "@babylonjs/core/XR/webXRInputSource.js";
 import type { WebXRAbstractMotionController } from "@babylonjs/core/XR/motionController/webXRAbstractMotionController.js";
 import type { Scene } from "@babylonjs/core/scene.js";
-import { hudPose } from "./xr-hud-pose.ts";
+import { HUD_DISTANCE, HUD_PITCH_RADIANS, hudPose } from "./xr-hud-pose.ts";
 import {
+  CONTENT_LEFT,
   hitTestPanel,
   layoutPanel,
   PANEL_METRICS,
+  RAIL_TOP,
   type XrCell,
   type XrPanelView,
   type XrPlacement,
   type XrRect,
 } from "./xr-panel-layout.ts";
 
-/** Physical size of the panel, chosen so a full page reads without eye movement at arm's length. */
-const PANEL_SIZE = { height: 1.15, width: 0.92 };
-/** Supersampling keeps text and fine rules crisp once the panel is angled in the headset. */
-const PANEL_TEXTURE_SCALE = 2;
+/**
+ * Physical size of the screen: wide enough at `HUD_DISTANCE` to subtend roughly 73° by 49°, which
+ * is as close to full-screen as a headset can be given without the corners falling outside the
+ * display's own field of view.
+ */
+const PANEL_SIZE = { height: 1.7, width: 2.72 };
+/** Supersampling keeps text and fine rules crisp once the screen is angled in the headset. */
+const PANEL_TEXTURE_SCALE = 1.25;
 const OPEN_SECONDS = 0.16;
 /** Drawn after the world so the console always reads, whatever it happens to be floating over. */
 const PANEL_RENDERING_GROUP = 2;
@@ -60,9 +65,14 @@ const DIM = "rgba(154, 206, 232, 0.82)";
 const FAINT = "rgba(126, 176, 204, 0.55)";
 const ACCENT = "#6fe3ff";
 
-/** A/X and a stick click are unambiguous "bring it here" inputs, even if it is already open. */
+/**
+ * A/X and a stick click open Discover, B/Y dismiss it.
+ *
+ * Two dedicated buttons rather than one toggle, so opening the screen never depends on the wearer
+ * remembering whether it is already open — and so nothing has to be left floating in the session
+ * as a thing to aim at. When Discover is dismissed the wearer's hands carry no chrome at all.
+ */
 const SUMMON_BUTTONS = new Set(["a-button", "x-button", "xr-standard-thumbstick"]);
-/** B/Y dismiss the panel, so opening it never depends on remembering its previous state. */
 const HIDE_BUTTONS = new Set(["b-button", "y-button"]);
 
 const toneAccent = (cell: XrCell): string => {
@@ -241,16 +251,82 @@ const paintTab = (context: CanvasRenderingContext2D, rect: XrRect, cell: XrCell)
   setTracking(context, 0);
 };
 
+const paintRailItem = (
+  context: CanvasRenderingContext2D,
+  rect: XrRect,
+  item: { accent?: string; cell: XrCell; glyph: string; index: string; source: string },
+): void => {
+  const accent = item.accent ?? ACCENT;
+  const { cell } = item;
+  const fill = context.createLinearGradient(rect.x, rect.y, rect.x + rect.width, rect.y);
+  if (cell.active) {
+    fill.addColorStop(0, "rgba(24, 104, 140, 0.7)");
+    fill.addColorStop(1, "rgba(10, 44, 66, 0.42)");
+  } else {
+    fill.addColorStop(0, "rgba(10, 26, 40, 0.72)");
+    fill.addColorStop(1, "rgba(7, 18, 29, 0.5)");
+  }
+  roundedRectPath(context, rect, 18);
+  context.fillStyle = fill;
+  context.fill();
+  context.strokeStyle = cell.active ? accent : "rgba(96, 200, 240, 0.2)";
+  context.lineWidth = cell.active ? 2.5 : 1.4;
+  context.stroke();
+
+  // The lit spine is how the browser rail marks the open section; it reads at a glance from the
+  // far side of a room, where a border weight change does not.
+  roundedRectPath(
+    context,
+    { height: rect.height - 26, width: 6, x: rect.x + 12, y: rect.y + 13 },
+    3,
+  );
+  context.fillStyle = accent;
+  context.globalAlpha = cell.active ? 1 : 0.4;
+  context.fill();
+  context.globalAlpha = 1;
+
+  context.textAlign = "left";
+  context.textBaseline = "middle";
+  context.font = font(500, 19);
+  context.fillStyle = FAINT;
+  setTracking(context, 2);
+  context.fillText(item.index, rect.x + 34, rect.y + 30);
+  setTracking(context, 0);
+
+  context.textAlign = "center";
+  context.font = font(500, 40);
+  context.fillStyle = accent;
+  context.fillText(item.glyph, rect.x + 82, rect.y + rect.height / 2 + 14);
+
+  context.textAlign = "left";
+  context.font = font(600, 30);
+  context.fillStyle = cell.active ? "#f2fdff" : INK;
+  context.fillText(truncate(context, cell.label, rect.width - 150), rect.x + 122, rect.y + 46);
+  context.font = font(400, 19);
+  context.fillStyle = DIM;
+  setTracking(context, 1.6);
+  context.fillText(
+    truncate(context, item.source.toUpperCase(), rect.width - 150),
+    rect.x + 122,
+    rect.y + 76,
+  );
+  setTracking(context, 0);
+};
+
 const paintPlacement = (context: CanvasRenderingContext2D, placement: XrPlacement): void => {
   switch (placement.kind) {
+    case "rail":
+      paintRailItem(context, placement.rect, placement.item);
+      return;
     case "row":
       paintRow(context, placement.rect, placement.cell);
       return;
     case "gridCell":
       paintGridCell(context, placement.rect, placement.cell);
       return;
-    case "tab":
     case "back":
+    case "railAction":
+    case "tab":
       paintTab(context, placement.rect, placement.cell);
       return;
     case "fact": {
@@ -386,22 +462,44 @@ const paintChrome = (context: CanvasRenderingContext2D, view: XrPanelView): void
   context.lineWidth = 3;
   context.stroke();
 
+  // The rail sits on its own slightly darker ground, the way the browser screen's `aside` does.
+  const railPanel = {
+    height: height - padding * 2,
+    width: PANEL_METRICS.railWidth + padding,
+    x: 4,
+    y: padding,
+  };
+  roundedRectPath(context, railPanel, 24);
+  context.fillStyle = "rgba(3, 12, 21, 0.55)";
+  context.fill();
+  context.beginPath();
+  context.moveTo(CONTENT_LEFT - padding, padding);
+  context.lineTo(CONTENT_LEFT - padding, height - padding);
+  context.strokeStyle = "rgba(111, 227, 255, 0.16)";
+  context.lineWidth = 2;
+  context.stroke();
+
   const header = context.createLinearGradient(0, 0, 0, PANEL_METRICS.headerRule);
   header.addColorStop(0, "rgba(28, 116, 156, 0.42)");
   header.addColorStop(1, "rgba(28, 116, 156, 0)");
   roundedRectPath(
     context,
-    { height: PANEL_METRICS.headerRule, width: body.width, x: body.x, y: body.y },
+    {
+      height: PANEL_METRICS.headerRule,
+      width: width - CONTENT_LEFT - padding,
+      x: CONTENT_LEFT,
+      y: body.y,
+    },
     30,
   );
   context.fillStyle = header;
   context.fill();
 
-  const rule = context.createLinearGradient(padding, 0, width - padding, 0);
+  const rule = context.createLinearGradient(CONTENT_LEFT, 0, width - padding, 0);
   rule.addColorStop(0, "rgba(111, 227, 255, 0.85)");
   rule.addColorStop(1, "rgba(111, 227, 255, 0.05)");
   context.beginPath();
-  context.moveTo(padding, PANEL_METRICS.headerRule);
+  context.moveTo(CONTENT_LEFT, PANEL_METRICS.headerRule);
   context.lineTo(width - padding, PANEL_METRICS.headerRule);
   context.strokeStyle = rule;
   context.lineWidth = 2;
@@ -425,24 +523,65 @@ const paintChrome = (context: CanvasRenderingContext2D, view: XrPanelView): void
     context.stroke();
   }
 
+  // Brand mark above the rail: the same EXORA / DISCOVER lockup the browser screen wears.
+  const markX = padding + 46;
+  const markY = RAIL_TOP - 96;
+  context.beginPath();
+  context.arc(markX, markY, 26, 0, Math.PI * 2);
+  context.strokeStyle = "rgba(111, 227, 255, 0.7)";
+  context.lineWidth = 3;
+  context.stroke();
+  context.beginPath();
+  context.arc(markX, markY, 9, 0, Math.PI * 2);
+  context.fillStyle = ACCENT;
+  context.fill();
+
+  context.textAlign = "left";
+  context.textBaseline = "middle";
+  context.font = font(700, 34);
+  context.fillStyle = INK;
+  setTracking(context, 6);
+  context.fillText("EXORA", markX + 46, markY - 12);
+  setTracking(context, 0);
+  context.font = font(500, 20);
+  context.fillStyle = ACCENT;
+  setTracking(context, 5);
+  context.fillText("DISCOVER", markX + 46, markY + 18);
+  setTracking(context, 0);
+
   context.textAlign = "left";
   context.textBaseline = "alphabetic";
-  context.fillStyle = INK;
-  context.font = font(700, 46);
-  setTracking(context, 0.5);
-  context.fillText(truncate(context, view.title, width - padding * 2 - 160), padding, 88);
-  setTracking(context, 0);
 
   if (view.subtitle) {
     context.font = font(500, 22);
     context.fillStyle = ACCENT;
-    setTracking(context, 3);
+    setTracking(context, 3.4);
     context.fillText(
-      truncate(context, view.subtitle.toUpperCase(), width - padding * 2 - 160),
-      padding,
-      126,
+      truncate(context, view.subtitle.toUpperCase(), width - CONTENT_LEFT - padding * 2 - 320),
+      CONTENT_LEFT,
+      86,
     );
     setTracking(context, 0);
+  }
+
+  context.fillStyle = INK;
+  context.font = font(700, 56);
+  setTracking(context, 0.5);
+  context.fillText(
+    truncate(context, view.title, width - CONTENT_LEFT - padding - 340),
+    CONTENT_LEFT,
+    150,
+  );
+  setTracking(context, 0);
+
+  if (view.summary) {
+    context.font = font(400, 24);
+    context.fillStyle = DIM;
+    context.fillText(
+      truncate(context, view.summary, width - CONTENT_LEFT - padding * 2),
+      CONTENT_LEFT,
+      198,
+    );
   }
 
   context.font = font(500, 20);
@@ -450,15 +589,15 @@ const paintChrome = (context: CanvasRenderingContext2D, view: XrPanelView): void
   context.textAlign = "center";
   setTracking(context, 2.6);
   context.fillText(
-    truncate(context, (view.footer ?? "").toUpperCase(), width - padding * 2),
-    width / 2,
+    truncate(context, (view.footer ?? "").toUpperCase(), width - CONTENT_LEFT - padding),
+    CONTENT_LEFT + (width - CONTENT_LEFT - padding) / 2,
     PANEL_METRICS.footerTop + 34,
   );
   setTracking(context, 0);
 };
 
 export interface XrPanel {
-  /** Wires controller buttons, the wrist pad, and the headset camera the panel is fixed to. */
+  /** Wires the controller buttons and the headset camera the screen is placed relative to. */
   attach: (xr: WebXRDefaultExperience) => void;
   dispose: () => void;
   hide: () => void;
@@ -631,7 +770,7 @@ export const createXrPanel = (scene: Scene, anisotropy = 4): XrPanel => {
     headForward.copyFrom(poseCamera.getDirection(Axis.Z)).normalize();
     headUp.copyFrom(poseCamera.getDirection(Axis.Y)).normalize();
 
-    const pose = hudPose(eyePosition, headForward, headUp);
+    const pose = hudPose(eyePosition, headForward, headUp, HUD_DISTANCE, HUD_PITCH_RADIANS);
     root.position.set(pose.position.x, pose.position.y, pose.position.z);
     lookDirection.set(pose.look.x, pose.look.y, pose.look.z);
     panelUp.set(pose.up.x, pose.up.y, pose.up.z);
@@ -649,7 +788,6 @@ export const createXrPanel = (scene: Scene, anisotropy = 4): XrPanel => {
     highlightMaterial.alpha = 0.26;
     root.setEnabled(true);
     root.scaling.setAll(0.92);
-    for (const pad of wristPads) pad.setEnabled(false);
     pulse(0.25, 20);
   };
 
@@ -663,7 +801,6 @@ export const createXrPanel = (scene: Scene, anisotropy = 4): XrPanel => {
     hovered = null;
     highlight.setEnabled(false);
     root.setEnabled(false);
-    for (const pad of wristPads) pad.setEnabled(true);
   };
 
   const toggle = (): void => (visible ? hide() : summon());
@@ -675,69 +812,9 @@ export const createXrPanel = (scene: Scene, anisotropy = 4): XrPanel => {
   };
   window.addEventListener("keydown", onConsoleKeyDown);
 
-  const wristPads: Mesh[] = [];
-
-  /**
-   * A pad on the back of each hand, so the panel can be recalled without knowing which face
-   * button does it — and so hand tracking, which has no buttons at all, can still summon it.
-   */
-  const createWristPad = (controller: WebXRInputSource): void => {
-    const parent = controller.grip ?? controller.pointer;
-    const padTexture = new DynamicTexture(
-      "xrWristPadTexture",
-      { height: 128, width: 256 },
-      scene,
-      true,
-      Texture.TRILINEAR_SAMPLINGMODE,
-    );
-    padTexture.hasAlpha = true;
-    const padContext = padTexture.getContext() as unknown as CanvasRenderingContext2D;
-    roundedRectPath(padContext, { height: 116, width: 244, x: 6, y: 6 }, 26);
-    padContext.fillStyle = "rgba(7, 24, 38, 0.9)";
-    padContext.fill();
-    padContext.strokeStyle = "rgba(111, 227, 255, 0.75)";
-    padContext.lineWidth = 4;
-    padContext.stroke();
-    padContext.fillStyle = INK;
-    padContext.font = font(600, 40);
-    padContext.textAlign = "center";
-    padContext.textBaseline = "middle";
-    padContext.fillText("CONSOLE", 128, 64);
-    padTexture.update();
-
-    const padMaterial = new StandardMaterial("xrWristPadMaterial", scene);
-    padMaterial.disableLighting = true;
-    padMaterial.emissiveColor = Color3.White();
-    padMaterial.diffuseTexture = padTexture;
-    padMaterial.emissiveTexture = padTexture;
-    padMaterial.useAlphaFromDiffuseTexture = true;
-    padMaterial.disableDepthWrite = true;
-    padMaterial.backFaceCulling = false;
-
-    const pad = MeshBuilder.CreatePlane("xrWristPad", { height: 0.036, width: 0.072 }, scene);
-    pad.parent = parent;
-    pad.material = padMaterial;
-    pad.position.set(0, 0.052, 0.028);
-    pad.rotation.x = Math.PI / 2 - 0.5;
-    pad.isPickable = true;
-    pad.applyFog = false;
-    pad.renderingGroupId = PANEL_RENDERING_GROUP;
-    pad.setEnabled(!visible);
-    // ActionManager uses Babylon's XR pointer-selection path directly for this small summon pad.
-    pad.actionManager = new ActionManager(scene);
-    pad.actionManager.registerAction(
-      new ExecuteCodeAction(ActionManager.OnPickTrigger, () => {
-        pulse(0.35, 26);
-        toggle();
-      }),
-    );
-    wristPads.push(pad);
-  };
-
   const bindController = (controller: WebXRInputSource): void => {
     controller.onMotionControllerInitObservable.add((motionController) => {
       motionControllers.push(motionController);
-      createWristPad(controller);
       for (const id of motionController.getComponentIds()) {
         const component = motionController.getComponent(id);
         if (SUMMON_BUTTONS.has(id) || HIDE_BUTTONS.has(id)) {
@@ -785,11 +862,6 @@ export const createXrPanel = (scene: Scene, anisotropy = 4): XrPanel => {
     dispose: () => {
       window.removeEventListener("keydown", onConsoleKeyDown);
       if (pointerObserver) scene.onPointerObservable.remove(pointerObserver);
-      for (const pad of wristPads) {
-        pad.material?.dispose(true, true);
-        pad.dispose();
-      }
-      wristPads.length = 0;
       motionControllers = [];
       lastPointerController = null;
       highlight.dispose();

@@ -1,5 +1,6 @@
 import { expect, test } from "vite-plus/test";
 import {
+  CONTENT_LEFT,
   hitTestPanel,
   homeActionCapacity,
   layoutPanel,
@@ -145,4 +146,58 @@ test("a home page filled to capacity still places the way out of the session", (
     "cell" in placement ? [placement.cell.id] : [],
   );
   expect(placed).toContain("exit");
+});
+
+test("keeps the rail clear of the workspace", () => {
+  const placements = layoutPanel({
+    blocks: [{ cells: [cell("alpha"), cell("beta")], kind: "rows" }],
+    rail: [
+      { cell: cell("solar", { active: true }), glyph: "☉", index: "01", source: "NASA / JPL" },
+      { cell: cell("worlds"), glyph: "◎", index: "02", source: "NASA ARCHIVE" },
+    ],
+    railActions: [cell("close"), cell("exit")],
+    title: "Start close to home.",
+  });
+
+  const rail = placements.filter((placement) => placement.kind === "rail");
+  const actions = placements.filter((placement) => placement.kind === "railAction");
+  const rows = placements.filter((placement) => placement.kind === "row");
+
+  expect(rail).toHaveLength(2);
+  expect(actions).toHaveLength(2);
+  for (const placement of [...rail, ...actions]) {
+    expect(placement.rect.x + placement.rect.width).toBeLessThanOrEqual(CONTENT_LEFT);
+  }
+  for (const row of rows) expect(row.rect.x).toBeGreaterThanOrEqual(CONTENT_LEFT);
+
+  // The rail's own controls own the foot of the column, below every destination.
+  const lastRail = rail.at(-1);
+  expect(actions[0]?.rect.y).toBeGreaterThan(
+    (lastRail?.rect.y ?? 0) + (lastRail?.rect.height ?? 0),
+  );
+  expect((actions.at(-1)?.rect.y ?? 0) + (actions.at(-1)?.rect.height ?? 0)).toBeLessThanOrEqual(
+    PANEL_METRICS.height,
+  );
+});
+
+test("lays a row block across its columns and keeps each cell pickable", () => {
+  const left = cell("left");
+  const right = cell("right");
+  const placements = layoutPanel({
+    blocks: [{ cells: [left, right, cell("wrapped")], columns: 2, kind: "rows" }],
+    title: "Two up",
+  });
+
+  const [first, second, third] = placements;
+  expect(first?.rect.y).toBe(second?.rect.y);
+  expect(second?.rect.x).toBeGreaterThan(first?.rect.x ?? 0);
+  expect(third?.rect.y).toBe((first?.rect.y ?? 0) + PANEL_METRICS.rowHeight + PANEL_METRICS.rowGap);
+  expect(third?.rect.x).toBe(first?.rect.x);
+  expect(
+    hitTestPanel(placements, (second?.rect.x ?? 0) + 10, (second?.rect.y ?? 0) + 10)?.cell,
+  ).toBe(right);
+});
+
+test("counts a column's worth of rows per column", () => {
+  expect(rowCapacity(0, 2)).toBe(rowCapacity(0) * 2);
 });

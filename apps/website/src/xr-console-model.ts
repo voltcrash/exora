@@ -1,5 +1,5 @@
 /**
- * Content model for the in-headset console.
+ * Content model for the in-headset Discover screen.
  *
  * Everything the flat page can do has to be reachable from inside a session, which means the
  * headset needs its own copy of the catalog vocabulary, an on-screen keyboard, and the world
@@ -10,7 +10,12 @@
 
 import type { ExoplanetProfile, StarProfile } from "@exora/contracts";
 import type { CustomPlanetParameters, CustomStarParameters } from "@exora/worldgen";
+import { blackHoleKindLabel, formatBlackHoleMass, type BlackHoleProfile } from "./black-holes.ts";
 import { formatNumber } from "./planet-utils.tsx";
+import type { AsteroidProfile } from "./solar-asteroids.ts";
+import type { CometProfile } from "./solar-comets.ts";
+import type { SolarMissionProfile } from "./solar-missions.ts";
+import type { SolarRegionProfile } from "./solar-regions.ts";
 import {
   bodyScaleLabel,
   orbitMappingLabel,
@@ -322,6 +327,67 @@ export const planetCellDetail = (planet: ExoplanetProfile): string => {
     .filter(Boolean)
     .join(" · ");
 };
+
+/**
+ * The Solar System's own shelves, mirroring the browser catalog's filter chips.
+ *
+ * The home system is browsed by what a body *is* rather than by curated collection, so the
+ * headset offers the same seven shelves the flat screen does instead of inventing a second
+ * vocabulary for the same data.
+ */
+export const SOLAR_SHELVES = [
+  { id: "planets", label: "Planets" },
+  { id: "dwarfs", label: "Dwarfs" },
+  { id: "moons", label: "Moons" },
+  { id: "asteroids", label: "Asteroids" },
+  { id: "comets", label: "Comets" },
+  { id: "regions", label: "Regions" },
+  { id: "missions", label: "Missions" },
+] as const;
+
+export type SolarShelf = (typeof SOLAR_SHELVES)[number]["id"];
+
+/** What a Solar System world is, said the way the flat catalog says it. */
+export const solarWorldDetail = (planet: ExoplanetProfile): string => {
+  const solar = planet.solarSystem;
+  if (!solar) return planetCellDetail(planet);
+  const type = solar.bodyType.replaceAll("-", " ");
+  return [solar.parent && solar.parent !== "Sun" ? `${type} of ${solar.parent}` : type]
+    .filter(Boolean)
+    .join(" · ");
+};
+
+export const blackHoleCellDetail = (blackHole: BlackHoleProfile): string =>
+  [
+    blackHoleKindLabel(blackHole),
+    formatBlackHoleMass(blackHole.massSolar),
+    blackHole.distanceLightYears === null
+      ? null
+      : `${formatNumber(blackHole.distanceLightYears, 0)} ly`,
+  ]
+    .filter(Boolean)
+    .join(" · ");
+
+export const asteroidCellDetail = (asteroid: AsteroidProfile): string =>
+  [asteroid.orbit.class, `${formatNumber(asteroid.diameterKilometers.value, 1)} km across`]
+    .filter(Boolean)
+    .join(" · ");
+
+export const cometCellDetail = (comet: CometProfile): string =>
+  [comet.orbit.class, `perihelion ${formatNumber(comet.orbit.perihelionAu, 2)} au`]
+    .filter(Boolean)
+    .join(" · ");
+
+export const regionCellDetail = (region: SolarRegionProfile): string =>
+  [
+    region.kind.replaceAll("-", " "),
+    `${formatNumber(region.distanceAu.inner, 0)}–${formatNumber(region.distanceAu.outer, 0)} au`,
+  ].join(" · ");
+
+export const missionCellDetail = (mission: SolarMissionProfile): string =>
+  [mission.agency, `${mission.startDate.slice(0, 4)}–${mission.endDate?.slice(0, 4) ?? "present"}`]
+    .filter(Boolean)
+    .join(" · ");
 
 export const starCellDetail = (star: StarProfile): string => {
   const { distanceParsecs, spectralType, visualMagnitude } = star.observation;

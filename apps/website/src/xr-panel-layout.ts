@@ -1,5 +1,5 @@
 /**
- * Layout arithmetic for the in-headset console.
+ * Layout arithmetic for the in-headset Discover screen.
  *
  * The console is drawn into a single canvas and pointed at with a controller ray, so every
  * interactive region has to exist twice: once as pixels the painter fills, and once as a
@@ -36,6 +36,22 @@ export interface XrFact {
   value: string;
 }
 
+/**
+ * One entry in the left rail, mirroring the flat Discover screen's numbered destination list.
+ *
+ * The rail is part of the view rather than a block, because it is the one region that never
+ * scrolls with the page: whichever section is open, the same six destinations stay reachable in
+ * the same place, exactly as the browser screen's `aside` does.
+ */
+export interface XrRailItem {
+  /** Section tint, mirroring the accent each destination wears on the browser screen. */
+  accent?: string;
+  cell: XrCell;
+  glyph: string;
+  index: string;
+  source: string;
+}
+
 export interface XrStepperRow {
   decrease: XrCell;
   increase: XrCell;
@@ -45,7 +61,7 @@ export interface XrStepperRow {
 
 export type XrBlock =
   | { cells: readonly XrCell[]; columns: number; height: number; kind: "grid" }
-  | { cells: readonly XrCell[]; kind: "rows" }
+  | { cells: readonly XrCell[]; columns?: number; kind: "rows" }
   | { cells: readonly XrCell[]; kind: "tabs" }
   | { facts: readonly XrFact[]; kind: "facts" }
   | { kind: "field"; label: string; value: string }
@@ -58,12 +74,19 @@ export interface XrPanelView {
   back?: XrCell;
   blocks: readonly XrBlock[];
   footer?: string;
+  /** Destination list down the left edge, plus the controls that close the screen. */
+  rail?: readonly XrRailItem[];
+  /** Rail-footer controls: leaving the screen, and leaving the session. */
+  railActions?: readonly XrCell[];
   subtitle?: string;
+  /** The one-line summary under the section title, matching the browser screen's header. */
+  summary?: string;
   title: string;
 }
 
 export type XrPlacement =
-  | { cell: XrCell; kind: "back" | "gridCell" | "row" | "tab"; rect: XrRect }
+  | { cell: XrCell; kind: "back" | "gridCell" | "railAction" | "row" | "tab"; rect: XrRect }
+  | { item: XrRailItem; kind: "rail"; rect: XrRect }
   | { kind: "fact"; label: string; rect: XrRect; value: string }
   | { kind: "field"; label: string; rect: XrRect; value: string }
   | { kind: "note"; lines: readonly string[]; rect: XrRect }
@@ -71,18 +94,23 @@ export type XrPlacement =
   | { kind: "stepperTrack"; label: string; rect: XrRect; value: string };
 
 export const PANEL_METRICS = {
-  backHeight: 58,
-  backWidth: 138,
+  backHeight: 62,
+  backWidth: 300,
   blockGap: 18,
-  contentTop: 182,
+  contentTop: 268,
   factHeight: 50,
   fieldHeight: 100,
-  footerTop: 1_212,
-  gridGap: 10,
-  headerRule: 156,
-  height: 1_280,
+  footerTop: 1_146,
+  gridGap: 12,
+  headerRule: 242,
+  height: 1_200,
   noteLine: 34,
   padding: 44,
+  /** Height of one rail destination, sized for a glyph, a name and its archive line. */
+  railItemHeight: 108,
+  railGap: 12,
+  /** Width of the destination rail down the left edge. */
+  railWidth: 372,
   rowGap: 12,
   rowHeight: 92,
   statusHeight: 44,
@@ -90,11 +118,18 @@ export const PANEL_METRICS = {
   stepperHeight: 82,
   tabGap: 10,
   tabHeight: 64,
-  width: 1_024,
+  width: 1_920,
 } as const;
 
-const CONTENT_WIDTH = PANEL_METRICS.width - PANEL_METRICS.padding * 2;
+/** Left edge of everything that is not the rail: header, blocks, footer. */
+export const CONTENT_LEFT = PANEL_METRICS.padding * 2 + PANEL_METRICS.railWidth;
+
+const CONTENT_WIDTH = PANEL_METRICS.width - CONTENT_LEFT - PANEL_METRICS.padding;
 const CONTENT_BOTTOM = PANEL_METRICS.footerTop - 14;
+/** Where the rail's destination list starts, below the Exora brand mark. */
+export const RAIL_TOP = 232;
+/** How far the destination list may run before the rail's own controls claim the space. */
+const RAIL_BOTTOM = PANEL_METRICS.height - PANEL_METRICS.padding - 180;
 
 /**
  * Greedy word wrap against an estimated character width.
@@ -137,8 +172,9 @@ export const wrapText = (text: string, maxCharacters: number, maxLines: number):
 export const homeActionCapacity = (): number =>
   rowCapacity(PANEL_METRICS.tabHeight + PANEL_METRICS.blockGap) - 1;
 
-/** Rows a list block can show before it would run past the footer. */
-export const rowCapacity = (topOffset: number): number =>
+/** Rows a list block can show before it would run past the footer, across `columns` columns. */
+export const rowCapacity = (topOffset: number, columns = 1): number =>
+  Math.max(1, Math.max(1, columns)) *
   Math.max(
     1,
     Math.floor(
@@ -151,11 +187,10 @@ const blockHeight = (block: XrBlock): number => {
   switch (block.kind) {
     case "tabs":
       return PANEL_METRICS.tabHeight;
-    case "rows":
-      return (
-        block.cells.length * PANEL_METRICS.rowHeight +
-        Math.max(0, block.cells.length - 1) * PANEL_METRICS.rowGap
-      );
+    case "rows": {
+      const rows = Math.ceil(block.cells.length / Math.max(1, block.columns ?? 1));
+      return rows * PANEL_METRICS.rowHeight + Math.max(0, rows - 1) * PANEL_METRICS.rowGap;
+    }
     case "grid": {
       const rows = Math.ceil(block.cells.length / Math.max(1, block.columns));
       return rows * block.height + Math.max(0, rows - 1) * PANEL_METRICS.gridGap;
@@ -163,7 +198,7 @@ const blockHeight = (block: XrBlock): number => {
     case "facts":
       return block.facts.length * PANEL_METRICS.factHeight;
     case "note":
-      return wrapText(block.text, 62, 4).length * PANEL_METRICS.noteLine;
+      return wrapText(block.text, 96, 4).length * PANEL_METRICS.noteLine;
     case "status":
       return PANEL_METRICS.statusHeight;
     case "field":
@@ -200,6 +235,39 @@ export const layoutPanel = (view: XrPanelView): XrPlacement[] => {
     });
   }
 
+  if (view.rail) {
+    view.rail.forEach((item, index) => {
+      const y = RAIL_TOP + index * (PANEL_METRICS.railItemHeight + PANEL_METRICS.railGap);
+      if (y + PANEL_METRICS.railItemHeight > RAIL_BOTTOM) return;
+      placements.push({
+        item,
+        kind: "rail",
+        rect: {
+          height: PANEL_METRICS.railItemHeight,
+          width: PANEL_METRICS.railWidth,
+          x: padding,
+          y,
+        },
+      });
+    });
+  }
+
+  if (view.railActions) {
+    const count = view.railActions.length;
+    view.railActions.forEach((cell, index) => {
+      const y =
+        PANEL_METRICS.height -
+        padding -
+        (count - index) * (PANEL_METRICS.tabHeight + PANEL_METRICS.railGap) +
+        PANEL_METRICS.railGap;
+      placements.push({
+        cell,
+        kind: "railAction",
+        rect: { height: PANEL_METRICS.tabHeight, width: PANEL_METRICS.railWidth, x: padding, y },
+      });
+    });
+  }
+
   let cursor = PANEL_METRICS.contentTop;
   for (const block of view.blocks) {
     if (cursor >= CONTENT_BOTTOM) break;
@@ -215,7 +283,7 @@ export const layoutPanel = (view: XrPanelView): XrPlacement[] => {
             rect: {
               height: PANEL_METRICS.tabHeight,
               width,
-              x: padding + index * (width + PANEL_METRICS.tabGap),
+              x: CONTENT_LEFT + index * (width + PANEL_METRICS.tabGap),
               y: cursor,
             },
           });
@@ -223,16 +291,23 @@ export const layoutPanel = (view: XrPanelView): XrPlacement[] => {
         break;
       }
       case "rows": {
-        let rowY = cursor;
-        for (const cell of block.cells) {
-          if (rowY + PANEL_METRICS.rowHeight > CONTENT_BOTTOM) break;
+        const columns = Math.max(1, block.columns ?? 1);
+        const width = (CONTENT_WIDTH - PANEL_METRICS.gridGap * (columns - 1)) / columns;
+        block.cells.forEach((cell, index) => {
+          const rowY =
+            cursor + Math.floor(index / columns) * (PANEL_METRICS.rowHeight + PANEL_METRICS.rowGap);
+          if (rowY + PANEL_METRICS.rowHeight > CONTENT_BOTTOM) return;
           placements.push({
             cell,
             kind: "row",
-            rect: { height: PANEL_METRICS.rowHeight, width: CONTENT_WIDTH, x: padding, y: rowY },
+            rect: {
+              height: PANEL_METRICS.rowHeight,
+              width,
+              x: CONTENT_LEFT + (index % columns) * (width + PANEL_METRICS.gridGap),
+              y: rowY,
+            },
           });
-          rowY += PANEL_METRICS.rowHeight + PANEL_METRICS.rowGap;
-        }
+        });
         break;
       }
       case "grid": {
@@ -249,7 +324,7 @@ export const layoutPanel = (view: XrPanelView): XrPlacement[] => {
             rect: {
               height: block.height,
               width,
-              x: padding + column * (width + PANEL_METRICS.gridGap),
+              x: CONTENT_LEFT + column * (width + PANEL_METRICS.gridGap),
               y,
             },
           });
@@ -258,13 +333,14 @@ export const layoutPanel = (view: XrPanelView): XrPlacement[] => {
       }
       case "facts": {
         block.facts.forEach((fact, index) => {
+          if (cursor + (index + 1) * PANEL_METRICS.factHeight > CONTENT_BOTTOM) return;
           placements.push({
             kind: "fact",
             label: fact.label,
             rect: {
               height: PANEL_METRICS.factHeight,
               width: CONTENT_WIDTH,
-              x: padding,
+              x: CONTENT_LEFT,
               y: cursor + index * PANEL_METRICS.factHeight,
             },
             value: fact.value,
@@ -273,26 +349,29 @@ export const layoutPanel = (view: XrPanelView): XrPlacement[] => {
         break;
       }
       case "note": {
-        const lines = wrapText(block.text, 62, 4);
+        const room = Math.floor((CONTENT_BOTTOM - cursor) / PANEL_METRICS.noteLine);
+        if (room <= 0) break;
+        const lines = wrapText(block.text, 96, Math.min(4, room));
         placements.push({
           kind: "note",
           lines,
           rect: {
             height: lines.length * PANEL_METRICS.noteLine,
             width: CONTENT_WIDTH,
-            x: padding,
+            x: CONTENT_LEFT,
             y: cursor,
           },
         });
         break;
       }
       case "status": {
+        if (cursor + PANEL_METRICS.statusHeight > CONTENT_BOTTOM) break;
         placements.push({
           kind: "status",
           rect: {
             height: PANEL_METRICS.statusHeight,
             width: CONTENT_WIDTH,
-            x: padding,
+            x: CONTENT_LEFT,
             y: cursor,
           },
           text: block.text,
@@ -301,13 +380,14 @@ export const layoutPanel = (view: XrPanelView): XrPlacement[] => {
         break;
       }
       case "field": {
+        if (cursor + PANEL_METRICS.fieldHeight > CONTENT_BOTTOM) break;
         placements.push({
           kind: "field",
           label: block.label,
           rect: {
             height: PANEL_METRICS.fieldHeight,
             width: CONTENT_WIDTH,
-            x: padding,
+            x: CONTENT_LEFT,
             y: cursor,
           },
           value: block.value,
@@ -319,7 +399,7 @@ export const layoutPanel = (view: XrPanelView): XrPlacement[] => {
         for (const row of block.rows) {
           if (rowY + PANEL_METRICS.stepperHeight > CONTENT_BOTTOM) break;
           const buttonY = rowY + (PANEL_METRICS.stepperHeight - PANEL_METRICS.stepperButton) / 2;
-          const increaseX = padding + CONTENT_WIDTH - PANEL_METRICS.stepperButton;
+          const increaseX = CONTENT_LEFT + CONTENT_WIDTH - PANEL_METRICS.stepperButton;
           const decreaseX = increaseX - PANEL_METRICS.stepperButton - PANEL_METRICS.gridGap;
           placements.push(
             {
@@ -327,8 +407,8 @@ export const layoutPanel = (view: XrPanelView): XrPlacement[] => {
               label: row.label,
               rect: {
                 height: PANEL_METRICS.stepperHeight,
-                width: decreaseX - padding - PANEL_METRICS.gridGap,
-                x: padding,
+                width: decreaseX - CONTENT_LEFT - PANEL_METRICS.gridGap,
+                x: CONTENT_LEFT,
                 y: rowY,
               },
               value: row.value,

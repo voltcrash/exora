@@ -424,7 +424,7 @@ export const App = () => {
   /**
    * The console's catalog, wired to the page rather than to the world in front of it.
    *
-   * Registered here because these four journeys belong to Exora, not to whichever destination
+   * Registered here because these journeys belong to Exora, not to whichever destination
    * happens to be mounted: a wearer browsing the archive from a comet is asking the page to take
    * them somewhere, exactly as they would be from a planet. The renderer only reaches for these
    * where the current world has nothing of its own to say. See `ConsoleNavigator`.
@@ -434,10 +434,26 @@ export const App = () => {
       sceneHost?.setConsoleNavigator({
         onForgePlanet: generatePlanet,
         onForgeStar: generateStar,
+        onTravelAsteroid: selectAsteroid,
+        onTravelBlackHole: selectBlackHole,
+        onTravelComet: selectComet,
+        onTravelMission: selectMission,
         onTravelPlanet: (planet) => selectPlanet(planet, false),
+        onTravelRegion: selectRegion,
         onTravelStar: (star) => selectStar(star, false),
       }),
-    [generatePlanet, generateStar, sceneHost, selectPlanet, selectStar],
+    [
+      generatePlanet,
+      generateStar,
+      sceneHost,
+      selectAsteroid,
+      selectBlackHole,
+      selectComet,
+      selectMission,
+      selectPlanet,
+      selectRegion,
+      selectStar,
+    ],
   );
 
   const returnHome = useCallback((): void => {

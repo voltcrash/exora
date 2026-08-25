@@ -42,16 +42,18 @@ test("rests below the eyes at the full viewing distance", () => {
   expect(length(offset)).toBeCloseTo(HUD_DISTANCE, 6);
 });
 
-test("leaves the forward view clear", () => {
+test("fills the forward view rather than clearing it", () => {
   const pose = hudPose(EYE, LEVEL.forward, LEVEL.up);
   const offset = {
     x: pose.position.x - EYE.x,
     y: pose.position.y - EYE.y,
     z: pose.position.z - EYE.z,
   };
-  // Half the panel's ~40 degree height has to still sit below a level gaze.
+  // Discover covers the window on the flat page and the view in a headset, so a level gaze has to
+  // land on the screen: the drop below the horizon stays well inside its ~24.5 degree half-height.
   const centreDegrees = (Math.asin(-offset.y / HUD_DISTANCE) * 180) / Math.PI;
-  expect(centreDegrees - 20.4).toBeGreaterThan(10);
+  expect(centreDegrees).toBeGreaterThan(0);
+  expect(centreDegrees).toBeLessThan(24.5);
 });
 
 test("ignores head pitch, so looking down brings the panel into view", () => {
