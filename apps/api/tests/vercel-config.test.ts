@@ -26,6 +26,6 @@ test("the deployment applies its browser security policy to every response", asy
     "x-frame-options": "DENY",
   });
   expect(headers["permissions-policy"]).toContain("xr-spatial-tracking=(self)");
-  expect(headers["permissions-policy"]).toContain("camera=()");
+  expect(headers["permissions-policy"]).toContain("camera=(self)");
   expect(headers["permissions-policy"]).toContain("microphone=()");
 });

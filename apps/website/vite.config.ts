@@ -1,4 +1,4 @@
-import { defineConfig, type Plugin } from "vite-plus";
+import { defineConfig, loadEnv, type Plugin } from "vite-plus";
 import react from "@vitejs/plugin-react";
 import { playwright } from "vite-plus/test/browser-playwright";
 import { NOTABLE_PLANET_NAMES, NOTABLE_STAR_NAMES } from "./src/search-discovery.ts";
@@ -117,6 +117,32 @@ const emitSitemap = (): Plugin => ({
   },
 });
 
+/**
+ * Loads Variant Launch before the application asks the browser about WebXR.
+ *
+ * The SDK is deliberately omitted when no key is configured. Local desktop development and CI
+ * then remain fully offline, while a configured production build receives the parser-blocking
+ * script placement Variant recommends for making `navigator.xr` available inside its iOS viewer.
+ * Redirect mode is not used: Exora's existing immersive button owns the handoff to the Launch
+ * Card, so opening an ordinary page on an iPhone never redirects without a tap.
+ */
+const variantLaunchSdk = (key: string): Plugin => ({
+  name: "exora:variant-launch-sdk",
+  transformIndexHtml: {
+    order: "pre",
+    handler: () =>
+      key
+        ? [
+            {
+              attrs: { src: `https://launchar.app/sdk/v1?key=${encodeURIComponent(key)}` },
+              injectTo: "head" as const,
+              tag: "script",
+            },
+          ]
+        : [],
+  },
+});
+
 /** A hard ceiling rather than Vite's advisory-only large-chunk warning. */
 const MAX_JAVASCRIPT_CHUNK_BYTES = 800_000;
 
@@ -136,73 +162,83 @@ const enforceJavaScriptBudget = (): Plugin => ({
   },
 });
 
-export default defineConfig({
-  optimizeDeps: {
-    // The irregular-body route is lazy, but browser journeys open it after the dev server has
-    // already started. Pre-bundling its loader/material modules prevents Vite from reloading the
-    // entire test page halfway through a journey when that route is first visited.
-    include: [
-      "@babylonjs/core/Lights/Shadows/shadowGenerator.js",
-      "@babylonjs/core/Loading/sceneLoader.js",
-      "@babylonjs/core/Materials/PBR/pbrMaterial.js",
-      "@babylonjs/loaders/dynamic.js",
-    ],
-  },
-  /**
-   * The two suites this package runs, kept as separate projects so neither pays for the other.
-   *
-   * `unit` is the bulk of the coverage and runs on Node, where it is fast enough to be worth running
-   * on every save. `browser` exists for the things Node cannot answer: whether a control still has an
-   * accessible name once the stylesheet has hidden its label, whether a dialog traps focus, whether
-   * the layout holds at a phone width. Those need a real engine with real CSS, so `vp test` runs only
-   * `unit` and the browser suite is asked for by name — nobody has to download a browser to run the
-   * tests, and CI runs both.
-   */
-  test: {
-    projects: [
-      {
-        extends: true,
-        test: {
-          name: "unit",
-          include: ["src/**/*.test.ts", "src/**/*.test.tsx"],
-          exclude: ["src/**/*.browser.test.ts", "src/**/*.browser.test.tsx"],
-        },
-      },
-      {
-        extends: true,
-        test: {
-          name: "browser",
-          include: ["src/**/*.browser.test.tsx"],
-          browser: {
-            enabled: true,
-            provider: playwright(),
-            headless: true,
-            // Desktop and phone, because the defects this suite is here to catch are the ones
-            // that only appear at one of those widths.
-            instances: [
-              { browser: "chromium", name: "desktop", viewport: { width: 1440, height: 900 } },
-              { browser: "chromium", name: "mobile", viewport: { width: 390, height: 844 } },
-            ],
+export default defineConfig(({ mode }) => {
+  const variantLaunchKey = loadEnv(mode, process.cwd(), "").VITE_VARIANT_LAUNCH_KEY?.trim() ?? "";
+
+  return {
+    optimizeDeps: {
+      // The irregular-body route is lazy, but browser journeys open it after the dev server has
+      // already started. Pre-bundling its loader/material modules prevents Vite from reloading the
+      // entire test page halfway through a journey when that route is first visited.
+      include: [
+        "@babylonjs/core/Lights/Shadows/shadowGenerator.js",
+        "@babylonjs/core/Loading/sceneLoader.js",
+        "@babylonjs/core/Materials/PBR/pbrMaterial.js",
+        "@babylonjs/loaders/dynamic.js",
+      ],
+    },
+    /**
+     * The two suites this package runs, kept as separate projects so neither pays for the other.
+     *
+     * `unit` is the bulk of the coverage and runs on Node, where it is fast enough to be worth running
+     * on every save. `browser` exists for the things Node cannot answer: whether a control still has an
+     * accessible name once the stylesheet has hidden its label, whether a dialog traps focus, whether
+     * the layout holds at a phone width. Those need a real engine with real CSS, so `vp test` runs only
+     * `unit` and the browser suite is asked for by name — nobody has to download a browser to run the
+     * tests, and CI runs both.
+     */
+    test: {
+      projects: [
+        {
+          extends: true,
+          test: {
+            name: "unit",
+            include: ["src/**/*.test.ts", "src/**/*.test.tsx"],
+            exclude: ["src/**/*.browser.test.ts", "src/**/*.browser.test.tsx"],
           },
         },
+        {
+          extends: true,
+          test: {
+            name: "browser",
+            include: ["src/**/*.browser.test.tsx"],
+            browser: {
+              enabled: true,
+              provider: playwright(),
+              headless: true,
+              // Desktop and phone, because the defects this suite is here to catch are the ones
+              // that only appear at one of those widths.
+              instances: [
+                { browser: "chromium", name: "desktop", viewport: { width: 1440, height: 900 } },
+                { browser: "chromium", name: "mobile", viewport: { width: 390, height: 844 } },
+              ],
+            },
+          },
+        },
+      ],
+    },
+    build: {
+      chunkSizeWarningLimit: MAX_JAVASCRIPT_CHUNK_BYTES / 1_000,
+      rolldownOptions: {
+        // Naming from the finished graph keeps dynamic boundaries intact. Grouping by dependency
+        // here would hoist Babylon into the entry chunk and add roughly 1.7 MB to first paint.
+        output: { chunkFileNames: chunkFileName },
       },
+    },
+    plugins: [
+      variantLaunchSdk(variantLaunchKey),
+      react(),
+      dropWebGpuShaders(),
+      emitSitemap(),
+      enforceJavaScriptBudget(),
     ],
-  },
-  build: {
-    chunkSizeWarningLimit: MAX_JAVASCRIPT_CHUNK_BYTES / 1_000,
-    rolldownOptions: {
-      // Naming from the finished graph keeps dynamic boundaries intact. Grouping by dependency
-      // here would hoist Babylon into the entry chunk and add roughly 1.7 MB to first paint.
-      output: { chunkFileNames: chunkFileName },
-    },
-  },
-  plugins: [react(), dropWebGpuShaders(), emitSitemap(), enforceJavaScriptBudget()],
-  server: {
-    proxy: {
-      "/api": {
-        changeOrigin: true,
-        target: "http://localhost:8787",
+    server: {
+      proxy: {
+        "/api": {
+          changeOrigin: true,
+          target: "http://localhost:8787",
+        },
       },
     },
-  },
+  };
 });

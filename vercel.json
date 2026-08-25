@@ -30,7 +30,7 @@
         },
         {
           "key": "Permissions-Policy",
-          "value": "camera=(), geolocation=(), microphone=(), payment=(), usb=(), xr-spatial-tracking=(self)"
+          "value": "camera=(self), geolocation=(), microphone=(), payment=(), usb=(), xr-spatial-tracking=(self)"
         },
         {
           "key": "Referrer-Policy",
