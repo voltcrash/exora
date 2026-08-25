@@ -5,6 +5,7 @@
   "type": "module",
   "scripts": {
     "ready": "vp check && vp run -r test && vp run -r build",
+    "quality:lighthouse": "vp run website#quality:lighthouse",
     "dev": "vp run --parallel --filter website --filter @exora/api dev",
     "dev:vercel": "vercel dev",
     "dev:api": "vp run @exora/api#dev",

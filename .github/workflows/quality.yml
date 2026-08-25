@@ -44,5 +44,8 @@ jobs:
       - name: Build every workspace
         run: vp run -r build
 
+      - name: Enforce Lighthouse quality budgets
+        run: vp run quality:lighthouse
+
       - name: Audit production dependencies
         run: vp pm audit -- --prod --audit-level=high

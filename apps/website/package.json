@@ -8,6 +8,7 @@
     "build": "tsc && vp build",
     "star-catalog": "node scripts/build-star-catalog.ts",
     "preview": "vp preview",
+    "quality:lighthouse": "lhci autorun",
     "test": "vp test --project unit",
     "test:browser": "vp test --project browser"
   },
@@ -23,6 +24,7 @@
   },
   "devDependencies": {
     "@iwer/devui": "catalog:",
+    "@lhci/cli": "catalog:",
     "@types/node": "^26.2.0",
     "@types/react": "catalog:",
     "@types/react-dom": "catalog:",
