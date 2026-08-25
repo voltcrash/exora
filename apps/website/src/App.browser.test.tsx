@@ -939,21 +939,21 @@ test("terrain view fades every interface region and reveals the hovered one", as
   shell!.classList.replace("view-orbit", "view-surface");
   const canvas = document.querySelector<HTMLCanvasElement>("canvas");
   expect(canvas).not.toBeNull();
-  await userEvent.hover(canvas!);
-  await new Promise((resolve) => window.setTimeout(resolve, 300));
+  await page.elementLocator(canvas!).hover();
 
   const regions = document.querySelectorAll<HTMLElement>(
     ".topbar > *, .hud > *, .mission-control > *",
   );
   expect(regions.length).toBeGreaterThan(2);
-  for (const region of regions) expect(getComputedStyle(region).opacity).toBe("0.34");
+  for (const region of regions) {
+    await expect.poll(() => getComputedStyle(region).opacity).toBe("0.34");
+  }
 
   const hoveredRegion = document.querySelector<HTMLElement>(".world-intro");
   expect(hoveredRegion).not.toBeNull();
-  await userEvent.hover(hoveredRegion!);
-  await new Promise((resolve) => window.setTimeout(resolve, 300));
+  await page.elementLocator(hoveredRegion!).hover();
 
-  expect(getComputedStyle(hoveredRegion!).opacity).toBe("1");
+  await expect.poll(() => getComputedStyle(hoveredRegion!).opacity).toBe("1");
   for (const region of regions) {
     if (region !== hoveredRegion) expect(getComputedStyle(region).opacity).toBe("0.34");
   }
