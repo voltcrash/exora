@@ -32,6 +32,9 @@ jobs:
       - name: Check formatting, lint, and types
         run: vp check
 
+      - name: Verify third-party asset provenance
+        run: vp run quality:assets
+
       - name: Run unit tests
         run: vp run -r test
 

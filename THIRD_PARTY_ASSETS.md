@@ -354,6 +354,12 @@ commands and the settings behind that split.
 Creator: ambientCG / Lennart Demes. Attribution is not legally required under CC0, but provenance
 is retained here.
 
+The ten shipped files are `textures/basalt/normal.ktx2`, `textures/basalt/roughness.ktx2`,
+`textures/cracked/normal.ktx2`, `textures/cracked/roughness.ktx2`,
+`textures/granite/normal.ktx2`, `textures/granite/roughness.ktx2`,
+`textures/ice/normal.ktx2`, `textures/ice/roughness.ktx2`,
+`textures/regolith/normal.ktx2`, and `textures/regolith/roughness.ktx2`.
+
 ### Exora chemistry color-detail maps
 
 The five files under `apps/website/public/textures/chemistry/` were generated specifically for
