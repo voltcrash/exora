@@ -924,6 +924,10 @@ const createSceneHost = (canvas: HTMLCanvasElement): SceneHost => {
         }
         if (state === WebXRState.IN_XR) {
           isInXr = true;
+          // Babylon disables clearing for AR by default. Exora clears to transparent in Camera
+          // View and opaque black in Space View, so an explicit clear is what makes both modes
+          // deterministic and prevents previous-frame colour from washing over passthrough.
+          if (activeImmersiveMode === "ar") scene.autoClear = true;
           // Inside a session the loop is the headset's frame callback, and a wearer cannot see
           // the flat dialog that parked it. Whatever suspensions are outstanding, run.
           startRenderLoop();
@@ -1067,12 +1071,20 @@ const createSceneHost = (canvas: HTMLCanvasElement): SceneHost => {
           true,
           false,
         );
-        xrCameraLayerMask = xr.baseExperience.camera.layerMask;
-        xr.baseExperience.camera.layerMask &= ~VIRTUAL_BACKGROUND_LAYER_MASK;
+        const arCamera = xr.baseExperience.camera;
+        xrCameraLayerMask = arCamera.layerMask;
+        arCamera.layerMask &= ~VIRTUAL_BACKGROUND_LAYER_MASK;
         arPresentation.begin(
           hitTest,
           xr.baseExperience.sessionManager,
           currentScope?.presentation ?? null,
+          (spaceBackground) => {
+            arCamera.layerMask = spaceBackground
+              ? xrCameraLayerMask
+              : xrCameraLayerMask & ~VIRTUAL_BACKGROUND_LAYER_MASK;
+            scene.clearColor.a = spaceBackground ? 1 : 0;
+            scene.autoClear = true;
+          },
         );
         // Variant Launch and native mobile WebXR both implement the standard AR session. Hit
         // testing is required; DOM overlay is optional so a device can still place/manipulate the

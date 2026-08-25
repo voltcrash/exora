@@ -23,6 +23,7 @@ test("AR makes the page transparent and places from the XR select event", () => 
   const hitResults = new Observable<IWebXRHitResult[]>();
   const sessionInitialized = new Observable<XRSession>();
   const session = new EventTarget() as XRSession;
+  const setSpaceBackground = vi.fn();
   const place = vi.fn();
   let placed = false;
   place.mockImplementation(() => {
@@ -44,12 +45,22 @@ test("AR makes the page transparent and places from the XR select event", () => 
     { onHitTestResultObservable: hitResults } as WebXRHitTest,
     { onXRSessionInit: sessionInitialized } as WebXRSessionManager,
     world,
+    setSpaceBackground,
   );
   sessionInitialized.notifyObservers(session);
 
   expect(scene.clearColor.a).toBe(0);
   expect(getComputedStyle(document.documentElement).backgroundColor).toBe("rgba(0, 0, 0, 0)");
   expect(getComputedStyle(app).backgroundColor).toBe("rgba(0, 0, 0, 0)");
+  expect(setSpaceBackground).toHaveBeenLastCalledWith(false);
+
+  const backgroundToggle =
+    presentation.overlay.querySelector<HTMLButtonElement>(".ar-background-toggle");
+  expect(backgroundToggle).not.toBeNull();
+  backgroundToggle?.click();
+  expect(backgroundToggle?.getAttribute("aria-pressed")).toBe("true");
+  expect(setSpaceBackground).toHaveBeenLastCalledWith(true);
+  expect(scene.clearColor.a).toBe(1);
 
   const immersivePinch = new Event("gesturestart", { bubbles: true, cancelable: true });
   document.dispatchEvent(immersivePinch);

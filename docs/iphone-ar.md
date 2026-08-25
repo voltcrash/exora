@@ -38,10 +38,14 @@ by desktop emulation. Run this pass on a physical iPhone in a non-private Safari
 5. Tap once. The current planet, star, black hole, system, or other mounted scene should appear at
    a tabletop scale with its existing materials, animation, and shaders intact.
 6. Drag the placed object to reposition it across the detected horizontal surface. Pinch with two
-   fingers to scale it; verify scaling remains uniform and bounded.
-7. Exit AR. The flat desktop/mobile view must return at its original camera framing, with its
+   fingers to scale it; verify scaling remains uniform and bounded while the instruction overlay
+   stays the same size.
+7. Tap **HIDE CAMERA · SPACE VIEW**. The physical feed should give way to Exora's opaque space
+   background while device tracking, hit testing, placement, dragging, and scaling continue in
+   the same `immersive-ar` session. Tap **SHOW CAMERA · AR VIEW** to restore passthrough.
+8. Exit AR. The flat desktop/mobile view must return at its original camera framing, with its
    virtual sky restored.
-8. Repeat with one planet, one star, and one black hole. Then re-run the existing Meta Quest
+9. Repeat with one planet, one star, and one black hole. Then re-run the existing Meta Quest
    checklist to confirm the same control still enters `immersive-vr`, retains thumbstick
    locomotion, and opens the in-headset Discover screen.
 

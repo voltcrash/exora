@@ -16,6 +16,7 @@ export interface ArPresentation {
     hitTest: WebXRHitTest,
     sessionManager: WebXRSessionManager,
     world: WorldPresentation | null,
+    setSpaceBackground: (enabled: boolean) => void,
   ) => void;
   dispose: () => void;
   /** Restores the flat/VR presentation after AR ends or fails to enter. */
@@ -43,6 +44,10 @@ export const createArPresentation = (scene: Scene): ArPresentation => {
   const guidance = document.createElement("p");
   guidance.textContent = instruction(false);
   overlay.append(guidance);
+  const backgroundToggle = document.createElement("button");
+  backgroundToggle.type = "button";
+  backgroundToggle.className = "ar-background-toggle";
+  overlay.append(backgroundToggle);
   document.body.append(overlay);
 
   const reticleMaterial = new StandardMaterial("ar-reticle-material", scene);
@@ -67,6 +72,31 @@ export const createArPresentation = (scene: Scene): ArPresentation => {
   let sessionInitObserver: Observer<XRSession> | null = null;
   let xrSession: XRSession | null = null;
   let previousClearAlpha = scene.clearColor.a;
+  let spaceBackground = false;
+  let updateSpaceBackground: ((enabled: boolean) => void) | null = null;
+
+  const renderBackgroundToggle = (): void => {
+    backgroundToggle.textContent = spaceBackground
+      ? "SHOW CAMERA · AR VIEW"
+      : "HIDE CAMERA · SPACE VIEW";
+    backgroundToggle.setAttribute("aria-pressed", String(spaceBackground));
+  };
+
+  const setSpaceBackground = (enabled: boolean): void => {
+    spaceBackground = enabled;
+    scene.clearColor.a = enabled ? 1 : 0;
+    document.documentElement.dataset.arBackground = enabled ? "space" : "camera";
+    document.body.dataset.arBackground = enabled ? "space" : "camera";
+    renderBackgroundToggle();
+    updateSpaceBackground?.(enabled);
+  };
+
+  backgroundToggle.addEventListener("beforexrselect", (event) => event.preventDefault());
+  backgroundToggle.addEventListener("click", (event) => {
+    event.stopPropagation();
+    setSpaceBackground(!spaceBackground);
+  });
+  renderBackgroundToggle();
 
   const preventGestureZoom = (event: Event): void => event.preventDefault();
   const preventTouchPinchZoom = (event: TouchEvent): void => {
@@ -100,7 +130,7 @@ export const createArPresentation = (scene: Scene): ArPresentation => {
     reticle.setEnabled(false);
     guidance.textContent = instruction(false);
     if (active) {
-      scene.clearColor.a = 0;
+      scene.clearColor.a = spaceBackground ? 1 : 0;
       currentWorld?.beginAr();
     }
   };
@@ -117,24 +147,31 @@ export const createArPresentation = (scene: Scene): ArPresentation => {
     sessionInitObserver = null;
     xrSession = null;
     currentWorld?.endAr();
+    updateSpaceBackground?.(false);
+    updateSpaceBackground = null;
+    spaceBackground = false;
+    renderBackgroundToggle();
     scene.clearColor.a = previousClearAlpha;
     latestHit = null;
     reticle.setEnabled(false);
     overlay.hidden = true;
     setPageZoomGuard(false);
     delete document.documentElement.dataset.presentationMode;
+    delete document.documentElement.dataset.arBackground;
     delete document.body.dataset.presentationMode;
+    delete document.body.dataset.arBackground;
   };
 
   return {
     overlay,
-    begin: (hitTest, sessionManager, world) => {
+    begin: (hitTest, sessionManager, world, onSpaceBackgroundChange) => {
       end();
       active = true;
       currentWorld = world;
       currentWorld?.beginAr();
       previousClearAlpha = scene.clearColor.a;
-      scene.clearColor.a = 0;
+      updateSpaceBackground = onSpaceBackgroundChange;
+      setSpaceBackground(false);
       overlay.hidden = false;
       setPageZoomGuard(true);
       guidance.textContent = instruction(false);

@@ -29,6 +29,7 @@ test("AR wraps and fits the existing foreground while ignoring its virtual sky",
   });
 
   expect(sky.layerMask).toBe(VIRTUAL_BACKGROUND_LAYER_MASK);
+  expect(sky.parent).toBeNull();
   expect(subject.parent?.name).toBe("world-presentation-contents");
   expect(subject.getAbsolutePosition().asArray()).toEqual([0, 2, 0]);
 

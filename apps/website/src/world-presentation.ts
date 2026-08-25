@@ -148,7 +148,12 @@ export const createWorldPresentation = (scene: Scene): WorldPresentation => {
       proxyGeometry.applyToMesh(proxy, true);
 
       for (const mesh of meshes) {
-        if (mesh !== proxy && !mesh.parent) mesh.parent = contentsRoot;
+        // A virtual sky follows the tracked camera in both VR and optional AR Space View. It is
+        // deliberately outside the tabletop proxy so placing/scaling a planet cannot shrink its
+        // stars into a small ball around the object.
+        if (mesh !== proxy && mesh.layerMask !== VIRTUAL_BACKGROUND_LAYER_MASK && !mesh.parent) {
+          mesh.parent = contentsRoot;
+        }
       }
       for (const node of transformNodes) {
         if (node !== contentsRoot && !node.parent) node.parent = contentsRoot;
