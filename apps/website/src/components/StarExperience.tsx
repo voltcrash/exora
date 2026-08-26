@@ -10,6 +10,7 @@ import { deriveStarVisual, starKindLabel, starSummary } from "../star-utils.ts";
 import type { TravelPhase } from "../travel-transition.ts";
 import { FrameRateSignal } from "./FrameRateSignal.tsx";
 import { MissionControl } from "./MissionControl.tsx";
+import { MobileSheet } from "./MobileSheet.tsx";
 
 interface StarExperienceProps {
   chromeHidden: boolean;
@@ -48,6 +49,7 @@ export const StarExperience = ({
   const [systemCached, setSystemCached] = useState(false);
   const [systemState, setSystemState] = useState<"idle" | "loading" | "ready" | "error">("idle");
   const [dioramaState, setDioramaState] = useState<"error" | "idle" | "loading">("idle");
+  const [worldsOpen, setWorldsOpen] = useState(false);
   const star = result.star;
   const observation = star.observation;
   const visual = deriveStarVisual(star);
@@ -360,7 +362,74 @@ export const StarExperience = ({
             · {star.source.retrievedOn}
           </p>
         </aside>
+
+        {!custom ? (
+          <div className="mobile-scene-actions mobile-scene-actions-two">
+            {systemPlanets.length > 0 ? (
+              <button
+                className="mobile-scene-action"
+                type="button"
+                disabled={dioramaState === "loading"}
+                onClick={() => void openSystem()}
+              >
+                <span aria-hidden="true">◎</span>
+                <span>
+                  <strong>Whole system</strong>
+                  <small>{dioramaState === "loading" ? "PLACING ORBITS…" : "VIEW ORBITS"}</small>
+                </span>
+              </button>
+            ) : null}
+            <button
+              className="mobile-scene-action"
+              type="button"
+              onClick={() => setWorldsOpen(true)}
+            >
+              <span aria-hidden="true">◌</span>
+              <span>
+                <strong>Known worlds</strong>
+                <small>
+                  {systemState === "loading"
+                    ? "QUERYING ARCHIVE…"
+                    : `${systemPlanets.length} CONFIRMED`}
+                </small>
+              </span>
+            </button>
+          </div>
+        ) : null}
       </main>
+
+      <MobileSheet
+        eyebrow="CONNECTED SYSTEM"
+        title="Known worlds"
+        open={worldsOpen}
+        onClose={() => setWorldsOpen(false)}
+      >
+        {systemState === "loading" ? <small role="status">QUERYING NASA ARCHIVE…</small> : null}
+        {systemState === "error" ? <small role="status">SYSTEM LINK UNAVAILABLE</small> : null}
+        {systemState === "ready" && systemPlanets.length === 0 ? (
+          <small>NO CONFIRMED WORLDS LINKED</small>
+        ) : null}
+        {systemPlanets.length > 0 ? (
+          <div className="known-world-list">
+            {systemPlanets.map((planet) => (
+              <button
+                key={planet.id}
+                type="button"
+                onClick={() => {
+                  setWorldsOpen(false);
+                  onSelectPlanet(planet, systemCached);
+                }}
+              >
+                <span className={`known-world-orb ${planet.kind}`} aria-hidden="true" />
+                <span>
+                  <strong>{planet.name}</strong>
+                  <small>{planet.kind.replace("-", " ")} · VISIT ↗</small>
+                </span>
+              </button>
+            ))}
+          </div>
+        ) : null}
+      </MobileSheet>
 
       <MissionControl
         chromeHidden={chromeHidden}

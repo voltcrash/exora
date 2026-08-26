@@ -16,6 +16,7 @@ import { findSolarWorld, tuneSolarWorldRecipe } from "../solar-system.ts";
 import { SURFACE_TRANSITION_MS, type TravelPhase } from "../travel-transition.ts";
 import { FrameRateSignal } from "./FrameRateSignal.tsx";
 import { MissionControl } from "./MissionControl.tsx";
+import { MobileSheet } from "./MobileSheet.tsx";
 
 interface PlanetExperienceProps {
   chromeHidden: boolean;
@@ -56,6 +57,7 @@ export const PlanetExperience = ({
   const [xrStatus, setXrStatus] = useState<XrStatus>("checking");
   const [hostJumpState, setHostJumpState] = useState<"idle" | "loading" | "error">("idle");
   const [systemJumpState, setSystemJumpState] = useState<"idle" | "loading" | "error">("idle");
+  const [orbitMenuOpen, setOrbitMenuOpen] = useState(false);
   const planet = result.planet;
   const solar = result.mode === "solar";
   const solarIdentity = planet.solarSystem;
@@ -307,79 +309,6 @@ export const PlanetExperience = ({
                 : "PLAUSIBLE VISUALIZATION FROM OBSERVED DATA"}
           </p>
         </section>
-
-        {subsystem ? (
-          <div className="subsystem-mobile-controls">
-            <button
-              type="button"
-              aria-pressed={subsystemActive}
-              onClick={() => setSceneMode(subsystemActive ? "world" : "subsystem")}
-            >
-              <span aria-hidden="true">{subsystemActive ? "◉" : "⌾"}</span>
-              <span>
-                <strong>
-                  {subsystemActive ? `${planet.name} close view` : `${planet.name} system`}
-                </strong>
-                <small>{subsystemActive ? "RETURN TO WORLD" : "EXPLORE MOONS + FIELDS"}</small>
-              </span>
-            </button>
-            {subsystemActive ? (
-              <>
-                <p>
-                  <span>
-                    SYSTEM SCALE · JPL MEAN ORBITS · LOG-COMPRESSED DISTANCE · BODY SIZES
-                    EXAGGERATED
-                  </span>
-                  <strong>UNRESOLVED SURFACES · NO INVENTED GEOGRAPHY</strong>
-                  <small>Neutral minor-moon silhouettes · simulated fields and transients</small>
-                </p>
-                <details>
-                  <summary>{subsystem.moons.length} SELECTED MOONS · ORBIT DATA</summary>
-                  <ul>
-                    {subsystem.moons.map((candidate) => (
-                      <li key={candidate.naifId}>
-                        <strong>{candidate.name}</strong>
-                        <small>
-                          NAIF {candidate.naifId} · {candidate.surface} ·{" "}
-                          {candidate.retrograde ? "retrograde" : "prograde"}
-                        </small>
-                      </li>
-                    ))}
-                  </ul>
-                </details>
-                <details>
-                  <summary>RINGS · FIELDS · RESONANCES</summary>
-                  <ul>
-                    {subsystem.rings.map((ring) => (
-                      <li key={ring.name}>
-                        <strong>{ring.name}</strong>
-                        <small>MEASURED BOUNDARIES</small>
-                      </li>
-                    ))}
-                    {subsystem.lagrangePoints.map((point) => (
-                      <li key={`${point.reference}-${point.label}`}>
-                        <strong>{point.label}</strong>
-                        <small>{point.reference} · DERIVED MARKER</small>
-                      </li>
-                    ))}
-                    {subsystem.magnetosphere ? (
-                      <li>
-                        <strong>MAGNETOSPHERE</strong>
-                        <small>{subsystem.magnetosphere.evidence} BOUNDARY</small>
-                      </li>
-                    ) : null}
-                    {subsystem.torus ? (
-                      <li>
-                        <strong>{subsystem.torus.moon} PLASMA TORUS</strong>
-                        <small>{subsystem.torus.evidence} STRUCTURE · SIMULATED DENSITY</small>
-                      </li>
-                    ) : null}
-                  </ul>
-                </details>
-              </>
-            ) : null}
-          </div>
-        ) : null}
 
         <aside
           className="telemetry"
@@ -657,7 +586,102 @@ export const PlanetExperience = ({
             {planet.source.archive} · {planet.source.table} · {planet.source.retrievedOn}
           </p>
         </aside>
+
+        {subsystem || result.mode !== "custom" ? (
+          <div className="mobile-scene-actions mobile-scene-actions-two">
+            {subsystem ? (
+              <button
+                className="mobile-scene-action"
+                type="button"
+                aria-pressed={subsystemActive}
+                onClick={() => {
+                  setSceneMode(subsystemActive ? "world" : "subsystem");
+                  setOrbitMenuOpen(false);
+                }}
+              >
+                <span aria-hidden="true">{subsystemActive ? "◉" : "⌾"}</span>
+                <span>
+                  <strong>{subsystemActive ? "Close orbit view" : `${planet.name} system`}</strong>
+                  <small>{subsystemActive ? "RETURN TO WORLD" : "MOONS + FIELDS"}</small>
+                </span>
+              </button>
+            ) : null}
+            {result.mode !== "custom" && !subsystemActive ? (
+              <button
+                className="mobile-scene-action"
+                type="button"
+                disabled={systemJumpState === "loading"}
+                onClick={() => void openHostSystem()}
+              >
+                <span aria-hidden="true">◎</span>
+                <span>
+                  <strong>Whole system</strong>
+                  <small>{systemJumpState === "loading" ? "PLACING ORBITS…" : "VIEW ORBITS"}</small>
+                </span>
+              </button>
+            ) : null}
+            {subsystemActive ? (
+              <button
+                className="mobile-scene-action"
+                type="button"
+                onClick={() => setOrbitMenuOpen(true)}
+              >
+                <span aria-hidden="true">☷</span>
+                <span>
+                  <strong>Orbit guide</strong>
+                  <small>MOONS + LAYERS</small>
+                </span>
+              </button>
+            ) : null}
+          </div>
+        ) : null}
       </main>
+
+      {subsystem ? (
+        <MobileSheet
+          eyebrow={`${planet.name.toUpperCase()} SYSTEM`}
+          title="Orbit guide"
+          open={orbitMenuOpen}
+          onClose={() => setOrbitMenuOpen(false)}
+        >
+          <p className="mobile-orbit-note">
+            JPL mean orbits · log-compressed distance · body sizes exaggerated
+          </p>
+          <div className="mobile-orbit-groups">
+            <section>
+              <h3>{subsystem.moons.length} selected moons</h3>
+              <ul>
+                {subsystem.moons.map((candidate) => (
+                  <li key={candidate.naifId}>
+                    <strong>{candidate.name}</strong>
+                    <small>
+                      NAIF {candidate.naifId} · {candidate.surface} ·{" "}
+                      {candidate.retrograde ? "retrograde" : "prograde"}
+                    </small>
+                  </li>
+                ))}
+              </ul>
+            </section>
+            <section>
+              <h3>Rings + fields</h3>
+              <ul>
+                {subsystem.rings.map((ring) => (
+                  <li key={ring.name}>
+                    <strong>{ring.name}</strong>
+                    <small>MEASURED BOUNDARIES</small>
+                  </li>
+                ))}
+                {subsystem.lagrangePoints.map((point) => (
+                  <li key={`${point.reference}-${point.label}`}>
+                    <strong>{point.label}</strong>
+                    <small>{point.reference} · DERIVED MARKER</small>
+                  </li>
+                ))}
+              </ul>
+            </section>
+          </div>
+        </MobileSheet>
+      ) : null}
 
       <MissionControl
         chromeHidden={chromeHidden}

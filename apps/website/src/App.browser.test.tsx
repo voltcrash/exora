@@ -581,6 +581,17 @@ test("a deep link to a system resolves to the diorama, and says what it compress
   stubArchive();
   mountApp("?system=Kepler-90");
 
+  if (window.innerWidth <= 640) {
+    await expect
+      .element(page.getByLabelText("Interactive visualization of the Kepler-90 system"))
+      .toBeVisible();
+    await expect.element(page.getByRole("button", { name: /Orbit controls/ })).toBeVisible();
+    expect(getComputedStyle(document.querySelector(".system-experience .hud")!).display).toBe(
+      "none",
+    );
+    return;
+  }
+
   await expect.element(page.getByRole("heading", { level: 1 })).toHaveTextContent("Kepler-90");
   expect(document.querySelector('link[rel="canonical"]')?.getAttribute("href")).toContain(
     "?system=Kepler-90",
@@ -597,6 +608,9 @@ test("a world in the diorama is reachable, and offers the way back to the system
   stubArchive();
   mountApp("?system=Kepler-90");
 
+  if (window.innerWidth <= 640) {
+    await userEvent.click(page.getByRole("button", { name: /Orbit controls/ }));
+  }
   await userEvent.click(page.getByRole("button", { name: /Kepler-90 c/ }));
 
   await expect.element(page.getByRole("heading", { level: 1 })).toHaveTextContent("Kepler-90 c");
@@ -676,6 +690,9 @@ test("the star catalog opens and travels to a star", async () => {
   await userEvent.click(result);
 
   await expect.element(page.getByRole("heading", { level: 1 })).toHaveTextContent("Sirius");
+  if (window.innerWidth <= 640) {
+    await userEvent.click(page.getByRole("button", { name: /Known worlds/ }));
+  }
   await expect.element(page.getByRole("button", { name: /Sirius b/ })).toBeVisible();
   await expect.element(page.getByRole("button", { name: /Sirius c/ })).toBeVisible();
   expect(window.location.search).toBe("?star=Sirius");
@@ -812,6 +829,28 @@ test("a Solar System planet switches into its dedicated parent-centered subsyste
   await expect.element(subsystem).toBeVisible();
   await userEvent.click(subsystem);
 
+  if (window.innerWidth <= 640) {
+    expect(
+      getComputedStyle(document.querySelector(".subsystem-experience .world-intro")!).display,
+    ).toBe("none");
+    expect(
+      getComputedStyle(document.querySelector(".subsystem-experience .telemetry")!).display,
+    ).toBe("none");
+    await userEvent.click(page.getByRole("button", { name: /Orbit guide/ }));
+    await expect
+      .element(
+        page.getByText("JPL mean orbits · log-compressed distance · body sizes exaggerated", {
+          exact: true,
+        }),
+      )
+      .toBeVisible();
+    await userEvent.keyboard("{Escape}");
+    await expect
+      .element(page.getByRole("button", { name: /Close orbit view/ }))
+      .toHaveAttribute("aria-pressed", "true");
+    return;
+  }
+
   await expect
     .element(
       page.getByText(
@@ -841,6 +880,17 @@ test("the Solar System diorama distinguishes cached JPL positions from catalog p
   stubArchive();
   mountApp("?system=Sun");
 
+  if (window.innerWidth <= 640) {
+    await userEvent.click(page.getByRole("button", { name: /Orbit controls/ }));
+    await expect.element(page.getByText("CATALOG POSITIONS", { exact: true })).toBeVisible();
+    await userEvent.click(page.getByRole("button", { name: "APPLY JPL" }));
+    await expect.element(page.getByText("CACHED JPL POSITIONS", { exact: true })).toBeVisible();
+    await expect.element(page.getByRole("button", { name: "PLAY" })).toBeEnabled();
+    await userEvent.click(page.getByRole("button", { name: "CATALOG ORBITS" }));
+    await expect.element(page.getByText("CATALOG POSITIONS", { exact: true })).toBeVisible();
+    return;
+  }
+
   await expect.element(page.getByRole("heading", { level: 1 })).toHaveTextContent("Sun");
   await expect.element(page.getByText("SIMPLIFIED CATALOG", { exact: true })).toBeVisible();
   await userEvent.click(page.getByRole("button", { name: "NOW" }));
@@ -859,6 +909,16 @@ test("the Sun's complete world list scrolls inside its left panel", async () => 
   stubArchive();
   mountApp("?star=Sun");
 
+  if (window.innerWidth <= 640) {
+    await userEvent.click(page.getByRole("button", { name: /Known worlds/ }));
+    await expect.element(page.getByRole("heading", { name: "Known worlds" })).toBeVisible();
+    const sheet = document.querySelector<HTMLElement>(".mobile-sheet-body");
+    expect(sheet).not.toBeNull();
+    expect(getComputedStyle(sheet!).overflowY).toBe("auto");
+    await expect.element(page.getByRole("button", { name: /Makemake/ })).toBeVisible();
+    return;
+  }
+
   await expect.element(page.getByRole("heading", { name: "Known worlds" })).toBeVisible();
   const intro = document.querySelector<HTMLElement>(".star-experience .world-intro");
   expect(intro).not.toBeNull();
@@ -874,6 +934,18 @@ test("the Sun's complete world list scrolls inside its left panel", async () => 
 test("the Solar System's complete object list scrolls inside its left panel", async () => {
   stubArchive();
   mountApp("?system=Sun");
+
+  if (window.innerWidth <= 640) {
+    await userEvent.click(page.getByRole("button", { name: /Orbit controls/ }));
+    await expect
+      .element(page.getByRole("heading", { name: "Worlds in the diorama" }))
+      .toBeVisible();
+    const sheet = document.querySelector<HTMLElement>(".mobile-sheet-body");
+    expect(sheet).not.toBeNull();
+    expect(getComputedStyle(sheet!).overflowY).toBe("auto");
+    await expect.element(page.getByRole("button", { name: /Makemake/ })).toBeVisible();
+    return;
+  }
 
   await expect.element(page.getByRole("heading", { name: "Worlds in the diorama" })).toBeVisible();
   const intro = document.querySelector<HTMLElement>(".system-experience .world-intro");

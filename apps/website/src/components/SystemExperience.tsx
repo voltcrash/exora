@@ -17,6 +17,7 @@ import type { SystemWorld } from "../system-scene.ts";
 import type { TravelPhase } from "../travel-transition.ts";
 import { FrameRateSignal } from "./FrameRateSignal.tsx";
 import { MissionControl } from "./MissionControl.tsx";
+import { MobileSheet } from "./MobileSheet.tsx";
 
 interface SystemExperienceProps {
   chromeHidden: boolean;
@@ -71,6 +72,7 @@ export const SystemExperience = ({
   const [sceneState, setSceneState] = useState<"loading" | "ready" | "error">("loading");
   const [xrStatus, setXrStatus] = useState<XrStatus>("checking");
   const [starJumpState, setStarJumpState] = useState<"error" | "idle" | "loading">("idle");
+  const [orbitMenuOpen, setOrbitMenuOpen] = useState(false);
   const [ephemeris, setEphemeris] = useState<EphemerisResponse | null>(null);
   const [ephemerisRequest, setEphemerisRequest] = useState<"error" | "idle" | "loading">("idle");
   const [displayedAt, setDisplayedAt] = useState(() => new Date());
@@ -503,6 +505,126 @@ export const SystemExperience = ({
           </p>
         </aside>
       </main>
+
+      <div className="mobile-orbit-action">
+        <button
+          className="mobile-scene-action"
+          type="button"
+          onClick={() => setOrbitMenuOpen(true)}
+        >
+          <span aria-hidden="true">☷</span>
+          <span>
+            <strong>Orbit controls</strong>
+            <small>{drawn.length} WORLDS + NAVIGATION</small>
+          </span>
+        </button>
+      </div>
+
+      <MobileSheet
+        eyebrow={`${hostStar.toUpperCase()} SYSTEM`}
+        title="Orbit controls"
+        open={orbitMenuOpen}
+        onClose={() => setOrbitMenuOpen(false)}
+      >
+        {solar ? (
+          <section className="mobile-ephemeris" aria-labelledby="mobile-ephemeris-title">
+            <div>
+              <span>
+                <small>POSITION MODE</small>
+                <h3 id="mobile-ephemeris-title">Live ephemeris</h3>
+              </span>
+              <strong role="status">
+                {ephemerisRequest === "loading"
+                  ? "CONTACTING JPL…"
+                  : ephemeris
+                    ? ephemeris.meta.cached
+                      ? "CACHED JPL POSITIONS"
+                      : "FRESH JPL POSITIONS"
+                    : "CATALOG POSITIONS"}
+              </strong>
+            </div>
+            <label>
+              <span>LOCAL DATE &amp; TIME</span>
+              <input
+                type="datetime-local"
+                min="1900-01-01T00:00:00"
+                max="2100-12-31T23:59:59"
+                step="1"
+                value={localDateTimeValue(displayedAt)}
+                onChange={(event) => {
+                  const selected = new Date(event.currentTarget.value);
+                  if (!Number.isFinite(selected.getTime())) return;
+                  setPlaying(false);
+                  displayedAtRef.current = selected;
+                  setDisplayedAt(selected);
+                  worldRef.current?.setEphemerisTime(selected);
+                }}
+              />
+            </label>
+            <div className="mobile-ephemeris-actions">
+              <button
+                type="button"
+                disabled={ephemerisRequest === "loading"}
+                onClick={() => void activateEphemeris(displayedAt)}
+              >
+                APPLY JPL
+              </button>
+              <button type="button" disabled={!ephemeris} onClick={() => setPlaying(!playing)}>
+                {playing ? "PAUSE" : "PLAY"}
+              </button>
+              <button type="button" disabled={!ephemeris} onClick={useCatalogPositions}>
+                CATALOG ORBITS
+              </button>
+            </div>
+          </section>
+        ) : null}
+
+        <button
+          className="system-jump mobile-host-jump"
+          type="button"
+          disabled={starJumpState === "loading"}
+          onClick={() => {
+            setOrbitMenuOpen(false);
+            void openHostStar();
+          }}
+        >
+          <span aria-hidden="true">☀</span>
+          <strong>{hostStar}</strong>
+          <small>{starJumpState === "loading" ? "RESOLVING…" : "STAND AT THE STAR ↗"}</small>
+        </button>
+
+        <section className="mobile-orbit-worlds" aria-labelledby="mobile-orbit-worlds-title">
+          <h3 id="mobile-orbit-worlds-title">Worlds in the diorama</h3>
+          {drawn.length > 0 ? (
+            <div className="known-world-list">
+              {drawn.map((orbit) => (
+                <button
+                  key={orbit.planet.id}
+                  type="button"
+                  onClick={() => {
+                    setOrbitMenuOpen(false);
+                    onSelectPlanet(orbit.planet, cached);
+                  }}
+                >
+                  <span className={`known-world-orb ${orbit.planet.kind}`} aria-hidden="true" />
+                  <span>
+                    <strong>{orbit.planet.name}</strong>
+                    <small>
+                      {formatNumber(orbit.elements.semiMajorAxisAu, 3)} AU ·{" "}
+                      {orbit.elements.periodDays === null
+                        ? "UNTIMED"
+                        : `${formatNumber(orbit.elements.periodDays, 1)} d`}{" "}
+                      · VISIT ↗
+                    </small>
+                  </span>
+                </button>
+              ))}
+            </div>
+          ) : (
+            <small role="status">PLACING ORBITS…</small>
+          )}
+        </section>
+      </MobileSheet>
 
       <MissionControl
         chromeHidden={chromeHidden}

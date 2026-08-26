@@ -2255,6 +2255,14 @@ h1 em {
   background: radial-gradient(circle at 32% 28%, #d8f6ff, #5798bb 52%, #1d3957 78%);
 }
 
+/* These controls replace scene-obscuring content on phones and are intentionally absent from the
+   desktop composition, where the HUD has room for the full archive panels. */
+.mobile-scene-actions,
+.mobile-orbit-action,
+.mobile-sheet {
+  display: none;
+}
+
 .source-note {
   margin: 11px 2px 0;
   color: #465258;
@@ -5672,10 +5680,12 @@ h1 em {
 }
 
 @media (max-width: 640px) {
-  .system-experience .world-intro {
-    max-height: calc(100vh - 180px);
-    overflow-y: auto;
-    scrollbar-color: rgb(139 230 234 / 28%) transparent;
+  /* Orbit scenes belong to the canvas. Their catalogs and controls now live in a top-layer sheet,
+     leaving only one compact entry point over the rendering. */
+  .system-experience .hud,
+  .subsystem-experience .hud > .world-intro,
+  .subsystem-experience .hud > .telemetry {
+    display: none;
   }
 
   .ephemeris-time-row {
@@ -5856,6 +5866,280 @@ h1 em {
     width: 168px;
     padding: 11px;
     border-radius: 15px;
+  }
+
+  .star-experience .telemetry,
+  .experience-shell:not(.subsystem-experience) .hud:has(.mobile-scene-actions-two) .telemetry {
+    bottom: 130px;
+  }
+
+  .star-experience .known-worlds {
+    display: none;
+  }
+
+  .mobile-scene-actions,
+  .mobile-orbit-action {
+    position: absolute;
+    z-index: 5;
+    right: 16px;
+    bottom: 12px;
+    width: 168px;
+    display: grid;
+    gap: 6px;
+    pointer-events: auto;
+  }
+
+  .subsystem-experience .mobile-scene-actions {
+    position: fixed;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    width: min(344px, calc(100vw - 32px));
+  }
+
+  .mobile-scene-action {
+    min-height: 50px;
+    display: grid;
+    grid-template-columns: 24px minmax(0, 1fr);
+    align-items: center;
+    gap: 7px;
+    padding: 8px 9px;
+    border: 1px solid rgb(139 230 234 / 26%);
+    border-radius: 12px;
+    color: var(--cyan);
+    background: rgb(6 15 18 / 88%);
+    backdrop-filter: blur(16px);
+    cursor: pointer;
+    text-align: left;
+  }
+
+  .mobile-scene-action:hover,
+  .mobile-scene-action:focus-visible {
+    border-color: rgb(139 230 234 / 58%);
+    background: rgb(10 28 31 / 92%);
+  }
+
+  .mobile-scene-action > span:first-child {
+    font-size: 19px;
+    text-align: center;
+  }
+
+  .mobile-scene-action > span:last-child {
+    min-width: 0;
+    display: grid;
+    gap: 2px;
+  }
+
+  .mobile-scene-action strong {
+    overflow: hidden;
+    color: #e6f7f8;
+    font-size: 8px;
+    font-weight: 500;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .mobile-scene-action small {
+    overflow: hidden;
+    color: var(--cyan);
+    font: 6px var(--mono);
+    letter-spacing: 0.04em;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .mobile-sheet[open] {
+    position: fixed;
+    z-index: 30;
+    inset: 0;
+    width: 100vw;
+    max-width: none;
+    height: 100dvh;
+    max-height: none;
+    margin: 0;
+    padding: 12px;
+    border: 0;
+    display: grid;
+    align-items: end;
+    color: var(--ink);
+    background: transparent;
+  }
+
+  .mobile-sheet::backdrop {
+    background: rgb(0 3 4 / 72%);
+    backdrop-filter: blur(5px);
+  }
+
+  .mobile-sheet > section {
+    max-height: calc(100dvh - 24px);
+    display: grid;
+    grid-template-rows: auto minmax(0, 1fr);
+    overflow: hidden;
+    border: 1px solid rgb(139 230 234 / 24%);
+    border-radius: 20px;
+    background:
+      radial-gradient(circle at 90% 0%, rgb(60 142 147 / 12%), transparent 32%), rgb(5 10 12 / 97%);
+    box-shadow: 0 24px 80px rgb(0 0 0 / 70%);
+  }
+
+  .mobile-sheet > section > header {
+    min-height: 70px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 16px;
+    padding: 15px 16px;
+    border-bottom: 1px solid var(--line);
+  }
+
+  .mobile-sheet > section > header > span {
+    display: grid;
+    gap: 4px;
+  }
+
+  .mobile-sheet > section > header small {
+    color: var(--cyan);
+    font: 7px var(--mono);
+    letter-spacing: 0.1em;
+  }
+
+  .mobile-sheet > section > header h2 {
+    margin: 0;
+    font-size: 17px;
+    font-weight: 500;
+    text-transform: uppercase;
+  }
+
+  .mobile-sheet > section > header button {
+    width: 40px;
+    height: 40px;
+    border: 1px solid var(--line);
+    border-radius: 50%;
+    color: var(--muted);
+    background: rgb(255 255 255 / 3%);
+    font-size: 24px;
+  }
+
+  .mobile-sheet-body {
+    display: grid;
+    align-content: start;
+    gap: 14px;
+    overflow-y: auto;
+    overscroll-behavior: contain;
+    padding: 14px;
+  }
+
+  .mobile-sheet .known-world-list {
+    grid-template-columns: 1fr;
+  }
+
+  .mobile-sheet .known-world-list button {
+    min-height: 64px;
+  }
+
+  .mobile-sheet-body > small,
+  .mobile-orbit-note {
+    margin: 0;
+    color: var(--faint);
+    font: 7px/1.6 var(--mono);
+    letter-spacing: 0.07em;
+    text-transform: uppercase;
+  }
+
+  .mobile-orbit-groups,
+  .mobile-orbit-groups section,
+  .mobile-orbit-groups ul {
+    display: grid;
+    gap: 8px;
+  }
+
+  .mobile-orbit-groups h3,
+  .mobile-orbit-worlds h3,
+  .mobile-ephemeris h3 {
+    margin: 0;
+    color: #e8f5f6;
+    font-size: 11px;
+    font-weight: 500;
+    text-transform: uppercase;
+  }
+
+  .mobile-orbit-groups ul {
+    margin: 0;
+    padding: 0;
+    list-style: none;
+  }
+
+  .mobile-orbit-groups li {
+    display: grid;
+    gap: 3px;
+    padding: 10px;
+    border: 1px solid var(--line);
+    border-radius: 10px;
+  }
+
+  .mobile-orbit-groups li strong {
+    font-size: 9px;
+    font-weight: 500;
+  }
+
+  .mobile-orbit-groups li small {
+    color: var(--faint);
+    font: 7px/1.5 var(--mono);
+  }
+
+  .mobile-ephemeris {
+    display: grid;
+    gap: 10px;
+    padding: 12px;
+    border: 1px solid rgb(139 230 234 / 18%);
+    border-radius: 12px;
+  }
+
+  .mobile-ephemeris > div:first-child {
+    display: flex;
+    align-items: end;
+    justify-content: space-between;
+    gap: 10px;
+  }
+
+  .mobile-ephemeris small,
+  .mobile-ephemeris > div:first-child > strong,
+  .mobile-ephemeris label > span {
+    color: var(--cyan);
+    font: 6px var(--mono);
+    letter-spacing: 0.07em;
+  }
+
+  .mobile-ephemeris label {
+    display: grid;
+    gap: 5px;
+  }
+
+  .mobile-ephemeris input,
+  .mobile-ephemeris-actions button {
+    min-height: 42px;
+    border: 1px solid rgb(139 230 234 / 22%);
+    border-radius: 9px;
+    color: #dce9eb;
+    background: rgb(139 230 234 / 4%);
+    font: 8px var(--mono);
+  }
+
+  .mobile-ephemeris input {
+    padding: 8px;
+  }
+
+  .mobile-ephemeris-actions {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 6px;
+  }
+
+  .mobile-host-jump {
+    width: 100%;
+  }
+
+  .mobile-orbit-worlds {
+    display: grid;
+    gap: 9px;
   }
 
   .telemetry-heading {
