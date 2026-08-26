@@ -18,6 +18,8 @@
     "prepare": "vp config"
   },
   "devDependencies": {
+    "@types/node": "catalog:",
+    "typescript": "catalog:",
     "vercel": "catalog:",
     "vite": "catalog:",
     "vite-plus": "catalog:"
