@@ -75,6 +75,21 @@ export const createArPresentation = (scene: Scene): ArPresentation => {
   let spaceBackground = false;
   let updateSpaceBackground: ((enabled: boolean) => void) | null = null;
 
+  const setPageBackground = (color: "#000" | "transparent" | null): void => {
+    const elements = [
+      document.documentElement,
+      document.body,
+      document.querySelector<HTMLElement>("#app"),
+      document.querySelector<HTMLElement>(".experience-shell"),
+      document.querySelector<HTMLElement>("#render-canvas"),
+    ];
+    for (const element of elements) {
+      if (!element) continue;
+      if (color) element.style.setProperty("background-color", color, "important");
+      else element.style.removeProperty("background-color");
+    }
+  };
+
   const renderBackgroundToggle = (): void => {
     backgroundToggle.textContent = spaceBackground
       ? "SHOW CAMERA · AR VIEW"
@@ -85,6 +100,11 @@ export const createArPresentation = (scene: Scene): ArPresentation => {
   const setSpaceBackground = (enabled: boolean): void => {
     spaceBackground = enabled;
     scene.clearColor.a = enabled ? 1 : 0;
+    // Variant's camera is a separate page-level layer. Apply the backing directly as well as via
+    // stylesheet state: WebKit can defer selector invalidation during an immersive session, while
+    // an inline compositor change takes effect in the same tap that switches the WebXR layer.
+    setPageBackground(enabled ? "#000" : "transparent");
+    document.documentElement.classList.toggle("ar-space-background", enabled);
     document.documentElement.dataset.arBackground = enabled ? "space" : "camera";
     document.body.dataset.arBackground = enabled ? "space" : "camera";
     renderBackgroundToggle();
@@ -158,6 +178,8 @@ export const createArPresentation = (scene: Scene): ArPresentation => {
     setPageZoomGuard(false);
     delete document.documentElement.dataset.presentationMode;
     delete document.documentElement.dataset.arBackground;
+    document.documentElement.classList.remove("ar-space-background");
+    setPageBackground(null);
     delete document.body.dataset.presentationMode;
     delete document.body.dataset.arBackground;
   };

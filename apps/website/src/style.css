@@ -690,6 +690,38 @@ body[data-presentation-mode="ar"] #render-canvas {
   background: transparent !important;
 }
 
+/*
+ * The ordinary experience UI is still mounted behind Variant's DOM overlay. Its full-screen haze,
+ * grid and transition layers must not take part in the camera composite: even with a transparent
+ * WebGL clear they otherwise leave the live feed looking as though a grey veil was laid over it.
+ * The AR overlay is appended directly to `body`, outside `#app`, so it remains visible.
+ */
+body[data-presentation-mode="ar"] #app > :not(#render-canvas) {
+  visibility: hidden !important;
+}
+
+body[data-presentation-mode="ar"] .experience-shell > *,
+body[data-presentation-mode="ar"] .space-haze,
+body[data-presentation-mode="ar"] .viewport-grid,
+body[data-presentation-mode="ar"] .surface-veil,
+body[data-presentation-mode="ar"] .travel-veil {
+  display: none !important;
+}
+
+/*
+ * Variant composites the iPhone camera underneath the page. Clearing the WebXR framebuffer to an
+ * alpha of one is sufficient on native WebXR, but it cannot cover that separate page-level camera
+ * layer in Variant. Give Space View an actually opaque page/canvas backing as well; the existing
+ * virtual starfield is then drawn over black at every tracked position and viewing angle.
+ */
+html.ar-space-background[data-presentation-mode="ar"],
+html.ar-space-background body[data-presentation-mode="ar"],
+html.ar-space-background body[data-presentation-mode="ar"] #app,
+html.ar-space-background body[data-presentation-mode="ar"] .experience-shell,
+html.ar-space-background body[data-presentation-mode="ar"] #render-canvas {
+  background: #000 !important;
+}
+
 html[data-presentation-mode="ar"],
 body[data-presentation-mode="ar"],
 body[data-presentation-mode="ar"] #ar-overlay,

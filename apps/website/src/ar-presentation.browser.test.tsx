@@ -12,6 +12,7 @@ import "./style.css";
 afterEach(() => {
   delete document.documentElement.dataset.presentationMode;
   delete document.body.dataset.presentationMode;
+  document.documentElement.classList.remove("ar-space-background");
   document.querySelector("#ar-test-app")?.remove();
 });
 
@@ -61,6 +62,8 @@ test("AR makes the page transparent and places from the XR select event", () => 
   expect(backgroundToggle?.getAttribute("aria-pressed")).toBe("true");
   expect(setSpaceBackground).toHaveBeenLastCalledWith(true);
   expect(scene.clearColor.a).toBe(1);
+  expect(getComputedStyle(document.documentElement).backgroundColor).toBe("rgb(0, 0, 0)");
+  expect(getComputedStyle(app).backgroundColor).toBe("rgb(0, 0, 0)");
 
   const immersivePinch = new Event("gesturestart", { bubbles: true, cancelable: true });
   document.dispatchEvent(immersivePinch);
