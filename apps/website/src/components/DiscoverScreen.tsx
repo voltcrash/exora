@@ -32,47 +32,77 @@ interface DiscoverScreenProps {
 
 const sections: readonly {
   accent: string;
-  glyph: string;
   id: DiscoverSection;
   label: string;
   source: string;
 }[] = [
   {
     accent: "amber",
-    glyph: "☉",
     id: "solar",
     label: "Solar System",
     source: "NASA / JPL",
   },
   {
     accent: "cyan",
-    glyph: "◎",
     id: "worlds",
     label: "Exoplanets",
     source: "NASA ARCHIVE",
   },
   {
     accent: "gold",
-    glyph: "✦",
     id: "stars",
     label: "Stars",
     source: "SIMBAD",
   },
   {
     accent: "violet",
-    glyph: "◉",
     id: "black-holes",
     label: "Black Holes",
     source: "NASA / EHT / ESA",
   },
   {
     accent: "coral",
-    glyph: "+",
     id: "forge",
     label: "World Forge",
     source: "EXORA LABS",
   },
 ] as const;
+
+/** Distinct silhouettes keep the compact mobile navigation legible without relying on colour. */
+const DiscoverIcon = ({ section }: { section: DiscoverSection }) => (
+  <svg className="discover-nav-icon" data-icon={section} viewBox="0 0 32 32" aria-hidden="true">
+    {section === "solar" ? (
+      <>
+        <circle cx="16" cy="16" r="4" />
+        <ellipse cx="16" cy="16" rx="12" ry="6.5" />
+        <circle className="icon-fill" cx="26" cy="14" r="1.8" />
+      </>
+    ) : section === "worlds" ? (
+      <>
+        <circle cx="16" cy="16" r="9" />
+        <path d="M10 10.5c4.8 1.2 8.8 5.4 11 11" />
+        <path d="M6 21.5c6-2.8 13.3-2 20 2.5" />
+      </>
+    ) : section === "stars" ? (
+      <>
+        <path d="m16 3 2.4 8.6L27 14l-8.6 2.4L16 25l-2.4-8.6L5 14l8.6-2.4L16 3Z" />
+        <path d="m25 5 .8 3.2L29 9l-3.2.8L25 13l-.8-3.2L21 9l3.2-.8L25 5Z" />
+      </>
+    ) : section === "black-holes" ? (
+      <>
+        <circle className="icon-fill" cx="16" cy="16" r="5" />
+        <ellipse cx="16" cy="16" rx="13" ry="7" transform="rotate(-18 16 16)" />
+        <path d="M4.5 21c6-3 17.5-6.5 23-10" />
+      </>
+    ) : (
+      <>
+        <circle cx="16" cy="16" r="10.5" />
+        <path d="M16 9v14M9 16h14" />
+        <path d="M11 11 8.5 8.5M21 21l2.5 2.5M21 11l2.5-2.5M11 21l-2.5 2.5" />
+      </>
+    )}
+  </svg>
+);
 
 const sectionCopy: Record<DiscoverSection, { eyebrow: string; title: string; summary: string }> = {
   solar: {
@@ -189,7 +219,7 @@ export const DiscoverScreen = ({
             >
               <span className="discover-nav-index">0{index + 1}</span>
               <span className="discover-nav-glyph" aria-hidden="true">
-                {item.glyph}
+                <DiscoverIcon section={item.id} />
               </span>
               <span className="discover-nav-copy">
                 <strong>{item.label}</strong>

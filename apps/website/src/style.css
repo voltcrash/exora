@@ -239,9 +239,24 @@
   place-items: center;
   border: 1px solid currentcolor;
   border-radius: 50%;
-  font-family: var(--mono);
-  font-size: 15px;
   box-shadow: inset 0 0 16px color-mix(in srgb, currentcolor 9%, transparent);
+}
+
+.discover-nav-icon {
+  width: 24px;
+  height: 24px;
+  overflow: visible;
+  fill: none;
+  stroke: currentcolor;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  stroke-width: 1.35;
+  vector-effect: non-scaling-stroke;
+}
+
+.discover-nav-icon .icon-fill {
+  fill: currentcolor;
+  stroke: none;
 }
 
 .discover-nav-copy {
@@ -512,9 +527,11 @@
 
   .discover-nav-item {
     min-height: 48px;
-    grid-template-columns: 24px 1fr;
-    gap: 6px;
-    padding: 5px 7px;
+    grid-template-columns: 1fr;
+    grid-template-rows: 26px auto;
+    place-items: center;
+    gap: 2px;
+    padding: 5px 4px 4px;
     border-radius: 12px;
   }
 
@@ -535,16 +552,30 @@
   }
 
   .discover-nav-glyph {
-    width: 24px;
-    height: 24px;
+    width: 26px;
+    height: 26px;
     border: 0;
-    font-size: 13px;
     box-shadow: none;
   }
 
+  .discover-nav-icon {
+    width: 25px;
+    height: 25px;
+    filter: drop-shadow(0 0 6px color-mix(in srgb, currentcolor 30%, transparent));
+  }
+
+  .discover-nav-copy {
+    display: block;
+    width: 100%;
+    text-align: center;
+  }
+
   .discover-nav-copy strong {
+    display: block;
     overflow: hidden;
-    font-size: 8px;
+    font-family: var(--mono);
+    font-size: 6.5px;
+    letter-spacing: 0.02em;
     text-overflow: ellipsis;
     white-space: nowrap;
   }
@@ -593,13 +624,7 @@
   }
 
   .discover-nav-item {
-    grid-template-columns: 1fr;
-    place-items: center;
     padding-inline: 3px;
-  }
-
-  .discover-nav-copy {
-    display: none;
   }
 
   .discover-header {
@@ -6287,6 +6312,50 @@ h1 em {
   .discover-trigger {
     min-width: 148px;
   }
+
+  /* Phone chrome uses two deliberate rows. The old shared top edge let the control deck cover
+     the wordmark on mid-sized phones, leaving only part of EXORA visible. */
+  .topbar {
+    top: max(12px, env(safe-area-inset-top));
+    right: 14px;
+    left: 14px;
+    min-height: 42px;
+  }
+
+  .brand {
+    gap: 10px;
+  }
+
+  .brand-mark {
+    width: 38px;
+    height: 38px;
+  }
+
+  .brand-copy strong {
+    font-size: 13px;
+    letter-spacing: 0.3em;
+  }
+
+  .brand-copy small {
+    display: block;
+    font-size: 6px;
+  }
+
+  .mission-control {
+    top: max(64px, calc(env(safe-area-inset-top) + 54px));
+    right: 12px;
+    left: 12px;
+    align-items: stretch;
+  }
+
+  .mission-control .control-deck {
+    width: 100%;
+    justify-content: flex-end;
+  }
+
+  .hud {
+    inset: max(124px, calc(env(safe-area-inset-top) + 114px)) 0 86px;
+  }
 }
 
 @media (max-width: 520px) {
@@ -6327,6 +6396,14 @@ h1 em {
   .discover-trigger-copy,
   .discover-trigger kbd {
     display: none;
+  }
+
+  .mission-control .control-deck {
+    justify-content: space-between;
+  }
+
+  .mission-control .deck-actions {
+    margin-left: auto;
   }
 
   /* The status line stays: whether there is a headset to enter is the point of the button, and

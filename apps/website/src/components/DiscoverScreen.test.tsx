@@ -31,6 +31,11 @@ test("Discover starts directly in the Solar System catalog", () => {
   expect(markup).toContain('aria-label="Discover destinations"');
   expect(markup).toContain('aria-label="Solar System catalog"');
   expect(markup).toContain("Start close to home.");
+  expect(markup).toContain('data-icon="solar"');
+  expect(markup).toContain('data-icon="worlds"');
+  expect(markup).toContain('data-icon="stars"');
+  expect(markup).toContain('data-icon="black-holes"');
+  expect(markup).toContain('data-icon="forge"');
   expect(markup).not.toContain("All of space. One way in.");
 });
 
