@@ -93,6 +93,28 @@ test("returns service health", async () => {
   expect(await response.json()).toEqual({ service: "exora-api", status: "ok" });
 });
 
+test("publishes an OpenAPI 3.1 document backed by the runtime response schemas", async () => {
+  const response = await createApp({ repository }).request("/api/openapi.json");
+  const document = await response.json();
+
+  expect(response.status).toBe(200);
+  expect(document).toMatchObject({
+    components: {
+      schemas: {
+        ApiError: { type: "object" },
+        Planet: { type: "object" },
+        Star: { type: "object" },
+      },
+    },
+    openapi: "3.1.0",
+    paths: {
+      "/api/ephemerides": { get: { responses: { 200: expect.any(Object) } } },
+      "/api/planets": { get: { responses: { 200: expect.any(Object) } } },
+      "/api/small-bodies": { get: { responses: { 200: expect.any(Object) } } },
+    },
+  });
+});
+
 const ephemerisRepository: HorizonsRepository = {
   positions: async (_naifIds, epoch) => ({
     cached: true,
@@ -365,6 +387,32 @@ test("returns normalized planet search results", async () => {
     data: [{ id: "hip-65426-b" }],
     meta: { cached: true, count: 1, query: "hip" },
   });
+});
+
+test("refuses malformed repository data instead of exposing it as an API payload", async () => {
+  const malformed: PlanetRepository = {
+    ...repository,
+    search: async () => ({
+      cached: false,
+      value: [
+        {
+          ...planet,
+          observation: { ...planet.observation, orbitalEccentricity: "unknown" },
+        } as unknown as ExoplanetProfile,
+      ],
+    }),
+  };
+  const logged = vi.spyOn(console, "error").mockImplementation(() => undefined);
+
+  const response = await createApp({ repository: malformed }).request("/api/planets?q=hip");
+  const payload = await response.json();
+
+  expect(response.status).toBe(500);
+  expect(payload).toEqual({
+    error: { code: "UPSTREAM_UNAVAILABLE", message: "The API could not complete the request." },
+  });
+  expect(JSON.stringify(payload)).not.toContain("unknown");
+  logged.mockRestore();
 });
 
 test("returns confirmed planets for a host star", async () => {

@@ -1,15 +1,18 @@
 import type {
   ApiErrorResponse,
-  EphemerisResponse,
   ExoplanetProfile,
-  MissionTrajectoryResponse,
-  PlanetResponse,
-  PlanetSearchResponse,
   SmallBodyLookup,
-  SmallBodySearchResponse,
   StarProfile,
-  StarResponse,
-  StarSearchResponse,
+} from "@exora/contracts";
+import {
+  apiErrorResponseSchema,
+  ephemerisResponseSchema,
+  missionTrajectoryResponseSchema,
+  planetResponseSchema,
+  planetSearchResponseSchema,
+  smallBodySearchResponseSchema,
+  starResponseSchema,
+  starSearchResponseSchema,
 } from "@exora/contracts";
 import { Hono, type Context } from "hono";
 import { cors } from "hono/cors";
@@ -35,6 +38,7 @@ import {
   type RepositoryResult,
 } from "./nasa-archive.ts";
 import { NasaSystemAliasRepository, type SystemAliasRepository } from "./nasa-system-aliases.ts";
+import { openApiDocument } from "./openapi.ts";
 import {
   clientKey,
   createRateLimiter,
@@ -70,9 +74,8 @@ interface CreateAppOptions {
   systemAliasRepository?: SystemAliasRepository;
 }
 
-const apiError = (code: ApiErrorResponse["error"]["code"], message: string): ApiErrorResponse => ({
-  error: { code, message },
-});
+const apiError = (code: ApiErrorResponse["error"]["code"], message: string): ApiErrorResponse =>
+  apiErrorResponseSchema.parse({ error: { code, message } });
 
 /** The longest a name either archive could plausibly carry; longer is a malformed request. */
 const MAX_NAME_LENGTH = 100;
@@ -111,15 +114,17 @@ const planetCollection = (
   cachePolicy: string,
 ): Response => {
   context.header("Cache-Control", cachePolicy);
-  return context.json<PlanetSearchResponse>({
-    data: result.value,
-    meta: {
-      cached: result.cached,
-      count: result.value.length,
-      query,
-      source: "NASA Exoplanet Archive",
-    },
-  });
+  return context.json(
+    planetSearchResponseSchema.parse({
+      data: result.value,
+      meta: {
+        cached: result.cached,
+        count: result.value.length,
+        query,
+        source: "NASA Exoplanet Archive",
+      },
+    }),
+  );
 };
 
 const starCollection = (
@@ -129,10 +134,12 @@ const starCollection = (
   cachePolicy: string,
 ): Response => {
   context.header("Cache-Control", cachePolicy);
-  return context.json<StarSearchResponse>({
-    data: result.value,
-    meta: { cached: result.cached, count: result.value.length, query, source: "SIMBAD" },
-  });
+  return context.json(
+    starSearchResponseSchema.parse({
+      data: result.value,
+      meta: { cached: result.cached, count: result.value.length, query, source: "SIMBAD" },
+    }),
+  );
 };
 
 export const createApp = ({
@@ -189,6 +196,8 @@ export const createApp = ({
     context.json({ service: "exora-api", status: "ok" as const }),
   );
 
+  app.get("/api/openapi.json", (context) => context.json(openApiDocument));
+
   app.get("/api/ephemerides", async (context) => {
     const decision = horizonsRateLimiter.check(
       clientKey({
@@ -240,19 +249,21 @@ export const createApp = ({
 
     const result = await horizonsRepository.positions(naifIds, epoch);
     context.header("Cache-Control", "public, max-age=300, stale-while-revalidate=86400");
-    return context.json<EphemerisResponse>({
-      data: result.value,
-      meta: {
-        cached: result.cached,
-        center: "Sun (10)",
-        coordinateFrame: "Ecliptic J2000",
-        epoch: epoch.toISOString(),
-        retrievedAt: result.retrievedAt,
-        source: HORIZONS_SOURCE,
-        sourceVersion: HORIZONS_API_VERSION,
-        stale: result.stale,
-      },
-    });
+    return context.json(
+      ephemerisResponseSchema.parse({
+        data: result.value,
+        meta: {
+          cached: result.cached,
+          center: "Sun (10)",
+          coordinateFrame: "Ecliptic J2000",
+          epoch: epoch.toISOString(),
+          retrievedAt: result.retrievedAt,
+          source: HORIZONS_SOURCE,
+          sourceVersion: HORIZONS_API_VERSION,
+          stale: result.stale,
+        },
+      }),
+    );
   });
 
   app.get("/api/mission-trajectories", async (context) => {
@@ -307,22 +318,24 @@ export const createApp = ({
 
     const result = await missionTrajectoryRepository.trajectory(spkId, start, stop, stepDays);
     context.header("Cache-Control", "public, max-age=86400, stale-while-revalidate=2592000");
-    return context.json<MissionTrajectoryResponse>({
-      data: result.value,
-      meta: {
-        cached: result.cached,
-        center: "Sun (10)",
-        coordinateFrame: "Ecliptic J2000",
-        retrievedAt: result.retrievedAt,
-        solution: result.solution,
-        source: HORIZONS_SOURCE,
-        sourceVersion: HORIZONS_API_VERSION,
-        spkId: result.target.spkId,
-        stale: result.stale,
-        stepDays,
-        targetName: result.target.name,
-      },
-    });
+    return context.json(
+      missionTrajectoryResponseSchema.parse({
+        data: result.value,
+        meta: {
+          cached: result.cached,
+          center: "Sun (10)",
+          coordinateFrame: "Ecliptic J2000",
+          retrievedAt: result.retrievedAt,
+          solution: result.solution,
+          source: HORIZONS_SOURCE,
+          sourceVersion: HORIZONS_API_VERSION,
+          spkId: result.target.spkId,
+          stale: result.stale,
+          stepDays,
+          targetName: result.target.name,
+        },
+      }),
+    );
   });
 
   app.get("/api/small-bodies", async (context) => {
@@ -363,20 +376,22 @@ export const createApp = ({
 
     const result = await sbdbRepository.search(query, lookup);
     context.header("Cache-Control", "public, max-age=300, stale-while-revalidate=86400");
-    return context.json<SmallBodySearchResponse>({
-      data: result.data,
-      matches: result.matches,
-      meta: {
-        cached: result.cached,
-        lookup,
-        query,
-        retrievedAt: result.retrievedAt,
-        source: SBDB_SOURCE,
-        sourceVersion: SBDB_API_VERSION,
-        stale: result.stale,
-        status: result.status,
-      },
-    });
+    return context.json(
+      smallBodySearchResponseSchema.parse({
+        data: result.data,
+        matches: result.matches,
+        meta: {
+          cached: result.cached,
+          lookup,
+          query,
+          retrievedAt: result.retrievedAt,
+          source: SBDB_SOURCE,
+          sourceVersion: SBDB_API_VERSION,
+          stale: result.stale,
+          status: result.status,
+        },
+      }),
+    );
   });
 
   app.get("/api/planets", async (context) => {
@@ -432,10 +447,12 @@ export const createApp = ({
 
     context.header("Cache-Control", CACHE_POLICY.catalog);
 
-    return context.json<PlanetResponse>({
-      data: result.value,
-      meta: { cached: result.cached, source: "NASA Exoplanet Archive" },
-    });
+    return context.json(
+      planetResponseSchema.parse({
+        data: result.value,
+        meta: { cached: result.cached, source: "NASA Exoplanet Archive" },
+      }),
+    );
   });
 
   app.get("/api/planets/:name", async (context) => {
@@ -456,10 +473,12 @@ export const createApp = ({
 
     context.header("Cache-Control", CACHE_POLICY.catalog);
 
-    return context.json<PlanetResponse>({
-      data: result.value,
-      meta: { cached: result.cached, source: "NASA Exoplanet Archive" },
-    });
+    return context.json(
+      planetResponseSchema.parse({
+        data: result.value,
+        meta: { cached: result.cached, source: "NASA Exoplanet Archive" },
+      }),
+    );
   });
 
   app.get("/api/stars/featured", async (context) => {
@@ -550,10 +569,12 @@ export const createApp = ({
     }
 
     context.header("Cache-Control", CACHE_POLICY.catalog);
-    return context.json<StarResponse>({
-      data: result.value,
-      meta: { cached: result.cached, source: "SIMBAD" },
-    });
+    return context.json(
+      starResponseSchema.parse({
+        data: result.value,
+        meta: { cached: result.cached, source: "SIMBAD" },
+      }),
+    );
   });
 
   app.notFound((context) =>
