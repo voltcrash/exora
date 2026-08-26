@@ -92,13 +92,13 @@ test("the world view gathers every control onto one named deck", () => {
   expect(deckNames(markup)).toEqual([
     "Open Discover",
     "Hide the interface",
-    "Immersive mode: CHECKING HEADSET",
+    "Immersive mode: ENTER AR/VR",
   ]);
   expect(markup).toContain('<kbd class="shortcut-icon" aria-label="Backspace or Delete">⌫</kbd>');
   expect(markup).toContain('<kbd class="shortcut-icon" aria-label="Tab">⇥</kbd>');
   expect(markup).toContain('class="discover-trigger-icon"');
   expect(markup).toContain('class="clear-view-icon"');
-  expect(markup).toContain("AR MODE");
+  expect(markup).toContain("ENTER AR/VR");
 
   // Nothing is left in the top bar but the way home.
   const header = markup.slice(markup.indexOf("<header"), markup.indexOf("</header>"));
@@ -109,7 +109,7 @@ test("the star view gathers the same controls onto the same deck", () => {
   expect(deckNames(starMarkup())).toEqual([
     "Open Discover",
     "Hide the interface",
-    "Immersive mode: CHECKING HEADSET",
+    "Immersive mode: ENTER AR/VR",
   ]);
 });
 
@@ -118,10 +118,10 @@ test("the same control is named the same way from either view", () => {
 });
 
 test.each([
-  ["ready-vr", "ENTER IMMERSIVE VR"],
-  ["ready-ar", "PLACE IN YOUR SPACE"],
-  ["ready-ar-launch", "OPEN AR ON IPHONE"],
-] as const)("the shared immersive control reflects the selected %s mode", (status, copy) => {
+  ["ready-vr", "ENTER VR", "vr"],
+  ["ready-ar", "ENTER AR", "ar"],
+  ["ready-ar-launch", "ENTER AR", "ar"],
+] as const)("the shared immersive control reflects the selected %s mode", (status, copy, mode) => {
   const markup = renderToStaticMarkup(
     <MissionControl
       chromeHidden={false}
@@ -133,8 +133,26 @@ test.each([
     />,
   );
 
-  expect(markup).toContain(copy);
+  expect(markup).toContain(`<strong>${copy}</strong>`);
+  expect(markup).toContain(`data-mode="${mode}"`);
   expect(markup).not.toContain("disabled");
+});
+
+test("the unavailable immersive control offers the combined AR/VR label", () => {
+  const markup = renderToStaticMarkup(
+    <MissionControl
+      chromeHidden={false}
+      hints={[]}
+      onOpenDiscover={vi.fn()}
+      onToggleChrome={vi.fn()}
+      sceneFailed={false}
+      xr={{ host: null, status: "unavailable" }}
+    />,
+  );
+
+  expect(markup).toContain("<strong>ENTER AR/VR</strong>");
+  expect(markup).toContain('data-mode="neutral"');
+  expect(markup).toContain("disabled");
 });
 
 test("the clear-view control becomes the way back when the interface is hidden", () => {

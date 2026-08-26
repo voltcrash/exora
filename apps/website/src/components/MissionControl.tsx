@@ -1,17 +1,45 @@
 import type { SceneHost, XrStatus } from "../scene-host.ts";
 import { DiscoverTrigger } from "./DiscoverTrigger.tsx";
 
-const xrButtonCopy: Record<XrStatus, string> = {
-  checking: "CHECKING HEADSET",
-  entering: "ENTERING SESSION",
-  "in-xr": "SESSION ACTIVE",
-  "ready-ar": "PLACE IN YOUR SPACE",
-  "ready-ar-launch": "OPEN AR ON IPHONE",
-  "ready-vr": "ENTER IMMERSIVE VR",
-  unavailable: "VR UNAVAILABLE",
+const immersiveButtonCopy: Record<XrStatus, "ENTER AR" | "ENTER AR/VR" | "ENTER VR"> = {
+  checking: "ENTER AR/VR",
+  entering: "ENTER AR/VR",
+  "in-xr": "ENTER AR/VR",
+  "ready-ar": "ENTER AR",
+  "ready-ar-launch": "ENTER AR",
+  "ready-vr": "ENTER VR",
+  unavailable: "ENTER AR/VR",
 };
 
 const readyStatuses = new Set<XrStatus>(["ready-ar", "ready-ar-launch", "ready-vr"]);
+
+type ImmersiveMode = "ar" | "neutral" | "vr";
+
+const immersiveMode = (status: XrStatus): ImmersiveMode =>
+  status === "ready-vr"
+    ? "vr"
+    : status === "ready-ar" || status === "ready-ar-launch"
+      ? "ar"
+      : "neutral";
+
+/** A phone-and-cube for AR, a headset for VR, and a combined spatial visor before detection. */
+const ImmersiveModeIcon = ({ mode }: { mode: ImmersiveMode }) => (
+  <svg className="immersive-mode-icon" data-mode={mode} viewBox="0 0 28 28" aria-hidden="true">
+    {mode === "ar" ? (
+      <>
+        <rect x="7" y="2.5" width="14" height="23" rx="3" />
+        <path d="m10.5 11.5 3.5-2 3.5 2v4L14 18l-3.5-2.5v-4Z" />
+        <path d="m10.5 11.5 3.5 2 3.5-2M14 13.5V18" />
+      </>
+    ) : (
+      <>
+        <path d="M5 9.5h18l2 3.5-2.4 6H17l-3-3-3 3H5.4L3 13l2-3.5Z" />
+        <path d="M8 13h3M17 13h3" />
+        {mode === "neutral" ? <path d="M14 5V2.5M8 6 6.5 4M20 6l1.5-2" /> : null}
+      </>
+    )}
+  </svg>
+);
 
 /** One key, and what it does to the scene under the deck. */
 export interface ControlHint {
@@ -105,17 +133,15 @@ export const MissionControl = ({
           <button
             className="enter-vr"
             type="button"
-            // The concise visible label leaves transient capability and connection state to the
-            // accessible name, so assistive technology still receives the complete status.
-            aria-label={`Immersive mode: ${xrButtonCopy[xr.status]}`}
+            aria-label={`Immersive mode: ${immersiveButtonCopy[xr.status]}`}
             disabled={!readyStatuses.has(xr.status)}
             onClick={() =>
               void xr.host?.enterImmersive().catch((error: unknown) => console.error(error))
             }
           >
-            <span className="button-orbit" aria-hidden="true" />
+            <ImmersiveModeIcon mode={immersiveMode(xr.status)} />
             <span>
-              <strong>AR MODE</strong>
+              <strong>{immersiveButtonCopy[xr.status]}</strong>
             </span>
           </button>
         </div>
