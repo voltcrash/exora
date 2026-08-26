@@ -2,6 +2,7 @@ import { expect, test, vi, beforeEach } from "vite-plus/test";
 import { featuredPlanet } from "./planet-profile.ts";
 import {
   reachStar,
+  reachStarSystem,
   reachSystem,
   resetDestinationCacheForTesting,
   warmDestinations,
@@ -56,7 +57,13 @@ const countingArchive = (): { calls: string[] } => {
   vi.stubGlobal("fetch", (input: string) => {
     calls.push(input);
     return Promise.resolve(
-      Response.json(input.startsWith("/api/stars") ? starPayload : systemPayload),
+      Response.json(
+        input.endsWith("/planets?limit=12")
+          ? systemPayload
+          : input.startsWith("/api/stars")
+            ? starPayload
+            : systemPayload,
+      ),
     );
   });
   return { calls };
@@ -92,6 +99,17 @@ test("two views asking at once share the one request", async () => {
 
   expect(first).toBe(second);
   expect(archive.calls).toHaveLength(1);
+});
+
+test("a canonical SIMBAD name reaches the NASA-named host system once", async () => {
+  const archive = countingArchive();
+
+  const first = await reachStarSystem("Proxima Centauri");
+  const second = await reachStarSystem("Proxima Centauri");
+
+  expect(first?.hostStar).toBe(featuredPlanet.hostStar);
+  expect(second).toBe(first);
+  expect(archive.calls).toEqual(["/api/stars/Proxima%20Centauri/planets?limit=12"]);
 });
 
 test("a host the archive links no worlds to is not remembered as a system", async () => {

@@ -2,9 +2,8 @@ import type { ExoplanetProfile, StarProfile } from "@exora/contracts";
 import type { CustomStar, CustomWorld } from "@exora/worldgen";
 import { useEffect, useRef, useState } from "react";
 import type { StarLoadResult } from "../api-client.ts";
-import { reachSystem } from "../destination-cache.ts";
+import { reachStarSystem, reachSystem } from "../destination-cache.ts";
 import type { StarWorld } from "../star-scene.ts";
-import { starSystemAliases } from "../star-identity.ts";
 import { formatNumber } from "../planet-utils.tsx";
 import type { SceneHost, XrStatus } from "../scene-host.ts";
 import { deriveStarVisual, starKindLabel, starSummary } from "../star-utils.ts";
@@ -92,17 +91,12 @@ export const StarExperience = ({
       return;
     }
     const controller = new AbortController();
-    const aliases = starSystemAliases(star, systemHostName);
     setSystemState("loading");
-    void (async () => {
-      for (const alias of aliases) {
-        // The same lookup the diorama jump makes, so asking here is what makes that jump
-        // instant: whichever alias answers is the one already in hand when it is taken.
-        const response = await reachSystem(alias);
-        if (response) return response;
-      }
-      return null;
-    })()
+    const request =
+      solar || systemHostName
+        ? reachSystem(systemHostName ?? star.name)
+        : reachStarSystem(star.name);
+    void request
       .then((response) => {
         if (controller.signal.aborted) return;
         setSystemPlanets(response?.planets ?? []);
@@ -113,7 +107,7 @@ export const StarExperience = ({
         if (!controller.signal.aborted) setSystemState("error");
       });
     return () => controller.abort();
-  }, [custom, star, systemHostName]);
+  }, [custom, solar, star.name, systemHostName]);
 
   useEffect(() => {
     worldRef.current?.setSystemWorlds(systemPlanets, (planet) =>

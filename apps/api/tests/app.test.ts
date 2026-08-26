@@ -7,6 +7,7 @@ import { SbdbError, type SbdbRepository } from "../src/sbdb.ts";
 import type { HorizonsRepository } from "../src/horizons.ts";
 import type { MissionTrajectoryRepository } from "../src/mission-trajectories.ts";
 import { SimbadArchiveError, type StarRepository } from "../src/simbad-archive.ts";
+import type { SystemAliasRepository } from "../src/nasa-system-aliases.ts";
 
 const planet: ExoplanetProfile = {
   id: "hip-65426-b",
@@ -79,6 +80,10 @@ const starRepository: StarRepository = {
   featured: async () => ({ cached: true, value: [star] }),
   findByName: async () => ({ cached: false, value: star }),
   search: async () => ({ cached: false, value: [star] }),
+};
+
+const systemAliasRepository: SystemAliasRepository = {
+  resolveHost: async () => ({ cached: true, value: "HIP 65426" }),
 };
 
 test("returns service health", async () => {
@@ -435,6 +440,18 @@ test("returns featured and exact SIMBAD star results", async () => {
   });
   expect(await searchResponse.json()).toMatchObject({ meta: { count: 1, query: "sirius" } });
   expect(await detailResponse.json()).toMatchObject({ data: { id: "alf-cma" } });
+});
+
+test("joins a canonical SIMBAD star to NASA's authoritative host name and planets", async () => {
+  const response = await createApp({ repository, starRepository, systemAliasRepository }).request(
+    "/api/stars/Sirius/planets",
+  );
+
+  expect(response.status).toBe(200);
+  expect(await response.json()).toMatchObject({
+    data: [{ hostStar: "HIP 65426", name: "HIP 65426 b" }],
+    meta: { count: 1, query: "HIP 65426", source: "NASA Exoplanet Archive" },
+  });
 });
 
 test("every response carries the caller's remaining request budget", async () => {

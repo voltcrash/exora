@@ -34,6 +34,7 @@ import {
   type PlanetRepository,
   type RepositoryResult,
 } from "./nasa-archive.ts";
+import { NasaSystemAliasRepository, type SystemAliasRepository } from "./nasa-system-aliases.ts";
 import {
   clientKey,
   createRateLimiter,
@@ -66,6 +67,7 @@ interface CreateAppOptions {
   sbdbRateLimiter?: RateLimiter;
   sbdbRepository?: SbdbRepository;
   starRepository?: StarRepository;
+  systemAliasRepository?: SystemAliasRepository;
 }
 
 const apiError = (code: ApiErrorResponse["error"]["code"], message: string): ApiErrorResponse => ({
@@ -143,6 +145,7 @@ export const createApp = ({
   sbdbRateLimiter = createRateLimiter({ limit: 20, windowMs: 60_000 }),
   sbdbRepository = new JplSbdbRepository(),
   starRepository = new SimbadStarRepository(),
+  systemAliasRepository = new NasaSystemAliasRepository(),
 }: CreateAppOptions = {}) => {
   const app = new Hono();
 
@@ -508,6 +511,31 @@ export const createApp = ({
 
     const result = await starRepository.search(query, requestedLimit(context, 12));
     return starCollection(context, result, query, CACHE_POLICY.catalog);
+  });
+
+  app.get("/api/stars/:name/planets", async (context) => {
+    const name = context.req.param("name").trim();
+    if (!name || name.length > MAX_NAME_LENGTH) {
+      return context.json(apiError("INVALID_REQUEST", "Star name is invalid."), 400);
+    }
+
+    const starResult = await starRepository.findByName(name);
+    if (!starResult.value) {
+      return context.json(apiError("NOT_FOUND", `No stellar object named ${name} was found.`), 404);
+    }
+
+    const hostResult = await systemAliasRepository.resolveHost(starResult.value);
+    if (!hostResult.value) {
+      return planetCollection(
+        context,
+        { cached: hostResult.cached, value: [] },
+        starResult.value.name,
+        CACHE_POLICY.catalog,
+      );
+    }
+
+    const planets = await repository.findByHost(hostResult.value, requestedLimit(context, 12));
+    return planetCollection(context, planets, hostResult.value, CACHE_POLICY.catalog);
   });
 
   app.get("/api/stars/:name", async (context) => {

@@ -7,6 +7,7 @@ import {
   loadPlanetFilterPool,
   loadPlanetByName,
   loadPlanetsByHost,
+  loadPlanetsForStar,
   loadSolarEphemeris,
   loadStarByName,
   searchPlanets,
@@ -85,6 +86,28 @@ test("loads the confirmed planets connected to a star", async () => {
   });
 
   expect(result).toMatchObject({ cached: true, planets: [{ id: featuredPlanet.id }] });
+});
+
+test("loads a SIMBAD star's planets through NASA's aliases service", async () => {
+  const result = await loadPlanetsForStar("Proxima Centauri", {
+    fetcher: async (input) => {
+      expect(input).toBe("/api/stars/Proxima%20Centauri/planets?limit=12");
+      return Response.json({
+        data: [featuredPlanet],
+        meta: {
+          cached: false,
+          count: 1,
+          query: "Proxima Cen",
+          source: "NASA Exoplanet Archive",
+        },
+      });
+    },
+  });
+
+  expect(result).toMatchObject({
+    planets: [{ id: featuredPlanet.id }],
+    query: "Proxima Cen",
+  });
 });
 
 test("loads a broad field for local physical filtering", async () => {

@@ -22,6 +22,7 @@
 
 import {
   loadPlanetsByHost,
+  loadPlanetsForStar,
   loadStarByName,
   type StarLoadResult,
   type SystemLoadResult,
@@ -30,6 +31,7 @@ import { findSolarStar, findSolarSystem } from "./solar-system.ts";
 
 const stars = new Map<string, Promise<StarLoadResult | null>>();
 const systems = new Map<string, Promise<SystemLoadResult | null>>();
+const starSystems = new Map<string, Promise<SystemLoadResult | null>>();
 
 const remembered = <Answer>(
   held: Map<string, Promise<Answer | null>>,
@@ -79,6 +81,14 @@ export const reachSystem = (hostStar: string): Promise<SystemLoadResult | null> 
     return { cached: result.cached, hostStar, planets: result.planets };
   });
 
+/** A SIMBAD star's system, resolved through NASA's own cross-catalog aliases service. */
+export const reachStarSystem = (starName: string): Promise<SystemLoadResult | null> =>
+  remembered(starSystems, starName, async () => {
+    const result = await loadPlanetsForStar(starName);
+    if (result.planets.length === 0) return null;
+    return { cached: result.cached, hostStar: result.query, planets: result.planets };
+  });
+
 /**
  * Asks for both routes out of a world, and waits for neither.
  *
@@ -94,4 +104,5 @@ export const warmDestinations = (hostStar: string): void => {
 export const resetDestinationCacheForTesting = (): void => {
   stars.clear();
   systems.clear();
+  starSystems.clear();
 };

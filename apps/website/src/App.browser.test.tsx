@@ -387,6 +387,19 @@ const stubArchive = ({ missing = [] as string[] } = {}) => {
       });
     }
 
+    if (url.pathname.startsWith("/api/stars/") && url.pathname.endsWith("/planets")) {
+      const starName = decodeURIComponent(
+        url.pathname.slice("/api/stars/".length, -"/planets".length),
+      );
+      return planetList(
+        starName,
+        ["b", "c"].map((letter) => ({
+          ...namedPlanet(`${starName} ${letter}`),
+          hostStar: starName,
+        })),
+      );
+    }
+
     if (url.pathname === "/api/planets") {
       const host = url.searchParams.get("host");
       if (host) {
@@ -663,6 +676,8 @@ test("the star catalog opens and travels to a star", async () => {
   await userEvent.click(result);
 
   await expect.element(page.getByRole("heading", { level: 1 })).toHaveTextContent("Sirius");
+  await expect.element(page.getByRole("button", { name: /Sirius b/ })).toBeVisible();
+  await expect.element(page.getByRole("button", { name: /Sirius c/ })).toBeVisible();
   expect(window.location.search).toBe("?star=Sirius");
 });
 

@@ -448,6 +448,16 @@ export const loadPlanetsByHost = async (
     "Planet discovery",
   );
 
+export const loadPlanetsForStar = async (
+  starName: string,
+  options: CollectionOptions = {},
+): Promise<PlanetSearchResult> =>
+  requestPlanetCollection(
+    `/api/stars/${encodeURIComponent(starName)}/planets?limit=12`,
+    options,
+    "Stellar system discovery",
+  );
+
 export const loadPlanetFilterPool = async (
   options: CollectionOptions = {},
 ): Promise<PlanetSearchResult> =>
