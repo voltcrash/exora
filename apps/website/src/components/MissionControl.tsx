@@ -1,43 +1,24 @@
 import type { SceneHost, XrStatus } from "../scene-host.ts";
 import { DiscoverTrigger } from "./DiscoverTrigger.tsx";
 
-const immersiveButtonCopy: Record<XrStatus, "ENTER AR" | "ENTER AR/VR" | "ENTER VR"> = {
-  checking: "ENTER AR/VR",
-  entering: "ENTER AR/VR",
-  "in-xr": "ENTER AR/VR",
-  "ready-ar": "ENTER AR",
-  "ready-ar-launch": "ENTER AR",
-  "ready-vr": "ENTER VR",
-  unavailable: "ENTER AR/VR",
+const xrAvailabilityCopy: Record<XrStatus, "AR AVAILABLE" | "NOT AVAILABLE" | "VR AVAILABLE"> = {
+  checking: "NOT AVAILABLE",
+  entering: "NOT AVAILABLE",
+  "in-xr": "NOT AVAILABLE",
+  "ready-ar": "AR AVAILABLE",
+  "ready-ar-launch": "AR AVAILABLE",
+  "ready-vr": "VR AVAILABLE",
+  unavailable: "NOT AVAILABLE",
 };
 
 const readyStatuses = new Set<XrStatus>(["ready-ar", "ready-ar-launch", "ready-vr"]);
 
-type ImmersiveMode = "ar" | "neutral" | "vr";
-
-const immersiveMode = (status: XrStatus): ImmersiveMode =>
-  status === "ready-vr"
-    ? "vr"
-    : status === "ready-ar" || status === "ready-ar-launch"
-      ? "ar"
-      : "neutral";
-
-/** A phone-and-cube for AR, a headset for VR, and a combined spatial visor before detection. */
-const ImmersiveModeIcon = ({ mode }: { mode: ImmersiveMode }) => (
-  <svg className="immersive-mode-icon" data-mode={mode} viewBox="0 0 28 28" aria-hidden="true">
-    {mode === "ar" ? (
-      <>
-        <rect x="7" y="2.5" width="14" height="23" rx="3" />
-        <path d="m10.5 11.5 3.5-2 3.5 2v4L14 18l-3.5-2.5v-4Z" />
-        <path d="m10.5 11.5 3.5 2 3.5-2M14 13.5V18" />
-      </>
-    ) : (
-      <>
-        <path d="M5 9.5h18l2 3.5-2.4 6H17l-3-3-3 3H5.4L3 13l2-3.5Z" />
-        <path d="M8 13h3M17 13h3" />
-        {mode === "neutral" ? <path d="M14 5V2.5M8 6 6.5 4M20 6l1.5-2" /> : null}
-      </>
-    )}
+/** A shared wraparound spatial visor, drawn in the same instrument-line style as the deck. */
+const ImmersiveModeIcon = () => (
+  <svg className="immersive-mode-icon" viewBox="0 0 32 28" aria-hidden="true">
+    <path d="M4.5 10.5C5.2 7 8.3 5 12.5 5h7c4.2 0 7.3 2 8 5.5l.7 5.4c.4 3.1-1.5 5.1-4.4 5.1h-3.1c-2.1 0-2.8-2.8-4.7-2.8S13.4 21 11.3 21H8.2c-2.9 0-4.8-2-4.4-5.1l.7-5.4Z" />
+    <path className="visor-highlight" d="M7.5 10c4.4-2.2 12.6-2.2 17 0" />
+    <path d="M3.8 12H1.5M28.2 12h2.3" />
   </svg>
 );
 
@@ -133,15 +114,16 @@ export const MissionControl = ({
           <button
             className="enter-vr"
             type="button"
-            aria-label={`Immersive mode: ${immersiveButtonCopy[xr.status]}`}
+            aria-label={`XR: ${xrAvailabilityCopy[xr.status]}`}
             disabled={!readyStatuses.has(xr.status)}
             onClick={() =>
               void xr.host?.enterImmersive().catch((error: unknown) => console.error(error))
             }
           >
-            <ImmersiveModeIcon mode={immersiveMode(xr.status)} />
+            <ImmersiveModeIcon />
             <span>
-              <strong>{immersiveButtonCopy[xr.status]}</strong>
+              <small>XR</small>
+              <strong>{xrAvailabilityCopy[xr.status]}</strong>
             </span>
           </button>
         </div>

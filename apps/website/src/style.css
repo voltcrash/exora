@@ -2511,7 +2511,8 @@ h1 em {
 }
 
 .enter-vr > span:nth-child(2) {
-  display: block;
+  display: grid;
+  gap: 2px;
 }
 
 .enter-vr strong {
@@ -2521,7 +2522,7 @@ h1 em {
 }
 
 .immersive-mode-icon {
-  width: 26px;
+  width: 28px;
   height: 26px;
   overflow: visible;
   fill: none;
@@ -2530,6 +2531,10 @@ h1 em {
   stroke-linejoin: round;
   stroke-width: 1.3;
   opacity: 0.82;
+}
+
+.immersive-mode-icon .visor-highlight {
+  opacity: 0.56;
 }
 
 .catalog-trigger:focus-visible,

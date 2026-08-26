@@ -89,16 +89,12 @@ test("the world view gathers every control onto one named deck", () => {
 
   // Discover, clear view and the immersive entry: navigation first, presentation second and the
   // optional headset mode last, matching both the visible and keyboard order.
-  expect(deckNames(markup)).toEqual([
-    "Open Discover",
-    "Hide the interface",
-    "Immersive mode: ENTER AR/VR",
-  ]);
+  expect(deckNames(markup)).toEqual(["Open Discover", "Hide the interface", "XR: NOT AVAILABLE"]);
   expect(markup).toContain('<kbd class="shortcut-icon" aria-label="Backspace or Delete">⌫</kbd>');
   expect(markup).toContain('<kbd class="shortcut-icon" aria-label="Tab">⇥</kbd>');
   expect(markup).toContain('class="discover-trigger-icon"');
   expect(markup).toContain('class="clear-view-icon"');
-  expect(markup).toContain("ENTER AR/VR");
+  expect(markup).toContain("<small>XR</small><strong>NOT AVAILABLE</strong>");
 
   // Nothing is left in the top bar but the way home.
   const header = markup.slice(markup.indexOf("<header"), markup.indexOf("</header>"));
@@ -109,7 +105,7 @@ test("the star view gathers the same controls onto the same deck", () => {
   expect(deckNames(starMarkup())).toEqual([
     "Open Discover",
     "Hide the interface",
-    "Immersive mode: ENTER AR/VR",
+    "XR: NOT AVAILABLE",
   ]);
 });
 
@@ -118,10 +114,10 @@ test("the same control is named the same way from either view", () => {
 });
 
 test.each([
-  ["ready-vr", "ENTER VR", "vr"],
-  ["ready-ar", "ENTER AR", "ar"],
-  ["ready-ar-launch", "ENTER AR", "ar"],
-] as const)("the shared immersive control reflects the selected %s mode", (status, copy, mode) => {
+  ["ready-vr", "VR AVAILABLE"],
+  ["ready-ar", "AR AVAILABLE"],
+  ["ready-ar-launch", "AR AVAILABLE"],
+] as const)("the shared immersive control reflects the selected %s mode", (status, copy) => {
   const markup = renderToStaticMarkup(
     <MissionControl
       chromeHidden={false}
@@ -134,11 +130,12 @@ test.each([
   );
 
   expect(markup).toContain(`<strong>${copy}</strong>`);
-  expect(markup).toContain(`data-mode="${mode}"`);
+  expect(markup).toContain("<small>XR</small>");
+  expect(markup).toContain('class="immersive-mode-icon"');
   expect(markup).not.toContain("disabled");
 });
 
-test("the unavailable immersive control offers the combined AR/VR label", () => {
+test("the unavailable immersive control reports its XR state", () => {
   const markup = renderToStaticMarkup(
     <MissionControl
       chromeHidden={false}
@@ -150,8 +147,8 @@ test("the unavailable immersive control offers the combined AR/VR label", () => 
     />,
   );
 
-  expect(markup).toContain("<strong>ENTER AR/VR</strong>");
-  expect(markup).toContain('data-mode="neutral"');
+  expect(markup).toContain("<small>XR</small><strong>NOT AVAILABLE</strong>");
+  expect(markup).toContain('class="immersive-mode-icon"');
   expect(markup).toContain("disabled");
 });
 
