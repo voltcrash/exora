@@ -30,6 +30,7 @@ catalog:
   vercel: ^59.1.4
   vite: npm:@voidzero-dev/vite-plus-core@0.2.9
   vite-plus: 0.2.9
+  zod: ^4.4.3
 overrides:
   vite: "catalog:"
   # Advisory patches for transitive development tooling. Every entry below is pinned inside the

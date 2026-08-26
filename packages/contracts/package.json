@@ -9,6 +9,9 @@
   "scripts": {
     "build": "vp pack"
   },
+  "dependencies": {
+    "zod": "catalog:"
+  },
   "devDependencies": {
     "typescript": "catalog:",
     "vite": "catalog:",
