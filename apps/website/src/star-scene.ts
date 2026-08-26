@@ -96,6 +96,9 @@ export const createStarWorld = (
   const seed = recipe.seed;
   const activity = recipe.activity;
   const diameter = recipe.radiusSceneUnits;
+  // Preserve a shared default viewpoint so physical size differences remain visible, but let
+  // compact stars approach closely enough that their corona does not sit beyond the zoom limit.
+  camera.lowerRadiusLimit = Math.min(9.5, diameter * 1.3 + 0.15);
 
   // SIMBAD gives this star a right ascension, a declination and a parallax, which is everything
   // needed to stand at it and look out: the background is then the real sky from there, with the

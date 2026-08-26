@@ -28,11 +28,16 @@ const STAR_COLUMNS = [
   'f."V"',
   'f."G"',
   "a.ids as aliases",
+  "d.diameter",
+  "d.unit as diameter_unit",
+  "h.teff",
 ].join(",");
 const STAR_FROM =
   "from ident as i join basic as b on i.oidref=b.oid " +
   "left outer join allfluxes as f on b.oid=f.oidref " +
-  "left outer join ids as a on b.oid=a.oidref";
+  "left outer join ids as a on b.oid=a.oidref " +
+  "left outer join mesDiameter as d on b.oid=d.oidref and d.mespos=1 " +
+  "left outer join mesFe_h as h on b.oid=h.oidref and h.mespos=1";
 
 type Fetcher = (input: string | URL | Request, init?: RequestInit) => Promise<Response>;
 
@@ -41,6 +46,8 @@ interface SimbadStarRow {
   V: number | null;
   aliases: string | null;
   dec: number | null;
+  diameter: number | null;
+  diameter_unit: string | null;
   main_id: string | null;
   matched_id: string | null;
   otype: string | null;
@@ -51,6 +58,7 @@ interface SimbadStarRow {
   ra: number | null;
   rvz_radvel: number | null;
   sp_type: string | null;
+  teff: number | null;
 }
 
 interface SimbadPayload {
@@ -276,6 +284,24 @@ const parseAliases = (aliases: string | null): readonly string[] =>
       ]
     : [];
 
+const ASTRONOMICAL_UNIT_KILOMETERS = 149_597_870.7;
+
+/** SIMBAD diameter measurements are either linear kilometres or angular milliarcseconds. An
+ * angular diameter divided by the parallax gives the physical diameter in astronomical units. */
+const diameterKilometers = (
+  diameter: number | null,
+  unit: string | null,
+  parallaxMas: number | null,
+): number | null => {
+  if (diameter === null || diameter <= 0) return null;
+  const normalizedUnit = unit?.trim().toLowerCase();
+  if (normalizedUnit === "km") return diameter;
+  if (normalizedUnit === "mas" && parallaxMas !== null && parallaxMas > 0) {
+    return (diameter / parallaxMas) * ASTRONOMICAL_UNIT_KILOMETERS;
+  }
+  return null;
+};
+
 export const normalizeSimbadStar = (
   rawRow: Record<string, unknown>,
   retrievedOn = new Date().toISOString().slice(0, 10),
@@ -303,8 +329,14 @@ export const normalizeSimbadStar = (
     observation: {
       rightAscensionDegrees: ra,
       declinationDegrees: dec,
+      diameterKilometers: diameterKilometers(
+        numberOrNull(row.diameter),
+        stringOrNull(row.diameter_unit),
+        parallax,
+      ),
       parallaxMas: parallax,
       distanceParsecs: parallax !== null && parallax > 0 ? 1_000 / parallax : null,
+      effectiveTemperatureKelvin: numberOrNull(row.teff),
       properMotionRaMasPerYear: numberOrNull(row.pmra),
       properMotionDecMasPerYear: numberOrNull(row.pmdec),
       radialVelocityKmPerSecond: numberOrNull(row.rvz_radvel),
@@ -314,7 +346,7 @@ export const normalizeSimbadStar = (
     },
     source: {
       archive: "SIMBAD",
-      tables: ["basic", "ident", "allfluxes"],
+      tables: ["basic", "ident", "allfluxes", "mesDiameter", "mesFe_h"],
       retrievedOn,
     },
   };
@@ -343,7 +375,7 @@ export class SimbadStarRepository implements StarRepository {
     const safeLimit = Math.max(1, Math.min(Math.trunc(limit), 12));
     const columns = STAR_COLUMNS.replace("i.id as matched_id", "b.main_id as matched_id");
     return this.#query(
-      `select distinct top ${safeLimit} ${columns} from basic as b left outer join allfluxes as f on b.oid=f.oidref left outer join ids as a on b.oid=a.oidref where ${filter.where} order by ${filter.order}`,
+      `select distinct top ${safeLimit} ${columns} from basic as b left outer join allfluxes as f on b.oid=f.oidref left outer join ids as a on b.oid=a.oidref left outer join mesDiameter as d on b.oid=d.oidref and d.mespos=1 left outer join mesFe_h as h on b.oid=h.oidref and h.mespos=1 where ${filter.where} order by ${filter.order}`,
     );
   }
 

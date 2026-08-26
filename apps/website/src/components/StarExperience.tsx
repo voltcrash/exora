@@ -193,7 +193,7 @@ export const StarExperience = ({
             <span>{observation.spectralType ?? "SPECTRUM UNKNOWN"}</span>
             <span>
               {custom ? "" : "~"}
-              {formatNumber(visual.estimatedTemperatureKelvin, 0)} K
+              {formatNumber(visual.temperatureKelvin, 0)} K
             </span>
           </div>
           <p className="world-summary">{starSummary(star)}</p>
@@ -203,7 +203,9 @@ export const StarExperience = ({
               ? "USER-DESIGNED PROCEDURAL STAR"
               : solar
                 ? "NASA/JPL MEASUREMENTS · EXORA STELLAR SURFACE"
-                : "STELLAR APPEARANCE INFERRED FROM SPECTRAL CLASS"}
+                : observation.effectiveTemperatureKelvin == null
+                  ? "STELLAR APPEARANCE INFERRED FROM SIMBAD SPECTRAL CLASS"
+                  : "SIMBAD STELLAR MEASUREMENTS · EXORA STELLAR SURFACE"}
           </p>
           {!custom ? (
             <section className="known-worlds" aria-labelledby="known-worlds-title">

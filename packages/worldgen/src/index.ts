@@ -1311,6 +1311,7 @@ const starKindDescription: Record<StarKind, string> = {
 /** Catalog facts about a star, normalized from SIMBAD (or a custom generator) and free of any
  * rendering assumptions. */
 export interface StarPhysicalProperties {
+  diameterKilometers: number | null;
   effectiveTemperatureKelvin: number | null;
   spectralType: string | null;
 }
@@ -1352,9 +1353,73 @@ const spectralStarPalette: Record<string, { label: string; temperatureKelvin: nu
 /** Extracts the physical facts a star's visual recipe is derived from, kept separate so the
  * catalog data and the rendering assumptions built on top of it never get conflated. */
 export const deriveStarPhysicalProperties = (star: StarProfile): StarPhysicalProperties => ({
-  effectiveTemperatureKelvin: star.customization?.temperatureKelvin ?? null,
+  diameterKilometers: star.observation.diameterKilometers ?? null,
+  effectiveTemperatureKelvin:
+    star.customization?.temperatureKelvin ?? star.observation.effectiveTemperatureKelvin ?? null,
   spectralType: star.observation.spectralType,
 });
+
+const spectralTemperatureKelvin = (spectralType: string | null): number => {
+  const match = spectralType?.match(/^\s*([OBAFGKM])\s*(\d(?:\.\d)?)/i);
+  if (!match) {
+    const spectralClass = spectralType?.match(/^\s*([OBAFGKM])/i)?.[1]?.toUpperCase();
+    return spectralStarPalette[spectralClass ?? "G"]?.temperatureKelvin ?? 5_700;
+  }
+
+  const spectralClass = match[1]?.toUpperCase() ?? "G";
+  const subtype = clamp(Number(match[2]), 0, 9.9) / 10;
+  const temperatureRange: Record<string, readonly [number, number]> = {
+    O: [40_000, 30_000],
+    B: [30_000, 10_500],
+    A: [9_700, 7_500],
+    F: [7_200, 6_000],
+    G: [5_900, 5_200],
+    K: [5_100, 3_900],
+    M: [3_800, 2_400],
+  };
+  const [hot, cool] = temperatureRange[spectralClass] ?? [5_900, 5_200];
+  return hot + (cool - hot) * subtype;
+};
+
+const inferredRadiusSolar = (star: StarProfile, spectralClass: string): number => {
+  if (star.kind === "white-dwarf") return 0.012;
+  if (star.kind === "neutron-star") return 0.000_02;
+
+  const mainSequenceRadius: Record<string, number> = {
+    O: 10,
+    B: 4,
+    A: 1.8,
+    F: 1.3,
+    G: 1,
+    K: 0.75,
+    M: 0.3,
+  };
+  const spectrum = star.observation.spectralType ?? "";
+  const luminosityMultiplier = /(?:Ia|Iab|Ib)(?:\W|$)/i.test(spectrum)
+    ? 80
+    : /II(?:\W|$)/i.test(spectrum)
+      ? 30
+      : /III(?:\W|$)/i.test(spectrum)
+        ? 10
+        : /IV(?:\W|$)/i.test(spectrum)
+          ? 2
+          : 1;
+  return (mainSequenceRadius[spectralClass] ?? 1) * luminosityMultiplier;
+};
+
+const SOLAR_DIAMETER_KILOMETERS = 1_391_400;
+
+const catalogStarRadiusSceneUnits = (
+  star: StarProfile,
+  physical: StarPhysicalProperties,
+  spectralClass: string,
+): number => {
+  const radiusSolar =
+    physical.diameterKilometers === null
+      ? inferredRadiusSolar(star, spectralClass)
+      : physical.diameterKilometers / SOLAR_DIAMETER_KILOMETERS;
+  return clamp(4.5 + Math.log10(Math.max(radiusSolar, 0.000_02)) * 2.4, 2.2, 12);
+};
 
 /**
  * Derives a stable visual recipe for a star, mirroring deriveWorldRecipe for planets. The seed
@@ -1369,7 +1434,7 @@ export const deriveStarRecipe = (star: StarProfile): StarVisualRecipe => {
   const palette = spectralStarPalette[spectralClass ?? "G"] ?? spectralStarPalette.G;
   const temperatureKelvin =
     physical.effectiveTemperatureKelvin === null
-      ? palette.temperatureKelvin
+      ? spectralTemperatureKelvin(physical.spectralType)
       : clamp(physical.effectiveTemperatureKelvin, 1_000, 40_000);
   // Always the same blackbody curve, whether the temperature came from a measurement or a
   // spectral-class fallback, so color and temperatureKelvin never disagree with each other.
@@ -1385,7 +1450,10 @@ export const deriveStarRecipe = (star: StarProfile): StarVisualRecipe => {
     temperatureKelvin,
     color,
     label: palette.label,
-    radiusSceneUnits: 5.6 + clampUnit(star.customization?.radius ?? 0.5) * 3.2,
+    radiusSceneUnits:
+      star.customization === undefined
+        ? catalogStarRadiusSceneUnits(star, physical, spectralClass ?? "G")
+        : 5.6 + clampUnit(star.customization.radius) * 3.2,
     activity,
     spectralClassification: `${spectralClass ?? "G"}${luminosityClass(star.kind)}`,
     rotationFactor: clampUnit(star.customization?.rotation ?? 0.5),

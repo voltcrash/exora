@@ -4,16 +4,16 @@ import { formatNumber } from "./planet-utils.tsx";
 
 export interface StarVisualProfile {
   color: readonly [number, number, number];
-  estimatedTemperatureKelvin: number;
   label: string;
+  temperatureKelvin: number;
 }
 
 export const deriveStarVisual = (star: StarProfile): StarVisualProfile => {
   const recipe = deriveStarRecipe(star);
   return {
     color: recipe.color,
-    estimatedTemperatureKelvin: recipe.temperatureKelvin,
     label: recipe.label,
+    temperatureKelvin: recipe.temperatureKelvin,
   };
 };
 

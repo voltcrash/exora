@@ -151,7 +151,11 @@ export type StarKind =
 
 export interface StarObservation {
   declinationDegrees: number | null;
+  /** Preferred SIMBAD stellar-diameter measurement, converted to kilometres when possible. */
+  diameterKilometers?: number | null;
   distanceParsecs: number | null;
+  /** Preferred effective-temperature measurement from SIMBAD's mesFe_h collection. */
+  effectiveTemperatureKelvin?: number | null;
   gaiaMagnitude: number | null;
   parallaxMas: number | null;
   properMotionDecMasPerYear: number | null;
@@ -183,7 +187,9 @@ export interface StarProfile {
     | {
         archive: "SIMBAD";
         retrievedOn: string;
-        tables: readonly ["basic", "ident", "allfluxes"];
+        tables:
+          | readonly ["basic", "ident", "allfluxes"]
+          | readonly ["basic", "ident", "allfluxes", "mesDiameter", "mesFe_h"];
       }
     | {
         archive: "Exora Custom Generator";

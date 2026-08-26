@@ -417,6 +417,44 @@ test("star recipes are deterministic for the same star and differ across object 
   expect(renamed.seed).not.toBe(first.seed);
 });
 
+test("SIMBAD effective temperature and diameter directly control catalog star color and size", () => {
+  const compactHotStar = deriveStarRecipe({
+    ...catalogStar,
+    observation: {
+      ...catalogStar.observation,
+      diameterKilometers: 1_391_400,
+      effectiveTemperatureKelvin: 12_000,
+    },
+  });
+  const largeCoolStar = deriveStarRecipe({
+    ...catalogStar,
+    observation: {
+      ...catalogStar.observation,
+      diameterKilometers: 139_140_000,
+      effectiveTemperatureKelvin: 3_200,
+    },
+  });
+
+  expect(compactHotStar.temperatureKelvin).toBe(12_000);
+  expect(largeCoolStar.temperatureKelvin).toBe(3_200);
+  expect(compactHotStar.color[2]).toBeGreaterThan(largeCoolStar.color[2]);
+  expect(largeCoolStar.radiusSceneUnits).toBeGreaterThan(compactHotStar.radiusSceneUnits);
+});
+
+test("SIMBAD spectral subclasses provide distinct physical fallbacks when temperature is absent", () => {
+  const earlyA = deriveStarRecipe({
+    ...catalogStar,
+    observation: { ...catalogStar.observation, spectralType: "A0V" },
+  });
+  const lateA = deriveStarRecipe({
+    ...catalogStar,
+    observation: { ...catalogStar.observation, spectralType: "A9V" },
+  });
+
+  expect(earlyA.temperatureKelvin).toBeGreaterThan(lateA.temperatureKelvin);
+  expect(earlyA.color).not.toEqual(lateA.color);
+});
+
 test("missing NASA host-star fields never produce NaN or non-finite values", () => {
   const sparse = deriveHostStar({
     ...featuredPlanet,

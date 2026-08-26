@@ -5045,7 +5045,7 @@ h1 em {
     radial-gradient(circle at 75% 18%, rgb(255 255 255 / 17%) 0 1px, transparent 2px),
     radial-gradient(circle at 85% 75%, rgb(255 255 255 / 20%) 0 1px, transparent 2px),
     radial-gradient(circle at 28% 78%, rgb(255 255 255 / 13%) 0 1px, transparent 2px),
-    radial-gradient(circle, hsl(var(--star-hue) 90% 62% / 10%), transparent 68%), #05080c;
+    radial-gradient(circle, rgb(var(--star-color) / 10%), transparent 68%), #05080c;
 }
 
 .black-hole-catalog-visual {
@@ -5143,13 +5143,13 @@ h1 em {
     linear-gradient(
       to right,
       transparent 48.4%,
-      hsl(var(--star-hue) 98% 97% / 90%) 50%,
+      rgb(var(--star-color) / 90%) 50%,
       transparent 51.6%
     ),
     linear-gradient(
       to bottom,
       transparent 48.7%,
-      hsl(var(--star-hue) 98% 97% / 72%) 50%,
+      rgb(var(--star-color) / 72%) 50%,
       transparent 51.3%
     );
   /* Fades the vanes out with distance AND hides the corners of the square they are painted on —
@@ -5168,21 +5168,21 @@ h1 em {
    colour lives in the darkening limb, and the brightness the screen cannot carry spills outside
    the disc as glow — the same reading the 3D photosphere is built on. */
 .catalog-star-core {
-  width: 108px;
-  height: 108px;
+  width: var(--star-size);
+  height: var(--star-size);
   z-index: 1;
   border-radius: 50%;
   background: radial-gradient(
     circle at 50% 50%,
-    #fff 0 26%,
-    hsl(var(--star-hue) 96% 88%) 46%,
-    hsl(var(--star-hue) 92% var(--star-bloom)) 78%,
-    hsl(var(--star-hue) 86% 44%) 100%
+    rgb(255 255 255) 0 26%,
+    rgb(var(--star-color) / 92%) 46%,
+    rgb(var(--star-color) / 68%) 78%,
+    rgb(var(--star-color) / 48%) 100%
   );
   box-shadow:
-    0 0 12px hsl(var(--star-hue) 96% 84% / 80%),
-    0 0 30px hsl(var(--star-hue) 94% 72% / 38%),
-    0 0 70px hsl(var(--star-hue) 90% 60% / 18%);
+    0 0 12px rgb(var(--star-color) / 80%),
+    0 0 30px rgb(var(--star-color) / 38%),
+    0 0 70px rgb(var(--star-color) / 18%);
 }
 
 .catalog-result:disabled {
@@ -6334,10 +6334,14 @@ h1 em {
     height: 128px;
   }
 
-  .catalog-planet-sphere,
-  .catalog-star-core {
+  .catalog-planet-sphere {
     width: 84px;
     height: 84px;
+  }
+
+  .catalog-star-core {
+    width: calc(var(--star-size) * 0.72);
+    height: calc(var(--star-size) * 0.72);
   }
 
   .catalog-orbit {
@@ -6381,10 +6385,14 @@ h1 em {
     height: 40px;
   }
 
-  .list-view .catalog-planet-sphere,
-  .list-view .catalog-star-core {
+  .list-view .catalog-planet-sphere {
     width: 27px;
     height: 27px;
+  }
+
+  .list-view .catalog-star-core {
+    width: calc(var(--star-size) * 0.25);
+    height: calc(var(--star-size) * 0.25);
   }
 
   .list-view .catalog-orbit {

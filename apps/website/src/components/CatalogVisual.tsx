@@ -1,4 +1,5 @@
 import type { ExoplanetProfile, StarProfile } from "@exora/contracts";
+import { deriveStarRecipe } from "@exora/worldgen";
 import type { CSSProperties } from "react";
 import type { BlackHoleProfile } from "../black-holes.ts";
 
@@ -45,21 +46,15 @@ export const PlanetCatalogVisual = ({ planet }: { planet: ExoplanetProfile }) =>
   );
 };
 
-const spectralHue = (star: StarProfile): number => {
-  const spectralClass = star.observation.spectralType?.match(/[OBAFGKM]/i)?.[0]?.toUpperCase();
-  return (
-    ({ O: 220, B: 215, A: 205, F: 48, G: 38, K: 24, M: 8 } as Record<string, number>)[
-      spectralClass ?? ""
-    ] ?? 42
-  );
-};
-
 export const StarCatalogVisual = ({ star }: { star: StarProfile }) => {
   const hash = hashName(star.name);
+  const recipe = deriveStarRecipe(star);
+  const rgb = recipe.color.map((channel) => Math.round(channel * 255)).join(" ");
+  const size = 68 + ((recipe.radiusSceneUnits - 2.2) / (12 - 2.2)) * 56;
   const style: VisualStyle = {
-    "--star-bloom": `${54 + (hash % 18)}%`,
-    "--star-hue": `${spectralHue(star)}deg`,
+    "--star-color": rgb,
     "--star-ray": `${hash % 90}deg`,
+    "--star-size": `${Math.min(124, Math.max(68, size))}px`,
   };
 
   // No glint. A glint is a specular highlight — light from somewhere else bouncing off a surface —

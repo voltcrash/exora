@@ -52,6 +52,34 @@ test("normalizes SIMBAD measurements and derives distance", () => {
   });
 });
 
+test("normalizes SIMBAD temperature and linear diameter measurements", () => {
+  const star = normalizeSimbadStar({
+    ...Object.fromEntries(metadata.map(({ name }, index) => [name, siriusRow[index]])),
+    diameter: 2_530_000,
+    diameter_unit: "km  ",
+    teff: 7_550,
+  });
+
+  expect(star?.observation).toMatchObject({
+    diameterKilometers: 2_530_000,
+    effectiveTemperatureKelvin: 7_550,
+  });
+  expect(star?.source).toMatchObject({
+    tables: ["basic", "ident", "allfluxes", "mesDiameter", "mesFe_h"],
+  });
+});
+
+test("converts a SIMBAD angular diameter to a physical diameter using parallax", () => {
+  const star = normalizeSimbadStar({
+    ...Object.fromEntries(metadata.map(({ name }, index) => [name, siriusRow[index]])),
+    diameter: 6.039,
+    diameter_unit: "mas",
+    plx_value: 130.23,
+  });
+
+  expect(star?.observation.diameterKilometers).toBeCloseTo(6_937_123, -3);
+});
+
 test("uses a proper-name alias for catalog-style discovery identifiers", () => {
   const star = normalizeSimbadStar({
     ...Object.fromEntries(metadata.map(({ name }, index) => [name, siriusRow[index]])),
@@ -112,6 +140,8 @@ test("uses exact alias matching and caches repeated searches", async () => {
   expect(second.cached).toBe(true);
   expect(requests).toBe(1);
   expect(adql).toContain("i.id='NAME Sirius'");
+  expect(adql).toContain("mesDiameter as d");
+  expect(adql).toContain("mesFe_h as h");
   expect(adql).not.toContain("like");
 });
 
