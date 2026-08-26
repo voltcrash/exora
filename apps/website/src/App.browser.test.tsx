@@ -932,6 +932,12 @@ test("the Sun's complete world list scrolls inside its left panel", async () => 
     return;
   }
 
+  const telemetry = page.getByLabelText("Observed star data");
+  await expect.element(telemetry).toHaveTextContent(/Earth distance\s*1\s*AU/);
+  await expect.element(telemetry).toHaveTextContent(/Diameter\s*1,391,400\s*KM/);
+  await expect.element(telemetry).toHaveTextContent(/Temperature\s*5,772\s*K/);
+  await expect.element(telemetry).toHaveTextContent("25.38 D SIDEREAL");
+  await expect.element(telemetry).toHaveTextContent(/AXIAL TILT 7.25°/);
   await expect.element(page.getByRole("heading", { name: "Known worlds" })).toBeVisible();
   const intro = document.querySelector<HTMLElement>(".star-experience .world-intro");
   expect(intro).not.toBeNull();

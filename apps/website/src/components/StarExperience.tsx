@@ -306,6 +306,34 @@ export const StarExperience = ({
                   </dd>
                 </div>
               </>
+            ) : solar ? (
+              <>
+                <div>
+                  <dt>Earth distance</dt>
+                  <dd>
+                    1 <small>AU</small>
+                  </dd>
+                </div>
+                <div>
+                  <dt>V magnitude</dt>
+                  <dd>
+                    {formatNumber(observation.visualMagnitude, 2)} <small>MAG</small>
+                  </dd>
+                </div>
+                <div>
+                  <dt>Diameter</dt>
+                  <dd>
+                    {formatNumber(observation.diameterKilometers ?? null, 0)} <small>KM</small>
+                  </dd>
+                </div>
+                <div>
+                  <dt>Temperature</dt>
+                  <dd>
+                    {formatNumber(observation.effectiveTemperatureKelvin ?? null, 0)}{" "}
+                    <small>K</small>
+                  </dd>
+                </div>
+              </>
             ) : (
               <>
                 <div>
@@ -343,16 +371,20 @@ export const StarExperience = ({
             </small>
           </div>
           <div className="telemetry-detail">
-            <span>{custom ? "GENERATION SEED" : "SPACE MOTION"}</span>
+            <span>{custom ? "GENERATION SEED" : solar ? "ROTATION" : "SPACE MOTION"}</span>
             <strong>
               {custom
                 ? star.customization?.seed
-                : `${formatNumber(observation.radialVelocityKmPerSecond, 1)} KM/S RADIAL`}
+                : solar
+                  ? `${formatNumber((star.solarSystem?.rotationPeriodHours ?? 0) / 24, 2)} D SIDEREAL`
+                  : `${formatNumber(observation.radialVelocityKmPerSecond, 1)} KM/S RADIAL`}
             </strong>
             <small>
               {custom
                 ? "REPRODUCIBLE PROCEDURAL PROFILE"
-                : `RA ${formatNumber(observation.properMotionRaMasPerYear, 1)} · DEC ${formatNumber(observation.properMotionDecMasPerYear, 1)} MAS/YR`}
+                : solar
+                  ? `AXIAL TILT ${formatNumber(star.solarSystem?.axialTiltDegrees ?? null, 2)}° · DIFFERENTIAL ROTATION`
+                  : `RA ${formatNumber(observation.properMotionRaMasPerYear, 1)} · DEC ${formatNumber(observation.properMotionDecMasPerYear, 1)} MAS/YR`}
             </small>
           </div>
           <p className="source-note">

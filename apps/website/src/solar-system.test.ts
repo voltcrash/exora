@@ -19,6 +19,11 @@ describe("the local Solar System catalog", () => {
   it("starts with the Sun under its permanent JPL identity", () => {
     expect(SOLAR_SYSTEM_CATALOG[0]).toEqual({ profile: SUN, type: "star" });
     expect(SUN.solarSystem).toMatchObject({ bodyType: "star", naifId: 10, parent: null });
+    expect(SUN.observation).toMatchObject({
+      diameterKilometers: 1_391_400,
+      effectiveTemperatureKelvin: 5_772,
+      visualMagnitude: -26.74,
+    });
     expect(SUN.source.archive).toBe("NASA/JPL Solar System Dynamics");
   });
 

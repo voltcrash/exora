@@ -25,7 +25,9 @@ export const SUN: StarProfile = {
   objectType: "G2 V star",
   observation: {
     declinationDegrees: null,
+    diameterKilometers: 1_391_400,
     distanceParsecs: 0,
+    effectiveTemperatureKelvin: 5_772,
     gaiaMagnitude: null,
     parallaxMas: null,
     properMotionDecMasPerYear: null,
