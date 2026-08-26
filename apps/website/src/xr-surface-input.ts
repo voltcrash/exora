@@ -5,6 +5,36 @@ export interface SurfaceRect {
   width: number;
 }
 
+export type XrControllerAction = "back" | "menu" | "primary" | "selection" | null;
+
+/**
+ * Normalizes WebXR Input Profile component ids into Exora's Quest control scheme.
+ *
+ * `menu` variants cover controllers that expose their application button. Quest Browser reserves
+ * the Meta universal-menu button, but the left application button is still handled whenever the
+ * runtime includes it in the motion-controller profile.
+ */
+export const xrControllerAction = (componentId: string): XrControllerAction => {
+  switch (componentId) {
+    case "a-button":
+    case "x-button":
+      return "primary";
+    case "b-button":
+    case "y-button":
+      return "back";
+    case "xr-standard-trigger":
+    case "menu":
+    case "menu-button":
+    case "xr-standard-menu":
+      return "menu";
+    case "xr-standard-squeeze":
+    case "squeeze":
+      return "selection";
+    default:
+      return null;
+  }
+};
+
 /** Maps Babylon's bottom-left texture coordinates into the browser's top-left client space. */
 export const texturePointToClient = (
   u: number,

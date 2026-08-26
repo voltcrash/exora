@@ -1,5 +1,6 @@
 import { ActionManager } from "@babylonjs/core/Actions/actionManager.js";
 import { ExecuteCodeAction } from "@babylonjs/core/Actions/directActions.js";
+import { PointerDragBehavior } from "@babylonjs/core/Behaviors/Meshes/pointerDragBehavior.js";
 import "@babylonjs/core/Culling/ray.js";
 import { Engine } from "@babylonjs/core/Engines/engine.js";
 import { DirectionalLight } from "@babylonjs/core/Lights/directionalLight.js";
@@ -1468,11 +1469,13 @@ const createPlanet = (
   planetProfile: ExoplanetProfile,
 ): {
   atmosphere: ShaderMaterial;
+  atmosphereMesh: Mesh;
   cloudLayer: ShaderMaterial | null;
   cloudMesh: Mesh | null;
   orbitalMeshes: AbstractMesh[];
   orbitalRoot: TransformNode;
   planet: Mesh;
+  planetRoot: TransformNode;
   ringMaterial: ShaderMaterial | null;
   ringSystem: TransformNode | null;
   shader: ShaderMaterial;
@@ -1491,6 +1494,8 @@ const createPlanet = (
   Effect.ShadersStore.exoraKnownBodyFragmentShader = KNOWN_BODY_FRAGMENT_SHADER;
 
   const orbitalRoot = new TransformNode("orbitalWorld", scene);
+  const planetRoot = new TransformNode("planetAssembly", scene);
+  planetRoot.parent = orbitalRoot;
   const orbitalMeshes: AbstractMesh[] = [];
 
   // Rocky worlds get an icosphere: its near-uniform vertex distribution avoids the pinched
@@ -1515,7 +1520,7 @@ const createPlanet = (
           scene,
         );
   planet.position.copyFrom(PLANET_POSITION);
-  planet.parent = orbitalRoot;
+  planet.parent = planetRoot;
   const measuredDimensions = planetProfile.solarSystem?.dimensionsKilometers;
   const meanDiameterKilometers = (planetProfile.observation.radiusEarth ?? 1) * 6_371 * 2;
   if (measuredDimensions && meanDiameterKilometers > 0) {
@@ -1530,7 +1535,7 @@ const createPlanet = (
       ? recipe.axialTilt
       : (planetProfile.solarSystem.axialTiltDegrees * Math.PI) / 180;
   planet.rotation.z = axialTilt;
-  planet.isPickable = false;
+  planet.isPickable = true;
   orbitalMeshes.push(planet);
 
   if (recipe.renderer === "rocky" && !knownTexture) {
@@ -1803,7 +1808,7 @@ const createPlanet = (
   const ringSystem = ringBuild?.system ?? null;
   const ringMaterial = ringBuild?.material ?? null;
   if (ringSystem) {
-    ringSystem.parent = orbitalRoot;
+    ringSystem.parent = planetRoot;
     orbitalMeshes.push(...ringSystem.getChildMeshes(false));
   }
 
@@ -1816,7 +1821,7 @@ const createPlanet = (
       scene,
     );
     cloudMesh.position.copyFrom(PLANET_POSITION);
-    cloudMesh.parent = orbitalRoot;
+    cloudMesh.parent = planetRoot;
     cloudMesh.rotation.z = axialTilt;
     cloudMesh.isPickable = false;
     cloudMesh.renderingGroupId = 1;
@@ -1865,7 +1870,7 @@ const createPlanet = (
     scene,
   );
   atmosphereMesh.position.copyFrom(PLANET_POSITION);
-  atmosphereMesh.parent = orbitalRoot;
+  atmosphereMesh.parent = planetRoot;
   atmosphereMesh.isPickable = false;
   atmosphereMesh.renderingGroupId = 1;
   orbitalMeshes.push(atmosphereMesh);
@@ -1916,11 +1921,13 @@ const createPlanet = (
 
   return {
     atmosphere,
+    atmosphereMesh,
     cloudLayer,
     cloudMesh,
     orbitalMeshes,
     orbitalRoot,
     planet,
+    planetRoot,
     ringMaterial,
     ringSystem,
     shader,
@@ -2315,11 +2322,13 @@ export const createPlanetWorld = (
   });
   const {
     atmosphere,
+    atmosphereMesh,
     cloudLayer,
     cloudMesh,
     orbitalMeshes,
     orbitalRoot,
     planet,
+    planetRoot,
     ringMaterial,
     ringSystem,
     shader,
@@ -2472,8 +2481,31 @@ export const createPlanetWorld = (
     onViewModeChange("transition");
   };
 
+  // A/X treats the planet as the direct route to terrain. Holding a grip instead keeps the
+  // pointer down, allowing Babylon's drag behavior to move the complete planet assembly without
+  // pulling its host star along with it.
+  planet.metadata = {
+    ...planet.metadata,
+    exoraXrPrimaryAction: () => {
+      if (host.isInXr() && viewState === "orbit") applyXrView(true, false);
+    },
+  };
+  const xrPlanetDrag = new PointerDragBehavior();
+  xrPlanetDrag.detachCameraControls = false;
+  xrPlanetDrag.dragDeltaRatio = 0.45;
+  xrPlanetDrag.moveAttached = false;
+  xrPlanetDrag.enabled = false;
+  xrPlanetDrag.onDragStartObservable.add(() => atmosphereMesh.unfreezeWorldMatrix());
+  xrPlanetDrag.onDragObservable.add(({ delta }) => planetRoot.position.addInPlace(delta));
+  xrPlanetDrag.onDragEndObservable.add(() => {
+    atmosphereMesh.computeWorldMatrix(true);
+    atmosphereMesh.freezeWorldMatrix();
+  });
+  planet.addBehavior(xrPlanetDrag);
+
   const renderObserver = scene.onBeforeRenderObservable.add(() => {
     const isInXr = host.isInXr();
+    xrPlanetDrag.enabled = isInXr && viewState === "orbit";
     // Two clocks, deliberately. Anything that integrates — walking, rotation, drifting cloud —
     // reads the clamped one, so that a single long frame cannot teleport it across the world.
     // Anything with a fixed duration reads the real one, because clamping *that* is what makes a
@@ -2753,11 +2785,17 @@ export const createPlanetWorld = (
      */
     farthestView: () => (viewState === "surface" ? SURFACE_DEPARTURE_RADIUS : undefined),
     focusXrRig: (initial) => applyXrView(viewState === "surface", initial),
+    handleXrBack: () => {
+      if (viewState !== "surface") return false;
+      applyXrView(false, false);
+      return true;
+    },
     restoreDesktopView: () => syncDesktopCamera(viewState === "surface"),
     // Meshes, materials and the key light are removed by the world scope the host opened around
     // this build; what is left here is everything that lives outside the scene graph.
     dispose: () => {
       camera.fov = ORBIT_FIELD_OF_VIEW;
+      planet.removeBehavior(xrPlanetDrag);
       window.removeEventListener("keydown", onMovementKeyDown);
       window.removeEventListener("keyup", onMovementKeyUp);
       window.removeEventListener("blur", clearMovementKeys);

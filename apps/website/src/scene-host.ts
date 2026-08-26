@@ -150,6 +150,8 @@ export interface MountedWorld {
    * height to the rig; every later call happens mid-session, where the height is already there.
    */
   focusXrRig: (initial: boolean) => void;
+  /** Handles B/Y within a world's own nested view before browser history is asked to go back. */
+  handleXrBack?: () => boolean;
   /** Restores the desktop camera so leaving the headset lands on the view the wearer left in. */
   restoreDesktopView: () => void;
 }
@@ -866,6 +868,12 @@ const createSceneHost = (canvas: HTMLCanvasElement): SceneHost => {
     handSupportOptions: { handMeshes: { disableDefaultMeshes: true } },
     inputOptions: { doNotLoadControllerMeshes: true },
     optionalFeatures: ["hand-tracking"],
+    // Quest triggers are reserved for opening Discover. Grips own Babylon's complete pointer
+    // down/move/up sequence, which preserves both selection and drag behavior on scene objects.
+    pointerSelectionOptions: {
+      enablePointerSelectionOnAllControllers: true,
+      overrideButtonId: "xr-standard-squeeze",
+    },
     outputCanvasOptions: {
       canvasOptions: {
         // Quest 2's compositor is unreliable with an explicitly opaque WebGL layer. Babylon's
@@ -900,7 +908,10 @@ const createSceneHost = (canvas: HTMLCanvasElement): SceneHost => {
           xrInput: createdXr.input,
         },
       ) as WebXRControllerMovement;
-      xrDiscoverSurface = createXrDiscoverSurface(scene, profile.anisotropicFiltering);
+      xrDiscoverSurface = createXrDiscoverSurface(scene, profile.anisotropicFiltering, () => {
+        if (currentWorld?.handleXrBack?.()) return;
+        if (window.location.search) window.history.back();
+      });
       xrDiscoverSurface.onVisibility((open) => {
         setDiscoverOpen(open);
         const sessionManager = createdXr.baseExperience.sessionManager;

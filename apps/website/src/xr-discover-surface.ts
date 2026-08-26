@@ -8,6 +8,8 @@
  */
 
 import { PointerEventTypes, type PointerInfo } from "@babylonjs/core/Events/pointerEvents.js";
+import type { PickingInfo } from "@babylonjs/core/Collisions/pickingInfo.js";
+import { Ray } from "@babylonjs/core/Culling/ray.js";
 import { DynamicTexture } from "@babylonjs/core/Materials/Textures/dynamicTexture.js";
 import { Texture } from "@babylonjs/core/Materials/Textures/texture.js";
 import { StandardMaterial } from "@babylonjs/core/Materials/standardMaterial.js";
@@ -24,16 +26,17 @@ import type { WebXRAbstractMotionController } from "@babylonjs/core/XR/motionCon
 import type { WebXRControllerComponent } from "@babylonjs/core/XR/motionController/webXRControllerComponent.js";
 import type { WebXRCamera } from "@babylonjs/core/XR/webXRCamera.js";
 import { HUD_DISTANCE, hudPose } from "./xr-hud-pose.ts";
-import { rangeValueAtClientX, texturePointToClient } from "./xr-surface-input.ts";
+import {
+  rangeValueAtClientX,
+  texturePointToClient,
+  xrControllerAction,
+} from "./xr-surface-input.ts";
 
 const PANEL_MAXIMUM = { height: 1.7, width: 2.72 };
 const INITIAL_TEXTURE = { height: 900, width: 1440 };
 const MAXIMUM_CAPTURE_PIXELS = 1_600_000;
 const CAPTURE_INTERVAL_MS = 250;
 const OPEN_SECONDS = 0.16;
-const SUMMON_BUTTONS = new Set(["a-button", "x-button", "xr-standard-thumbstick"]);
-const HIDE_BUTTONS = new Set(["b-button", "y-button"]);
-
 export interface XrDiscoverSurface {
   attach: (xr: WebXRDefaultExperience) => void;
   dispose: () => void;
@@ -67,7 +70,11 @@ const scrollContainer = (element: Element | null, boundary: HTMLElement): HTMLEl
   return boundary;
 };
 
-export const createXrDiscoverSurface = (scene: Scene, anisotropy: number): XrDiscoverSurface => {
+export const createXrDiscoverSurface = (
+  scene: Scene,
+  anisotropy: number,
+  onBack: () => void,
+): XrDiscoverSurface => {
   const root = new TransformNode("xrDiscoverSurfaceRoot", scene);
   root.rotationQuaternion = Quaternion.Identity();
 
@@ -112,6 +119,8 @@ export const createXrDiscoverSurface = (scene: Scene, anisotropy: number): XrDis
   let hovered: Element | null = null;
   let scrollStick: WebXRControllerComponent | null = null;
   let lastPointerController: WebXRAbstractMotionController | null = null;
+  let nextPointerId = 10_000;
+  const pointerIds = new WeakMap<WebXRInputSource, number>();
   const boundMotionControllers = new WeakSet<WebXRAbstractMotionController>();
   const visibilityListeners = new Set<(open: boolean) => void>();
 
@@ -198,11 +207,10 @@ export const createXrDiscoverSurface = (scene: Scene, anisotropy: number): XrDis
     void lastPointerController?.pulse(intensity, duration).catch(() => undefined);
   };
 
-  const resolve = (
-    info: PointerInfo,
+  const resolvePick = (
+    pick: PickingInfo | null | undefined,
   ): { clientX: number; clientY: number; element: Element | null } | null => {
     const element = dialog;
-    const pick = info.pickInfo;
     if (!element || !pick?.hit || pick.pickedMesh !== screen) return null;
     const coordinates = pick.getTextureCoordinates();
     if (!coordinates) return null;
@@ -217,6 +225,8 @@ export const createXrDiscoverSurface = (scene: Scene, anisotropy: number): XrDis
       element: document.elementFromPoint(point.x, point.y),
     };
   };
+
+  const resolve = (info: PointerInfo) => resolvePick(info.pickInfo);
 
   const dispatchPointer = (
     target: Element,
@@ -321,20 +331,60 @@ export const createXrDiscoverSurface = (scene: Scene, anisotropy: number): XrDis
   };
   window.addEventListener("keydown", onConsoleKeyDown);
 
-  const bindMotionController = (motionController: WebXRAbstractMotionController): void => {
+  const activateControllerTarget = (controller: WebXRInputSource): void => {
+    const ray = new Ray(Vector3.Zero(), Vector3.Forward(), 100);
+    controller.getWorldPointerRayToRef(ray);
+    const pick = scene.pickWithRay(ray);
+    if (!pick?.hit) return;
+
+    const panelHit = resolvePick(pick);
+    if (visible && panelHit) {
+      const target = interactiveTarget(panelHit.element);
+      if (!target || target.matches(":disabled, [aria-disabled='true']")) return;
+      pulse(0.35, 26);
+      activate(target, panelHit.clientX);
+      scheduleCapture();
+      return;
+    }
+
+    const metadata = pick.pickedMesh?.metadata as
+      | { exoraXrPrimaryAction?: () => void }
+      | null
+      | undefined;
+    if (metadata?.exoraXrPrimaryAction) {
+      pulse(0.35, 26);
+      metadata.exoraXrPrimaryAction();
+      return;
+    }
+
+    const pointerId = pointerIds.get(controller) ?? nextPointerId++;
+    pointerIds.set(controller, pointerId);
+    const event = { pointerId, pointerType: "xr" };
+    scene.simulatePointerDown(pick, event);
+    scene.simulatePointerUp(pick, event);
+  };
+
+  const bindMotionController = (
+    controller: WebXRInputSource,
+    motionController: WebXRAbstractMotionController,
+  ): void => {
     if (boundMotionControllers.has(motionController)) return;
     boundMotionControllers.add(motionController);
     for (const id of motionController.getComponentIds()) {
       const component = motionController.getComponent(id);
-      if (SUMMON_BUTTONS.has(id) || HIDE_BUTTONS.has(id)) {
+      const action = xrControllerAction(id);
+      if (action) {
         component.onButtonStateChangedObservable.add(() => {
           if (component.changes.pressed?.current !== true) return;
-          setVisible(SUMMON_BUTTONS.has(id));
-        });
-      }
-      if (id === "xr-standard-trigger") {
-        component.onButtonStateChangedObservable.add(() => {
-          if (component.changes.pressed?.current === true) lastPointerController = motionController;
+          lastPointerController = motionController;
+          if (action === "menu") {
+            setVisible(!visible);
+          } else if (action === "back") {
+            if (visible) setVisible(false);
+            else onBack();
+          } else if (action === "primary") {
+            activateControllerTarget(controller);
+          }
         });
       }
       if (id === "xr-standard-thumbstick" && !scrollStick) scrollStick = component;
@@ -342,8 +392,10 @@ export const createXrDiscoverSurface = (scene: Scene, anisotropy: number): XrDis
   };
 
   const bindController = (controller: WebXRInputSource): void => {
-    if (controller.motionController) bindMotionController(controller.motionController);
-    controller.onMotionControllerInitObservable.add(bindMotionController);
+    if (controller.motionController) bindMotionController(controller, controller.motionController);
+    controller.onMotionControllerInitObservable.add((motionController) =>
+      bindMotionController(controller, motionController),
+    );
   };
 
   const attach = (xr: WebXRDefaultExperience): void => {
