@@ -41,8 +41,10 @@ const gestureCenter = (points: readonly ScreenPoint[]): ScreenPoint => ({
 });
 
 const gestureDistance = (points: readonly ScreenPoint[]): number | null => {
-  if (points.length < 2) return null;
-  return Math.hypot(points[1].x - points[0].x, points[1].y - points[0].y);
+  const first = points[0];
+  const second = points[1];
+  if (!first || !second) return null;
+  return Math.hypot(second.x - first.x, second.y - first.y);
 };
 
 /**

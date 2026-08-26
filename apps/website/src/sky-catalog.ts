@@ -186,6 +186,14 @@ export class SkyCatalogFormatError extends Error {
   }
 }
 
+const valueAt = (values: ArrayLike<number>, index: number): number => {
+  const value = values[index];
+  if (value === undefined) {
+    throw new SkyCatalogFormatError(`Sky catalogue column is missing value ${index}.`);
+  }
+  return value;
+};
+
 /**
  * Maps the downloaded asset onto typed arrays.
  *
@@ -229,8 +237,8 @@ export const parseSkyCatalog = (buffer: ArrayBuffer): SkyCatalog => {
   // every arrival at a new destination is a cost with no reason to be paid more than once.
   const unitDirections = new Float32Array(count * 3);
   for (let index = 0; index < count; index += 1) {
-    const rightAscension = rightAscensionRadians[index];
-    const declination = declinationRadians[index];
+    const rightAscension = valueAt(rightAscensionRadians, index);
+    const declination = valueAt(declinationRadians, index);
     const cosineDeclination = Math.cos(declination);
     unitDirections[index * 3] = cosineDeclination * Math.cos(rightAscension);
     unitDirections[index * 3 + 1] = cosineDeclination * Math.sin(rightAscension);
@@ -316,8 +324,8 @@ export const projectSky = (
   let visible = 0;
 
   for (let index = 0; index < count; index += 1) {
-    const catalogDistance = distanceParsecs[index];
-    const magnitude = visualMagnitude[index] / MILLI;
+    const catalogDistance = valueAt(distanceParsecs, index);
+    const magnitude = valueAt(visualMagnitude, index) / MILLI;
 
     if (catalogDistance === NO_PARALLAX_DISTANCE) {
       // Unplaceable, so unmovable. It was visible from Earth at this magnitude, and that is the
@@ -329,9 +337,9 @@ export const projectSky = (
     }
 
     const offset = index * 3;
-    const deltaX = unitDirections[offset] * catalogDistance - viewerX;
-    const deltaY = unitDirections[offset + 1] * catalogDistance - viewerY;
-    const deltaZ = unitDirections[offset + 2] * catalogDistance - viewerZ;
+    const deltaX = valueAt(unitDirections, offset) * catalogDistance - viewerX;
+    const deltaY = valueAt(unitDirections, offset + 1) * catalogDistance - viewerY;
+    const deltaZ = valueAt(unitDirections, offset + 2) * catalogDistance - viewerZ;
     const separation = Math.sqrt(deltaX * deltaX + deltaY * deltaY + deltaZ * deltaZ);
     if (separation < SUBJECT_SEPARATION_PARSECS) continue;
 
@@ -354,14 +362,16 @@ export const projectSky = (
     // star and the magnitude computed for it live in two arrays that have to stay in step.
     const slots = new Uint32Array(visible);
     for (let slot = 0; slot < visible; slot += 1) slots[slot] = slot;
-    slots.sort((left, right) => candidateMagnitudes[left] - candidateMagnitudes[right]);
+    slots.sort(
+      (left, right) => valueAt(candidateMagnitudes, left) - valueAt(candidateMagnitudes, right),
+    );
 
     drawStars = new Uint32Array(drawn);
     drawMagnitudes = new Float32Array(drawn);
     for (let rank = 0; rank < drawn; rank += 1) {
-      const slot = slots[rank];
-      drawStars[rank] = candidateStars[slot];
-      drawMagnitudes[rank] = candidateMagnitudes[slot];
+      const slot = valueAt(slots, rank);
+      drawStars[rank] = valueAt(candidateStars, slot);
+      drawMagnitudes[rank] = valueAt(candidateMagnitudes, slot);
     }
   }
 
@@ -398,13 +408,13 @@ const buildVertexData = (
   const magnitudeSpan = magnitudeLimit - REFERENCE_MAGNITUDE;
 
   for (let drawIndex = 0; drawIndex < drawn; drawIndex += 1) {
-    const star = stars[drawIndex];
+    const star = valueAt(stars, drawIndex);
     const offset = star * 3;
-    const catalogDistance = distanceParsecs[star];
+    const catalogDistance = valueAt(distanceParsecs, star);
 
-    let directionX = unitDirections[offset];
-    let directionY = unitDirections[offset + 1];
-    let directionZ = unitDirections[offset + 2];
+    let directionX = valueAt(unitDirections, offset);
+    let directionY = valueAt(unitDirections, offset + 1);
+    let directionZ = valueAt(unitDirections, offset + 2);
 
     if (catalogDistance !== NO_PARALLAX_DISTANCE) {
       const deltaX = directionX * catalogDistance - viewerX;
@@ -424,7 +434,7 @@ const buildVertexData = (
       drawIndex * 3,
     );
 
-    const apparent = apparentMagnitudes[drawIndex];
+    const apparent = valueAt(apparentMagnitudes, drawIndex);
     // Linear in magnitude, which is Pogson's scale and therefore already logarithmic in flux —
     // the way brightness is perceived rather than the way it is measured. Linear in flux would
     // leave everything below second magnitude as black pixels.
@@ -432,7 +442,7 @@ const buildVertexData = (
     const intensity = MINIMUM_INTENSITY + (1 - MINIMUM_INTENSITY) * brightness;
 
     const [red, green, blue] = temperatureToRgb(
-      colourIndexToTemperatureKelvin(colourIndex[star] / MILLI),
+      colourIndexToTemperatureKelvin(valueAt(colourIndex, star) / MILLI),
     );
     // A source bright enough to clip does so in every channel at once, so the brightest stars
     // whiten while the fainter ones keep their colour. Same curve as `starClipToWhite` in

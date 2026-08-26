@@ -1401,9 +1401,9 @@ const weldNormals = (positions: FloatArray, normals: Float32Array): void => {
     }
     representativeOf[vertex] = representative;
     const target = representative * 3;
-    sums[target] += normals[offset]!;
-    sums[target + 1] += normals[offset + 1]!;
-    sums[target + 2] += normals[offset + 2]!;
+    sums[target] = sums[target]! + normals[offset]!;
+    sums[target + 1] = sums[target + 1]! + normals[offset + 1]!;
+    sums[target + 2] = sums[target + 2]! + normals[offset + 2]!;
   }
 
   for (let vertex = 0; vertex < vertexCount; vertex += 1) {

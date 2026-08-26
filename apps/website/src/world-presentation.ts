@@ -148,9 +148,9 @@ export const createWorldPresentation = (scene: Scene): WorldPresentation => {
       const positions = proxyGeometry.positions;
       if (positions) {
         for (let index = 0; index < positions.length; index += 3) {
-          positions[index] += center.x;
-          positions[index + 1] += center.y;
-          positions[index + 2] += center.z;
+          positions[index] = positions[index]! + center.x;
+          positions[index + 1] = positions[index + 1]! + center.y;
+          positions[index + 2] = positions[index + 2]! + center.z;
         }
       }
       proxyGeometry.applyToMesh(proxy, true);

@@ -8,6 +8,7 @@
     "allowArbitraryExtensions": true,
     "strict": true,
     "exactOptionalPropertyTypes": true,
+    "noUncheckedIndexedAccess": true,
     "skipLibCheck": true,
 
     /* Bundler mode */

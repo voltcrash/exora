@@ -6,6 +6,8 @@
     "moduleResolution": "nodenext",
     "moduleDetection": "force",
     "strict": true,
+    "exactOptionalPropertyTypes": true,
+    "noUncheckedIndexedAccess": true,
     "noUnusedLocals": true,
     "declaration": true,
     "noEmit": true,

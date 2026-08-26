@@ -448,6 +448,15 @@ export const derivePlanetDerivedProperties = (
 const countKnownInputs = (values: readonly (number | null)[]): number =>
   values.filter((value) => value !== null).length;
 
+const DEFAULT_ROCKY_PALETTE: RockyPaletteFamily = "silicate-neutral";
+const INFERRED_ROCKY_PALETTES = [
+  "oxidized-red",
+  DEFAULT_ROCKY_PALETTE,
+  "basaltic-dark",
+  "sulfuric-yellow",
+  "desert-tan",
+] as const satisfies readonly RockyPaletteFamily[];
+
 /** Builds a cautious, probabilistic INFERRED read on a planet's likely appearance from its
  * MEASURED and DERIVED properties. Rocky-kind objects are further split into rocky /
  * ocean_candidate / ice / lava / unknown; giant-kind objects are split into gas_giant /
@@ -557,15 +566,8 @@ export const derivePlanetInferredProperties = (
             ? random() > 0.5
               ? "carbon-dark"
               : "basaltic-dark"
-            : (
-                [
-                  "oxidized-red",
-                  "silicate-neutral",
-                  "basaltic-dark",
-                  "sulfuric-yellow",
-                  "desert-tan",
-                ] as const
-              )[Math.floor(random() * 5)];
+            : (INFERRED_ROCKY_PALETTES[Math.floor(random() * INFERRED_ROCKY_PALETTES.length)] ??
+              DEFAULT_ROCKY_PALETTE);
 
   return {
     confidence,
@@ -1340,12 +1342,14 @@ export interface StarVisualRecipe {
  * Color is never stored here — it's always derived from temperatureToRgb so a star's displayed
  * hue is a single physically-motivated blackbody curve rather than hand-picked cartoon spectral
  * colors (a G star should read as warm white, not saturated banana yellow). */
+const DEFAULT_STAR_PALETTE = { temperatureKelvin: 5_700, label: "Yellow star" };
+
 const spectralStarPalette: Record<string, { label: string; temperatureKelvin: number }> = {
   O: { temperatureKelvin: 35_000, label: "Blue star" },
   B: { temperatureKelvin: 18_000, label: "Blue-white star" },
   A: { temperatureKelvin: 8_500, label: "White star" },
   F: { temperatureKelvin: 6_700, label: "White star" },
-  G: { temperatureKelvin: 5_700, label: "Yellow star" },
+  G: DEFAULT_STAR_PALETTE,
   K: { temperatureKelvin: 4_500, label: "Orange star" },
   M: { temperatureKelvin: 3_200, label: "Red star" },
 };
@@ -1431,7 +1435,7 @@ export const deriveStarRecipe = (star: StarProfile): StarVisualRecipe => {
   const random = createRandom(seed);
   const physical = deriveStarPhysicalProperties(star);
   const spectralClass = physical.spectralType?.match(/[OBAFGKM]/i)?.[0]?.toUpperCase();
-  const palette = spectralStarPalette[spectralClass ?? "G"] ?? spectralStarPalette.G;
+  const palette = spectralStarPalette[spectralClass ?? "G"] ?? DEFAULT_STAR_PALETTE;
   const temperatureKelvin =
     physical.effectiveTemperatureKelvin === null
       ? spectralTemperatureKelvin(physical.spectralType)
@@ -1509,10 +1513,14 @@ export const generateCustomStar = (parameters: CustomStarParameters): CustomStar
 const scaleColor = (color: Rgb, amount: number): Rgb =>
   color.map((channel) => clampUnit(channel * amount)) as unknown as Rgb;
 
-const mixColor = (from: Rgb, to: Rgb, amount: number): Rgb =>
-  from.map(
-    (channel, index) => channel + (to[index] - channel) * clampUnit(amount),
-  ) as unknown as Rgb;
+const mixColor = (from: Rgb, to: Rgb, amount: number): Rgb => {
+  const mix = clampUnit(amount);
+  return [
+    from[0] + (to[0] - from[0]) * mix,
+    from[1] + (to[1] - from[1]) * mix,
+    from[2] + (to[2] - from[2]) * mix,
+  ];
+};
 
 export const generateCustomWorld = (parameters: CustomPlanetParameters): CustomWorld => {
   const radius = clampUnit(parameters.radius);

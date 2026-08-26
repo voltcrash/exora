@@ -59,13 +59,19 @@ const packSynthetic = (stars: readonly SyntheticStar[], magnitudeLimit = 6.5): A
 const syntheticCatalog = (stars: readonly SyntheticStar[], magnitudeLimit = 6.5): SkyCatalog =>
   parseSkyCatalog(packSynthetic(stars, magnitudeLimit));
 
+const valueAt = (values: ArrayLike<number>, index: number): number => {
+  const value = values[index];
+  if (value === undefined) throw new Error(`Expected a value at index ${index}.`);
+  return value;
+};
+
 const sceneVector = (
   positions: Float32Array,
   index: number,
 ): { x: number; y: number; z: number } => ({
-  x: positions[index * 3],
-  y: positions[index * 3 + 1],
-  z: positions[index * 3 + 2],
+  x: valueAt(positions, index * 3),
+  y: valueAt(positions, index * 3 + 1),
+  z: valueAt(positions, index * 3 + 2),
 });
 
 afterEach(() => {
@@ -85,11 +91,11 @@ test("the bundled asset parses and holds the naked-eye sky", async () => {
   expect(catalog.unitDirections).toHaveLength(catalog.count * 3);
 
   // Written brightest first, and the brightest star in the sky is Sirius at V = -1.44.
-  expect(catalog.visualMagnitude[0] / 1_000).toBeCloseTo(-1.44, 3);
-  expect(catalog.distanceParsecs[0]).toBeCloseTo(2.637, 2);
+  expect(valueAt(catalog.visualMagnitude, 0) / 1_000).toBeCloseTo(-1.44, 3);
+  expect(valueAt(catalog.distanceParsecs, 0)).toBeCloseTo(2.637, 2);
   for (let index = 1; index < catalog.count; index += 1) {
-    expect(catalog.visualMagnitude[index]).toBeGreaterThanOrEqual(
-      catalog.visualMagnitude[index - 1],
+    expect(valueAt(catalog.visualMagnitude, index)).toBeGreaterThanOrEqual(
+      valueAt(catalog.visualMagnitude, index - 1),
     );
   }
 });
@@ -98,14 +104,17 @@ test("every catalogued direction is a unit vector and nothing exceeds the faint 
   const catalog = parseSkyCatalog(await readBundledAsset());
 
   for (let index = 0; index < catalog.count; index += 1) {
-    const x = catalog.unitDirections[index * 3];
-    const y = catalog.unitDirections[index * 3 + 1];
-    const z = catalog.unitDirections[index * 3 + 2];
+    const x = valueAt(catalog.unitDirections, index * 3);
+    const y = valueAt(catalog.unitDirections, index * 3 + 1);
+    const z = valueAt(catalog.unitDirections, index * 3 + 2);
     expect(Math.sqrt(x * x + y * y + z * z)).toBeCloseTo(1, 5);
-    expect(catalog.visualMagnitude[index] / 1_000).toBeLessThanOrEqual(catalog.magnitudeLimit);
+    expect(valueAt(catalog.visualMagnitude, index) / 1_000).toBeLessThanOrEqual(
+      catalog.magnitudeLimit,
+    );
     // Zero is the marker for a star with no usable parallax. A negative or tiny distance would
     // mean the build invented one.
-    expect(catalog.distanceParsecs[index] === 0 || catalog.distanceParsecs[index] > 1).toBe(true);
+    const distance = valueAt(catalog.distanceParsecs, index);
+    expect(distance === 0 || distance > 1).toBe(true);
   }
 });
 
@@ -225,8 +234,8 @@ test("colour comes from the catalogued colour index, through a black-body temper
     { shellRadius: 90, starLimit: 10 },
   );
 
-  expect(colors[0]).toBeGreaterThan(colors[2]);
-  expect(colors[6]).toBeGreaterThan(colors[4]);
+  expect(valueAt(colors, 0)).toBeGreaterThan(valueAt(colors, 2));
+  expect(valueAt(colors, 6)).toBeGreaterThan(valueAt(colors, 4));
 });
 
 test("the north celestial pole is scene up, and the sky is not mirrored", () => {
@@ -372,13 +381,15 @@ test("a star with no usable parallax keeps its direction and its catalogued magn
     { shellRadius: 1, starLimit: 10 },
   );
 
+  expect(close.drawn).toBe(2);
+  expect(distant.drawn).toBe(1);
   // Same direction and same brightness from both viewpoints, because moving it would need a
   // distance nobody has measured.
   expect(sceneVector(close.positions, 0)).toEqual(sceneVector(distant.positions, 0));
-  expect(close.colors[0]).toBeCloseTo(distant.colors[0], 6);
+  expect(valueAt(close.colors, 0)).toBeCloseTo(valueAt(distant.colors, 0), 6);
 
-  // Its neighbour, which does have a parallax, moved between the two.
-  expect(sceneVector(close.positions, 1)).not.toEqual(sceneVector(distant.positions, 1));
+  // Its measured neighbour is reprojected nearby and falls below the visibility cut far away.
+  expect(sceneVector(close.positions, 1)).not.toEqual(sceneVector(close.positions, 0));
 });
 
 test("the star the scene is already drawing is not drawn again as a background point", () => {
@@ -423,7 +434,7 @@ test("the device budget keeps the brightest stars the viewpoint can actually see
   expect(sceneVector(budgeted.positions, 0).x).toBeCloseTo(1, 4);
   expect(sceneVector(budgeted.positions, 1).z).toBeCloseTo(Math.sin((80 * Math.PI) / 180), 4);
   // Brightest first, so the budgeted sky is the part of it a person would notice.
-  expect(budgeted.colors[0]).toBeGreaterThan(budgeted.colors[4]);
+  expect(valueAt(budgeted.colors, 0)).toBeGreaterThan(valueAt(budgeted.colors, 4));
 
   // A budget larger than the visible sky draws the visible sky, not the budget.
   expect(projectSky(catalog, viewpoint, { shellRadius: 1, starLimit: 500 }).drawn).toBe(4);
