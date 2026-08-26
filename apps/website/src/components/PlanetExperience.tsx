@@ -9,7 +9,7 @@ import { useEffect, useMemo, useState, type CSSProperties } from "react";
 import type { PlanetLoadResult } from "../api-client.ts";
 import { warmDestinations } from "../destination-cache.ts";
 import type { ViewMode } from "../planet-scene.ts";
-import { formatNumber, formatPlanetName } from "../planet-utils.tsx";
+import { formatMeasurement, formatNumber, formatPlanetName } from "../planet-utils.tsx";
 import type { PlanetarySubsystem } from "../planetary-subsystems.ts";
 import type { SceneHost, XrStatus } from "../scene-host.ts";
 import { findSolarWorld, tuneSolarWorldRecipe } from "../solar-system.ts";
@@ -207,28 +207,35 @@ export const PlanetExperience = ({
     subsystemActive,
   ]);
 
-  const massUnit =
-    observation.massJupiter !== null ? (
-      <>
-        M<sub>J</sub>
-      </>
-    ) : (
-      <>
-        M<sub>⊕</sub>
-      </>
-    );
-  const massValue = observation.massJupiter ?? observation.massEarth;
-  const radiusUnit =
-    observation.radiusJupiter !== null ? (
-      <>
-        R<sub>J</sub>
-      </>
-    ) : (
-      <>
-        R<sub>⊕</sub>
-      </>
-    );
-  const radiusValue = observation.radiusJupiter ?? observation.radiusEarth;
+  const useJupiterUnits =
+    planet.kind === "gas-giant" ||
+    (planet.kind === "unknown" &&
+      observation.massEarth === null &&
+      observation.radiusEarth === null);
+  const massUnit = useJupiterUnits ? (
+    <>
+      M<sub>J</sub>
+    </>
+  ) : (
+    <>
+      M<sub>⊕</sub>
+    </>
+  );
+  const massValue = useJupiterUnits
+    ? (observation.massJupiter ?? observation.massEarth)
+    : (observation.massEarth ?? observation.massJupiter);
+  const radiusUnit = useJupiterUnits ? (
+    <>
+      R<sub>J</sub>
+    </>
+  ) : (
+    <>
+      R<sub>⊕</sub>
+    </>
+  );
+  const radiusValue = useJupiterUnits
+    ? (observation.radiusJupiter ?? observation.radiusEarth)
+    : (observation.radiusEarth ?? observation.radiusJupiter);
   const localOrbitKilometers = solarIdentity?.orbitalSemiMajorAxisKilometers ?? null;
 
   const openPrimaryBody = (): void => {
@@ -533,26 +540,26 @@ export const PlanetExperience = ({
             <div>
               <dt>Mass</dt>
               <dd>
-                {formatNumber(massValue)} <small>{massUnit}</small>
+                {formatMeasurement(massValue)} <small>{massUnit}</small>
               </dd>
             </div>
             <div>
               <dt>Radius</dt>
               <dd>
-                {formatNumber(radiusValue)} <small>{radiusUnit}</small>
+                {formatMeasurement(radiusValue)} <small>{radiusUnit}</small>
               </dd>
             </div>
             <div>
               <dt>Orbit</dt>
               <dd>
-                {formatNumber(localOrbitKilometers ?? observation.semiMajorAxisAu, 1)}{" "}
+                {formatMeasurement(localOrbitKilometers ?? observation.semiMajorAxisAu, 1)}{" "}
                 <small>{localOrbitKilometers === null ? "AU" : "KM"}</small>
               </dd>
             </div>
             <div>
               <dt>Distance</dt>
               <dd>
-                {formatNumber(observation.distanceParsecs, 0)} <small>PC</small>
+                {formatMeasurement(observation.distanceParsecs, 1)} <small>PC</small>
               </dd>
             </div>
           </dl>

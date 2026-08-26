@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import type { StarLoadResult } from "../api-client.ts";
 import { reachSystem } from "../destination-cache.ts";
 import type { StarWorld } from "../star-scene.ts";
+import { starSystemAliases } from "../star-identity.ts";
 import { formatNumber } from "../planet-utils.tsx";
 import type { SceneHost, XrStatus } from "../scene-host.ts";
 import { deriveStarVisual, starKindLabel, starSummary } from "../star-utils.ts";
@@ -91,9 +92,7 @@ export const StarExperience = ({
       return;
     }
     const controller = new AbortController();
-    const aliases = [systemHostName, star.name, star.catalogName.replace(/^\*\s*/, "")].filter(
-      (name, index, names): name is string => Boolean(name) && names.indexOf(name) === index,
-    );
+    const aliases = starSystemAliases(star, systemHostName);
     setSystemState("loading");
     void (async () => {
       for (const alias of aliases) {
@@ -114,7 +113,7 @@ export const StarExperience = ({
         if (!controller.signal.aborted) setSystemState("error");
       });
     return () => controller.abort();
-  }, [custom, star.catalogName, star.name, systemHostName]);
+  }, [custom, star, systemHostName]);
 
   useEffect(() => {
     worldRef.current?.setSystemWorlds(systemPlanets, (planet) =>

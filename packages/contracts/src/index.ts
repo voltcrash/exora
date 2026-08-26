@@ -163,6 +163,8 @@ export interface StarObservation {
 }
 
 export interface StarProfile {
+  /** SIMBAD identifiers for this same object, used to bridge archive naming differences. */
+  aliases?: readonly string[];
   catalogName: string;
   customization?: {
     activity: number;

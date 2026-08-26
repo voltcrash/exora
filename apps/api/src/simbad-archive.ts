@@ -247,16 +247,34 @@ const formatBayerDesignation = (identifier: string): string | null => {
 };
 
 const displayName = (matchedId: string, mainId: string, aliases: string | null): string => {
-  const matched = matchedId.replace(/^NAME\s+/i, "").trim();
-  if (matched && !/^(\*|V\*|Cl\*)\s/.test(matched)) return matched;
+  // `matchedId` is the spelling used to find the object, not its identity. Prefer SIMBAD's main
+  // proper name so the same object cannot change title depending on the route taken.
+  const mainProperName = mainId.replace(/^NAME\s+/i, "").trim();
+  if (/^NAME\s+/i.test(mainId) && mainProperName) return mainProperName;
 
   const properName = aliases
     ?.split("|")
     .find((alias) => /^NAME\s+/i.test(alias))
     ?.replace(/^NAME\s+/i, "")
     .trim();
-  return properName || formatBayerDesignation(mainId) || mainId;
+  if (properName) return properName;
+
+  const matched = matchedId.replace(/^NAME\s+/i, "").trim();
+  if (matched && !/^(\*|V\*|Cl\*)\s/.test(matched)) return matched;
+  return formatBayerDesignation(mainId) || mainId;
 };
+
+const parseAliases = (aliases: string | null): readonly string[] =>
+  aliases
+    ? [
+        ...new Set(
+          aliases
+            .split("|")
+            .map((alias) => alias.trim())
+            .filter(Boolean),
+        ),
+      ]
+    : [];
 
 export const normalizeSimbadStar = (
   rawRow: Record<string, unknown>,
@@ -269,12 +287,14 @@ export const normalizeSimbadStar = (
   const dec = numberOrNull(row.dec);
   if (!mainId || !matchedId || ra === null || dec === null) return null;
 
-  const name = displayName(matchedId, mainId, stringOrNull(row.aliases));
+  const aliases = parseAliases(stringOrNull(row.aliases));
+  const name = displayName(matchedId, mainId, aliases.join("|") || null);
   const parallax = numberOrNull(row.plx_value);
   const spectralType = stringOrNull(row.sp_type);
   const otype = stringOrNull(row.otype) ?? "*";
 
   return {
+    aliases,
     id: slugifyStarName(mainId),
     name,
     catalogName: mainId,

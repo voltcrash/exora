@@ -11,6 +11,7 @@ import type { ReactNode } from "react";
  * shapes, so they are built once and looked up by the only option that varies.
  */
 const numberFormatters = new Map<number, Intl.NumberFormat>();
+const smallMeasurementFormatter = new Intl.NumberFormat("en", { maximumSignificantDigits: 3 });
 
 const numberFormatter = (maximumFractionDigits: number): Intl.NumberFormat => {
   const existing = numberFormatters.get(maximumFractionDigits);
@@ -22,6 +23,13 @@ const numberFormatter = (maximumFractionDigits: number): Intl.NumberFormat => {
 
 export const formatNumber = (value: number | null, maximumFractionDigits = 1): string =>
   value === null ? "—" : numberFormatter(maximumFractionDigits).format(value);
+
+/** Preserve small, non-zero measurements that fixed decimal rounding would falsely show as 0. */
+export const formatMeasurement = (value: number | null, maximumFractionDigits = 1): string => {
+  const formatted = formatNumber(value, maximumFractionDigits);
+  if (value === null || value === 0 || !/^-?0$/.test(formatted)) return formatted;
+  return smallMeasurementFormatter.format(value);
+};
 
 export const formatPlanetName = (name: string): ReactNode => {
   const segments = name.split(" ");

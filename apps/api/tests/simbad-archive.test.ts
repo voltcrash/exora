@@ -61,6 +61,22 @@ test("uses a proper-name alias for catalog-style discovery identifiers", () => {
 
   expect(star?.name).toBe("Sirius");
   expect(star?.catalogName).toBe("* alf CMa");
+  expect(star?.aliases).toEqual(["* alf CMa", "NAME Sirius", "HD 48915"]);
+});
+
+test("keeps one canonical display name regardless of the matched alias", () => {
+  const base = {
+    ...Object.fromEntries(metadata.map(({ name }, index) => [name, siriusRow[index]])),
+    aliases: "* alf Cen C|Proxima Cen|NAME Proxima Centauri|GJ 551",
+    main_id: "NAME Proxima Centauri",
+  };
+
+  expect(normalizeSimbadStar({ ...base, matched_id: "Proxima Cen" })?.name).toBe(
+    "Proxima Centauri",
+  );
+  expect(normalizeSimbadStar({ ...base, matched_id: "NAME Proxima Centauri" })?.name).toBe(
+    "Proxima Centauri",
+  );
 });
 
 test("formats Bayer designations when SIMBAD has no proper-name alias", () => {
