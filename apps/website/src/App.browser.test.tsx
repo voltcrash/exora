@@ -1111,3 +1111,19 @@ test("nothing overflows the viewport horizontally", async () => {
     document.documentElement.clientWidth,
   );
 });
+
+test("the navigation deck keeps an even gap between every control", async () => {
+  stubArchive();
+  mountApp();
+  await expect.element(page.getByRole("heading", { level: 1 })).toBeVisible();
+
+  const discover = document
+    .querySelector<HTMLElement>(".discover-trigger")!
+    .getBoundingClientRect();
+  const clearView = document.querySelector<HTMLElement>(".clear-view")!.getBoundingClientRect();
+  const xr = document.querySelector<HTMLElement>(".enter-vr")!.getBoundingClientRect();
+  const firstGap = clearView.left - discover.right;
+  const secondGap = xr.left - clearView.right;
+
+  expect(Math.abs(firstGap - secondGap)).toBeLessThanOrEqual(1);
+});
