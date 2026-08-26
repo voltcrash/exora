@@ -45,6 +45,12 @@ export const createArPresentation = (scene: Scene): ArPresentation => {
   const guidance = document.createElement("p");
   guidance.textContent = instruction(false);
   overlay.append(guidance);
+  const backButton = document.createElement("button");
+  backButton.type = "button";
+  backButton.className = "ar-back-button";
+  backButton.setAttribute("aria-label", "Exit AR");
+  backButton.textContent = "\u2190 BACK";
+  overlay.append(backButton);
   const backgroundToggle = document.createElement("button");
   backgroundToggle.type = "button";
   backgroundToggle.className = "ar-background-toggle";
@@ -98,6 +104,7 @@ export const createArPresentation = (scene: Scene): ArPresentation => {
   let previousClearAlpha = scene.clearColor.a;
   let spaceBackground = false;
   let updateSpaceBackground: ((enabled: boolean) => void) | null = null;
+  let exitSession: (() => Promise<void>) | null = null;
 
   const renderBackgroundToggle = (): void => {
     backgroundToggle.textContent = spaceBackground
@@ -122,6 +129,18 @@ export const createArPresentation = (scene: Scene): ArPresentation => {
   backgroundToggle.addEventListener("click", (event) => {
     event.stopPropagation();
     setSpaceBackground(!spaceBackground);
+  });
+  backButton.addEventListener("beforexrselect", (event) => event.preventDefault());
+  backButton.addEventListener("click", async (event) => {
+    event.stopPropagation();
+    if (!exitSession || backButton.disabled) return;
+    backButton.disabled = true;
+    try {
+      await exitSession();
+    } catch (error) {
+      console.error("Unable to exit the AR session", error);
+      backButton.disabled = false;
+    }
   });
   renderBackgroundToggle();
 
@@ -176,6 +195,8 @@ export const createArPresentation = (scene: Scene): ArPresentation => {
     currentWorld?.endAr();
     updateSpaceBackground?.(false);
     updateSpaceBackground = null;
+    exitSession = null;
+    backButton.disabled = false;
     spaceBackground = false;
     spaceBackdrop.setEnabled(false);
     renderBackgroundToggle();
@@ -199,6 +220,7 @@ export const createArPresentation = (scene: Scene): ArPresentation => {
       currentWorld?.beginAr();
       previousClearAlpha = scene.clearColor.a;
       updateSpaceBackground = onSpaceBackgroundChange;
+      exitSession = () => sessionManager.exitXRAsync();
       setSpaceBackground(false);
       overlay.hidden = false;
       setPageZoomGuard(true);

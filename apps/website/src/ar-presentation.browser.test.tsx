@@ -23,6 +23,7 @@ test("AR makes the page transparent and places from the XR select event", () => 
   const hitResults = new Observable<IWebXRHitResult[]>();
   const sessionInitialized = new Observable<XRSession>();
   const session = new EventTarget() as XRSession;
+  const exitXRAsync = vi.fn().mockResolvedValue(undefined);
   const setSpaceBackground = vi.fn();
   const place = vi.fn();
   let placed = false;
@@ -43,7 +44,7 @@ test("AR makes the page transparent and places from the XR select event", () => 
 
   presentation.begin(
     { onHitTestResultObservable: hitResults } as WebXRHitTest,
-    { onXRSessionInit: sessionInitialized } as WebXRSessionManager,
+    { exitXRAsync, onXRSessionInit: sessionInitialized } as unknown as WebXRSessionManager,
     world,
     setSpaceBackground,
   );
@@ -52,6 +53,11 @@ test("AR makes the page transparent and places from the XR select event", () => 
   expect(scene.clearColor.a).toBe(0);
   expect(getComputedStyle(document.documentElement).backgroundColor).toBe("rgba(0, 0, 0, 0)");
   expect(getComputedStyle(app).backgroundColor).toBe("rgba(0, 0, 0, 0)");
+
+  const backButton = presentation.overlay.querySelector<HTMLButtonElement>(".ar-back-button");
+  expect(backButton?.textContent).toBe("\u2190 BACK");
+  backButton?.click();
+  expect(exitXRAsync).toHaveBeenCalledOnce();
   expect(scene.getMeshByName("ar-space-backdrop")?.isEnabled()).toBe(false);
   expect(setSpaceBackground).toHaveBeenLastCalledWith(false);
 
