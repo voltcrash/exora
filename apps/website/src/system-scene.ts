@@ -543,7 +543,9 @@ export const createSystemWorld = (
     if (travel) {
       for (const orbit of layout.orbits.slice(0, 5)) {
         actions.push({
-          badge: orbit.planet.kind === "unknown" ? undefined : orbit.planet.kind.replace("-", " "),
+          ...(orbit.planet.kind === "unknown"
+            ? {}
+            : { badge: orbit.planet.kind.replace("-", " ") }),
           detail: orbitSummary(orbit),
           id: `world-${orbit.planet.id}`,
           label: orbit.planet.name,
@@ -557,10 +559,10 @@ export const createSystemWorld = (
 
   const consoleContributions: WorldConsole = {
     facts: () => systemFacts(hostName, layout),
-    onForgePlanet: onForgeWorld,
-    onForgeStar,
-    onTravelPlanet: onSelectPlanet,
-    onTravelStar: onSelectStar,
+    ...(onForgeWorld ? { onForgePlanet: onForgeWorld } : {}),
+    ...(onForgeStar ? { onForgeStar } : {}),
+    ...(onSelectPlanet ? { onTravelPlanet: onSelectPlanet } : {}),
+    ...(onSelectStar ? { onTravelStar: onSelectStar } : {}),
     sceneActions: buildSceneActions,
     source: () =>
       primary

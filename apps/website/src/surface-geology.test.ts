@@ -18,7 +18,9 @@ const geologyFor = (profile: Parameters<typeof tuneSolarWorldRecipe>[0]) => {
     profile.solarSystem
       ? {
           naifId: profile.solarSystem.naifId,
-          surfaceStatus: profile.solarSystem.surfaceStatus,
+          ...(profile.solarSystem.surfaceStatus
+            ? { surfaceStatus: profile.solarSystem.surfaceStatus }
+            : {}),
         }
       : null,
   );

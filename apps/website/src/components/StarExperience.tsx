@@ -141,7 +141,7 @@ export const StarExperience = ({
             // same selection handlers the DOM dialogs use are handed to the scene.
             onSelectPlanet: (destination) => onSelectPlanet(destination, false),
             onSelectStar: (destination) => onSelectStar(destination, false),
-            onSelectSystem: custom ? undefined : () => void openSystem(),
+            ...(custom ? {} : { onSelectSystem: () => void openSystem() }),
             onForgeWorld: onGeneratePlanet,
             onForgeStar: onGenerateStar,
             onFirstFrame: () => {

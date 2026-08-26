@@ -707,7 +707,7 @@ export const createStellarSurface = ({
     // A star that fills the frame is already overwhelmingly bright on its own; one that covers a
     // handful of pixels has nothing but its glare to say so.
     intensity: isSubject ? 0.78 + recipe.activity * 0.25 : 1.15,
-    parent,
+    ...(parent ? { parent } : {}),
     position,
     scene,
     // The glare has to land on top of the disc it belongs to, not be sorted behind it.

@@ -2348,7 +2348,9 @@ export const createPlanetWorld = (
       planetProfile.solarSystem
         ? {
             naifId: planetProfile.solarSystem.naifId,
-            surfaceStatus: planetProfile.solarSystem.surfaceStatus,
+            ...(planetProfile.solarSystem.surfaceStatus
+              ? { surfaceStatus: planetProfile.solarSystem.surfaceStatus }
+              : {}),
           }
         : null,
     ) ?? cloudDeckGeology(recipe);
@@ -2761,10 +2763,10 @@ export const createPlanetWorld = (
 
   const consoleContributions: WorldConsole = {
     facts: () => planetFacts(planetProfile),
-    onForgePlanet: onForgeWorld,
-    onForgeStar,
-    onTravelPlanet: onSelectPlanet,
-    onTravelStar: onSelectStar,
+    ...(onForgeWorld ? { onForgePlanet: onForgeWorld } : {}),
+    ...(onForgeStar ? { onForgeStar } : {}),
+    ...(onSelectPlanet ? { onTravelPlanet: onSelectPlanet } : {}),
+    ...(onSelectStar ? { onTravelStar: onSelectStar } : {}),
     sceneActions: buildSceneActions,
     source: () => `${planetProfile.source.archive} · ${planetProfile.source.retrievedOn}`,
     subtitle: () =>

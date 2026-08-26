@@ -194,7 +194,7 @@ export const createStarWorld = (
     if (travel) {
       for (const planet of menuPlanets.slice(0, 5)) {
         actions.push({
-          badge: planet.kind === "unknown" ? undefined : planet.kind.replace("-", " "),
+          ...(planet.kind === "unknown" ? {} : { badge: planet.kind.replace("-", " ") }),
           detail: "Travel to this world",
           id: `planet-${planet.id}`,
           label: planet.name,
@@ -208,10 +208,10 @@ export const createStarWorld = (
 
   const consoleContributions: WorldConsole = {
     facts: () => starFacts(star),
-    onForgePlanet: onForgeWorld,
-    onForgeStar,
-    onTravelPlanet: onSelectPlanet,
-    onTravelStar: onSelectStar,
+    ...(onForgeWorld ? { onForgePlanet: onForgeWorld } : {}),
+    ...(onForgeStar ? { onForgeStar } : {}),
+    ...(onSelectPlanet ? { onTravelPlanet: onSelectPlanet } : {}),
+    ...(onSelectStar ? { onTravelStar: onSelectStar } : {}),
     sceneActions: buildSceneActions,
     source: () => `${star.source.archive} · ${star.source.retrievedOn}`,
     subtitle: () => `${starKindLabel(star)} · orbital view`,

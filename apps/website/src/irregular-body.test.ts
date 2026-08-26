@@ -118,11 +118,8 @@ describe("irregular-body physical scale", () => {
     });
     const scene = new Scene(engine);
     const profile = deriveRenderQuality({ pixelRatio: 1, userAgent: "Desktop" });
-    const mounted = await createIrregularBody(
-      scene,
-      { ...descriptor, shapeModel: undefined },
-      profile,
-    );
+    const { shapeModel: _shapeModel, ...dimensionsOnlyDescriptor } = descriptor;
+    const mounted = await createIrregularBody(scene, dimensionsOnlyDescriptor, profile);
     const geometry = scene.getTransformNodeByName("433 Eros-measured-geometry");
 
     expect(mounted.geometryStatus).toBe("dimensions-only");

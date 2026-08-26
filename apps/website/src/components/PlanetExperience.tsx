@@ -171,8 +171,12 @@ export const PlanetExperience = ({
               planet,
               recipe,
               onViewModeChange: setViewMode,
-              onSelectHostStar: result.mode === "custom" ? undefined : () => void openHostStar(),
-              onSelectSystem: result.mode === "custom" ? undefined : () => void openHostSystem(),
+              ...(result.mode === "custom"
+                ? {}
+                : {
+                    onSelectHostStar: () => void openHostStar(),
+                    onSelectSystem: () => void openHostSystem(),
+                  }),
               // The console inside the headset can travel anywhere the browser catalog can, so the
               // same selection handlers the DOM dialogs use are handed to the scene.
               onSelectPlanet: (destination) => onSelectPlanet(destination, false),

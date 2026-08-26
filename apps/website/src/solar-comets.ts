@@ -80,7 +80,7 @@ const descriptor = (
   name,
   naifId,
   rotation: { axialTiltDegrees: null, periodHours, spinAxis: "z" },
-  shapeModel: model ? { lods: [model], sourceKind: "mission-obj" } : undefined,
+  ...(model ? { shapeModel: { lods: [model], sourceKind: "mission-obj" as const } } : {}),
   spkId,
   surface: { albedoColor: [0.075, 0.068, 0.058], roughness: 0.98, treatment: "physically-neutral" },
 });

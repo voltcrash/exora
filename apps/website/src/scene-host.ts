@@ -243,7 +243,9 @@ const createSceneHost = (canvas: HTMLCanvasElement): SceneHost => {
     userAgent: deviceNavigator.userAgent,
     pixelRatio: window.devicePixelRatio,
     hardwareConcurrency: deviceNavigator.hardwareConcurrency,
-    deviceMemory: deviceNavigator.deviceMemory,
+    ...(deviceNavigator.deviceMemory === undefined
+      ? {}
+      : { deviceMemory: deviceNavigator.deviceMemory }),
   });
 
   const engine = new Engine(

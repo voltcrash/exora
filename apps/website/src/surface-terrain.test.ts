@@ -10,7 +10,12 @@ const fieldFor = (profile: Parameters<typeof tuneSolarWorldRecipe>[0]) => {
   const geology = deriveSurfaceGeology(
     recipe,
     profile.solarSystem
-      ? { naifId: profile.solarSystem.naifId, surfaceStatus: profile.solarSystem.surfaceStatus }
+      ? {
+          naifId: profile.solarSystem.naifId,
+          ...(profile.solarSystem.surfaceStatus
+            ? { surfaceStatus: profile.solarSystem.surfaceStatus }
+            : {}),
+        }
       : null,
   );
   if (!geology) throw new Error(`Expected ${profile.name} to have a geology.`);
