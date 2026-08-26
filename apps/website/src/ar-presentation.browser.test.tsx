@@ -12,7 +12,6 @@ import "./style.css";
 afterEach(() => {
   delete document.documentElement.dataset.presentationMode;
   delete document.body.dataset.presentationMode;
-  document.documentElement.classList.remove("ar-space-background");
   document.querySelector("#ar-test-app")?.remove();
 });
 
@@ -53,6 +52,7 @@ test("AR makes the page transparent and places from the XR select event", () => 
   expect(scene.clearColor.a).toBe(0);
   expect(getComputedStyle(document.documentElement).backgroundColor).toBe("rgba(0, 0, 0, 0)");
   expect(getComputedStyle(app).backgroundColor).toBe("rgba(0, 0, 0, 0)");
+  expect(scene.getMeshByName("ar-space-backdrop")?.isEnabled()).toBe(false);
   expect(setSpaceBackground).toHaveBeenLastCalledWith(false);
 
   const backgroundToggle =
@@ -61,9 +61,10 @@ test("AR makes the page transparent and places from the XR select event", () => 
   backgroundToggle?.click();
   expect(backgroundToggle?.getAttribute("aria-pressed")).toBe("true");
   expect(setSpaceBackground).toHaveBeenLastCalledWith(true);
-  expect(scene.clearColor.a).toBe(1);
-  expect(getComputedStyle(document.documentElement).backgroundColor).toBe("rgb(0, 0, 0)");
-  expect(getComputedStyle(app).backgroundColor).toBe("rgb(0, 0, 0)");
+  expect(scene.clearColor.a).toBe(0);
+  expect(scene.getMeshByName("ar-space-backdrop")?.isEnabled()).toBe(true);
+  expect(getComputedStyle(document.documentElement).backgroundColor).toBe("rgba(0, 0, 0, 0)");
+  expect(getComputedStyle(app).backgroundColor).toBe("rgba(0, 0, 0, 0)");
 
   const immersivePinch = new Event("gesturestart", { bubbles: true, cancelable: true });
   document.dispatchEvent(immersivePinch);
@@ -92,6 +93,7 @@ test("AR makes the page transparent and places from the XR select event", () => 
 
   presentation.end();
   expect(scene.clearColor.a).toBe(1);
+  expect(scene.getMeshByName("ar-space-backdrop")?.isEnabled()).toBe(false);
   expect(document.documentElement.dataset.presentationMode).toBeUndefined();
   const ordinaryPinch = new Event("gesturestart", { bubbles: true, cancelable: true });
   document.dispatchEvent(ordinaryPinch);

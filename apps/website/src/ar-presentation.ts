@@ -1,6 +1,7 @@
 import { Color3 } from "@babylonjs/core/Maths/math.color.js";
 import { Vector3 } from "@babylonjs/core/Maths/math.vector.js";
 import { StandardMaterial } from "@babylonjs/core/Materials/standardMaterial.js";
+import { Mesh } from "@babylonjs/core/Meshes/mesh.js";
 import { MeshBuilder } from "@babylonjs/core/Meshes/meshBuilder.js";
 import { PointerEventTypes } from "@babylonjs/core/Events/pointerEvents.js";
 import type { Observer } from "@babylonjs/core/Misc/observable.js";
@@ -8,7 +9,7 @@ import type { PointerInfo } from "@babylonjs/core/Events/pointerEvents.js";
 import type { Scene } from "@babylonjs/core/scene.js";
 import type { IWebXRHitResult, WebXRHitTest } from "@babylonjs/core/XR/features/WebXRHitTest.js";
 import type { WebXRSessionManager } from "@babylonjs/core/XR/webXRSessionManager.js";
-import type { WorldPresentation } from "./world-presentation.ts";
+import { VIRTUAL_BACKGROUND_LAYER_MASK, type WorldPresentation } from "./world-presentation.ts";
 
 export interface ArPresentation {
   /** Connects hit testing and manipulation to the currently mounted, already-built world. */
@@ -64,6 +65,29 @@ export const createArPresentation = (scene: Scene): ArPresentation => {
   reticle.isPickable = false;
   reticle.setEnabled(false);
 
+  // Space View must live in the same XR framebuffer as the world. A black DOM/canvas backing is
+  // composited above Variant's WebXR layer on iPhone and therefore hides the planet along with the
+  // camera. This inward-facing, camera-relative shell instead contributes opaque black fragments
+  // behind the world while leaving its foreground and virtual starfield visible.
+  const spaceBackdropMaterial = new StandardMaterial("ar-space-backdrop-material", scene);
+  spaceBackdropMaterial.disableLighting = true;
+  spaceBackdropMaterial.diffuseColor = Color3.Black();
+  spaceBackdropMaterial.emissiveColor = Color3.Black();
+  spaceBackdropMaterial.specularColor = Color3.Black();
+  spaceBackdropMaterial.disableDepthWrite = true;
+  const spaceBackdrop = MeshBuilder.CreateSphere(
+    "ar-space-backdrop",
+    { diameter: 1_000, segments: 16, sideOrientation: Mesh.BACKSIDE },
+    scene,
+  );
+  spaceBackdrop.material = spaceBackdropMaterial;
+  spaceBackdrop.layerMask = VIRTUAL_BACKGROUND_LAYER_MASK;
+  spaceBackdrop.infiniteDistance = true;
+  spaceBackdrop.isPickable = false;
+  spaceBackdrop.applyFog = false;
+  spaceBackdrop.alwaysSelectAsActiveMesh = true;
+  spaceBackdrop.setEnabled(false);
+
   let active = false;
   let currentWorld: WorldPresentation | null = null;
   let latestHit: Vector3 | null = null;
@@ -75,21 +99,6 @@ export const createArPresentation = (scene: Scene): ArPresentation => {
   let spaceBackground = false;
   let updateSpaceBackground: ((enabled: boolean) => void) | null = null;
 
-  const setPageBackground = (color: "#000" | "transparent" | null): void => {
-    const elements = [
-      document.documentElement,
-      document.body,
-      document.querySelector<HTMLElement>("#app"),
-      document.querySelector<HTMLElement>(".experience-shell"),
-      document.querySelector<HTMLElement>("#render-canvas"),
-    ];
-    for (const element of elements) {
-      if (!element) continue;
-      if (color) element.style.setProperty("background-color", color, "important");
-      else element.style.removeProperty("background-color");
-    }
-  };
-
   const renderBackgroundToggle = (): void => {
     backgroundToggle.textContent = spaceBackground
       ? "SHOW CAMERA · AR VIEW"
@@ -99,12 +108,10 @@ export const createArPresentation = (scene: Scene): ArPresentation => {
 
   const setSpaceBackground = (enabled: boolean): void => {
     spaceBackground = enabled;
-    scene.clearColor.a = enabled ? 1 : 0;
-    // Variant's camera is a separate page-level layer. Apply the backing directly as well as via
-    // stylesheet state: WebKit can defer selector invalidation during an immersive session, while
-    // an inline compositor change takes effect in the same tap that switches the WebXR layer.
-    setPageBackground(enabled ? "#000" : "transparent");
-    document.documentElement.classList.toggle("ar-space-background", enabled);
+    // Babylon deliberately leaves an immersive-AR framebuffer uncleared so the platform can
+    // provide a truly transparent camera composite. Space is geometry, not a different clear.
+    scene.clearColor.a = 0;
+    spaceBackdrop.setEnabled(enabled);
     document.documentElement.dataset.arBackground = enabled ? "space" : "camera";
     document.body.dataset.arBackground = enabled ? "space" : "camera";
     renderBackgroundToggle();
@@ -150,7 +157,7 @@ export const createArPresentation = (scene: Scene): ArPresentation => {
     reticle.setEnabled(false);
     guidance.textContent = instruction(false);
     if (active) {
-      scene.clearColor.a = spaceBackground ? 1 : 0;
+      scene.clearColor.a = 0;
       currentWorld?.beginAr();
     }
   };
@@ -170,6 +177,7 @@ export const createArPresentation = (scene: Scene): ArPresentation => {
     updateSpaceBackground?.(false);
     updateSpaceBackground = null;
     spaceBackground = false;
+    spaceBackdrop.setEnabled(false);
     renderBackgroundToggle();
     scene.clearColor.a = previousClearAlpha;
     latestHit = null;
@@ -178,8 +186,6 @@ export const createArPresentation = (scene: Scene): ArPresentation => {
     setPageZoomGuard(false);
     delete document.documentElement.dataset.presentationMode;
     delete document.documentElement.dataset.arBackground;
-    document.documentElement.classList.remove("ar-space-background");
-    setPageBackground(null);
     delete document.body.dataset.presentationMode;
     delete document.body.dataset.arBackground;
   };
@@ -243,6 +249,8 @@ export const createArPresentation = (scene: Scene): ArPresentation => {
       end();
       reticle.dispose(false, true);
       reticleMaterial.dispose(false, false);
+      spaceBackdrop.dispose(false, true);
+      spaceBackdropMaterial.dispose(false, false);
       overlay.remove();
     },
     end,

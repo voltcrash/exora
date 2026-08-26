@@ -708,20 +708,6 @@ body[data-presentation-mode="ar"] .travel-veil {
   display: none !important;
 }
 
-/*
- * Variant composites the iPhone camera underneath the page. Clearing the WebXR framebuffer to an
- * alpha of one is sufficient on native WebXR, but it cannot cover that separate page-level camera
- * layer in Variant. Give Space View an actually opaque page/canvas backing as well; the existing
- * virtual starfield is then drawn over black at every tracked position and viewing angle.
- */
-html.ar-space-background[data-presentation-mode="ar"],
-html.ar-space-background body[data-presentation-mode="ar"],
-html.ar-space-background body[data-presentation-mode="ar"] #app,
-html.ar-space-background body[data-presentation-mode="ar"] .experience-shell,
-html.ar-space-background body[data-presentation-mode="ar"] #render-canvas {
-  background: #000 !important;
-}
-
 html[data-presentation-mode="ar"],
 body[data-presentation-mode="ar"],
 body[data-presentation-mode="ar"] #ar-overlay,
