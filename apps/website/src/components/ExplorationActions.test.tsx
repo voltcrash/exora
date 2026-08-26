@@ -7,7 +7,7 @@ import { StarExperience } from "./StarExperience.tsx";
 import { MissionControl } from "./MissionControl.tsx";
 
 /**
- * Discover sheds its text on narrow phones and keeps only a decorative orbital mark. The name
+ * Discover sheds its text on narrow phones and keeps only a decorative telescope mark. The name
  * therefore has to come from an attribute the media query cannot reach. The same is true of the
  * immersive entry beside it on the deck, which loses its copy at the same width.
  *
@@ -96,6 +96,9 @@ test("the world view gathers every control onto one named deck", () => {
   ]);
   expect(markup).toContain('<kbd class="shortcut-icon" aria-label="Backspace or Delete">⌫</kbd>');
   expect(markup).toContain('<kbd class="shortcut-icon" aria-label="Tab">⇥</kbd>');
+  expect(markup).toContain('class="discover-trigger-icon"');
+  expect(markup).toContain('class="clear-view-icon"');
+  expect(markup).toContain("AR MODE");
 
   // Nothing is left in the top bar but the way home.
   const header = markup.slice(markup.indexOf("<header"), markup.indexOf("</header>"));

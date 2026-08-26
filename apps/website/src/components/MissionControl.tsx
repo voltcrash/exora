@@ -84,7 +84,11 @@ export const MissionControl = ({
           aria-pressed={chromeHidden}
           onClick={onToggleChrome}
         >
-          <span className="clear-view-mark" aria-hidden="true" />
+          <svg className="clear-view-icon" viewBox="0 0 28 28" aria-hidden="true">
+            <path d="M3 14s4-7 11-7 11 7 11 7-4 7-11 7S3 14 3 14Z" />
+            <circle cx="14" cy="14" r="3.5" />
+            {!chromeHidden ? <path className="eye-slash" d="m5 23 18-18" /> : null}
+          </svg>
           <span>
             <small>{chromeHidden ? "RESTORE VIEW" : "CLEAR VIEW"}</small>
             <strong>{chromeHidden ? "SHOW INTERFACE" : "HIDE INTERFACE"}</strong>
@@ -101,9 +105,8 @@ export const MissionControl = ({
           <button
             className="enter-vr"
             type="button"
-            // The copy inside is dropped on a phone and the orbit mark left behind is decorative,
-            // so the button's name has to come from somewhere the media query cannot reach. It
-            // carries the status because the status is what the visible copy says.
+            // The concise visible label leaves transient capability and connection state to the
+            // accessible name, so assistive technology still receives the complete status.
             aria-label={`Immersive mode: ${xrButtonCopy[xr.status]}`}
             disabled={!readyStatuses.has(xr.status)}
             onClick={() =>
@@ -112,11 +115,7 @@ export const MissionControl = ({
           >
             <span className="button-orbit" aria-hidden="true" />
             <span>
-              <small>IMMERSIVE MODE</small>
-              <strong>{xrButtonCopy[xr.status]}</strong>
-            </span>
-            <span className="button-arrow" aria-hidden="true">
-              ↗
+              <strong>AR MODE</strong>
             </span>
           </button>
         </div>

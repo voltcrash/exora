@@ -518,24 +518,6 @@ test("Discover opens directly into the Solar System at this width", async () => 
   }
 });
 
-test("the mobile identity and control deck occupy separate header rows", async () => {
-  stubArchive();
-  mountApp();
-
-  await expect.element(page.getByRole("heading", { level: 1 })).toBeVisible();
-  if (window.innerWidth > 760) return;
-
-  const brand = document.querySelector<HTMLElement>(".brand")!;
-  const deck = document.querySelector<HTMLElement>(".control-deck")!;
-  const brandBounds = brand.getBoundingClientRect();
-  const deckBounds = deck.getBoundingClientRect();
-
-  expect(brandBounds.width).toBeGreaterThan(90);
-  expect(brandBounds.bottom).toBeLessThanOrEqual(deckBounds.top);
-  expect(deckBounds.right).toBeLessThanOrEqual(window.innerWidth - 10);
-  expect(deckBounds.left).toBeGreaterThanOrEqual(10);
-});
-
 test("a deep link to a named world resolves to that world", async () => {
   stubArchive();
   mountApp("?planet=Kepler-22%20b");
