@@ -48,6 +48,12 @@ test("AR wraps and fits the existing foreground while ignoring its virtual sky",
   expect(placedAtmosphere.z).toBeCloseTo(3);
   expect(atmosphere.isWorldMatrixFrozen).toBe(false);
 
+  presentation.moveBy(new Vector3(0.2, 0, -0.4));
+  expect(presentation.proxy.position.asArray()).toEqual([1.2, -0.34, 2.6]);
+  presentation.scaleBy(2);
+  expect(presentation.proxy.scaling.asArray()).toEqual([0.68, 0.68, 0.68]);
+  expect(presentation.proxy.position.y).toBeCloseTo(-0.68);
+
   presentation.endAr();
   subject.computeWorldMatrix(true);
   expect(subject.getAbsolutePosition().asArray()).toEqual([0, 2, 0]);

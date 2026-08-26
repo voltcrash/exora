@@ -1,3 +1,4 @@
+import { FreeCamera } from "@babylonjs/core/Cameras/freeCamera.js";
 import { NullEngine } from "@babylonjs/core/Engines/nullEngine.js";
 import { Observable } from "@babylonjs/core/Misc/observable.js";
 import { Quaternion, Vector3 } from "@babylonjs/core/Maths/math.vector.js";
@@ -18,6 +19,7 @@ afterEach(() => {
 test("AR makes the page transparent and places from the XR select event", () => {
   const engine = new NullEngine();
   const scene = new Scene(engine);
+  scene.activeCamera = new FreeCamera("camera", new Vector3(0, 1, -2), scene);
   scene.clearColor.a = 1;
   const presentation = createArPresentation(scene);
   const hitResults = new Observable<IWebXRHitResult[]>();
@@ -26,6 +28,8 @@ test("AR makes the page transparent and places from the XR select event", () => 
   const exitXRAsync = vi.fn().mockResolvedValue(undefined);
   const setSpaceBackground = vi.fn();
   const place = vi.fn();
+  const moveBy = vi.fn();
+  const scaleBy = vi.fn();
   let placed = false;
   place.mockImplementation(() => {
     placed = true;
@@ -34,7 +38,10 @@ test("AR makes the page transparent and places from the XR select event", () => 
     beginAr: vi.fn(),
     endAr: vi.fn(),
     isPlaced: () => placed,
+    moveBy,
     place,
+    proxy: { absolutePosition: Vector3.Zero() },
+    scaleBy,
   } as unknown as WorldPresentation;
 
   const app = document.createElement("div");
@@ -96,6 +103,24 @@ test("AR makes the page transparent and places from the XR select event", () => 
 
   expect(place).toHaveBeenCalledOnce();
   expect(place).toHaveBeenCalledWith(stablePosition);
+
+  presentation.overlay.dispatchEvent(
+    new PointerEvent("pointerdown", { bubbles: true, clientX: 100, clientY: 100, pointerId: 1 }),
+  );
+  document.dispatchEvent(
+    new PointerEvent("pointermove", { bubbles: true, clientX: 120, clientY: 110, pointerId: 1 }),
+  );
+  expect(moveBy).toHaveBeenCalledOnce();
+
+  presentation.overlay.dispatchEvent(
+    new PointerEvent("pointerdown", { bubbles: true, clientX: 200, clientY: 100, pointerId: 2 }),
+  );
+  document.dispatchEvent(
+    new PointerEvent("pointermove", { bubbles: true, clientX: 240, clientY: 100, pointerId: 2 }),
+  );
+  expect(scaleBy.mock.calls[0]?.[0]).toBeCloseTo(1.4936, 3);
+  document.dispatchEvent(new PointerEvent("pointerup", { bubbles: true, pointerId: 1 }));
+  document.dispatchEvent(new PointerEvent("pointerup", { bubbles: true, pointerId: 2 }));
 
   presentation.end();
   expect(scene.clearColor.a).toBe(1);

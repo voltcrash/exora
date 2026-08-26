@@ -38,9 +38,13 @@ export interface WorldPresentation {
   /** Restores the exact identity transform used by desktop and immersive VR. */
   endAr: () => void;
   isPlaced: () => boolean;
+  /** Moves a placed world in XR metres without changing its surface height. */
+  moveBy: (delta: Vector3) => void;
   /** Places the bottom of the captured world on the hit-tested physical surface. */
   place: (position: Vector3) => void;
   proxy: Mesh;
+  /** Applies a relative scale change while preserving the world's contact with its surface. */
+  scaleBy: (factor: number) => void;
 }
 
 const finiteBounds = (meshes: readonly AbstractMesh[]): { maximum: Vector3; minimum: Vector3 } => {
@@ -101,18 +105,22 @@ export const createWorldPresentation = (scene: Scene): WorldPresentation => {
   let captured = false;
   let frozenMeshes: readonly AbstractMesh[] = [];
 
+  const applyScale = (requestedScale: number): void => {
+    const nextScale = Math.min(
+      baseScale * MAX_AR_SCALE_FACTOR,
+      Math.max(baseScale * MIN_AR_SCALE_FACTOR, requestedScale),
+    );
+    proxy.scaling.setAll(nextScale);
+    proxy.position.y = surfaceY - minimumY * nextScale;
+  };
+
   drag.onDragEndObservable.add(() => {
     surfaceY = proxy.position.y + minimumY * proxy.scaling.y;
   });
 
   const scaleObserver = scene.onBeforeRenderObservable.add(() => {
     if (!placed) return;
-    const nextScale = Math.min(
-      baseScale * MAX_AR_SCALE_FACTOR,
-      Math.max(baseScale * MIN_AR_SCALE_FACTOR, proxy.scaling.x),
-    );
-    proxy.scaling.setAll(nextScale);
-    proxy.position.y = surfaceY - minimumY * nextScale;
+    applyScale(proxy.scaling.x);
   });
 
   return {
@@ -199,12 +207,20 @@ export const createWorldPresentation = (scene: Scene): WorldPresentation => {
       }
     },
     isPlaced: () => placed,
+    moveBy: (delta) => {
+      if (!placed) return;
+      proxy.position.addInPlace(delta);
+    },
     place: (position) => {
       surfaceY = position.y;
       proxy.position.copyFrom(position);
       proxy.position.y = surfaceY - minimumY * proxy.scaling.y;
       proxy.setEnabled(true);
       placed = true;
+    },
+    scaleBy: (factor) => {
+      if (!placed || !Number.isFinite(factor) || factor <= 0) return;
+      applyScale(proxy.scaling.x * factor);
     },
   };
 };

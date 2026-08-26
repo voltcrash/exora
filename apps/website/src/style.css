@@ -718,14 +718,14 @@ body[data-presentation-mode="ar"] #render-canvas {
 
 /*
  * The only DOM sent into an immersive AR overlay. The page HUD remains on the flat browser page;
- * this transparent strip supplies placement guidance without covering the real camera feed or
- * intercepting the WebXR touch rays Babylon uses for placement and manipulation.
+ * this transparent surface supplies placement guidance and receives direct screen gestures. XR
+ * select remains responsible for initial placement; pointer motion owns manipulation afterwards.
  */
 #ar-overlay {
   position: fixed;
   z-index: 100;
   inset: 0;
-  pointer-events: none;
+  pointer-events: auto;
   background: transparent;
 }
 

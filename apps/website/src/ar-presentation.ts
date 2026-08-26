@@ -30,6 +30,21 @@ export interface ArPresentation {
 const instruction = (placed: boolean): string =>
   placed ? "DRAG TO MOVE · PINCH TO SCALE" : "MOVE TO FIND A SURFACE · TAP TO PLACE";
 
+interface ScreenPoint {
+  x: number;
+  y: number;
+}
+
+const gestureCenter = (points: readonly ScreenPoint[]): ScreenPoint => ({
+  x: points.reduce((sum, point) => sum + point.x, 0) / points.length,
+  y: points.reduce((sum, point) => sum + point.y, 0) / points.length,
+});
+
+const gestureDistance = (points: readonly ScreenPoint[]): number | null => {
+  if (points.length < 2) return null;
+  return Math.hypot(points[1].x - points[0].x, points[1].y - points[0].y);
+};
+
 /**
  * Owns AR-only input and guidance around the ordinary Babylon world.
  *
@@ -105,6 +120,9 @@ export const createArPresentation = (scene: Scene): ArPresentation => {
   let spaceBackground = false;
   let updateSpaceBackground: ((enabled: boolean) => void) | null = null;
   let exitSession: (() => Promise<void>) | null = null;
+  const activePointers = new Map<number, ScreenPoint>();
+  let previousGestureCenter: ScreenPoint | null = null;
+  let previousGestureDistance: number | null = null;
 
   const renderBackgroundToggle = (): void => {
     backgroundToggle.textContent = spaceBackground
@@ -169,6 +187,77 @@ export const createArPresentation = (scene: Scene): ArPresentation => {
 
   const onXrSelect = (): void => placeAtLatestHit();
 
+  const resetGestureBaseline = (): void => {
+    const points = [...activePointers.values()];
+    previousGestureCenter = points.length > 0 ? gestureCenter(points) : null;
+    previousGestureDistance = gestureDistance(points);
+  };
+
+  const moveWorldByScreenDelta = (deltaX: number, deltaY: number): void => {
+    if (!currentWorld || !scene.activeCamera) return;
+    const camera = scene.activeCamera;
+    const distance = Vector3.Distance(camera.globalPosition, currentWorld.proxy.absolutePosition);
+    const viewportHeight = Math.max(overlay.clientHeight, window.innerHeight, 1);
+    const metersPerPixel = (2 * distance * Math.tan(camera.fov / 2)) / viewportHeight;
+    const right = camera.getDirection(Vector3.Right());
+    right.y = 0;
+    if (right.lengthSquared() < 0.0001) return;
+    right.normalize();
+    const forward = camera.getDirection(Vector3.Forward());
+    forward.y = 0;
+    if (forward.lengthSquared() < 0.0001) {
+      Vector3.CrossToRef(right, Vector3.Up(), forward);
+    }
+    forward.normalize();
+    currentWorld.moveBy(
+      right.scale(deltaX * metersPerPixel).addInPlace(forward.scale(-deltaY * metersPerPixel)),
+    );
+  };
+
+  const onPointerDown = (event: PointerEvent): void => {
+    if (
+      !active ||
+      !currentWorld?.isPlaced() ||
+      (event.target instanceof Element && event.target.closest("button"))
+    ) {
+      return;
+    }
+    activePointers.set(event.pointerId, { x: event.clientX, y: event.clientY });
+    resetGestureBaseline();
+    event.preventDefault();
+  };
+
+  const onPointerMove = (event: PointerEvent): void => {
+    if (!activePointers.has(event.pointerId) || !currentWorld?.isPlaced()) return;
+    activePointers.set(event.pointerId, { x: event.clientX, y: event.clientY });
+    const points = [...activePointers.values()];
+    const nextCenter = gestureCenter(points);
+    if (previousGestureCenter) {
+      moveWorldByScreenDelta(
+        nextCenter.x - previousGestureCenter.x,
+        nextCenter.y - previousGestureCenter.y,
+      );
+    }
+    const nextDistance = gestureDistance(points);
+    if (nextDistance && previousGestureDistance) {
+      currentWorld.scaleBy(nextDistance / previousGestureDistance);
+    }
+    previousGestureCenter = nextCenter;
+    previousGestureDistance = nextDistance;
+    event.preventDefault();
+  };
+
+  const onPointerEnd = (event: PointerEvent): void => {
+    if (!activePointers.delete(event.pointerId)) return;
+    resetGestureBaseline();
+    event.preventDefault();
+  };
+
+  overlay.addEventListener("pointerdown", onPointerDown);
+  document.addEventListener("pointermove", onPointerMove, { capture: true, passive: false });
+  document.addEventListener("pointerup", onPointerEnd, { capture: true, passive: false });
+  document.addEventListener("pointercancel", onPointerEnd, { capture: true, passive: false });
+
   const resetWorld = (world: WorldPresentation | null): void => {
     currentWorld?.endAr();
     currentWorld = world;
@@ -197,6 +286,8 @@ export const createArPresentation = (scene: Scene): ArPresentation => {
     updateSpaceBackground = null;
     exitSession = null;
     backButton.disabled = false;
+    activePointers.clear();
+    resetGestureBaseline();
     spaceBackground = false;
     spaceBackdrop.setEnabled(false);
     renderBackgroundToggle();
@@ -273,6 +364,10 @@ export const createArPresentation = (scene: Scene): ArPresentation => {
       reticleMaterial.dispose(false, false);
       spaceBackdrop.dispose(false, true);
       spaceBackdropMaterial.dispose(false, false);
+      overlay.removeEventListener("pointerdown", onPointerDown);
+      document.removeEventListener("pointermove", onPointerMove, { capture: true });
+      document.removeEventListener("pointerup", onPointerEnd, { capture: true });
+      document.removeEventListener("pointercancel", onPointerEnd, { capture: true });
       overlay.remove();
     },
     end,
