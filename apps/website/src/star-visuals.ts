@@ -89,6 +89,7 @@ attribute vec2 corner;
 uniform mat4 worldView;
 uniform mat4 projection;
 uniform float glareRadius;
+uniform float glareScale;
 uniform float depthOffset;
 
 varying vec2 vCorner;
@@ -101,12 +102,12 @@ void main(void) {
   // "toward the camera" is -Z; the floor keeps the quad from being shoved behind the near plane
   // when the viewer flies right up to the star.
   float originalDepth = viewPosition.z;
-  float shiftedDepth = max(originalDepth - depthOffset, originalDepth * 0.05);
+  float shiftedDepth = max(originalDepth - depthOffset * glareScale, originalDepth * 0.05);
   // Moving only view-space Z changes the projected centre of every off-axis star and makes its
   // glare slide away from the photosphere as the camera moves. Scale the full billboard by the
   // same depth ratio so the depth-test offset has zero effect on its screen-space position/size.
   float projectionScale = shiftedDepth / max(originalDepth, 0.0001);
-  viewPosition.xy = (viewPosition.xy + corner * glareRadius) * projectionScale;
+  viewPosition.xy = (viewPosition.xy + corner * glareRadius * glareScale) * projectionScale;
   viewPosition.z = shiftedDepth;
   vCorner = corner;
   gl_Position = projection * viewPosition;
@@ -402,6 +403,7 @@ export const createStarGlare = ({
         "projection",
         "time",
         "glareRadius",
+        "glareScale",
         "glareIntensity",
         "glareColor",
         "spikeStrength",
@@ -414,6 +416,7 @@ export const createStarGlare = ({
   material.backFaceCulling = false;
   material.disableDepthWrite = true;
   material.setFloat("glareRadius", glareRadius);
+  material.setFloat("glareScale", 1);
   material.setFloat("glareIntensity", intensity);
   material.setColor3("glareColor", color);
   material.setFloat("spikeStrength", spikes);
@@ -427,6 +430,17 @@ export const createStarGlare = ({
   return {
     mesh,
     update: (elapsedSeconds: number): void => {
+      // The billboard's vertices all share the star's centre and are expanded in view space by
+      // the shader. Consequently Babylon's world matrix scales the centre but cannot scale that
+      // expansion for us. Read the inherited presentation scale explicitly so tabletop AR (and
+      // its pinch gesture) shrinks the halo with the star instead of leaving a desktop-sized,
+      // translucent quad across the whole camera feed.
+      mesh.computeWorldMatrix(true);
+      const absoluteScale = mesh.absoluteScaling;
+      material.setFloat(
+        "glareScale",
+        Math.max(Math.abs(absoluteScale.x), Math.abs(absoluteScale.y), Math.abs(absoluteScale.z)),
+      );
       material.setFloat("time", elapsedSeconds);
     },
     dispose: (): void => {

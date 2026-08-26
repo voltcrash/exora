@@ -1,9 +1,12 @@
 import { readFile } from "node:fs/promises";
 import { NullEngine } from "@babylonjs/core/Engines/nullEngine.js";
+import { Color3 } from "@babylonjs/core/Maths/math.color.js";
+import { Vector3 } from "@babylonjs/core/Maths/math.vector.js";
+import { TransformNode } from "@babylonjs/core/Meshes/transformNode.js";
 import { Scene } from "@babylonjs/core/scene.js";
 import { afterEach, beforeEach, expect, test, vi } from "vite-plus/test";
 import { resetSkyCatalogForTesting, type SkyViewpoint } from "./sky-catalog.ts";
-import { createStarfield } from "./star-visuals.ts";
+import { createStarfield, createStarGlare } from "./star-visuals.ts";
 
 /** Vega: a real position, a real distance, and therefore a real sky to look at from it. */
 const VEGA: SkyViewpoint = {
@@ -82,6 +85,35 @@ test("the seeded field is reproducible from its seed and varies with it", () => 
 
   expect(readPositions(4_242)).toEqual(readPositions(4_242));
   expect(readPositions(4_242)).not.toEqual(readPositions(4_243));
+});
+
+test("a star glare inherits the presentation scale used by tabletop AR", () => {
+  const parent = new TransformNode("scaled-world", scene);
+  parent.scaling.setAll(0.05);
+  const glare = createStarGlare({
+    color: Color3.White(),
+    diameter: 2,
+    intensity: 1,
+    parent,
+    position: Vector3.Zero(),
+    scene,
+    spikes: 0.5,
+  });
+
+  glare.update(0);
+  const serialized = glare.mesh.material?.serialize() as {
+    floats?: Record<string, number>;
+  };
+  expect(serialized.floats?.glareScale).toBeCloseTo(0.05);
+
+  parent.scaling.setAll(0.2);
+  glare.update(1);
+  const resized = glare.mesh.material?.serialize() as {
+    floats?: Record<string, number>;
+  };
+  expect(resized.floats?.glareScale).toBeCloseTo(0.2);
+  glare.dispose();
+  parent.dispose();
 });
 
 test("an unreachable catalogue falls back to the seeded field rather than an empty sky", async () => {
