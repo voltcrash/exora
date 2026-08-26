@@ -976,7 +976,9 @@ test("terrain view fades every interface region and reveals the hovered one", as
 
   const shell = document.querySelector<HTMLElement>(".experience-shell");
   expect(shell).not.toBeNull();
-  expect(planetSceneStub.setViewMode).not.toBeNull();
+  // The heading can commit one render before the async world-mount effect installs this callback.
+  // Busy CI runners expose that gap even though a local browser usually completes both together.
+  await expect.poll(() => typeof planetSceneStub.setViewMode).toBe("function");
   planetSceneStub.setViewMode?.("surface");
   await expect.poll(() => shell!.classList.contains("view-surface")).toBe(true);
   const canvas = document.querySelector<HTMLCanvasElement>("canvas");
