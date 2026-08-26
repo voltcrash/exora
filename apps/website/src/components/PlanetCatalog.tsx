@@ -171,7 +171,7 @@ export const PlanetCatalog = ({ embedded = false, onClose, onSelect }: PlanetCat
   const [query, setQuery] = useState("");
   const [planets, setPlanets] = useState<ExoplanetProfile[]>([]);
   const [cached, setCached] = useState(false);
-  const [searchState, setSearchState] = useState<SearchState>("idle");
+  const [searchState, setSearchState] = useState<SearchState>("loading");
   const [activeCategory, setActiveCategory] = useState<string | null>(null);
   const [portalView, setPortalView] = useState<PortalView>("collections");
   const [resultView, setResultView] = useState<"gallery" | "list">("gallery");
@@ -234,10 +234,30 @@ export const PlanetCatalog = ({ embedded = false, onClose, onSelect }: PlanetCat
       return () => controller.abort();
     }
     if (normalizedQuery.length < 1) {
-      setPlanets([]);
       setSuggestion(null);
-      setSearchState("idle");
-      return;
+      const controller = new AbortController();
+      setSearchState("loading");
+      void loadPlanetFilterPool({ signal: controller.signal })
+        .then((result) => {
+          if (controller.signal.aborted) return;
+          setPlanets(
+            result.planets.toSorted((left, right) =>
+              left.name.localeCompare(right.name, undefined, {
+                numeric: true,
+                sensitivity: "base",
+              }),
+            ),
+          );
+          setCached(result.cached);
+          setSearchState("ready");
+        })
+        .catch((error: unknown) => {
+          if (controller.signal.aborted) return;
+          console.error(error);
+          setPlanets([]);
+          setSearchState("error");
+        });
+      return () => controller.abort();
     }
 
     const controller = new AbortController();
@@ -326,16 +346,18 @@ export const PlanetCatalog = ({ embedded = false, onClose, onSelect }: PlanetCat
 
   const status =
     searchState === "idle"
-      ? "Choose a discovery path, or search the archive by name."
+      ? "Loading the alphabetical planet catalog…"
       : searchState === "loading"
         ? portalView === "filters"
           ? "Calibrating the physical planet field…"
           : query.trim()
             ? `Scanning NASA archive for “${query.trim()}”…`
-            : `Opening ${activeLabel ?? "curated destinations"}…`
+            : activeLabel
+              ? `Opening ${activeLabel}…`
+              : "Loading the alphabetical planet catalog…"
         : searchState === "error"
           ? "The archive signal is unavailable. Try again shortly."
-          : `${visiblePlanets.length} confirmed ${visiblePlanets.length === 1 ? "world" : "worlds"} visible${portalView === "filters" ? ` from ${planets.length} sampled systems` : suggestion ? ` for suggested signal ${suggestion}` : activeLabel ? ` in ${activeLabel}` : ""}${cached ? " · cached result" : ""}.`;
+          : `${visiblePlanets.length} confirmed ${visiblePlanets.length === 1 ? "world" : "worlds"} visible${portalView === "filters" ? ` from ${planets.length} sampled systems` : suggestion ? ` for suggested signal ${suggestion}` : activeLabel ? ` in ${activeLabel}` : " · alphabetical catalog"}${cached ? " · cached result" : ""}.`;
 
   return (
     <dialog
@@ -605,10 +627,7 @@ export const PlanetCatalog = ({ embedded = false, onClose, onSelect }: PlanetCat
             <span aria-hidden="true">↗</span>
           </button>
         )}
-        <ol
-          id="planet-search-results"
-          className={`catalog-results ${resultView}-view${searchState === "idle" ? " is-idle" : ""}`}
-        >
+        <ol id="planet-search-results" className={`catalog-results ${resultView}-view`}>
           {searchState === "loading" && (
             <li className="catalog-loading">
               <span /> Resolving confirmed worlds

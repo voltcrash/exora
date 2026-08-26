@@ -111,7 +111,7 @@ export const StarCatalog = ({ embedded = false, onClose, onSelect }: StarCatalog
   const [query, setQuery] = useState("");
   const [stars, setStars] = useState<StarProfile[]>([]);
   const [cached, setCached] = useState(false);
-  const [searchState, setSearchState] = useState<SearchState>("idle");
+  const [searchState, setSearchState] = useState<SearchState>("loading");
   const [activeCategory, setActiveCategory] = useState<string | null>(null);
   const [portalView, setPortalView] = useState<PortalView>("collections");
   const [resultView, setResultView] = useState<"gallery" | "list">("gallery");
@@ -151,10 +151,30 @@ export const StarCatalog = ({ embedded = false, onClose, onSelect }: StarCatalog
       return () => controller.abort();
     }
     if (query.trim().length < 1) {
-      setStars([]);
       setSuggestion(null);
-      setSearchState("idle");
-      return;
+      const controller = new AbortController();
+      setSearchState("loading");
+      void searchStars("", { signal: controller.signal })
+        .then((result) => {
+          if (controller.signal.aborted) return;
+          setStars(
+            result.stars.toSorted((left, right) =>
+              left.name.localeCompare(right.name, undefined, {
+                numeric: true,
+                sensitivity: "base",
+              }),
+            ),
+          );
+          setCached(result.cached);
+          setSearchState("ready");
+        })
+        .catch((error: unknown) => {
+          if (controller.signal.aborted) return;
+          console.error(error);
+          setStars([]);
+          setSearchState("error");
+        });
+      return () => controller.abort();
     }
     const controller = new AbortController();
     setSearchState("loading");
@@ -220,14 +240,16 @@ export const StarCatalog = ({ embedded = false, onClose, onSelect }: StarCatalog
 
   const status =
     searchState === "idle"
-      ? "Choose a stellar family, or search SIMBAD by name."
+      ? "Loading the alphabetical stellar catalog…"
       : searchState === "loading"
         ? query.trim().length >= 1
           ? `Resolving “${query.trim()}” in SIMBAD…`
-          : `Scanning SIMBAD for ${activeLabel ?? "stellar objects"}…`
+          : activeLabel
+            ? `Scanning SIMBAD for ${activeLabel}…`
+            : "Loading the alphabetical stellar catalog…"
         : searchState === "error"
           ? "The SIMBAD signal is unavailable. Try again shortly."
-          : `${stars.length} stellar ${stars.length === 1 ? "destination" : "destinations"}${suggestion ? ` for suggested signal ${suggestion}` : activeLabel ? ` in ${activeLabel}` : ""}${cached ? " · cached result" : ""}.`;
+          : `${stars.length} stellar ${stars.length === 1 ? "destination" : "destinations"}${suggestion ? ` for suggested signal ${suggestion}` : activeLabel ? ` in ${activeLabel}` : " · alphabetical catalog"}${cached ? " · cached result" : ""}.`;
 
   return (
     <dialog
@@ -409,10 +431,7 @@ export const StarCatalog = ({ embedded = false, onClose, onSelect }: StarCatalog
             <span aria-hidden="true">↗</span>
           </button>
         )}
-        <ol
-          id="star-search-results"
-          className={`catalog-results ${resultView}-view${searchState === "idle" ? " is-idle" : ""}`}
-        >
+        <ol id="star-search-results" className={`catalog-results ${resultView}-view`}>
           {searchState === "loading" && (
             <li className="catalog-loading">
               <span /> Resolving stellar data

@@ -433,11 +433,15 @@ const stubArchive = ({ missing = [] as string[] } = {}) => {
     // `/api/stars/featured` is a collection despite its shape, which is why it is answered here
     // rather than alongside the single-object lookup above.
     if (url.pathname === "/api/stars" || url.pathname === "/api/stars/featured") {
+      const data =
+        url.pathname === "/api/stars/featured"
+          ? [sirius, { ...sirius, catalogName: "NAME Altair", id: "altair", name: "Altair" }]
+          : [sirius];
       return Response.json({
-        data: [sirius],
+        data,
         meta: {
           cached: false,
-          count: 1,
+          count: data.length,
           query: url.searchParams.get("q") ?? url.searchParams.get("category") ?? "",
           source: "SIMBAD",
         },
@@ -682,8 +686,7 @@ test("the star catalog opens and travels to a star", async () => {
   await openDiscoverSection("Stars");
   await expect.element(page.getByRole("heading", { name: "Follow the light." })).toBeVisible();
 
-  // The star catalog opens on its curated collections with no results loaded, so reaching one
-  // means searching for it.
+  // The alphabetized catalog is already visible, and searching remains available as a refinement.
   await userEvent.fill(page.getByPlaceholder(/Type a common name or catalog ID/), "Sirius");
   const result = page.getByRole("button", { name: /Sirius/ }).first();
   await expect.element(result).toBeVisible();
@@ -696,6 +699,16 @@ test("the star catalog opens and travels to a star", async () => {
   await expect.element(page.getByRole("button", { name: /Sirius b/ })).toBeVisible();
   await expect.element(page.getByRole("button", { name: /Sirius c/ })).toBeVisible();
   expect(window.location.search).toBe("?star=Sirius");
+});
+
+test("the star catalog preloads destinations alphabetically", async () => {
+  stubArchive();
+  mountApp();
+
+  await openDiscoverSection("Stars");
+  const destinations = page.getByRole("list").getByRole("button");
+  await expect.element(destinations.nth(0)).toHaveTextContent(/Altair/);
+  await expect.element(destinations.nth(1)).toHaveTextContent(/Sirius/);
 });
 
 test("the black-hole atlas opens and travels to a sourced horizon", async () => {
@@ -1165,7 +1178,7 @@ test("Discover keeps the renderer running inside an immersive session", async ()
   expect(stubbedHost().renderSuspensions).toBe(0);
 });
 
-test("overlay scrolling stays inside a contained surface without a viewport blur", async () => {
+test("Discover uses one scrolling surface without a viewport blur", async () => {
   stubArchive();
   mountApp();
   await expect.element(page.getByRole("heading", { level: 1 })).toBeVisible();
@@ -1173,17 +1186,19 @@ test("overlay scrolling stays inside a contained surface without a viewport blur
   await openDiscoverSection("Exoplanets");
   const catalog = document.querySelector<HTMLDialogElement>(".planet-catalog");
   const catalogScroller = catalog?.querySelector<HTMLElement>(".catalog-scroll-region");
-  expect(getComputedStyle(catalog!).overflowY).toBe("hidden");
-  expect(getComputedStyle(catalogScroller!).overflowY).toBe("auto");
-  expect(getComputedStyle(catalogScroller!).contain).toContain("paint");
+  const discoverStage = document.querySelector<HTMLElement>(".discover-stage");
+  expect(getComputedStyle(catalog!).overflowY).toBe("visible");
+  expect(getComputedStyle(discoverStage!).overflowY).toBe("auto");
+  expect(getComputedStyle(catalogScroller!).overflowY).toBe("visible");
+  expect(getComputedStyle(document.querySelector(".catalog-results")!).overflowY).toBe("visible");
   expect(getComputedStyle(catalog!, "::backdrop").backdropFilter).toBe("none");
 
   await userEvent.click(page.getByRole("button", { name: "Close Discover" }));
   await openDiscoverSection("World Forge");
   const forge = document.querySelector<HTMLDialogElement>(".planet-builder");
   const forgeScroller = forge?.querySelector<HTMLFormElement>("form");
-  expect(getComputedStyle(forge!).overflowY).toBe("hidden");
-  expect(getComputedStyle(forgeScroller!).overflowY).toBe("auto");
+  expect(getComputedStyle(forge!).overflowY).toBe("visible");
+  expect(getComputedStyle(forgeScroller!).overflowY).toBe("visible");
   expect(getComputedStyle(forge!, "::backdrop").backdropFilter).toBe("none");
 });
 

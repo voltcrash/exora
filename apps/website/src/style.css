@@ -304,8 +304,9 @@
 .discover-stage {
   min-width: 0;
   min-height: 0;
-  display: grid;
-  grid-template-rows: auto minmax(0, 1fr);
+  overflow-x: hidden;
+  overflow-y: auto;
+  scrollbar-color: rgb(139 230 234 / 25%) transparent;
 }
 
 .discover-header {
@@ -405,13 +406,12 @@
 
 .discover-main {
   min-height: 0;
-  overflow: hidden;
+  overflow: visible;
 }
 
 .discover-workspace {
-  height: 100%;
   min-height: 0;
-  overflow: hidden;
+  overflow: visible;
 }
 
 .discover-workspace .embedded-catalog,
@@ -419,11 +419,11 @@
   position: static;
   inset: auto;
   width: 100%;
-  height: 100%;
+  height: auto;
   max-height: none;
   margin: 0;
   padding: 0;
-  overflow: hidden;
+  overflow: visible;
   border: 0;
   border-radius: 0;
   background: transparent;
@@ -433,14 +433,14 @@
 
 .discover-workspace .embedded-catalog .catalog-scroll-region,
 .discover-workspace .embedded-forge form {
-  height: 100%;
+  height: auto;
   max-height: none;
   padding-top: 8px;
-  overflow-y: auto;
+  overflow: visible;
 }
 
 .discover-workspace .embedded-catalog .catalog-scroll-region {
-  contain: layout paint;
+  contain: layout;
 }
 
 .discover-workspace .embedded-forge form {
@@ -4156,7 +4156,7 @@ h1 em {
   align-items: center;
   justify-content: space-between;
   gap: 20px;
-  padding: 22px 26px 13px;
+  padding: 16px 26px 10px;
   color: var(--cyan);
   font-family: var(--mono);
   font-size: 8px;
@@ -4172,7 +4172,7 @@ h1 em {
 .discovery-tabs {
   display: flex;
   gap: 8px;
-  padding: 0 26px 12px;
+  padding: 0 26px 10px;
 }
 
 .discovery-tabs button {
@@ -4209,12 +4209,12 @@ h1 em {
 }
 
 .collection-card {
-  min-height: 130px;
+  min-height: 88px;
   display: grid;
-  grid-template-columns: 45px 1fr auto;
+  grid-template-columns: 30px 1fr auto;
   align-items: stretch;
-  gap: 16px;
-  padding: 18px;
+  gap: 10px;
+  padding: 12px 14px;
   overflow: hidden;
   position: relative;
   border: 1px solid rgb(229 244 247 / 11%);
@@ -4262,7 +4262,7 @@ h1 em {
 .collection-copy {
   display: grid;
   align-content: center;
-  gap: 7px;
+  gap: 4px;
 }
 
 .collection-copy small {
@@ -4273,7 +4273,7 @@ h1 em {
 }
 
 .collection-copy strong {
-  font-size: clamp(15px, 1.8vw, 20px);
+  font-size: clamp(14px, 1.5vw, 17px);
   font-weight: 500;
   letter-spacing: -0.025em;
 }
@@ -4832,23 +4832,10 @@ h1 em {
 }
 
 .catalog-results {
-  max-height: 310px;
   margin: 0;
   padding: 0 26px 26px;
-  overflow-y: auto;
-  /* The results are a scroller inside a scroller: this list sits in a dialog that scrolls too.
-     Left to chain, a flick that runs the list out of worlds does not stop there — it carries on
-     into the dialog and drags the whole panel up underneath the pointer, so reaching the end of
-     the results throws the header, the console and the search field off the screen. Reading a
-     list should not be able to move the thing containing it. */
-  overscroll-behavior: contain;
+  overflow: visible;
   list-style: none;
-  scrollbar-color: rgb(139 230 234 / 25%) transparent;
-  scrollbar-width: thin;
-}
-
-.catalog-results.is-idle {
-  display: none;
 }
 
 .catalog-results li + li {
@@ -4900,7 +4887,6 @@ h1 em {
 }
 
 .catalog-results.gallery-view {
-  max-height: 500px;
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: 10px;
@@ -6255,7 +6241,7 @@ h1 em {
   }
 
   .collection-card {
-    min-height: 96px;
+    min-height: 82px;
     grid-template-columns: 28px 1fr auto;
     gap: 10px;
     padding: 14px;
