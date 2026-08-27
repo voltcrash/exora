@@ -20,14 +20,14 @@ import type { CustomStar, CustomWorld } from "@exora/worldgen";
 import { ArcRotateCamera } from "@babylonjs/core/Cameras/arcRotateCamera.js";
 import "@babylonjs/core/Culling/ray.js";
 import { Ray } from "@babylonjs/core/Culling/ray.js";
-import { Engine } from "@babylonjs/core/Engines/engine.js";
-import { Color3, Color4 } from "@babylonjs/core/Maths/math.color.js";
+import type { Engine } from "@babylonjs/core/Engines/engine.js";
+import { Color3 } from "@babylonjs/core/Maths/math.color.js";
 import { Vector3 } from "@babylonjs/core/Maths/math.vector.js";
 import { StandardMaterial } from "@babylonjs/core/Materials/standardMaterial.js";
 import { Mesh } from "@babylonjs/core/Meshes/mesh.js";
 import { MeshBuilder } from "@babylonjs/core/Meshes/meshBuilder.js";
 import "@babylonjs/core/Meshes/instancedMesh.js";
-import { Scene, ScenePerformancePriority } from "@babylonjs/core/scene.js";
+import { Scene } from "@babylonjs/core/scene.js";
 import type { WebXRCamera } from "@babylonjs/core/XR/webXRCamera.js";
 import type { WebXRAbstractMotionController } from "@babylonjs/core/XR/motionController/webXRAbstractMotionController.js";
 import type { WebXRControllerComponent } from "@babylonjs/core/XR/motionController/webXRControllerComponent.js";
@@ -69,6 +69,8 @@ import {
 import type { XrConsoleHost } from "./xr-console.ts";
 import { advanceXrButtonPressGate, xrControllerAction } from "./xr-controller-input.ts";
 import { createSceneMountSlot } from "./scene-mount.ts";
+import { createSceneHostRegistry } from "./scene-host-registry.ts";
+import { createPersistentScene, resetPersistentScene } from "./scene-lifecycle.ts";
 import {
   chooseImmersiveDestination,
   getVariantLaunchUrl,
@@ -90,7 +92,6 @@ export type XrStatus =
 
 /** Locomotion speed inside a session, shared by every destination so travel never changes feel. */
 const XR_MOVE_SPEED = 2.2;
-const DEFAULT_CLEAR_COLOR = new Color4(0.0015, 0.003, 0.008, 1);
 /** How long the in-headset fade takes in each direction. */
 const VEIL_FADE_SECONDS = 0.22;
 
@@ -242,41 +243,8 @@ const createSceneHost = (canvas: HTMLCanvasElement): SceneHost => {
       : { deviceMemory: deviceNavigator.deviceMemory }),
   });
 
-  const engine = new Engine(
-    canvas,
-    profile.tier === "desktop",
-    {
-      antialias: profile.tier === "desktop",
-      // Variant Launch composites the iPhone camera behind the page. The WebGL context therefore
-      // needs an alpha channel even though desktop and immersive VR still clear it opaquely.
-      alpha: true,
-      doNotHandleContextLost: false,
-      preserveDrawingBuffer: false,
-      stencil: false,
-    },
-    false,
-  );
-  engine.setHardwareScalingLevel(profile.hardwareScalingLevel);
-
-  const scene = new Scene(engine);
-  scene.clearColor = DEFAULT_CLEAR_COLOR.clone();
-  scene.performancePriority = ScenePerformancePriority.Intermediate;
-  // The intermediate priority also turns off the colour clear, which leaves each eye smearing
-  // the previous frame in an immersive session. Nothing here paints every pixel, so clear.
-  scene.autoClear = true;
-  scene.skipPointerMovePicking = true;
-
-  const camera = new ArcRotateCamera(
-    "explorerCamera",
-    -Math.PI / 2,
-    Math.PI / 2.13,
-    17.2,
-    Vector3.Zero(),
-    scene,
-  );
-  camera.wheelDeltaPercentage = 0.018;
-  camera.pinchDeltaPercentage = 0.008;
-  camera.inertia = 0.82;
+  const resources = createPersistentScene(canvas, profile);
+  const { camera, engine, scene } = resources;
 
   let isInXr = false;
 
@@ -553,13 +521,7 @@ const createSceneHost = (canvas: HTMLCanvasElement): SceneHost => {
   window.addEventListener("resize", resize);
 
   /** Undoes the scene-level settings a world is allowed to change, before the next one lands. */
-  const resetSceneDefaults = (): void => {
-    camera.detachControl();
-    scene.clearColor = DEFAULT_CLEAR_COLOR.clone();
-    scene.fogMode = Scene.FOGMODE_NONE;
-    scene.fogDensity = 0;
-    scene.setRenderingAutoClearDepthStencil(1, true, true, true);
-  };
+  const resetSceneDefaults = (): void => resetPersistentScene(scene, camera);
 
   const worldMount = createSceneMountSlot<MountedWorld>(scene, {
     beforeRemove: () => arPresentation.setWorld(null),
@@ -1018,7 +980,7 @@ const createSceneHost = (canvas: HTMLCanvasElement): SceneHost => {
     return xrInitialization;
   };
 
-  return {
+  const sceneHost: SceneHost = {
     camera,
     canvas,
     engine,
@@ -1133,7 +1095,7 @@ const createSceneHost = (canvas: HTMLCanvasElement): SceneHost => {
       disposed = true;
       // Test remounts and client-side renderer recovery can present the same canvas node again.
       // Never let the module singleton hand that caller this already-disposed host.
-      if (host?.scene === scene) host = null;
+      sceneHostRegistry.forget(sceneHost);
       // Both subscriber sets are released, not just one. A disposed host answers nothing, and
       // `recreateSceneHost` builds its replacement while React still holds the old subscriptions
       // until its effects re-run — so anything still reachable from here is a listener that has
@@ -1156,14 +1118,14 @@ const createSceneHost = (canvas: HTMLCanvasElement): SceneHost => {
       // the loader turns a routine React unmount into a late `clearColor`/mesh write on null
       // internals. The disposed flag still prevents the completed destination from mounting.
       void worldDisposed.then(() => {
-        scene.dispose();
-        engine.dispose();
+        resources.dispose();
       });
     },
   };
+  return sceneHost;
 };
 
-let host: SceneHost | null = null;
+const sceneHostRegistry = createSceneHostRegistry(createSceneHost);
 
 /**
  * The one renderer for the page.
@@ -1173,15 +1135,10 @@ let host: SceneHost | null = null;
  * context is exactly what used to end the immersive session.
  */
 export const acquireSceneHost = (canvas: HTMLCanvasElement): SceneHost => {
-  if (host && host.canvas === canvas) return host;
-  host?.dispose();
-  host = createSceneHost(canvas);
-  return host;
+  return sceneHostRegistry.acquire(canvas);
 };
 
 /** Replaces a failed renderer while retaining the page-owned canvas and React destination. */
 export const recreateSceneHost = (canvas: HTMLCanvasElement): SceneHost => {
-  host?.dispose();
-  host = createSceneHost(canvas);
-  return host;
+  return sceneHostRegistry.recreate(canvas);
 };

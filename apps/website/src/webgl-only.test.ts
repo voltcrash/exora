@@ -26,5 +26,5 @@ test("the renderer stays WebGL, so dropping Babylon's WGSL shaders is safe", () 
 test("the guard reads real sources rather than silently matching nothing", () => {
   // A glob that resolved to an empty set would make the assertion above vacuously true.
   expect(Object.keys(sources).length).toBeGreaterThan(20);
-  expect(sources["./scene-host.ts"]).toContain("new Engine(");
+  expect(sources["./scene-lifecycle.ts"]).toContain("new Engine(");
 });
