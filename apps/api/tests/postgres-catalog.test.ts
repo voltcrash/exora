@@ -73,6 +73,7 @@ class FakeDatabase implements DatabaseClient {
   readonly queries: { parameters: readonly unknown[]; statement: string }[] = [];
   /** How many of the next upsert's rows the database should report as newly inserted. */
   insertedRows = Number.POSITIVE_INFINITY;
+  selectedRows: Record<string, unknown>[] = [planetRow];
 
   async close(): Promise<void> {}
 
@@ -92,7 +93,7 @@ class FakeDatabase implements DatabaseClient {
       return [{ id: "stale-world" }] as unknown as T[];
     }
     if (statement.includes("SELECT") && statement.includes("FROM exoplanets")) {
-      return [planetRow] as unknown as T[];
+      return this.selectedRows as T[];
     }
     return [];
   }
@@ -112,6 +113,14 @@ test("serves normalized planet profiles from PostgreSQL", async () => {
   // archive adapters set when an in-process entry replaces a TAP request.
   expect(result).toEqual({ cached: false, value: planet });
   expect(database.queries[0]?.parameters).toEqual(["Kepler-62 f"]);
+});
+
+test("rejects malformed PostgreSQL measurements instead of exposing them", async () => {
+  const database = new FakeDatabase();
+  database.selectedRows = [{ ...planetRow, radius_earth: "1.41" }];
+  const repository = new PostgresPlanetRepository(database);
+
+  await expect(repository.findByName("Kepler-62 f")).rejects.toThrow();
 });
 
 test("loads a broad bounded planet field for physical controls", async () => {

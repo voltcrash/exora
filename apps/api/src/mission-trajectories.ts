@@ -1,4 +1,4 @@
-import type { MissionTrajectoryPoint } from "@exora/contracts";
+import { missionTrajectoryPointSchema, type MissionTrajectoryPoint } from "@exora/contracts";
 import { createRequestCoalescer } from "./archive-cache.ts";
 import { HORIZONS_API_VERSION, HORIZONS_SOURCE, HorizonsError } from "./horizons.ts";
 
@@ -141,12 +141,16 @@ export const parseMissionTrajectory = (
       number,
     ];
     const calendar = fields[1] ?? "";
-    return {
+    const point = missionTrajectoryPointSchema.safeParse({
       calendarTdb: calendar.endsWith(" TDB") ? calendar : `${calendar} TDB`,
       julianDateTdb,
       positionAu: { x, y, z },
       velocityAuPerDay: { x: vx, y: vy, z: vz },
-    };
+    });
+    if (!point.success) {
+      throw new HorizonsError("Horizons returned an invalid mission trajectory sample.");
+    }
+    return point.data;
   });
   return { points, solution };
 };

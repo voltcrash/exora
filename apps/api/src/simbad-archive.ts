@@ -1,4 +1,5 @@
-import type { StarKind, StarProfile } from "@exora/contracts";
+import { starProfileSchema, type StarKind, type StarProfile } from "@exora/contracts";
+import { z } from "zod";
 import { createArchiveCache, createRequestCoalescer } from "./archive-cache.ts";
 import type { RepositoryResult } from "./nasa-archive.ts";
 
@@ -61,10 +62,32 @@ interface SimbadStarRow {
   teff: number | null;
 }
 
-interface SimbadPayload {
-  data?: unknown[][];
-  metadata?: { name?: string }[];
-}
+const nullableFiniteNumber = z.number().finite().nullable();
+const nullableText = z.string().nullable();
+const simbadStarRowSchema = z.strictObject({
+  G: nullableFiniteNumber,
+  V: nullableFiniteNumber,
+  aliases: nullableText,
+  dec: nullableFiniteNumber,
+  diameter: nullableFiniteNumber,
+  diameter_unit: nullableText,
+  main_id: nullableText,
+  matched_id: nullableText,
+  otype: nullableText,
+  otype_txt: nullableText,
+  plx_value: nullableFiniteNumber,
+  pmdec: nullableFiniteNumber,
+  pmra: nullableFiniteNumber,
+  ra: nullableFiniteNumber,
+  rvz_radvel: nullableFiniteNumber,
+  sp_type: nullableText,
+  teff: nullableFiniteNumber,
+});
+const simbadPayloadSchema = z.object({
+  data: z.array(z.array(z.unknown())),
+  metadata: z.array(z.object({ name: z.string().min(1) })),
+});
+const expectedSimbadColumns = new Set(Object.keys(simbadStarRowSchema.shape));
 
 export interface StarRepository {
   discover(
@@ -433,21 +456,35 @@ export class SimbadStarRepository implements StarRepository {
           throw new SimbadArchiveError(`SIMBAD TAP responded with status ${response.status}.`);
         }
 
-        const payload = (await response.json()) as SimbadPayload;
-        if (!Array.isArray(payload.metadata) || !Array.isArray(payload.data)) {
+        const payload = simbadPayloadSchema.safeParse(await response.json());
+        if (!payload.success) {
           throw new SimbadArchiveError("SIMBAD TAP returned an unexpected response shape.");
         }
 
-        const columns = payload.metadata.map((column) => column.name ?? "");
+        const columns = payload.data.metadata.map((column) => column.name);
+        if (
+          columns.length !== expectedSimbadColumns.size ||
+          new Set(columns).size !== columns.length ||
+          columns.some((column) => !expectedSimbadColumns.has(column))
+        ) {
+          throw new SimbadArchiveError("SIMBAD TAP returned unexpected result columns.");
+        }
         const retrievedOn = new Date(requestTime).toISOString().slice(0, 10);
-        const stars = payload.data
-          .map((values) =>
-            normalizeSimbadStar(
+        const stars = payload.data.data
+          .map((values) => {
+            if (values.length !== columns.length) {
+              throw new SimbadArchiveError("SIMBAD TAP returned a truncated result row.");
+            }
+            const row = simbadStarRowSchema.safeParse(
               Object.fromEntries(columns.map((column, index) => [column, values[index]])),
-              retrievedOn,
-            ),
-          )
-          .filter((star): star is StarProfile => star !== null);
+            );
+            if (!row.success) {
+              throw new SimbadArchiveError("SIMBAD TAP returned malformed stellar measurements.");
+            }
+            return normalizeSimbadStar(row.data, retrievedOn);
+          })
+          .filter((star): star is StarProfile => star !== null)
+          .map((star) => starProfileSchema.parse(star) as unknown as StarProfile);
 
         this.#cache.set(adql, stars, requestTime + this.#cacheTtlMs);
         return { cached: false, value: stars };

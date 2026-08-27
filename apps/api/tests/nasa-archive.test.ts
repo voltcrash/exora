@@ -1,6 +1,10 @@
 import { expect, test } from "vite-plus/test";
 import { DEFAULT_MAX_ENTRIES } from "../src/archive-cache.ts";
-import { NasaPlanetRepository, normalizeNasaPlanet } from "../src/nasa-archive.ts";
+import {
+  NasaArchiveError,
+  NasaPlanetRepository,
+  normalizeNasaPlanet,
+} from "../src/nasa-archive.ts";
 
 const nasaRow = {
   pl_name: "HIP 65426 b",
@@ -70,6 +74,14 @@ test("a row with no sky position reports none rather than a placeholder", () => 
     distanceParsecs: null,
     rightAscensionDegrees: null,
   });
+});
+
+test("rejects malformed NASA measurements instead of rewriting them as null", async () => {
+  const repository = new NasaPlanetRepository({
+    fetcher: async () => Response.json([{ ...nasaRow, pl_orbeccen: "not measured" }]),
+  });
+
+  await expect(repository.search("HIP", 12)).rejects.toBeInstanceOf(NasaArchiveError);
 });
 
 test("the TAP query asks for the sky position every destination needs", async () => {

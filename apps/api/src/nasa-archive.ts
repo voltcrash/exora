@@ -1,4 +1,5 @@
-import type { ExoplanetProfile, PlanetKind } from "@exora/contracts";
+import { exoplanetProfileSchema, type ExoplanetProfile, type PlanetKind } from "@exora/contracts";
+import { z } from "zod";
 import { createArchiveCache, createRequestCoalescer } from "./archive-cache.ts";
 import {
   NASA_DIALECT,
@@ -68,6 +69,33 @@ interface NasaPlanetRow {
   st_lum: number | null;
   sy_dist: number | null;
 }
+
+const nullableFiniteNumber = z.number().finite().nullable();
+const nullableText = z.string().nullable();
+const nasaPlanetRowSchema = z.strictObject({
+  dec: nullableFiniteNumber,
+  disc_year: nullableFiniteNumber,
+  discoverymethod: nullableText,
+  hostname: nullableText,
+  pl_bmasse: nullableFiniteNumber,
+  pl_bmassj: nullableFiniteNumber,
+  pl_eqt: nullableFiniteNumber,
+  pl_name: nullableText,
+  pl_orbeccen: nullableFiniteNumber,
+  pl_orbincl: nullableFiniteNumber,
+  pl_orbper: nullableFiniteNumber,
+  pl_orbsmax: nullableFiniteNumber,
+  pl_rade: nullableFiniteNumber,
+  pl_radj: nullableFiniteNumber,
+  ra: nullableFiniteNumber,
+  st_lum: nullableFiniteNumber,
+  st_mass: nullableFiniteNumber,
+  st_rad: nullableFiniteNumber,
+  st_spectype: nullableText,
+  st_teff: nullableFiniteNumber,
+  sy_dist: nullableFiniteNumber,
+});
+const nasaPlanetRowsSchema = z.array(nasaPlanetRowSchema);
 
 export interface RepositoryResult<T> {
   cached: boolean;
@@ -277,18 +305,15 @@ export class NasaPlanetRepository implements PlanetRepository {
 
         const payload: unknown = await response.json();
 
-        if (!Array.isArray(payload)) {
+        const rows = nasaPlanetRowsSchema.safeParse(payload);
+        if (!rows.success)
           throw new NasaArchiveError("NASA TAP returned an unexpected response shape.");
-        }
 
         const retrievedOn = new Date(requestTime).toISOString().slice(0, 10);
-        const planets = payload
-          .map((row) =>
-            row && typeof row === "object"
-              ? normalizeNasaPlanet(row as Record<string, unknown>, retrievedOn)
-              : null,
-          )
-          .filter((planet): planet is ExoplanetProfile => planet !== null);
+        const planets = rows.data
+          .map((row) => normalizeNasaPlanet(row, retrievedOn))
+          .filter((planet): planet is ExoplanetProfile => planet !== null)
+          .map((planet) => exoplanetProfileSchema.parse(planet) as unknown as ExoplanetProfile);
 
         this.#cache.set(adql, planets, requestTime + this.#cacheTtlMs);
 

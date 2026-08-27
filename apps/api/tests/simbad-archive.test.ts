@@ -1,5 +1,9 @@
 import { expect, test } from "vite-plus/test";
-import { normalizeSimbadStar, SimbadStarRepository } from "../src/simbad-archive.ts";
+import {
+  normalizeSimbadStar,
+  SimbadArchiveError,
+  SimbadStarRepository,
+} from "../src/simbad-archive.ts";
 
 const metadata = [
   "matched_id",
@@ -15,6 +19,10 @@ const metadata = [
   "sp_type",
   "V",
   "G",
+  "aliases",
+  "diameter",
+  "diameter_unit",
+  "teff",
 ].map((name) => ({ name }));
 
 const siriusRow = [
@@ -30,6 +38,10 @@ const siriusRow = [
   -5.5,
   "A0mA1Va",
   -1.46,
+  null,
+  null,
+  null,
+  null,
   null,
 ];
 
@@ -143,6 +155,16 @@ test("uses exact alias matching and caches repeated searches", async () => {
   expect(adql).toContain("mesDiameter as d");
   expect(adql).toContain("mesFe_h as h");
   expect(adql).not.toContain("like");
+});
+
+test("rejects malformed SIMBAD measurements instead of rewriting them as null", async () => {
+  const malformed = [...siriusRow];
+  malformed[4] = "101.287";
+  const repository = new SimbadStarRepository({
+    fetcher: async () => Response.json({ data: [malformed], metadata }),
+  });
+
+  await expect(repository.search("sirius", 12)).rejects.toBeInstanceOf(SimbadArchiveError);
 });
 
 test("coalesces identical SIMBAD queries while the first request is unresolved", async () => {

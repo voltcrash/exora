@@ -1,4 +1,4 @@
-import type { EphemerisVector } from "@exora/contracts";
+import { ephemerisVectorSchema, type EphemerisVector } from "@exora/contracts";
 import { createRequestCoalescer } from "./archive-cache.ts";
 
 const HORIZONS_ENDPOINT = "https://ssd.jpl.nasa.gov/api/horizons.api";
@@ -128,7 +128,7 @@ export const parseHorizonsVector = (
     throw new HorizonsError("Horizons returned non-finite vector components.");
   }
   const [x, y, z, vx, vy, vz] = values as [number, number, number, number, number, number];
-  return {
+  const vector = ephemerisVectorSchema.safeParse({
     epoch,
     name: target.name,
     naifId: target.naifId,
@@ -136,7 +136,9 @@ export const parseHorizonsVector = (
     solution,
     spkId: target.spkId,
     velocityAuPerDay: { x: vx, y: vy, z: vz },
-  };
+  });
+  if (!vector.success) throw new HorizonsError("Horizons returned an invalid vector contract.");
+  return vector.data;
 };
 
 const requestUrl = (target: HorizonsTarget, epoch: Date): URL => {

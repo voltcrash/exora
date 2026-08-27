@@ -1,4 +1,5 @@
-import type { ExoplanetProfile } from "@exora/contracts";
+import { exoplanetProfileSchema, type ExoplanetProfile } from "@exora/contracts";
+import { z } from "zod";
 import type { DatabaseClient } from "./database.ts";
 import {
   PLANET_DISCOVERY_FILTERS,
@@ -38,6 +39,37 @@ interface PlanetRow extends Record<string, unknown> {
   source_table: "pscomppars";
 }
 
+const nullableFiniteNumber = z.number().finite().nullable();
+const nullableText = z.string().nullable();
+const planetRowSchema = z.strictObject({
+  declination_degrees: nullableFiniteNumber,
+  discovery_method: z.string().min(1),
+  discovery_year: nullableFiniteNumber,
+  distance_parsecs: nullableFiniteNumber,
+  equilibrium_temperature_kelvin: nullableFiniteNumber,
+  host_luminosity_log_solar: nullableFiniteNumber,
+  host_mass_solar: nullableFiniteNumber,
+  host_radius_solar: nullableFiniteNumber,
+  host_spectral_type: nullableText,
+  host_star: z.string().min(1),
+  host_temperature_kelvin: nullableFiniteNumber,
+  id: z.string().min(1),
+  kind: z.enum(["gas-giant", "ice-giant", "rocky", "unknown"]),
+  mass_earth: nullableFiniteNumber,
+  mass_jupiter: nullableFiniteNumber,
+  name: z.string().min(1),
+  orbital_eccentricity: nullableFiniteNumber,
+  orbital_inclination_degrees: nullableFiniteNumber,
+  orbital_period_days: nullableFiniteNumber,
+  radius_earth: nullableFiniteNumber,
+  radius_jupiter: nullableFiniteNumber,
+  retrieved_on: z.union([z.string().min(1), z.date()]),
+  right_ascension_degrees: nullableFiniteNumber,
+  semi_major_axis_au: nullableFiniteNumber,
+  source_archive: z.literal("NASA Exoplanet Archive"),
+  source_table: z.literal("pscomppars"),
+});
+
 const PLANET_COLUMNS = `
   id,
   name,
@@ -70,38 +102,41 @@ const PLANET_COLUMNS = `
 const toIsoDate = (value: string | Date): string =>
   value instanceof Date ? value.toISOString().slice(0, 10) : value.slice(0, 10);
 
-const toPlanet = (row: PlanetRow): ExoplanetProfile => ({
-  id: row.id,
-  name: row.name,
-  hostStar: row.host_star,
-  kind: row.kind,
-  observation: {
-    radiusJupiter: row.radius_jupiter,
-    massJupiter: row.mass_jupiter,
-    radiusEarth: row.radius_earth,
-    massEarth: row.mass_earth,
-    equilibriumTemperatureKelvin: row.equilibrium_temperature_kelvin,
-    orbitalEccentricity: row.orbital_eccentricity,
-    orbitalInclinationDegrees: row.orbital_inclination_degrees,
-    orbitalPeriodDays: row.orbital_period_days,
-    semiMajorAxisAu: row.semi_major_axis_au,
-    distanceParsecs: row.distance_parsecs,
-    rightAscensionDegrees: row.right_ascension_degrees,
-    declinationDegrees: row.declination_degrees,
-    discoveryYear: row.discovery_year,
-    discoveryMethod: row.discovery_method,
-    hostSpectralType: row.host_spectral_type,
-    hostTemperatureKelvin: row.host_temperature_kelvin,
-    hostRadiusSolar: row.host_radius_solar,
-    hostMassSolar: row.host_mass_solar,
-    hostLuminosityLogSolar: row.host_luminosity_log_solar,
-  },
-  source: {
-    archive: row.source_archive,
-    table: row.source_table,
-    retrievedOn: toIsoDate(row.retrieved_on),
-  },
-});
+const toPlanet = (value: unknown): ExoplanetProfile => {
+  const row = planetRowSchema.parse(value) as PlanetRow;
+  return exoplanetProfileSchema.parse({
+    hostStar: row.host_star,
+    id: row.id,
+    kind: row.kind,
+    name: row.name,
+    observation: {
+      declinationDegrees: row.declination_degrees,
+      discoveryMethod: row.discovery_method,
+      discoveryYear: row.discovery_year,
+      distanceParsecs: row.distance_parsecs,
+      equilibriumTemperatureKelvin: row.equilibrium_temperature_kelvin,
+      hostLuminosityLogSolar: row.host_luminosity_log_solar,
+      hostMassSolar: row.host_mass_solar,
+      hostRadiusSolar: row.host_radius_solar,
+      hostSpectralType: row.host_spectral_type,
+      hostTemperatureKelvin: row.host_temperature_kelvin,
+      massEarth: row.mass_earth,
+      massJupiter: row.mass_jupiter,
+      orbitalEccentricity: row.orbital_eccentricity,
+      orbitalInclinationDegrees: row.orbital_inclination_degrees,
+      orbitalPeriodDays: row.orbital_period_days,
+      radiusEarth: row.radius_earth,
+      radiusJupiter: row.radius_jupiter,
+      rightAscensionDegrees: row.right_ascension_degrees,
+      semiMajorAxisAu: row.semi_major_axis_au,
+    },
+    source: {
+      archive: row.source_archive,
+      retrievedOn: toIsoDate(row.retrieved_on),
+      table: row.source_table,
+    },
+  }) as unknown as ExoplanetProfile;
+};
 
 /**
  * Reads report `cached: false`.

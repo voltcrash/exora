@@ -5,6 +5,7 @@ import type {
   SmallBodyParameter,
   SmallBodyProfile,
 } from "@exora/contracts";
+import { smallBodyMatchSchema, smallBodyProfileSchema } from "@exora/contracts";
 import { createRequestCoalescer } from "./archive-cache.ts";
 
 const SBDB_ENDPOINT = "https://ssd-api.jpl.nasa.gov/sbdb.api";
@@ -117,17 +118,27 @@ const recordOrNull = (value: unknown): Record<string, unknown> | null =>
     ? (value as Record<string, unknown>)
     : null;
 
-const stringOrNull = (value: unknown): string | null =>
-  typeof value === "string" && value.trim() ? value.trim() : null;
-
-const numberOrNull = (value: unknown): number | null => {
-  if (typeof value !== "number" && typeof value !== "string") return null;
-  const parsed = Number(value);
-  return Number.isFinite(parsed) ? parsed : null;
+const stringOrNull = (value: unknown): string | null => {
+  if (value === null || value === undefined || value === "") return null;
+  if (typeof value !== "string") throw new SbdbError("SBDB returned a malformed text field.");
+  return value.trim() || null;
 };
 
-const booleanOrNull = (value: unknown): boolean | null =>
-  typeof value === "boolean" ? value : null;
+const numberOrNull = (value: unknown): number | null => {
+  if (value === null || value === undefined || value === "") return null;
+  if (typeof value !== "number" && typeof value !== "string") {
+    throw new SbdbError("SBDB returned a malformed numeric field.");
+  }
+  const parsed = Number(value);
+  if (!Number.isFinite(parsed)) throw new SbdbError("SBDB returned a non-finite numeric field.");
+  return parsed;
+};
+
+const booleanOrNull = (value: unknown): boolean | null => {
+  if (value === null || value === undefined) return null;
+  if (typeof value !== "boolean") throw new SbdbError("SBDB returned a malformed boolean field.");
+  return value;
+};
 
 const parameter = (value: unknown): SmallBodyParameter | null => {
   const candidate = recordOrNull(value);
@@ -146,7 +157,17 @@ const parameter = (value: unknown): SmallBodyParameter | null => {
 };
 
 const parameters = (value: unknown): SmallBodyParameter[] =>
-  Array.isArray(value) ? value.map(parameter).filter((item) => item !== null) : [];
+  value === null || value === undefined
+    ? []
+    : Array.isArray(value)
+      ? value.map((item) => {
+          const parsed = parameter(item);
+          if (!parsed) throw new SbdbError("SBDB returned a malformed parameter.");
+          return parsed;
+        })
+      : (() => {
+          throw new SbdbError("SBDB returned a malformed parameter collection.");
+        })();
 
 const closeApproach = (value: unknown): SmallBodyCloseApproach | null => {
   const candidate = recordOrNull(value);
@@ -167,11 +188,15 @@ const closeApproach = (value: unknown): SmallBodyCloseApproach | null => {
 };
 
 const relevantApproaches = (value: unknown, now: number): SmallBodyCloseApproach[] => {
-  if (!Array.isArray(value)) return [];
+  if (value === null || value === undefined) return [];
+  if (!Array.isArray(value)) throw new SbdbError("SBDB returned malformed close approaches.");
   const todayJulianDate = now / 86_400_000 + 2_440_587.5;
   return value
-    .map(closeApproach)
-    .filter((item) => item !== null)
+    .map((item) => {
+      const parsed = closeApproach(item);
+      if (!parsed) throw new SbdbError("SBDB returned a malformed close approach.");
+      return parsed;
+    })
     .sort(
       (left, right) =>
         Math.abs((left.julianDate ?? todayJulianDate) - todayJulianDate) -
@@ -205,16 +230,22 @@ export const parseSbdbPayload = (
   validateSignature(candidate);
   if (String(candidate.code) === "300") {
     if (!Array.isArray(candidate.list)) throw new SbdbError("SBDB omitted its ambiguity list.");
-    const matches = candidate.list
-      .map((item) => {
-        const match = recordOrNull(item);
-        const designation = stringOrNull(match?.pdes);
-        const name = stringOrNull(match?.name);
-        return designation && name ? { designation, name } : null;
-      })
-      .filter((item) => item !== null);
+    const matches = candidate.list.map((item) => {
+      const match = recordOrNull(item);
+      const designation = stringOrNull(match?.pdes);
+      const name = stringOrNull(match?.name);
+      return designation && name ? { designation, name } : null;
+    });
+    if (matches.some((match) => match === null)) {
+      throw new SbdbError("SBDB returned a malformed ambiguity choice.");
+    }
     if (matches.length === 0) throw new SbdbError("SBDB returned an empty ambiguity list.");
-    return { data: null, matches, retrievedAt, status: "ambiguous" };
+    return {
+      data: null,
+      matches: matches.map((match) => smallBodyMatchSchema.parse(match)),
+      retrievedAt,
+      status: "ambiguous",
+    };
   }
 
   const object = recordOrNull(candidate.object);
@@ -232,29 +263,31 @@ export const parseSbdbPayload = (
   const orbitClass = recordOrNull(object.orbit_class);
   const orbitClassCode = stringOrNull(orbitClass?.code);
   const orbitClassName = stringOrNull(orbitClass?.name);
-  return {
-    data: {
-      closeApproaches: relevantApproaches(candidate.ca_data, now),
-      designation,
-      fullName,
-      kind,
-      nearEarth: booleanOrNull(object.neo),
-      orbit: {
-        conditionCode: stringOrNull(orbit.condition_code),
-        dataArcDays: numberOrNull(orbit.data_arc),
-        elements: parameters(orbit.elements),
-        epochJulianDate: numberOrNull(orbit.epoch),
-        firstObservation: stringOrNull(orbit.first_obs),
-        lastObservation: stringOrNull(orbit.last_obs),
-        solutionDate: stringOrNull(orbit.soln_date),
-        solutionId: stringOrNull(object.orbit_id) ?? stringOrNull(orbit.orbit_id),
-      },
-      orbitClass:
-        orbitClassCode && orbitClassName ? { code: orbitClassCode, name: orbitClassName } : null,
-      physicalParameters: parameters(candidate.phys_par),
-      potentiallyHazardous: booleanOrNull(object.pha),
-      spkId,
+  const profile = smallBodyProfileSchema.safeParse({
+    closeApproaches: relevantApproaches(candidate.ca_data, now),
+    designation,
+    fullName,
+    kind,
+    nearEarth: booleanOrNull(object.neo),
+    orbit: {
+      conditionCode: stringOrNull(orbit.condition_code),
+      dataArcDays: numberOrNull(orbit.data_arc),
+      elements: parameters(orbit.elements),
+      epochJulianDate: numberOrNull(orbit.epoch),
+      firstObservation: stringOrNull(orbit.first_obs),
+      lastObservation: stringOrNull(orbit.last_obs),
+      solutionDate: stringOrNull(orbit.soln_date),
+      solutionId: stringOrNull(object.orbit_id) ?? stringOrNull(orbit.orbit_id),
     },
+    orbitClass:
+      orbitClassCode && orbitClassName ? { code: orbitClassCode, name: orbitClassName } : null,
+    physicalParameters: parameters(candidate.phys_par),
+    potentiallyHazardous: booleanOrNull(object.pha),
+    spkId,
+  });
+  if (!profile.success) throw new SbdbError("SBDB returned an invalid small-body contract.");
+  return {
+    data: profile.data,
     matches: [],
     retrievedAt,
     status: "match",
