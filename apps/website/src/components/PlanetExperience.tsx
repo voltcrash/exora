@@ -13,7 +13,6 @@ import type { ViewMode } from "../planet-scene.ts";
 import { formatMeasurement, formatNumber, formatPlanetName } from "../planet-utils.tsx";
 import type { PlanetarySubsystem } from "../planetary-subsystems.ts";
 import type { SceneHost, XrStatus } from "../scene-host.ts";
-import { findSolarWorld, tuneSolarWorldRecipe } from "../solar-system.ts";
 import { SURFACE_TRANSITION_MS, type TravelPhase } from "../travel-transition.ts";
 import { FrameRateSignal } from "./FrameRateSignal.tsx";
 import { MissionControl } from "./MissionControl.tsx";
@@ -59,6 +58,9 @@ export const PlanetExperience = ({
   const [hostJumpState, setHostJumpState] = useState<"idle" | "loading" | "error">("idle");
   const [systemJumpState, setSystemJumpState] = useState<"idle" | "loading" | "error">("idle");
   const [orbitMenuOpen, setOrbitMenuOpen] = useState(false);
+  const [findSolarWorld, setFindSolarWorld] = useState<
+    ((name: string) => ExoplanetProfile | null) | null
+  >(null);
   const planet = result.planet;
   const solar = result.mode === "solar";
   const solarIdentity = planet.solarSystem;
@@ -66,7 +68,7 @@ export const PlanetExperience = ({
   const isMoon = solarIdentity?.bodyType === "moon";
   const observation = planet.observation;
   const recipe = useMemo(
-    () => recipeOverride ?? tuneSolarWorldRecipe(planet, deriveWorldRecipe(planet)),
+    () => recipeOverride ?? deriveWorldRecipe(planet),
     [planet, recipeOverride],
   );
 
@@ -82,9 +84,13 @@ export const PlanetExperience = ({
       };
     }
 
-    void import("../planetary-subsystems.ts").then(({ findPlanetarySubsystem }) => {
-      if (active) setSubsystem(findPlanetarySubsystem(planet.name));
-    });
+    void Promise.all([import("../planetary-subsystems.ts"), import("../solar-system.ts")]).then(
+      ([{ findPlanetarySubsystem }, solarSystem]) => {
+        if (!active) return;
+        setFindSolarWorld(() => solarSystem.findSolarWorld);
+        setSubsystem(findPlanetarySubsystem(planet.name));
+      },
+    );
     return () => {
       active = false;
     };
@@ -158,7 +164,7 @@ export const PlanetExperience = ({
                 if (!abandoned) setSceneState("ready");
               },
               onSelectMoon: (name) => {
-                const destination = findSolarWorld(name);
+                const destination = findSolarWorld?.(name);
                 if (destination) onSelectPlanet(destination, true);
               },
               planet,
@@ -247,7 +253,7 @@ export const PlanetExperience = ({
 
   const openPrimaryBody = (): void => {
     if (!isMoon || !solarIdentity.parent) return;
-    const primary = findSolarWorld(solarIdentity.parent);
+    const primary = findSolarWorld?.(solarIdentity.parent);
     if (primary) onSelectPlanet(primary, true);
   };
 
@@ -386,7 +392,7 @@ export const PlanetExperience = ({
                 <span>SELECTED MOONS · MEAN ELEMENTS</span>
                 <ul>
                   {subsystem.moons.map((candidate) => {
-                    const destination = findSolarWorld(candidate.name);
+                    const destination = findSolarWorld?.(candidate.name);
                     return (
                       <li key={candidate.naifId}>
                         {destination ? (

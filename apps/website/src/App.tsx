@@ -1,5 +1,6 @@
 import type { ExoplanetProfile, StarProfile } from "@exora/contracts";
 import {
+  deriveWorldRecipe,
   generateCustomStar,
   generateCustomWorld,
   type CustomStar,
@@ -19,18 +20,11 @@ import { RecoveryScreen } from "./components/RecoveryScreen.tsx";
 import { featuredPlanet } from "./planet-profile.ts";
 import { hasRenderer } from "./planet-utils.tsx";
 import { canonicalUrlForSearch } from "./canonical-url.ts";
-import {
-  customPlanetUrl,
-  customStarUrl,
-  parseCustomPlanetUrl,
-  parseCustomStarUrl,
-} from "./custom-destination-url.ts";
 import type { BlackHoleProfile } from "./black-holes.ts";
 import { togglesClearView } from "./clear-view-shortcut.ts";
 import { togglesDiscoverShortcut } from "./discover-shortcut.ts";
 import { TRAVEL_CROSS_MS, TRAVEL_REVEAL_MS, type TravelPhase } from "./travel-transition.ts";
 import { useSceneHost } from "./use-scene-host.ts";
-import { findSolarStar, findSolarWorld } from "./solar-system.ts";
 import type { AsteroidProfile } from "./solar-asteroids.ts";
 import type { CometProfile } from "./solar-comets.ts";
 import type { SolarRegionProfile } from "./solar-regions.ts";
@@ -96,6 +90,18 @@ type ActiveObject =
       type: "missing";
     };
 
+const solarPlanetObject = async (
+  planet: ExoplanetProfile,
+  cached: boolean,
+): Promise<ActiveObject> => {
+  const { tuneSolarWorldRecipe } = await import("./solar-system.ts");
+  return {
+    recipe: tuneSolarWorldRecipe(planet, deriveWorldRecipe(planet)),
+    result: { cached, mode: "solar", planet },
+    type: "planet",
+  };
+};
+
 const defaultPlanetObject = (): ActiveObject => ({
   result: { cached: true, mode: "fallback", planet: featuredPlanet },
   type: "planet",
@@ -144,6 +150,7 @@ const loadRequestedObject = async (): Promise<ActiveObject> => {
 
   const starName = parameters.get("star");
   if (starName) {
+    const { findSolarStar } = await import("./solar-system.ts");
     const localStar = findSolarStar(starName);
     if (localStar)
       return { result: { cached: true, mode: "solar", star: localStar }, type: "star" };
@@ -161,9 +168,10 @@ const loadRequestedObject = async (): Promise<ActiveObject> => {
 
   const name = parameters.get("planet");
   if (name) {
+    const { findSolarWorld } = await import("./solar-system.ts");
     const localWorld = findSolarWorld(name);
     if (localWorld) {
-      return { result: { cached: true, mode: "solar", planet: localWorld }, type: "planet" };
+      return solarPlanetObject(localWorld, true);
     }
 
     const requested = await loadPlanetByName(name);
@@ -174,6 +182,7 @@ const loadRequestedObject = async (): Promise<ActiveObject> => {
 
   const customPlanet = parameters.get("custom");
   if (customPlanet !== null) {
+    const { parseCustomPlanetUrl } = await import("./custom-destination-url.ts");
     const customParameters = parseCustomPlanetUrl(customPlanet);
     if (!customParameters) {
       return {
@@ -194,6 +203,7 @@ const loadRequestedObject = async (): Promise<ActiveObject> => {
 
   const customStar = parameters.get("customStar");
   if (customStar !== null) {
+    const { parseCustomStarUrl } = await import("./custom-destination-url.ts");
     const customParameters = parseCustomStarUrl(customStar);
     if (!customParameters) {
       return {
@@ -371,8 +381,12 @@ export const App = () => {
   const selectPlanet = useCallback((planet: ExoplanetProfile, cached: boolean): void => {
     window.history.pushState({}, "", `?planet=${encodeURIComponent(planet.name)}`);
     setDiscoverOpen(false);
+    if (planet.solarSystem) {
+      void solarPlanetObject(planet, cached).then(setActiveObject);
+      return;
+    }
     setActiveObject({
-      result: { cached, mode: planet.solarSystem ? "solar" : "live", planet },
+      result: { cached, mode: "live", planet },
       type: "planet",
     });
   }, []);
@@ -424,13 +438,15 @@ export const App = () => {
 
   const openMissionParent = useCallback(
     (parent: SolarMissionProfile["parent"]): void => {
-      if (parent === "Sun") {
-        const star = findSolarStar(parent);
-        if (star) selectStar(star, true);
-        return;
-      }
-      const planet = findSolarWorld(parent);
-      if (planet) selectPlanet(planet, true);
+      void import("./solar-system.ts").then(({ findSolarStar, findSolarWorld }) => {
+        if (parent === "Sun") {
+          const star = findSolarStar(parent);
+          if (star) selectStar(star, true);
+          return;
+        }
+        const planet = findSolarWorld(parent);
+        if (planet) selectPlanet(planet, true);
+      });
     },
     [selectPlanet, selectStar],
   );
@@ -460,21 +476,25 @@ export const App = () => {
   }, []);
 
   const generatePlanet = useCallback(({ parameters, planet, recipe }: CustomWorld): void => {
-    window.history.pushState({}, "", customPlanetUrl(parameters));
-    setDiscoverOpen(false);
-    setActiveObject({
-      recipe,
-      result: { cached: false, mode: "custom", planet },
-      type: "planet",
+    void import("./custom-destination-url.ts").then(({ customPlanetUrl }) => {
+      window.history.pushState({}, "", customPlanetUrl(parameters));
+      setDiscoverOpen(false);
+      setActiveObject({
+        recipe,
+        result: { cached: false, mode: "custom", planet },
+        type: "planet",
+      });
     });
   }, []);
 
   const generateStar = useCallback(({ parameters, star }: CustomStar): void => {
-    window.history.pushState({}, "", customStarUrl(parameters));
-    setDiscoverOpen(false);
-    setActiveObject({
-      result: { cached: false, mode: "custom", star },
-      type: "star",
+    void import("./custom-destination-url.ts").then(({ customStarUrl }) => {
+      window.history.pushState({}, "", customStarUrl(parameters));
+      setDiscoverOpen(false);
+      setActiveObject({
+        result: { cached: false, mode: "custom", star },
+        type: "star",
+      });
     });
   }, []);
 

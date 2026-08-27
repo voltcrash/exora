@@ -32,3 +32,9 @@ would make the initial scene unrepresentative. Application and optional-feature 
 be split when it can be deferred without delaying the first scene; the warning is retained to make
 regressions visible rather than converting Babylon's necessary runtime surface into a brittle hard
 failure.
+
+The August 2026 audit reduced eager JavaScript from 390,515 bytes to about 266 kB by deferring the
+Solar System/geology catalogs, custom-link helpers, development XR emulator, and runtime API schemas.
+The remaining desktop coverage estimate is about 95 kB: roughly 59 kB in Babylon mesh/math paths and
+36 kB in the React/application chunk. Those values are diagnostic rather than budgets because the
+exact coverage depends on how many initial renderer tasks finish inside Lighthouse's sampling window.

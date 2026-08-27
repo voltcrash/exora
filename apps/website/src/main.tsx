@@ -3,7 +3,6 @@ import { SpeedInsights } from "@vercel/speed-insights/react";
 import { createRoot } from "react-dom/client";
 import { App } from "./App.tsx";
 import { ApplicationErrorBoundary } from "./components/ApplicationErrorBoundary.tsx";
-import { installXrEmulator, isXrEmulatorRequested } from "./xr-emulator.ts";
 import "./style.css";
 
 const WEB_FONT_STYLESHEET =
@@ -38,9 +37,14 @@ const render = (): void => {
   scheduleWebFontLoad();
 };
 
-// The emulated runtime has to own navigator.xr before Babylon probes for a headset.
-if (isXrEmulatorRequested()) {
-  void installXrEmulator().then(render);
+// The emulator is a development feature, but when enabled it has to own navigator.xr before
+// Babylon probes for a headset. Keep its request parsing and installation path out of production's
+// eager application chunk while preserving that ordering in emulator-enabled builds.
+if (import.meta.env.DEV || import.meta.env.VITE_XR_EMULATOR === "1") {
+  void import("./xr-emulator.ts").then(({ installXrEmulator, isXrEmulatorRequested }) => {
+    if (isXrEmulatorRequested()) void installXrEmulator().then(render);
+    else render();
+  });
 } else {
   render();
 }

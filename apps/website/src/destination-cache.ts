@@ -27,7 +27,6 @@ import {
   type StarLoadResult,
   type SystemLoadResult,
 } from "./api-client.ts";
-import { findSolarStar, findSolarSystem } from "./solar-system.ts";
 
 const stars = new Map<string, Promise<StarLoadResult | null>>();
 const systems = new Map<string, Promise<SystemLoadResult | null>>();
@@ -57,11 +56,13 @@ const remembered = <Answer>(
 
 /** The star an archive files under this name, or null where it files none. */
 export const reachStar = (name: string): Promise<StarLoadResult | null> =>
-  remembered(stars, name, () => {
-    const local = findSolarStar(name);
-    return local
-      ? Promise.resolve({ cached: true, mode: "solar", star: local })
-      : loadStarByName(name);
+  remembered(stars, name, async () => {
+    if (name.trim().toLocaleLowerCase() === "sun") {
+      const { findSolarStar } = await import("./solar-system.ts");
+      const local = findSolarStar(name);
+      if (local) return { cached: true, mode: "solar", star: local };
+    }
+    return loadStarByName(name);
   });
 
 /**
@@ -74,8 +75,11 @@ export const reachStar = (name: string): Promise<StarLoadResult | null> =>
  */
 export const reachSystem = (hostStar: string): Promise<SystemLoadResult | null> =>
   remembered(systems, hostStar, async () => {
-    const local = findSolarSystem(hostStar);
-    if (local) return local;
+    if (hostStar.trim().toLocaleLowerCase() === "sun") {
+      const { findSolarSystem } = await import("./solar-system.ts");
+      const local = findSolarSystem(hostStar);
+      if (local) return local;
+    }
     const result = await loadPlanetsByHost(hostStar);
     if (result.planets.length === 0) return null;
     return { cached: result.cached, hostStar, planets: result.planets };
