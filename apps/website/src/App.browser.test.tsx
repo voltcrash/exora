@@ -994,6 +994,9 @@ test("the Solar System's complete object list scrolls inside its left panel", as
   }
 
   await expect.element(page.getByRole("heading", { name: "Worlds in the diorama" })).toBeVisible();
+  // The renderer now starts after the first paint, so the heading can be visible while the
+  // measured orbit list is still being laid out. Wait for the list item the scroll assertion uses.
+  await expect.element(page.getByRole("button", { name: /Makemake/ })).toBeVisible();
   const intro = document.querySelector<HTMLElement>(".system-experience .world-intro");
   expect(intro).not.toBeNull();
   expect(getComputedStyle(intro!).overflowY).toBe("auto");

@@ -6,8 +6,24 @@ import { ApplicationErrorBoundary } from "./components/ApplicationErrorBoundary.
 import { installXrEmulator, isXrEmulatorRequested } from "./xr-emulator.ts";
 import "./style.css";
 
+const WEB_FONT_STYLESHEET =
+  "https://fonts.googleapis.com/css2?family=Exo+2:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap";
+
 const root = document.querySelector<HTMLDivElement>("#app");
 if (!root) throw new Error("Exora could not find its application root.");
+
+const scheduleWebFontLoad = (): void => {
+  window.requestAnimationFrame(() => {
+    window.setTimeout(() => {
+      if (document.head.querySelector('link[data-exora-fonts="true"]')) return;
+      const link = document.createElement("link");
+      link.rel = "stylesheet";
+      link.href = WEB_FONT_STYLESHEET;
+      link.dataset.exoraFonts = "true";
+      document.head.append(link);
+    }, 1_000);
+  });
+};
 
 const render = (): void => {
   createRoot(root).render(
@@ -19,6 +35,7 @@ const render = (): void => {
       </>
     </ApplicationErrorBoundary>,
   );
+  scheduleWebFontLoad();
 };
 
 // The emulated runtime has to own navigator.xr before Babylon probes for a headset.

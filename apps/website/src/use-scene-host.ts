@@ -10,6 +10,28 @@ export interface SceneHostController {
   status: SceneHostStatus;
 }
 
+const RENDERER_START_DELAY_MS = 1_000;
+
+/**
+ * Gives the first React paint a chance to reach the screen before the Babylon graph is evaluated.
+ *
+ * The renderer is intentionally dynamic, but a passive effect can still run before the browser's
+ * next paint when the canvas ref causes a follow-up render. Waiting one frame and then a short task
+ * delay makes the boundary explicit: the loading UI is visible immediately, while the expensive
+ * engine import starts after that first useful frame.
+ */
+const afterFirstPaint = (callback: () => void): (() => void) => {
+  let timeoutId: number | null = null;
+  const frameId = window.requestAnimationFrame(() => {
+    timeoutId = window.setTimeout(callback, RENDERER_START_DELAY_MS);
+  });
+
+  return () => {
+    window.cancelAnimationFrame(frameId);
+    if (timeoutId !== null) window.clearTimeout(timeoutId);
+  };
+};
+
 /**
  * The shared renderer, resolved once the Babylon bundle has loaded.
  *
@@ -34,26 +56,30 @@ export const useSceneHost = (canvas: HTMLCanvasElement | null): SceneHostControl
     let cancelled = false;
     let unsubscribe = (): void => undefined;
     setStatus("initializing");
-    // Started alongside the renderer, not with the first world that wants it. The star catalogue
-    // is one memoized download for the life of the page, and a destination builds its sky on the
-    // microtask that resolves it — so getting the request out now is what keeps the very first
-    // arrival from rendering a frame or two of empty space before its stars appear.
-    void import("./sky-catalog.ts").then(({ loadSkyCatalog }) => loadSkyCatalog());
-    void import("./scene-host.ts")
-      .then(({ acquireSceneHost, recreateSceneHost }) => {
-        if (cancelled) return;
-        const nextHost = attempt === 0 ? acquireSceneHost(canvas) : recreateSceneHost(canvas);
-        unsubscribe = nextHost.onRendererStatus((nextStatus) => {
-          if (!cancelled) setStatus(nextStatus);
+    const cancelStartup = afterFirstPaint(() => {
+      if (cancelled) return;
+      // Started alongside the renderer, not with the first world that wants it. The star catalogue
+      // is one memoized download for the life of the page, and a destination builds its sky on the
+      // microtask that resolves it — so getting the request out now is what keeps the very first
+      // arrival from rendering a frame or two of empty space before its stars appear.
+      void import("./sky-catalog.ts").then(({ loadSkyCatalog }) => loadSkyCatalog());
+      void import("./scene-host.ts")
+        .then(({ acquireSceneHost, recreateSceneHost }) => {
+          if (cancelled) return;
+          const nextHost = attempt === 0 ? acquireSceneHost(canvas) : recreateSceneHost(canvas);
+          unsubscribe = nextHost.onRendererStatus((nextStatus) => {
+            if (!cancelled) setStatus(nextStatus);
+          });
+          setHost(nextHost);
+        })
+        .catch((error: unknown) => {
+          console.error("[renderer] failed to initialize", error);
+          if (!cancelled) setStatus("failed");
         });
-        setHost(nextHost);
-      })
-      .catch((error: unknown) => {
-        console.error("[renderer] failed to initialize", error);
-        if (!cancelled) setStatus("failed");
-      });
+    });
     return () => {
       cancelled = true;
+      cancelStartup();
       unsubscribe();
     };
   }, [attempt, canvas]);
