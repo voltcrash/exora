@@ -10,12 +10,36 @@ const response = (schema: keyof typeof apiResponseSchemas, description: string) 
   description,
 });
 
-const errorResponses = {
-  400: response("ApiError", "Invalid request"),
-  404: response("ApiError", "Resource not found"),
-  429: response("ApiError", "Rate limit exceeded"),
-  502: response("ApiError", "Upstream astronomy service unavailable"),
+const errorResponseDefinitions = {
+  BadRequest: response("ApiError", "Request parameters are invalid"),
+  DatabaseUnavailable: response("ApiError", "The catalog database is temporarily unavailable"),
+  InternalServerError: response("ApiError", "An unexpected server error occurred"),
+  NotFound: response("ApiError", "The requested resource was not found"),
+  RateLimited: response("ApiError", "The request rate limit was exceeded"),
+  UpstreamUnavailable: response(
+    "ApiError",
+    "A required external astronomy service is temporarily unavailable",
+  ),
 };
+
+const errorResponseNames = {
+  400: "BadRequest",
+  404: "NotFound",
+  429: "RateLimited",
+  500: "InternalServerError",
+  502: "UpstreamUnavailable",
+  503: "DatabaseUnavailable",
+} as const satisfies Record<number, keyof typeof errorResponseDefinitions>;
+
+type ErrorStatus = keyof typeof errorResponseNames;
+
+const errorResponses = (...statuses: readonly ErrorStatus[]) =>
+  Object.fromEntries(
+    statuses.map((status) => [
+      status,
+      { $ref: `#/components/responses/${errorResponseNames[status]}` },
+    ]),
+  );
 
 const queryParameter = (name: string, description: string, schema: Record<string, unknown>) => ({
   description,
@@ -26,6 +50,7 @@ const queryParameter = (name: string, description: string, schema: Record<string
 
 export const openApiDocument = {
   components: {
+    responses: errorResponseDefinitions,
     schemas: Object.fromEntries(
       Object.entries(apiResponseSchemas).map(([name, schema]) => [name, z.toJSONSchema(schema)]),
     ),
@@ -49,7 +74,7 @@ export const openApiDocument = {
         ],
         responses: {
           200: response("Ephemeris", "Heliocentric ecliptic-J2000 vectors"),
-          ...errorResponses,
+          ...errorResponses(400, 429, 500, 502),
         },
         summary: "Get Solar System ephemerides",
       },
@@ -73,7 +98,7 @@ export const openApiDocument = {
             },
             description: "Service is available",
           },
-          429: errorResponses[429],
+          ...errorResponses(429, 500),
         },
         summary: "Check API health",
       },
@@ -92,14 +117,17 @@ export const openApiDocument = {
         ],
         responses: {
           200: response("MissionTrajectory", "Validated spacecraft trajectory samples"),
-          ...errorResponses,
+          ...errorResponses(400, 429, 500, 502),
         },
         summary: "Get a mission trajectory",
       },
     },
     "/api/openapi.json": {
       get: {
-        responses: { 200: { description: "OpenAPI 3.1 document" }, 429: errorResponses[429] },
+        responses: {
+          200: { description: "OpenAPI 3.1 document" },
+          ...errorResponses(429, 500),
+        },
         summary: "Get this OpenAPI document",
       },
     },
@@ -112,13 +140,19 @@ export const openApiDocument = {
           queryParameter("browse", "Named browse collection", { type: "string" }),
           queryParameter("limit", "Bounded result count", { type: "integer" }),
         ],
-        responses: { 200: response("PlanetSearch", "Matching planet profiles"), ...errorResponses },
+        responses: {
+          200: response("PlanetSearch", "Matching planet profiles"),
+          ...errorResponses(400, 429, 500, 502, 503),
+        },
         summary: "Search or discover planets",
       },
     },
     "/api/planets/featured": {
       get: {
-        responses: { 200: response("Planet", "Featured planet profile"), ...errorResponses },
+        responses: {
+          200: response("Planet", "Featured planet profile"),
+          ...errorResponses(404, 429, 500, 502, 503),
+        },
         summary: "Get the featured planet",
       },
     },
@@ -127,7 +161,10 @@ export const openApiDocument = {
         parameters: [
           { in: "path", name: "name", required: true, schema: { maxLength: 100, type: "string" } },
         ],
-        responses: { 200: response("Planet", "Exact planet profile"), ...errorResponses },
+        responses: {
+          200: response("Planet", "Exact planet profile"),
+          ...errorResponses(400, 404, 429, 500, 502, 503),
+        },
         summary: "Get a planet by archive name",
       },
     },
@@ -146,7 +183,7 @@ export const openApiDocument = {
         ],
         responses: {
           200: response("SmallBodySearch", "Unique, ambiguous, or not-found SBDB result"),
-          ...errorResponses,
+          ...errorResponses(400, 429, 500, 502),
         },
         summary: "Search JPL small bodies",
       },
@@ -158,13 +195,19 @@ export const openApiDocument = {
           queryParameter("category", "Curated discovery category", { type: "string" }),
           queryParameter("limit", "Bounded result count", { type: "integer" }),
         ],
-        responses: { 200: response("StarSearch", "Matching star profiles"), ...errorResponses },
+        responses: {
+          200: response("StarSearch", "Matching star profiles"),
+          ...errorResponses(400, 429, 500, 502),
+        },
         summary: "Search or discover stars",
       },
     },
     "/api/stars/featured": {
       get: {
-        responses: { 200: response("StarSearch", "Featured stars"), ...errorResponses },
+        responses: {
+          200: response("StarSearch", "Featured stars"),
+          ...errorResponses(429, 500, 502),
+        },
         summary: "Get featured stars",
       },
     },
@@ -173,7 +216,10 @@ export const openApiDocument = {
         parameters: [
           { in: "path", name: "name", required: true, schema: { maxLength: 100, type: "string" } },
         ],
-        responses: { 200: response("Star", "Exact star profile"), ...errorResponses },
+        responses: {
+          200: response("Star", "Exact star profile"),
+          ...errorResponses(400, 404, 429, 500, 502),
+        },
         summary: "Get a star by SIMBAD name",
       },
     },
@@ -185,7 +231,7 @@ export const openApiDocument = {
         ],
         responses: {
           200: response("PlanetSearch", "Planets around the resolved SIMBAD host"),
-          ...errorResponses,
+          ...errorResponses(400, 404, 429, 500, 502, 503),
         },
         summary: "Get planets around a star",
       },
