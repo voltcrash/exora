@@ -1,6 +1,7 @@
 import type { ExoplanetProfile, StarProfile } from "@exora/contracts";
 import {
   deriveWorldRecipe,
+  WORLDGEN_VERSION,
   type CustomStar,
   type CustomWorld,
   type WorldRecipe,
@@ -298,19 +299,21 @@ export const PlanetExperience = ({
             <span aria-hidden="true" />{" "}
             {subsystemActive
               ? "JPL MEAN ORBITS · LOG-COMPRESSED DISTANCE · BODY SIZES EXAGGERATED"
-              : solar
-                ? solarIdentity?.surfaceStatus === "unresolved"
-                  ? "UNRESOLVED SURFACE · PHYSICALLY CONSTRAINED NEUTRAL VISUALIZATION"
-                  : solarIdentity?.surfaceStatus === "modeled"
-                    ? "MEASURED PROPORTIONS · UNRESOLVED NEUTRAL SURFACE"
-                    : solarIdentity?.texture?.topography
-                      ? "DAWN GLOBAL MOSAIC + MEASURED TOPOGRAPHY · EXORA LIGHTING"
-                      : solarIdentity?.texture
-                        ? isMoon
-                          ? "NASA MISSION MOSAIC · MEASURED ROTATION + EXORA LIGHTING"
-                          : "SPACECRAFT GLOBAL MOSAIC · EXORA ATMOSPHERE + LIGHTING"
-                        : "KNOWN PLANET · PHYSICALLY TUNED ATMOSPHERIC VISUALIZATION"
-                : "PLAUSIBLE VISUALIZATION FROM OBSERVED DATA"}
+              : result.mode === "custom"
+                ? `SHAREABLE URL RECIPE · WORLDGEN V${WORLDGEN_VERSION}`
+                : solar
+                  ? solarIdentity?.surfaceStatus === "unresolved"
+                    ? "UNRESOLVED SURFACE · PHYSICALLY CONSTRAINED NEUTRAL VISUALIZATION"
+                    : solarIdentity?.surfaceStatus === "modeled"
+                      ? "MEASURED PROPORTIONS · UNRESOLVED NEUTRAL SURFACE"
+                      : solarIdentity?.texture?.topography
+                        ? "DAWN GLOBAL MOSAIC + MEASURED TOPOGRAPHY · EXORA LIGHTING"
+                        : solarIdentity?.texture
+                          ? isMoon
+                            ? "NASA MISSION MOSAIC · MEASURED ROTATION + EXORA LIGHTING"
+                            : "SPACECRAFT GLOBAL MOSAIC · EXORA ATMOSPHERE + LIGHTING"
+                          : "KNOWN PLANET · PHYSICALLY TUNED ATMOSPHERIC VISUALIZATION"
+                  : "PLAUSIBLE VISUALIZATION FROM OBSERVED DATA"}
           </p>
         </section>
 

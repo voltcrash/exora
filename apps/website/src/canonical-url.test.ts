@@ -40,7 +40,7 @@ test("a black-hole destination wins in the same order the app resolves it", () =
   );
 });
 
-test("a procedural world collapses to the root rather than inviting a crawler to index a seed", () => {
+test("a procedural recipe collapses to the root rather than creating generated canonicals", () => {
   expect(canonicalUrlForSearch("?custom=My%20World")).toBe(`${SITE_ORIGIN}/`);
   expect(canonicalUrlForSearch("?customStar=My%20Star")).toBe(`${SITE_ORIGIN}/`);
 });

@@ -1,6 +1,7 @@
 import {
   generateCustomStar,
   generateCustomWorld,
+  WORLDGEN_VERSION,
   type CustomPlanetParameters,
   type CustomStar,
   type CustomStarParameters,
@@ -456,8 +457,8 @@ export const WorldForge = ({
 
         <footer className="builder-footer">
           <p>
-            <span aria-hidden="true" /> Every parameter feeds the renderer. Reuse a seed to recreate
-            the same {mode === "planet" ? "world" : "star"}.
+            <span aria-hidden="true" /> The generated URL includes this versioned recipe (Worldgen v
+            {WORLDGEN_VERSION}), so it reloads and can be shared.
           </p>
           <button className="generate-world" type="submit">
             <span className="button-orbit" aria-hidden="true" />

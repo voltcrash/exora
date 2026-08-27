@@ -1,5 +1,5 @@
 import type { ExoplanetProfile, StarProfile } from "@exora/contracts";
-import type { CustomStar, CustomWorld } from "@exora/worldgen";
+import { WORLDGEN_VERSION, type CustomStar, type CustomWorld } from "@exora/worldgen";
 import { useEffect, useRef, useState } from "react";
 import type { StarLoadResult } from "../api-client.ts";
 import { reachStarSystem, reachSystem } from "../destination-cache.ts";
@@ -200,7 +200,7 @@ export const StarExperience = ({
           <p className="visual-note">
             <span aria-hidden="true" />{" "}
             {custom
-              ? "USER-DESIGNED PROCEDURAL STAR"
+              ? `SHAREABLE URL RECIPE · WORLDGEN V${WORLDGEN_VERSION}`
               : solar
                 ? "NASA/JPL MEASUREMENTS · EXORA STELLAR SURFACE"
                 : observation.effectiveTemperatureKelvin == null

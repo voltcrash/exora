@@ -299,6 +299,7 @@ export interface CustomPlanetParameters {
 }
 
 export interface CustomWorld {
+  parameters: CustomPlanetParameters;
   planet: ExoplanetProfile;
   recipe: WorldRecipe;
 }
@@ -314,6 +315,7 @@ export interface CustomStarParameters {
 }
 
 export interface CustomStar {
+  parameters: CustomStarParameters;
   star: StarProfile;
 }
 
@@ -1476,6 +1478,7 @@ export const generateCustomStar = (parameters: CustomStarParameters): CustomStar
   const spectralClass = temperatureToSpectralClass(temperatureKelvin);
   const name = parameters.name.trim() || "Untitled Star";
   return {
+    parameters,
     star: {
       id: `custom-star-${seed}`,
       name,
@@ -1601,6 +1604,7 @@ export const generateCustomWorld = (parameters: CustomPlanetParameters): CustomW
     const waterColor = mixColor([0.005, 0.06, 0.16], parameters.baseColor, 0.12);
     const highColor = mixColor(parameters.baseColor, [0.95, 0.92, 0.84], 0.52);
     return {
+      parameters,
       planet,
       recipe: {
         ...shared,
@@ -1660,6 +1664,7 @@ export const generateCustomWorld = (parameters: CustomPlanetParameters): CustomW
     const stormStrength = activity;
     const polarGlow = atmosphere * 0.75;
     return {
+      parameters,
       planet,
       recipe: {
         ...shared,
@@ -1696,6 +1701,7 @@ export const generateCustomWorld = (parameters: CustomPlanetParameters): CustomW
   const jetCount = 8 + Math.round(activity * 24);
   const stormStrength = activity;
   return {
+    parameters,
     planet,
     recipe: {
       ...shared,

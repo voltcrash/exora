@@ -1,5 +1,11 @@
 import type { ExoplanetProfile, StarProfile } from "@exora/contracts";
-import type { CustomStar, CustomWorld, WorldRecipe } from "@exora/worldgen";
+import {
+  generateCustomStar,
+  generateCustomWorld,
+  type CustomStar,
+  type CustomWorld,
+  type WorldRecipe,
+} from "@exora/worldgen";
 import { lazy, Suspense, useCallback, useEffect, useState, type CSSProperties } from "react";
 import {
   loadPlanetByName,
@@ -13,6 +19,12 @@ import { RecoveryScreen } from "./components/RecoveryScreen.tsx";
 import { featuredPlanet } from "./planet-profile.ts";
 import { hasRenderer } from "./planet-utils.tsx";
 import { canonicalUrlForSearch } from "./canonical-url.ts";
+import {
+  customPlanetUrl,
+  customStarUrl,
+  parseCustomPlanetUrl,
+  parseCustomStarUrl,
+} from "./custom-destination-url.ts";
 import type { BlackHoleProfile } from "./black-holes.ts";
 import { togglesClearView } from "./clear-view-shortcut.ts";
 import { togglesDiscoverShortcut } from "./discover-shortcut.ts";
@@ -65,7 +77,7 @@ type ActiveObject =
   | { blackHole: BlackHoleProfile; type: "black-hole" }
   | { comet: CometProfile; type: "comet" }
   | { mission: SolarMissionProfile; type: "mission" }
-  | { result: PlanetLoadResult; type: "planet" }
+  | { recipe?: WorldRecipe; result: PlanetLoadResult; type: "planet" }
   | { result: StarLoadResult; type: "star" }
   | { result: SystemLoadResult; type: "system" }
   | { region: SolarRegionProfile; type: "region" }
@@ -80,6 +92,7 @@ type ActiveObject =
         | "star"
         | "system";
       name: string;
+      detail?: string;
       type: "missing";
     };
 
@@ -147,17 +160,55 @@ const loadRequestedObject = async (): Promise<ActiveObject> => {
   }
 
   const name = parameters.get("planet");
-  if (!name) return defaultPlanetObject();
+  if (name) {
+    const localWorld = findSolarWorld(name);
+    if (localWorld) {
+      return { result: { cached: true, mode: "solar", planet: localWorld }, type: "planet" };
+    }
 
-  const localWorld = findSolarWorld(name);
-  if (localWorld) {
-    return { result: { cached: true, mode: "solar", planet: localWorld }, type: "planet" };
+    const requested = await loadPlanetByName(name);
+    return requested && hasRenderer(requested.planet)
+      ? { result: requested, type: "planet" }
+      : { kind: "planet", name, type: "missing" };
   }
 
-  const requested = await loadPlanetByName(name);
-  return requested && hasRenderer(requested.planet)
-    ? { result: requested, type: "planet" }
-    : { kind: "planet", name, type: "missing" };
+  const customPlanet = parameters.get("custom");
+  if (customPlanet !== null) {
+    const customParameters = parseCustomPlanetUrl(customPlanet);
+    if (!customParameters) {
+      return {
+        detail:
+          "This custom-world link contains an invalid or incompatible World Forge recipe. Return to the featured world and generate a new link.",
+        kind: "planet",
+        name: "custom recipe",
+        type: "missing",
+      };
+    }
+    const custom = generateCustomWorld(customParameters);
+    return {
+      recipe: custom.recipe,
+      result: { cached: false, mode: "custom", planet: custom.planet },
+      type: "planet",
+    };
+  }
+
+  const customStar = parameters.get("customStar");
+  if (customStar !== null) {
+    const customParameters = parseCustomStarUrl(customStar);
+    if (!customParameters) {
+      return {
+        detail:
+          "This custom-star link contains an invalid or incompatible World Forge recipe. Return to the featured world and generate a new link.",
+        kind: "star",
+        name: "custom recipe",
+        type: "missing",
+      };
+    }
+    const custom = generateCustomStar(customParameters);
+    return { result: { cached: false, mode: "custom", star: custom.star }, type: "star" };
+  }
+
+  return defaultPlanetObject();
 };
 
 export const App = () => {
@@ -182,11 +233,12 @@ export const App = () => {
       parameters.has("region") ||
       parameters.has("planet") ||
       parameters.has("star") ||
-      parameters.has("system")
+      parameters.has("system") ||
+      parameters.has("custom") ||
+      parameters.has("customStar")
       ? null
       : defaultPlanetObject();
   });
-  const [customRecipe, setCustomRecipe] = useState<WorldRecipe | null>(null);
   const [systemHostName, setSystemHostName] = useState<string | null>(null);
 
   // Whether the interface has been put away, leaving the world on its own. Held here rather than
@@ -220,7 +272,6 @@ export const App = () => {
     (sceneHostStatus === "initializing" || sceneHostStatus === "ready");
 
   const loadFromLocation = useCallback(() => {
-    setCustomRecipe(null);
     setSystemHostName(null);
     void loadRequestedObject().then(setActiveObject);
   }, []);
@@ -320,7 +371,6 @@ export const App = () => {
   const selectPlanet = useCallback((planet: ExoplanetProfile, cached: boolean): void => {
     window.history.pushState({}, "", `?planet=${encodeURIComponent(planet.name)}`);
     setDiscoverOpen(false);
-    setCustomRecipe(null);
     setActiveObject({
       result: { cached, mode: planet.solarSystem ? "solar" : "live", planet },
       type: "planet",
@@ -330,7 +380,6 @@ export const App = () => {
   const selectStar = useCallback((star: StarProfile, cached: boolean): void => {
     window.history.pushState({}, "", `?star=${encodeURIComponent(star.name)}`);
     setDiscoverOpen(false);
-    setCustomRecipe(null);
     setSystemHostName(null);
     setActiveObject({
       result: { cached, mode: star.solarSystem ? "solar" : "live", star },
@@ -341,7 +390,6 @@ export const App = () => {
   const selectAsteroid = useCallback((asteroid: AsteroidProfile): void => {
     window.history.pushState({}, "", `?asteroid=${encodeURIComponent(asteroid.name)}`);
     setDiscoverOpen(false);
-    setCustomRecipe(null);
     setSystemHostName(null);
     setActiveObject({ asteroid, type: "asteroid" });
   }, []);
@@ -349,7 +397,6 @@ export const App = () => {
   const selectBlackHole = useCallback((blackHole: BlackHoleProfile): void => {
     window.history.pushState({}, "", `?blackHole=${encodeURIComponent(blackHole.name)}`);
     setDiscoverOpen(false);
-    setCustomRecipe(null);
     setSystemHostName(null);
     setActiveObject({ blackHole, type: "black-hole" });
   }, []);
@@ -357,7 +404,6 @@ export const App = () => {
   const selectComet = useCallback((comet: CometProfile): void => {
     window.history.pushState({}, "", `?comet=${encodeURIComponent(comet.name)}`);
     setDiscoverOpen(false);
-    setCustomRecipe(null);
     setSystemHostName(null);
     setActiveObject({ comet, type: "comet" });
   }, []);
@@ -365,7 +411,6 @@ export const App = () => {
   const selectRegion = useCallback((region: SolarRegionProfile): void => {
     window.history.pushState({}, "", `?region=${encodeURIComponent(region.name)}`);
     setDiscoverOpen(false);
-    setCustomRecipe(null);
     setSystemHostName(null);
     setActiveObject({ region, type: "region" });
   }, []);
@@ -373,7 +418,6 @@ export const App = () => {
   const selectMission = useCallback((mission: SolarMissionProfile): void => {
     window.history.pushState({}, "", `?mission=${encodeURIComponent(mission.name)}`);
     setDiscoverOpen(false);
-    setCustomRecipe(null);
     setSystemHostName(null);
     setActiveObject({ mission, type: "mission" });
   }, []);
@@ -401,7 +445,6 @@ export const App = () => {
     const system = await reachSystem(hostStar);
     if (!system) return false;
     window.history.pushState({}, "", `?system=${encodeURIComponent(hostStar)}`);
-    setCustomRecipe(null);
     setSystemHostName(hostStar);
     setActiveObject({ result: system, type: "system" });
     return true;
@@ -411,26 +454,24 @@ export const App = () => {
     const result = await reachStar(hostStar);
     if (!result) return false;
     window.history.pushState({}, "", `?star=${encodeURIComponent(result.star.name)}`);
-    setCustomRecipe(null);
     setSystemHostName(hostStar);
     setActiveObject({ result, type: "star" });
     return true;
   }, []);
 
-  const generatePlanet = useCallback(({ planet, recipe }: CustomWorld): void => {
-    window.history.pushState({}, "", `?custom=${encodeURIComponent(planet.name)}`);
+  const generatePlanet = useCallback(({ parameters, planet, recipe }: CustomWorld): void => {
+    window.history.pushState({}, "", customPlanetUrl(parameters));
     setDiscoverOpen(false);
-    setCustomRecipe(recipe);
     setActiveObject({
+      recipe,
       result: { cached: false, mode: "custom", planet },
       type: "planet",
     });
   }, []);
 
-  const generateStar = useCallback(({ star }: CustomStar): void => {
-    window.history.pushState({}, "", `?customStar=${encodeURIComponent(star.name)}`);
+  const generateStar = useCallback(({ parameters, star }: CustomStar): void => {
+    window.history.pushState({}, "", customStarUrl(parameters));
     setDiscoverOpen(false);
-    setCustomRecipe(null);
     setActiveObject({
       result: { cached: false, mode: "custom", star },
       type: "star",
@@ -439,7 +480,6 @@ export const App = () => {
 
   const returnHome = useCallback((): void => {
     window.history.replaceState({}, "", "/");
-    setCustomRecipe(null);
     setSystemHostName(null);
     setActiveObject(defaultPlanetObject());
   }, []);
@@ -528,7 +568,10 @@ export const App = () => {
       ) : activeObject.type === "missing" ? (
         <RecoveryScreen
           action="RETURN TO FEATURED WORLD"
-          detail={`The ${activeObject.kind} “${activeObject.name}” could not be resolved from its archive or is not yet supported by Exora.`}
+          detail={
+            activeObject.detail ??
+            `The ${activeObject.kind} “${activeObject.name}” could not be resolved from its archive or is not yet supported by Exora.`
+          }
           heading="DESTINATION UNAVAILABLE"
           onRetry={returnHome}
         />
@@ -612,7 +655,7 @@ export const App = () => {
           onSelectPlanet={selectPlanet}
           onSelectStar={selectStar}
           onSelectSystem={selectSystem}
-          recipeOverride={customRecipe}
+          recipeOverride={activeObject.recipe ?? null}
           travelPhase={travelPhase}
         />
       ) : activeObject.type === "system" ? (

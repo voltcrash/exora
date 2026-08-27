@@ -474,10 +474,22 @@ let container: HTMLElement | null = null;
  */
 const mountApp = (search = ""): void => {
   window.history.replaceState({}, "", `/${search}`);
+  renderApp();
+};
+
+const renderApp = (): void => {
   container = document.createElement("div");
   document.body.append(container);
   root = createRoot(container);
   root.render(<App />);
+};
+
+const remountAppAtCurrentUrl = (): void => {
+  root?.unmount();
+  container?.remove();
+  root = null;
+  container = null;
+  renderApp();
 };
 
 const openDiscoverSection = async (
@@ -1013,11 +1025,71 @@ test("the World Forge opens and builds a world the page then shows", async () =>
   await expect
     .element(page.getByRole("heading", { name: "Make the next discovery." }))
     .toBeVisible();
+  await expect
+    .element(page.getByText(/generated URL includes this versioned recipe/i))
+    .toBeVisible();
 
   await userEvent.click(page.getByRole("button", { name: /GENERATE/i }).first());
 
   await expect.element(page.getByText("GENERATED WORLD")).toBeVisible();
   expect(window.location.search).toContain("custom=");
+});
+
+test("a generated world survives a reload and its URL opens as a deep link", async () => {
+  stubArchive();
+  mountApp();
+
+  await openDiscoverSection("World Forge");
+  await userEvent.fill(page.getByLabelText("WORLD NAME"), "Reloadia");
+  await userEvent.click(page.getByRole("button", { name: /GENERATE PLANET/i }));
+  await expect.element(page.getByRole("heading", { level: 1 })).toHaveTextContent("Reloadia");
+  const sharedSearch = window.location.search;
+  expect(sharedSearch).toMatch(/^\?custom=[A-Za-z0-9_-]+$/);
+
+  remountAppAtCurrentUrl();
+
+  await expect.element(page.getByRole("heading", { level: 1 })).toHaveTextContent("Reloadia");
+  expect(window.location.search).toBe(sharedSearch);
+  await expect.element(page.getByText("GENERATED WORLD")).toBeVisible();
+});
+
+test("an invalid custom recipe fails safely with a clear recovery path", async () => {
+  stubArchive();
+  mountApp("?custom=not-a-valid-recipe");
+
+  await expect
+    .element(page.getByRole("heading", { name: "DESTINATION UNAVAILABLE" }))
+    .toBeVisible();
+  await expect.element(page.getByText(/invalid or incompatible World Forge recipe/i)).toBeVisible();
+  await expect
+    .element(page.getByRole("button", { name: "RETURN TO FEATURED WORLD" }))
+    .toBeVisible();
+});
+
+test("back and forward restore generated planets and stars", async () => {
+  stubArchive();
+  mountApp();
+
+  await openDiscoverSection("World Forge");
+  await userEvent.fill(page.getByLabelText("WORLD NAME"), "History World");
+  await userEvent.click(page.getByRole("button", { name: /GENERATE PLANET/i }));
+  await expect.element(page.getByRole("heading", { level: 1 })).toHaveTextContent("History World");
+  const planetSearch = window.location.search;
+
+  await openDiscoverSection("World Forge");
+  await userEvent.click(page.getByRole("tab", { name: /IGNITE A STAR/i }));
+  await userEvent.fill(page.getByLabelText("STAR NAME"), "History Star");
+  await userEvent.click(page.getByRole("button", { name: /GENERATE STAR/i }));
+  await expect.element(page.getByRole("heading", { level: 1 })).toHaveTextContent("History Star");
+  const starSearch = window.location.search;
+
+  window.history.back();
+  await expect.element(page.getByRole("heading", { level: 1 })).toHaveTextContent("History World");
+  expect(window.location.search).toBe(planetSearch);
+
+  window.history.forward();
+  await expect.element(page.getByRole("heading", { level: 1 })).toHaveTextContent("History Star");
+  expect(window.location.search).toBe(starSearch);
 });
 
 test("Backspace toggles Discover open and closed", async () => {
