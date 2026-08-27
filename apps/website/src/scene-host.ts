@@ -46,11 +46,7 @@ import {
   type RenderQualityProfile,
   type RenderQualityTier,
 } from "./render-quality.ts";
-import {
-  transitionRendererStatus,
-  type RendererEvent,
-  type RendererStatus,
-} from "./renderer-recovery.ts";
+import type { RendererStatus } from "./renderer-recovery.ts";
 import {
   arrivalRadius,
   departureRadius,
@@ -71,6 +67,7 @@ import { advanceXrButtonPressGate, xrControllerAction } from "./xr-controller-in
 import { createSceneMountSlot } from "./scene-mount.ts";
 import { createSceneHostRegistry } from "./scene-host-registry.ts";
 import { createPersistentScene, resetPersistentScene } from "./scene-lifecycle.ts";
+import { createRenderLifecycle } from "./scene-render-lifecycle.ts";
 import {
   chooseImmersiveDestination,
   getVariantLaunchUrl,
@@ -378,27 +375,6 @@ const createSceneHost = (canvas: HTMLCanvasElement): SceneHost => {
   });
   void refreshImmersiveSupport();
 
-  let rendererStatus: RendererStatus = "ready";
-  const rendererStatusListeners = new Set<(status: RendererStatus) => void>();
-  const dispatchRendererEvent = (event: RendererEvent): void => {
-    const next = transitionRendererStatus(rendererStatus, event);
-    if (next === rendererStatus) return;
-    rendererStatus = next;
-    for (const listener of rendererStatusListeners) listener(next);
-  };
-
-  // Babylon owns the low-level resource rebuild because context-loss handling is enabled on the
-  // engine. Exora owns the user-visible lifecycle: pause behind a recovery screen, then only
-  // declare success after the restored context has rendered a complete frame.
-  engine.onContextLostObservable.add(() => {
-    if (!disposed) dispatchRendererEvent("context-lost");
-  });
-  engine.onContextRestoredObservable.add(() => {
-    if (disposed) return;
-    dispatchRendererEvent("context-restored");
-    engine.resize();
-  });
-
   /**
    * Trades peripheral sharpness for frame rate while the headset is on.
    *
@@ -465,60 +441,12 @@ const createSceneHost = (canvas: HTMLCanvasElement): SceneHost => {
     }
   });
 
-  let looping = false;
-  /** How many overlays are currently claiming the screen. Zero means the loop should be running. */
-  let suspensions = 0;
-
-  const renderFrame = (): void => {
-    try {
-      scene.render();
-      dispatchRendererEvent("frame-rendered");
-    } catch (error) {
-      console.error("[renderer] frame failed", error);
-      dispatchRendererEvent("render-failed");
-      engine.stopRenderLoop();
-      looping = false;
-    }
-  };
-
-  const startRenderLoop = (): void => {
-    if (looping || disposed) return;
-    looping = true;
-    // Babylon's frame-time average is a rolling window that knows nothing about the pause, so
-    // without this the first frame back reports the whole suspension as one enormous frame and
-    // the heads-up display spends a second claiming single-digit FPS.
-    engine.performanceMonitor.reset();
-    engine.runRenderLoop(renderFrame);
-  };
-
-  const stopRenderLoop = (): void => {
-    if (!looping) return;
-    looping = false;
-    engine.stopRenderLoop(renderFrame);
-  };
-
-  const suspendRendering = (): (() => void) => {
-    suspensions += 1;
-    if (suspensions === 1 && !isInXr) stopRenderLoop();
-
-    let released = false;
-    return () => {
-      if (released) return;
-      released = true;
-      suspensions -= 1;
-      if (suspensions === 0) startRenderLoop();
-    };
-  };
-
-  startRenderLoop();
-
-  const resize = (): void => {
-    engine.resize();
-    // A resized canvas gets a fresh, empty drawing buffer. While the loop is parked nothing
-    // would ever fill it, so the scrim would be blurring a blank rectangle: draw the one frame.
-    if (!looping && !disposed) renderFrame();
-  };
-  window.addEventListener("resize", resize);
+  const renderLifecycle = createRenderLifecycle({
+    engine,
+    isInXr: () => isInXr,
+    resizeTarget: window,
+    scene,
+  });
 
   /** Undoes the scene-level settings a world is allowed to change, before the next one lands. */
   const resetSceneDefaults = (): void => resetPersistentScene(scene, camera);
@@ -765,7 +693,7 @@ const createSceneHost = (canvas: HTMLCanvasElement): SceneHost => {
       departure = null;
       travelOrigin = null;
       setTravelPhase("idle");
-      dispatchRendererEvent("render-failed");
+      renderLifecycle.fail();
       throw error;
     }
     if (!world) return null;
@@ -778,7 +706,7 @@ const createSceneHost = (canvas: HTMLCanvasElement): SceneHost => {
     // catalog closes and the world mounts in the same commit, and nothing says which lands
     // first. One frame here means the scrim is never left blurring the world the visitor just
     // left.
-    if (!looping) renderFrame();
+    if (!renderLifecycle.isRunning) renderLifecycle.renderFrame();
     // Building a world stalls the frame loop, and the rolling average knows nothing about why:
     // left alone it reports the stall as a run of enormous frames for seconds afterwards, which
     // shows up as a heads-up display insisting on single digits and — worse — as the quality
@@ -930,7 +858,7 @@ const createSceneHost = (canvas: HTMLCanvasElement): SceneHost => {
           isInXr = true;
           // Inside a session the loop is the headset's frame callback, and a wearer cannot see
           // the flat dialog that parked it. Whatever suspensions are outstanding, run.
-          startRenderLoop();
+          renderLifecycle.start();
           sessionFoveation = profile.xrFixedFoveation;
           if (createdXr.baseExperience.sessionManager.isFixedFoveationSupported) {
             createdXr.baseExperience.sessionManager.fixedFoveation = sessionFoveation;
@@ -943,7 +871,7 @@ const createSceneHost = (canvas: HTMLCanvasElement): SceneHost => {
         if (state === runtime.WebXRState.NOT_IN_XR) {
           const endedMode = activeImmersiveMode;
           isInXr = false;
-          if (suspensions > 0) stopRenderLoop();
+          if (renderLifecycle.suspensionCount > 0) renderLifecycle.stop();
           rigAwaitingWorld = false;
           veilTarget = 0;
           veilAlpha = 0;
@@ -1005,18 +933,14 @@ const createSceneHost = (canvas: HTMLCanvasElement): SceneHost => {
     setDiscoverVisibility: (open) => {
       setDiscoverOpen(open);
     },
-    suspendRendering,
+    suspendRendering: renderLifecycle.suspend,
     xrCamera: () => xr?.baseExperience.camera ?? null,
     onXrStatus: (listener) => {
       statusListeners.add(listener);
       listener(xrStatus);
       return () => statusListeners.delete(listener);
     },
-    onRendererStatus: (listener) => {
-      rendererStatusListeners.add(listener);
-      listener(rendererStatus);
-      return () => rendererStatusListeners.delete(listener);
-    },
+    onRendererStatus: renderLifecycle.onStatus,
     onTravelPhase: (listener) => {
       travelListeners.add(listener);
       listener(travelPhase);
@@ -1100,19 +1024,16 @@ const createSceneHost = (canvas: HTMLCanvasElement): SceneHost => {
       // `recreateSceneHost` builds its replacement while React still holds the old subscriptions
       // until its effects re-run — so anything still reachable from here is a listener that has
       // already stopped being told the truth.
-      rendererStatusListeners.clear();
       statusListeners.clear();
       travelListeners.clear();
       endGlide(null, false);
       stopWatchingVariantLaunch();
-      window.removeEventListener("resize", resize);
+      renderLifecycle.dispose();
       const worldDisposed = worldMount.dispose();
       arPresentation.dispose();
       discoverListeners.clear();
       xr?.dispose();
       xr = null;
-      looping = false;
-      engine.stopRenderLoop();
       // An OBJ/GLB import cannot be cancelled once Babylon has handed it to a loader. Keep the
       // shared scene alive until that build leaves its serialized scope; disposing it underneath
       // the loader turns a routine React unmount into a late `clearColor`/mesh write on null
