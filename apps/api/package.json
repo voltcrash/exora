@@ -4,7 +4,7 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "build": "vp pack",
+    "build": "vp pack && node scripts/check-deployment-bundle.ts",
     "db:migrate": "node --env-file-if-exists=../../.env --use-system-ca src/migrate.ts",
     "db:sync": "node --env-file-if-exists=../../.env --use-system-ca src/sync-planets.ts",
     "test": "vp test"
