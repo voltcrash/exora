@@ -68,24 +68,12 @@ import { createSceneMountSlot } from "./scene-mount.ts";
 import { createSceneHostRegistry } from "./scene-host-registry.ts";
 import { createPersistentScene, resetPersistentScene } from "./scene-lifecycle.ts";
 import { createRenderLifecycle } from "./scene-render-lifecycle.ts";
-import {
-  chooseImmersiveDestination,
-  getVariantLaunchUrl,
-  onVariantLaunchReady,
-  type ImmersiveDestination,
-  type ImmersiveMode,
-} from "./variant-launch.ts";
+import { createXrIntegration, type XrStatus } from "./scene-xr-integration.ts";
+import { getVariantLaunchUrl, onVariantLaunchReady, type ImmersiveMode } from "./variant-launch.ts";
 import { VIRTUAL_BACKGROUND_LAYER_MASK } from "./world-presentation.ts";
 import type * as XrRuntime from "./xr-runtime.ts";
 
-export type XrStatus =
-  | "checking"
-  | "entering"
-  | "in-xr"
-  | "ready-ar"
-  | "ready-ar-launch"
-  | "ready-vr"
-  | "unavailable";
+export type { XrStatus } from "./scene-xr-integration.ts";
 
 /** Locomotion speed inside a session, shared by every destination so travel never changes feel. */
 const XR_MOVE_SPEED = 2.2;
@@ -312,13 +300,6 @@ const createSceneHost = (canvas: HTMLCanvasElement): SceneHost => {
     });
   };
 
-  let isArSupported = false;
-  let isVrSupported = false;
-  let immersiveDestination: ImmersiveDestination = chooseImmersiveDestination({
-    ar: false,
-    launchUrl: getVariantLaunchUrl(),
-    vr: false,
-  });
   let activeImmersiveMode: ImmersiveMode | null = null;
   let xrCameraLayerMask = 0x0fff_ffff;
   let disposed = false;
@@ -340,40 +321,11 @@ const createSceneHost = (canvas: HTMLCanvasElement): SceneHost => {
   };
   let qualitySampleSeconds = 0;
 
-  let xrStatus: XrStatus = "checking";
-  const statusListeners = new Set<(status: XrStatus) => void>();
-  const setXrStatus = (next: XrStatus): void => {
-    xrStatus = next;
-    for (const listener of statusListeners) listener(next);
-  };
-
-  const readyXrStatus = (): XrStatus => {
-    if (!immersiveDestination) return "unavailable";
-    if (immersiveDestination.mode === "vr") return "ready-vr";
-    return immersiveDestination.launchUrl ? "ready-ar-launch" : "ready-ar";
-  };
-
-  const refreshImmersiveSupport = async (): Promise<void> => {
-    const xrSystem = navigator.xr;
-    [isArSupported, isVrSupported] = xrSystem
-      ? await Promise.all([
-          xrSystem.isSessionSupported("immersive-ar").catch(() => false),
-          xrSystem.isSessionSupported("immersive-vr").catch(() => false),
-        ])
-      : [false, false];
-    if (disposed) return;
-    immersiveDestination = chooseImmersiveDestination({
-      ar: isArSupported,
-      launchUrl: getVariantLaunchUrl(),
-      vr: isVrSupported,
-    });
-    if (!isInXr && xrStatus !== "entering") setXrStatus(readyXrStatus());
-  };
-
-  const stopWatchingVariantLaunch = onVariantLaunchReady(() => {
-    void refreshImmersiveSupport();
+  const xrIntegration = createXrIntegration({
+    getLaunchUrl: getVariantLaunchUrl,
+    onLaunchReady: onVariantLaunchReady,
+    xrSystem: () => navigator.xr,
   });
-  void refreshImmersiveSupport();
 
   /**
    * Trades peripheral sharpness for frame rate while the headset is on.
@@ -776,7 +728,7 @@ const createSceneHost = (canvas: HTMLCanvasElement): SceneHost => {
             }
             return;
           }
-          if (!isVrSupported) return;
+          if (!xrIntegration.isVrSupported()) return;
           activeImmersiveMode = "vr";
           await createdXr.baseExperience.enterXRAsync(
             "immersive-vr",
@@ -785,7 +737,7 @@ const createSceneHost = (canvas: HTMLCanvasElement): SceneHost => {
           );
         } catch (error) {
           activeImmersiveMode = null;
-          setXrStatus(readyXrStatus());
+          xrIntegration.markReady();
           console.error("[xr] controller VR toggle failed", error);
         } finally {
           changingVr = false;
@@ -853,7 +805,7 @@ const createSceneHost = (canvas: HTMLCanvasElement): SceneHost => {
 
       createdXr.baseExperience.onStateChangedObservable.add((state) => {
         if (disposed) return;
-        if (state === runtime.WebXRState.ENTERING_XR) setXrStatus("entering");
+        if (state === runtime.WebXRState.ENTERING_XR) xrIntegration.markEntering();
         if (state === runtime.WebXRState.IN_XR) {
           isInXr = true;
           // Inside a session the loop is the headset's frame callback, and a wearer cannot see
@@ -866,7 +818,7 @@ const createSceneHost = (canvas: HTMLCanvasElement): SceneHost => {
           // Enter directly into the world. Discover remains a browser/desktop dialog and is not
           // projected into the immersive scene.
           setDiscoverOpen(false);
-          setXrStatus("in-xr");
+          xrIntegration.markInXr();
         }
         if (state === runtime.WebXRState.NOT_IN_XR) {
           const endedMode = activeImmersiveMode;
@@ -890,13 +842,13 @@ const createSceneHost = (canvas: HTMLCanvasElement): SceneHost => {
           }
           activeImmersiveMode = null;
           worldMount.current?.restoreDesktopView();
-          setXrStatus(readyXrStatus());
+          xrIntegration.markReady();
         }
       });
       return createdXr;
     } catch (error) {
       xrInitialization = null;
-      if (!disposed) setXrStatus(readyXrStatus());
+      if (!disposed) xrIntegration.markReady();
       console.error("[xr] failed to initialize", error);
       return null;
     }
@@ -919,9 +871,9 @@ const createSceneHost = (canvas: HTMLCanvasElement): SceneHost => {
     cancelTravel,
     prefersReducedMotion,
     getFps: () => engine.getFps(),
-    isArSupported: () => isArSupported,
+    isArSupported: xrIntegration.isArSupported,
     isInXr: () => isInXr,
-    isVrSupported: () => isVrSupported,
+    isVrSupported: xrIntegration.isVrSupported,
     mountWorld,
     onDiscoverVisibility: (listener) => {
       discoverListeners.add(listener);
@@ -935,11 +887,7 @@ const createSceneHost = (canvas: HTMLCanvasElement): SceneHost => {
     },
     suspendRendering: renderLifecycle.suspend,
     xrCamera: () => xr?.baseExperience.camera ?? null,
-    onXrStatus: (listener) => {
-      statusListeners.add(listener);
-      listener(xrStatus);
-      return () => statusListeners.delete(listener);
-    },
+    onXrStatus: xrIntegration.onStatus,
     onRendererStatus: renderLifecycle.onStatus,
     onTravelPhase: (listener) => {
       travelListeners.add(listener);
@@ -947,7 +895,7 @@ const createSceneHost = (canvas: HTMLCanvasElement): SceneHost => {
       return () => travelListeners.delete(listener);
     },
     enterImmersive: async () => {
-      const destination = immersiveDestination;
+      const destination = xrIntegration.destination;
       if (!destination) return;
       if (destination.launchUrl) {
         window.location.assign(destination.launchUrl);
@@ -1010,7 +958,7 @@ const createSceneHost = (canvas: HTMLCanvasElement): SceneHost => {
         features.disableFeature(runtime.WebXRFeatureName.HIT_TEST);
         features.disableFeature(runtime.WebXRFeatureName.DOM_OVERLAY);
         activeImmersiveMode = null;
-        setXrStatus(readyXrStatus());
+        xrIntegration.markReady();
         throw error;
       }
     },
@@ -1024,10 +972,9 @@ const createSceneHost = (canvas: HTMLCanvasElement): SceneHost => {
       // `recreateSceneHost` builds its replacement while React still holds the old subscriptions
       // until its effects re-run — so anything still reachable from here is a listener that has
       // already stopped being told the truth.
-      statusListeners.clear();
       travelListeners.clear();
       endGlide(null, false);
-      stopWatchingVariantLaunch();
+      xrIntegration.dispose();
       renderLifecycle.dispose();
       const worldDisposed = worldMount.dispose();
       arPresentation.dispose();
