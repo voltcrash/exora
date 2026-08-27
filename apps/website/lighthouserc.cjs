@@ -1,28 +1,58 @@
 const { chromium } = require("playwright");
 
+const profileName = process.env.LIGHTHOUSE_PROFILE === "mobile" ? "mobile" : "desktop";
+const profile =
+  profileName === "mobile"
+    ? {
+        settings: {
+          formFactor: "mobile",
+          screenEmulation: {
+            deviceScaleFactor: 2.625,
+            disabled: false,
+            height: 823,
+            mobile: true,
+            width: 393,
+          },
+          throttling: {
+            cpuSlowdownMultiplier: 4,
+            downloadThroughputKbps: 1_638.4,
+            requestLatencyMs: 150,
+            rttMs: 150,
+            throughputKbps: 1_638.4,
+            uploadThroughputKbps: 750,
+          },
+          throttlingMethod: "simulate",
+        },
+        thresholds: { fcp: 3_000, lcp: 5_000 },
+      }
+    : {
+        settings: { preset: "desktop", throttlingMethod: "provided" },
+        thresholds: { fcp: 3_000, lcp: 5_000 },
+      };
+
 module.exports = {
   ci: {
     collect: {
       chromePath: chromium.executablePath(),
-      numberOfRuns: 1,
+      numberOfRuns: 5,
       settings: {
-        chromeFlags: "--headless=new --no-sandbox",
+        chromeFlags: "--headless=new --no-sandbox --enable-unsafe-swiftshader",
         onlyCategories: ["performance", "accessibility", "best-practices", "seo"],
-        preset: "desktop",
-        throttlingMethod: "provided",
+        ...profile.settings,
       },
       staticDistDir: "dist",
       url: ["/"],
     },
     assert: {
+      aggregationMethod: "median",
       assertions: {
         "categories:accessibility": ["error", { minScore: 0.95 }],
         "categories:best-practices": ["error", { minScore: 0.9 }],
         "categories:performance": ["warn", { minScore: 0.85 }],
         "categories:seo": ["error", { minScore: 0.9 }],
         "cumulative-layout-shift": ["error", { maxNumericValue: 0.1 }],
-        "first-contentful-paint": ["error", { maxNumericValue: 3000 }],
-        "largest-contentful-paint": ["error", { maxNumericValue: 5000 }],
+        "first-contentful-paint": ["error", { maxNumericValue: profile.thresholds.fcp }],
+        "largest-contentful-paint": ["error", { maxNumericValue: profile.thresholds.lcp }],
         // Software-rendered CI does not consistently produce TBT for a live WebGL animation loop.
         // FCP, LCP, CLS, transfer weight, and the non-performance categories remain hard gates.
         "total-blocking-time": ["warn", { maxNumericValue: 4000 }],
@@ -30,6 +60,6 @@ module.exports = {
         "unused-javascript": "warn",
       },
     },
-    upload: { outputDir: ".lighthouseci", target: "filesystem" },
+    upload: { outputDir: `.lighthouseci/${profileName}`, target: "filesystem" },
   },
 };

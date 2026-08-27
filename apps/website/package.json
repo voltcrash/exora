@@ -9,7 +9,7 @@
     "quality:bundle": "node scripts/check-performance-budget.ts",
     "star-catalog": "node scripts/build-star-catalog.ts",
     "preview": "vp preview",
-    "quality:lighthouse": "lhci autorun",
+    "quality:lighthouse": "lhci autorun && LIGHTHOUSE_PROFILE=mobile lhci autorun",
     "test": "vp test --project unit",
     "test:browser": "vp test --project browser"
   },
