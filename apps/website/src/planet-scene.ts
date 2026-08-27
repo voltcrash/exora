@@ -2489,9 +2489,9 @@ export const createPlanetWorld = (
     onViewModeChange("transition");
   };
 
-  // A/X treats the planet as the direct route to terrain. Holding a grip instead keeps the
-  // pointer down, allowing Babylon's drag behavior to move the complete planet assembly without
-  // pulling its host star along with it.
+  // A/X is both the primary selection and the direct manipulation gesture in immersive VR:
+  // scene-host keeps the pointer down while the button is held, allowing Babylon's drag behavior
+  // to move the complete planet assembly. A press without movement still routes to terrain.
   planet.metadata = {
     ...planet.metadata,
     exoraXrPrimaryAction: () => {

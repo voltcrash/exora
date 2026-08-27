@@ -18,7 +18,9 @@
 import type { ExoplanetProfile, StarProfile } from "@exora/contracts";
 import type { CustomStar, CustomWorld } from "@exora/worldgen";
 import { ArcRotateCamera } from "@babylonjs/core/Cameras/arcRotateCamera.js";
+import { PickingInfo } from "@babylonjs/core/Collisions/pickingInfo.js";
 import "@babylonjs/core/Culling/ray.js";
+import { Ray } from "@babylonjs/core/Culling/ray.js";
 import { Engine } from "@babylonjs/core/Engines/engine.js";
 import { Color3, Color4 } from "@babylonjs/core/Maths/math.color.js";
 import { Vector3 } from "@babylonjs/core/Maths/math.vector.js";
@@ -28,6 +30,9 @@ import { MeshBuilder } from "@babylonjs/core/Meshes/meshBuilder.js";
 import "@babylonjs/core/Meshes/instancedMesh.js";
 import { Scene, ScenePerformancePriority } from "@babylonjs/core/scene.js";
 import type { WebXRCamera } from "@babylonjs/core/XR/webXRCamera.js";
+import type { WebXRAbstractMotionController } from "@babylonjs/core/XR/motionController/webXRAbstractMotionController.js";
+import type { WebXRControllerComponent } from "@babylonjs/core/XR/motionController/webXRControllerComponent.js";
+import type { WebXRInputSource } from "@babylonjs/core/XR/webXRInputSource.js";
 import type { WebXRControllerMovement } from "@babylonjs/core/XR/features/WebXRControllerMovement.pure.js";
 import type { WebXRDefaultExperience } from "@babylonjs/core/XR/webXRDefaultExperience.js";
 import { createArPresentation } from "./ar-presentation.ts";
@@ -361,6 +366,20 @@ const createSceneHost = (canvas: HTMLCanvasElement): SceneHost => {
   let xrInitialization: Promise<WebXRDefaultExperience | null> | null = null;
   let xrDiscoverSurface: XrDiscoverSurface | null = null;
   let xrMovement: WebXRControllerMovement | null = null;
+  interface XrDragState {
+    component: WebXRControllerComponent;
+    controller: WebXRInputSource;
+    moved: boolean;
+    pointerId: number;
+    primaryAction?: () => void;
+    startDirection: Vector3;
+    startOrigin: Vector3;
+  }
+  const xrDragStates = new Map<WebXRInputSource, XrDragState>();
+  const boundXrDragControllers = new WeakSet<WebXRInputSource>();
+  const boundXrDragMotionControllers = new WeakSet<WebXRAbstractMotionController>();
+  let nextXrDragPointerId = 20_000;
+  let xrDragObserver: ReturnType<typeof scene.onBeforeRenderObservable.add> | null = null;
   let discoverElement: HTMLDialogElement | null = null;
   let currentWorld: MountedWorld | null = null;
   let currentScope: WorldScope | null = null;
@@ -457,6 +476,62 @@ const createSceneHost = (canvas: HTMLCanvasElement): SceneHost => {
     sessionFoveation = next;
     sessionManager.fixedFoveation = next;
   };
+
+  const xrPointerEvent = (pointerId: number): PointerEventInit => ({
+    pointerId,
+    pointerType: "xr",
+  });
+  const xrDragRay = new Ray(Vector3.Zero(), Vector3.Forward(), 100);
+  const finishXrDrag = (controller: WebXRInputSource, activate = true): void => {
+    const state = xrDragStates.get(controller);
+    if (!state) return;
+    controller.getWorldPointerRayToRef(xrDragRay);
+    const pick = scene.pickWithRay(xrDragRay);
+    scene.simulatePointerUp(pick ?? new PickingInfo(), xrPointerEvent(state.pointerId));
+    xrDragStates.delete(controller);
+    if (activate && !state.moved) state.primaryAction?.();
+  };
+  const beginXrDrag = (controller: WebXRInputSource, component: WebXRControllerComponent): void => {
+    if (!isInXr || activeImmersiveMode !== "vr" || discoverOpen || xrDragStates.has(controller))
+      return;
+    controller.getWorldPointerRayToRef(xrDragRay);
+    const pick = scene.pickWithRay(xrDragRay);
+    if (!pick?.hit) return;
+    const pointerId = nextXrDragPointerId++;
+    const metadata = pick.pickedMesh?.metadata as
+      | { exoraXrPrimaryAction?: () => void }
+      | null
+      | undefined;
+    const state: XrDragState = {
+      component,
+      controller,
+      moved: false,
+      pointerId,
+      ...(metadata?.exoraXrPrimaryAction ? { primaryAction: metadata.exoraXrPrimaryAction } : {}),
+      startDirection: xrDragRay.direction.clone(),
+      startOrigin: xrDragRay.origin.clone(),
+    };
+    xrDragStates.set(controller, state);
+    scene.simulatePointerDown(pick, xrPointerEvent(pointerId));
+  };
+  const updateXrDrags = (): void => {
+    for (const state of xrDragStates.values()) {
+      if (!state.component.pressed || !isInXr || activeImmersiveMode !== "vr" || discoverOpen) {
+        finishXrDrag(state.controller, false);
+        continue;
+      }
+      state.controller.getWorldPointerRayToRef(xrDragRay);
+      if (
+        Vector3.DistanceSquared(state.startOrigin, xrDragRay.origin) > 0.0001 ||
+        Vector3.Dot(state.startDirection, xrDragRay.direction) < 0.9994
+      ) {
+        state.moved = true;
+      }
+      const pick = scene.pickWithRay(xrDragRay);
+      if (pick?.hit) scene.simulatePointerMove(pick, xrPointerEvent(state.pointerId));
+    }
+  };
+  xrDragObserver = scene.onBeforeRenderObservable.add(updateXrDrags);
 
   scene.onBeforeRenderObservable.add(() => {
     const deltaSeconds = Math.min(engine.getDeltaTime() / 1_000, 0.05);
@@ -881,8 +956,8 @@ const createSceneHost = (canvas: HTMLCanvasElement): SceneHost => {
         handSupportOptions: { handMeshes: { disableDefaultMeshes: true } },
         inputOptions: { doNotLoadControllerMeshes: true },
         optionalFeatures: ["hand-tracking"],
-        // Quest triggers are reserved for opening Discover. Grips own Babylon's complete pointer
-        // down/move/up sequence, which preserves both selection and drag behavior on scene objects.
+        // Quest triggers open Discover. Squeeze remains Babylon's pointer-selection fallback;
+        // A/X gets its own pointer lifecycle below so a held press can drag scene objects.
         pointerSelectionOptions: {
           enablePointerSelectionOnAllControllers: true,
           overrideButtonId: "xr-standard-squeeze",
@@ -920,6 +995,35 @@ const createSceneHost = (canvas: HTMLCanvasElement): SceneHost => {
           xrInput: createdXr.input,
         },
       ) as WebXRControllerMovement;
+      const bindXrDragMotionController = (
+        controller: WebXRInputSource,
+        motionController: WebXRAbstractMotionController,
+      ): void => {
+        if (boundXrDragMotionControllers.has(motionController)) return;
+        boundXrDragMotionControllers.add(motionController);
+        for (const id of ["a-button", "x-button"]) {
+          const component = motionController.getComponent(id);
+          if (!component) continue;
+          component.onButtonStateChangedObservable.add((changed) => {
+            if (changed.changes.pressed?.current === true) beginXrDrag(controller, component);
+            if (changed.changes.pressed?.current === false) finishXrDrag(controller);
+          });
+        }
+      };
+      const bindXrDragController = (controller: WebXRInputSource): void => {
+        if (boundXrDragControllers.has(controller)) return;
+        boundXrDragControllers.add(controller);
+        const motionController = controller.motionController;
+        if (motionController) bindXrDragMotionController(controller, motionController);
+        controller.onMotionControllerInitObservable.add((initializedMotionController) =>
+          bindXrDragMotionController(controller, initializedMotionController),
+        );
+      };
+      for (const controller of createdXr.input.controllers) bindXrDragController(controller);
+      createdXr.input.onControllerAddedObservable.add(bindXrDragController);
+      createdXr.input.onControllerRemovedObservable.add((controller) =>
+        finishXrDrag(controller, false),
+      );
       xrDiscoverSurface = runtime.createXrDiscoverSurface(
         scene,
         profile.anisotropicFiltering,
@@ -1151,6 +1255,10 @@ const createSceneHost = (canvas: HTMLCanvasElement): SceneHost => {
       xrDiscoverSurface?.dispose();
       xrDiscoverSurface = null;
       xrMovement = null;
+      for (const controller of xrDragStates.keys()) finishXrDrag(controller, false);
+      xrDragStates.clear();
+      if (xrDragObserver) scene.onBeforeRenderObservable.remove(xrDragObserver);
+      xrDragObserver = null;
       discoverElement = null;
       xr?.dispose();
       xr = null;

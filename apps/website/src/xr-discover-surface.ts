@@ -341,7 +341,9 @@ export const createXrDiscoverSurface = (
   const activateControllerTarget = (controller: WebXRInputSource): void => {
     const ray = new Ray(Vector3.Zero(), Vector3.Forward(), 100);
     controller.getWorldPointerRayToRef(ray);
-    const pick = scene.pickWithRay(ray);
+    // Discover is a modal surface. Prefer it over any world mesh behind the panel so A/X always
+    // reaches the visible catalog instead of silently activating (or missing) the subject below.
+    const pick = scene.pickWithRay(ray, (mesh) => mesh === screen);
     if (!pick?.hit) return;
 
     const panelHit = resolvePick(pick);
@@ -389,7 +391,7 @@ export const createXrDiscoverSurface = (
           } else if (action === "back") {
             if (visible) setVisible(false);
             else onBack();
-          } else if (action === "primary") {
+          } else if (action === "primary" && visible) {
             activateControllerTarget(controller);
           }
         });

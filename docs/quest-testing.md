@@ -12,7 +12,8 @@ from a plain LAN HTTP address.
    the previous frame at the edges of either eye.
 5. Verify VR opens directly onto the full world, then summon Discover with a controller menu
    button. Confirm a controller ray can point at the in-headset panel and that every entry on it
-   responds: browse, travel, recentre, and return to the world.
+   responds: browse, travel, recentre, and return to the world. In the world, hold A/X while
+   moving a controller to drag the pointed object; release without moving to select it.
 6. Walk the surface excursion with the thumbstick and confirm the wearer stays on the terrain.
 7. Exit and re-enter VR, then switch worlds and enter again.
 8. Open a system diorama on a host with several worlds — TRAPPIST-1, Kepler-90 and our own Sun
