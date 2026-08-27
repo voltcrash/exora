@@ -30,6 +30,7 @@ import "@babylonjs/core/Meshes/instancedMesh.js";
 import { Scene, ScenePerformancePriority } from "@babylonjs/core/scene.js";
 import type { WebXRCamera } from "@babylonjs/core/XR/webXRCamera.js";
 import type { WebXRAbstractMotionController } from "@babylonjs/core/XR/motionController/webXRAbstractMotionController.js";
+import type { WebXRControllerComponent } from "@babylonjs/core/XR/motionController/webXRControllerComponent.js";
 import type { WebXRInputSource } from "@babylonjs/core/XR/webXRInputSource.js";
 import type { WebXRDefaultExperience } from "@babylonjs/core/XR/webXRDefaultExperience.js";
 import { createArPresentation } from "./ar-presentation.ts";
@@ -66,7 +67,7 @@ import {
   type TravelPhase,
 } from "./travel-transition.ts";
 import type { XrConsoleHost } from "./xr-console.ts";
-import { xrControllerAction } from "./xr-controller-input.ts";
+import { advanceXrButtonPressGate, xrControllerAction } from "./xr-controller-input.ts";
 import {
   chooseImmersiveDestination,
   getVariantLaunchUrl,
@@ -361,6 +362,7 @@ const createSceneHost = (canvas: HTMLCanvasElement): SceneHost => {
   let xrInitialization: Promise<WebXRDefaultExperience | null> | null = null;
   const boundXrControllers = new WeakSet<WebXRInputSource>();
   const boundXrMotionControllers = new WeakSet<WebXRAbstractMotionController>();
+  const xrImmersiveButtonArmed = new WeakMap<WebXRControllerComponent, boolean>();
   let currentWorld: MountedWorld | null = null;
   let currentScope: WorldScope | null = null;
   let mountToken = 0;
@@ -948,17 +950,25 @@ const createSceneHost = (canvas: HTMLCanvasElement): SceneHost => {
         for (const id of motionController.getComponentIds()) {
           const component = motionController.getComponent(id);
           if (!component) continue;
+          const action = xrControllerAction(id, controller.inputSource.handedness);
+          if (action === "immersive") xrImmersiveButtonArmed.set(component, !component.pressed);
           component.onButtonStateChangedObservable.add((changed) => {
             const pressed = changed.changes.pressed?.current;
             if (id === "a-button" || id === "x-button") {
               if (pressed === true) activateXrPrimary(controller);
               return;
             }
+            if (action === "immersive" && pressed !== undefined) {
+              const gate = advanceXrButtonPressGate(
+                xrImmersiveButtonArmed.get(component) ?? false,
+                pressed,
+              );
+              xrImmersiveButtonArmed.set(component, gate.armed);
+              if (gate.activate) void toggleVr();
+              return;
+            }
             if (pressed !== true) return;
-            switch (xrControllerAction(id, controller.inputSource.handedness)) {
-              case "immersive":
-                void toggleVr();
-                break;
+            switch (action) {
               case "discover":
                 setDiscoverOpen(!discoverOpen);
                 break;

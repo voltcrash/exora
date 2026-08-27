@@ -6,7 +6,9 @@ from a plain LAN HTTP address.
 ## Test pass
 
 1. Open Exora and confirm the HUD reports `QUEST` beside the FPS counter.
-2. Enter immersive VR and verify the viewing deck starts at floor height.
+2. Enter immersive VR with the controller trigger and verify the viewing deck starts at floor
+   height without immediately returning to the flat page. Release the trigger before testing its
+   exit shortcut.
 3. Orbit around one gas giant, one rocky world, and one ice giant.
 4. Confirm the planet, atmosphere, and ice-giant rings render in both eyes, with no smearing of
    the previous frame at the edges of either eye.

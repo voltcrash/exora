@@ -1,5 +1,11 @@
 import { expect, test } from "vite-plus/test";
-import { xrControllerAction } from "./xr-controller-input.ts";
+import { advanceXrButtonPressGate, xrControllerAction } from "./xr-controller-input.ts";
+
+test("ignores a trigger inherited from VR entry until it is released", () => {
+  expect(advanceXrButtonPressGate(false, true)).toEqual({ activate: false, armed: false });
+  expect(advanceXrButtonPressGate(false, false)).toEqual({ activate: false, armed: true });
+  expect(advanceXrButtonPressGate(true, true)).toEqual({ activate: true, armed: false });
+});
 
 test("maps Quest face buttons, grips, triggers, and the left application menu control", () => {
   expect(xrControllerAction("a-button")).toBe("primary");
