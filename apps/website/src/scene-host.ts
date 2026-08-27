@@ -18,7 +18,6 @@
 import type { ExoplanetProfile, StarProfile } from "@exora/contracts";
 import type { CustomStar, CustomWorld } from "@exora/worldgen";
 import { ArcRotateCamera } from "@babylonjs/core/Cameras/arcRotateCamera.js";
-import { PickingInfo } from "@babylonjs/core/Collisions/pickingInfo.js";
 import "@babylonjs/core/Culling/ray.js";
 import { Ray } from "@babylonjs/core/Culling/ray.js";
 import { Engine } from "@babylonjs/core/Engines/engine.js";
@@ -148,6 +147,12 @@ export interface MountedWorld {
    * height to the rig; every later call happens mid-session, where the height is already there.
    */
   focusXrRig: (initial: boolean) => void;
+  /** Captures the focal point used while A/X orbits the immersive view. */
+  beginXrViewDrag?: () => void;
+  /** Orbits the immersive rig by the controller's accumulated angular motion. */
+  dragXrView?: (yawRadians: number, pitchRadians: number) => void;
+  /** Releases any focal point captured for an A/X view drag. */
+  endXrViewDrag?: () => void;
   /** Handles B/Y within a world's own nested view before browser history is asked to go back. */
   handleXrBack?: () => boolean;
   /** Restores the desktop camera so leaving the headset lands on the view the wearer left in. */
@@ -370,15 +375,15 @@ const createSceneHost = (canvas: HTMLCanvasElement): SceneHost => {
     component: WebXRControllerComponent;
     controller: WebXRInputSource;
     moved: boolean;
-    pointerId: number;
     primaryAction?: () => void;
+    previousDirection: Vector3;
+    previousOrigin: Vector3;
     startDirection: Vector3;
     startOrigin: Vector3;
   }
   const xrDragStates = new Map<WebXRInputSource, XrDragState>();
   const boundXrDragControllers = new WeakSet<WebXRInputSource>();
   const boundXrDragMotionControllers = new WeakSet<WebXRAbstractMotionController>();
-  let nextXrDragPointerId = 20_000;
   let xrDragObserver: ReturnType<typeof scene.onBeforeRenderObservable.add> | null = null;
   let discoverElement: HTMLDialogElement | null = null;
   let currentWorld: MountedWorld | null = null;
@@ -477,28 +482,27 @@ const createSceneHost = (canvas: HTMLCanvasElement): SceneHost => {
     sessionManager.fixedFoveation = next;
   };
 
-  const xrPointerEvent = (pointerId: number): PointerEventInit => ({
-    pointerId,
-    pointerType: "xr",
-  });
   const xrDragRay = new Ray(Vector3.Zero(), Vector3.Forward(), 100);
   const finishXrDrag = (controller: WebXRInputSource, activate = true): void => {
     const state = xrDragStates.get(controller);
     if (!state) return;
     controller.getWorldPointerRayToRef(xrDragRay);
-    const pick = scene.pickWithRay(xrDragRay);
-    scene.simulatePointerUp(pick ?? new PickingInfo(), xrPointerEvent(state.pointerId));
     xrDragStates.delete(controller);
+    currentWorld?.endXrViewDrag?.();
     if (activate && !state.moved) state.primaryAction?.();
   };
   const beginXrDrag = (controller: WebXRInputSource, component: WebXRControllerComponent): void => {
-    if (!isInXr || activeImmersiveMode !== "vr" || discoverOpen || xrDragStates.has(controller))
+    if (
+      !isInXr ||
+      activeImmersiveMode !== "vr" ||
+      discoverOpen ||
+      xrDragStates.has(controller) ||
+      xrDragStates.size > 0
+    )
       return;
     controller.getWorldPointerRayToRef(xrDragRay);
     const pick = scene.pickWithRay(xrDragRay);
-    if (!pick?.hit) return;
-    const pointerId = nextXrDragPointerId++;
-    const metadata = pick.pickedMesh?.metadata as
+    const metadata = pick?.pickedMesh?.metadata as
       | { exoraXrPrimaryAction?: () => void }
       | null
       | undefined;
@@ -506,13 +510,14 @@ const createSceneHost = (canvas: HTMLCanvasElement): SceneHost => {
       component,
       controller,
       moved: false,
-      pointerId,
       ...(metadata?.exoraXrPrimaryAction ? { primaryAction: metadata.exoraXrPrimaryAction } : {}),
+      previousDirection: xrDragRay.direction.clone(),
+      previousOrigin: xrDragRay.origin.clone(),
       startDirection: xrDragRay.direction.clone(),
       startOrigin: xrDragRay.origin.clone(),
     };
     xrDragStates.set(controller, state);
-    scene.simulatePointerDown(pick, xrPointerEvent(pointerId));
+    currentWorld?.beginXrViewDrag?.();
   };
   const updateXrDrags = (): void => {
     for (const state of xrDragStates.values()) {
@@ -521,14 +526,34 @@ const createSceneHost = (canvas: HTMLCanvasElement): SceneHost => {
         continue;
       }
       state.controller.getWorldPointerRayToRef(xrDragRay);
+      const originDelta = xrDragRay.origin.subtract(state.previousOrigin);
+      const previousYaw = Math.atan2(state.previousDirection.x, state.previousDirection.z);
+      const currentYaw = Math.atan2(xrDragRay.direction.x, xrDragRay.direction.z);
+      let yawDelta = currentYaw - previousYaw;
+      if (yawDelta > Math.PI) yawDelta -= Math.PI * 2;
+      if (yawDelta < -Math.PI) yawDelta += Math.PI * 2;
+      const pitchDelta =
+        Math.asin(Math.min(1, Math.max(-1, xrDragRay.direction.y))) -
+        Math.asin(Math.min(1, Math.max(-1, state.previousDirection.y)));
+      const viewForward = scene.activeCamera?.getForwardRay().direction ?? Vector3.Forward();
+      const viewRight = Vector3.Cross(Vector3.Up(), viewForward);
+      if (viewRight.lengthSquared() > 0.0001) viewRight.normalize();
+      else viewRight.set(1, 0, 0);
+      const viewUp = Vector3.Cross(viewForward, viewRight).normalize();
+      // Translating a held controller across the view should work as well as sweeping its ray.
+      // At arm's length, 1.6 radians/metre gives a deliberate hand motion roughly the same
+      // response as the corresponding angular sweep, without amplifying tracking jitter.
+      yawDelta += Vector3.Dot(originDelta, viewRight) * 1.6;
+      const combinedPitchDelta = pitchDelta + Vector3.Dot(originDelta, viewUp) * 1.6;
       if (
         Vector3.DistanceSquared(state.startOrigin, xrDragRay.origin) > 0.0001 ||
         Vector3.Dot(state.startDirection, xrDragRay.direction) < 0.9994
       ) {
         state.moved = true;
       }
-      const pick = scene.pickWithRay(xrDragRay);
-      if (pick?.hit) scene.simulatePointerMove(pick, xrPointerEvent(state.pointerId));
+      if (state.moved) currentWorld?.dragXrView?.(yawDelta, combinedPitchDelta);
+      state.previousDirection.copyFrom(xrDragRay.direction);
+      state.previousOrigin.copyFrom(xrDragRay.origin);
     }
   };
   xrDragObserver = scene.onBeforeRenderObservable.add(updateXrDrags);
@@ -957,7 +982,7 @@ const createSceneHost = (canvas: HTMLCanvasElement): SceneHost => {
         inputOptions: { doNotLoadControllerMeshes: true },
         optionalFeatures: ["hand-tracking"],
         // Quest triggers open Discover. Squeeze remains Babylon's pointer-selection fallback;
-        // A/X gets its own pointer lifecycle below so a held press can drag scene objects.
+        // A/X is handled below as a tap action or a held gesture that orbits the immersive view.
         pointerSelectionOptions: {
           enablePointerSelectionOnAllControllers: true,
           overrideButtonId: "xr-standard-squeeze",

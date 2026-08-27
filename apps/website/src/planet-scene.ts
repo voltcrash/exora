@@ -1,6 +1,5 @@
 import { ActionManager } from "@babylonjs/core/Actions/actionManager.js";
 import { ExecuteCodeAction } from "@babylonjs/core/Actions/directActions.js";
-import { PointerDragBehavior } from "@babylonjs/core/Behaviors/Meshes/pointerDragBehavior.js";
 import "@babylonjs/core/Culling/ray.js";
 import { Engine } from "@babylonjs/core/Engines/engine.js";
 import { DirectionalLight } from "@babylonjs/core/Lights/directionalLight.js";
@@ -2328,13 +2327,11 @@ export const createPlanetWorld = (
   });
   const {
     atmosphere,
-    atmosphereMesh,
     cloudLayer,
     cloudMesh,
     orbitalMeshes,
     orbitalRoot,
     planet,
-    planetRoot,
     ringMaterial,
     ringSystem,
     shader,
@@ -2489,31 +2486,16 @@ export const createPlanetWorld = (
     onViewModeChange("transition");
   };
 
-  // A/X is both the primary selection and the direct manipulation gesture in immersive VR:
-  // scene-host keeps the pointer down while the button is held, allowing Babylon's drag behavior
-  // to move the complete planet assembly. A press without movement still routes to terrain.
+  // A stationary A/X press still takes the direct route to terrain. A held, moving press is
+  // consumed by scene-host as a view-orbit gesture and does not manipulate this mesh.
   planet.metadata = {
     ...planet.metadata,
     exoraXrPrimaryAction: () => {
       if (host.isInXr() && viewState === "orbit") applyXrView(true, false);
     },
   };
-  const xrPlanetDrag = new PointerDragBehavior();
-  xrPlanetDrag.detachCameraControls = false;
-  xrPlanetDrag.dragDeltaRatio = 0.45;
-  xrPlanetDrag.moveAttached = false;
-  xrPlanetDrag.enabled = false;
-  xrPlanetDrag.onDragStartObservable.add(() => atmosphereMesh.unfreezeWorldMatrix());
-  xrPlanetDrag.onDragObservable.add(({ delta }) => planetRoot.position.addInPlace(delta));
-  xrPlanetDrag.onDragEndObservable.add(() => {
-    atmosphereMesh.computeWorldMatrix(true);
-    atmosphereMesh.freezeWorldMatrix();
-  });
-  planet.addBehavior(xrPlanetDrag);
-
   const renderObserver = scene.onBeforeRenderObservable.add(() => {
     const isInXr = host.isInXr();
-    xrPlanetDrag.enabled = isInXr && viewState === "orbit";
     // Two clocks, deliberately. Anything that integrates — walking, rotation, drifting cloud —
     // reads the clamped one, so that a single long frame cannot teleport it across the world.
     // Anything with a fixed duration reads the real one, because clamping *that* is what makes a
@@ -2698,6 +2680,45 @@ export const createPlanetWorld = (
     }
   };
 
+  let xrViewDragTarget: Vector3 | null = null;
+  const beginXrViewDrag = (): void => {
+    const rig = host.xrCamera();
+    if (!rig || viewState === "entering" || viewState === "leaving") return;
+    if (viewState === "orbit") {
+      xrViewDragTarget = PLANET_POSITION.clone();
+      return;
+    }
+    const forward = rig.getForwardRay().direction;
+    const horizontalForward = new Vector3(forward.x, 0, forward.z);
+    if (horizontalForward.lengthSquared() < 0.001) horizontalForward.set(0, 0, 1);
+    horizontalForward.normalize();
+    xrViewDragTarget = rig.position.add(horizontalForward.scale(18));
+    xrViewDragTarget.y = rig.position.y - 0.3;
+  };
+  const dragXrView = (yawRadians: number, pitchRadians: number): void => {
+    const rig = host.xrCamera();
+    const target = xrViewDragTarget;
+    if (!rig || !target) return;
+    const offset = rig.position.subtract(target);
+    const radius = offset.length();
+    if (radius < 0.001) return;
+    const azimuth = Math.atan2(offset.z, offset.x) - yawRadians;
+    const elevation = Math.asin(Math.min(1, Math.max(-1, offset.y / radius)));
+    const minimumElevation = viewState === "surface" ? 0 : -Math.PI * 0.38;
+    const maximumElevation = viewState === "surface" ? Math.PI / 3 : Math.PI * 0.38;
+    const nextElevation = Math.min(
+      maximumElevation,
+      Math.max(minimumElevation, elevation + pitchRadians),
+    );
+    const horizontalRadius = Math.cos(nextElevation) * radius;
+    rig.position.set(
+      target.x + Math.cos(azimuth) * horizontalRadius,
+      target.y + Math.sin(nextElevation) * radius,
+      target.z + Math.sin(azimuth) * horizontalRadius,
+    );
+    rig.setTarget(target);
+  };
+
   /** Restores the desktop camera so leaving the headset lands on the view the wearer left in. */
   const syncDesktopCamera = (surface: boolean): void => {
     camera.fov = surface ? SURFACE_FIELD_OF_VIEW : ORBIT_FIELD_OF_VIEW;
@@ -2782,6 +2803,7 @@ export const createPlanetWorld = (
   };
 
   return {
+    beginXrViewDrag,
     console: consoleContributions,
     /**
      * How far a jump may pull back from this world before it stops holding up.
@@ -2793,6 +2815,10 @@ export const createPlanetWorld = (
      */
     farthestView: () => (viewState === "surface" ? SURFACE_DEPARTURE_RADIUS : undefined),
     focusXrRig: (initial) => applyXrView(viewState === "surface", initial),
+    dragXrView,
+    endXrViewDrag: () => {
+      xrViewDragTarget = null;
+    },
     handleXrBack: () => {
       if (viewState !== "surface") return false;
       applyXrView(false, false);
@@ -2803,7 +2829,6 @@ export const createPlanetWorld = (
     // this build; what is left here is everything that lives outside the scene graph.
     dispose: () => {
       camera.fov = ORBIT_FIELD_OF_VIEW;
-      planet.removeBehavior(xrPlanetDrag);
       window.removeEventListener("keydown", onMovementKeyDown);
       window.removeEventListener("keyup", onMovementKeyUp);
       window.removeEventListener("blur", clearMovementKeys);
