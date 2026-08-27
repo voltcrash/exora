@@ -17,6 +17,7 @@ import {
 import { Hono, type Context } from "hono";
 import { cors } from "hono/cors";
 import { isAuthorizedCatalogRefresh, type CatalogRefreshDispatcher } from "./catalog-refresh.ts";
+import { DatabaseError } from "./errors.ts";
 import {
   HORIZONS_API_VERSION,
   HORIZONS_SOURCE,
@@ -39,6 +40,7 @@ import {
   type RepositoryResult,
 } from "./nasa-archive.ts";
 import { NasaSystemAliasRepository, type SystemAliasRepository } from "./nasa-system-aliases.ts";
+import { ApiObservability, type Dependency } from "./observability.ts";
 import { openApiDocument } from "./openapi.ts";
 import {
   clientKey,
@@ -70,6 +72,9 @@ interface CreateAppOptions {
   horizonsRepository?: HorizonsRepository;
   missionRateLimiter?: RateLimiter;
   missionTrajectoryRepository?: MissionTrajectoryRepository;
+  observability?: ApiObservability;
+  /** Identifies whether the planet repository crosses the NASA or PostgreSQL boundary. */
+  planetDataSource?: Extract<Dependency, "database" | "nasa">;
   /** Overridable so a test can exercise the limit without issuing a hundred requests. */
   rateLimiter?: RateLimiter;
   repository?: PlanetRepository;
@@ -83,6 +88,54 @@ interface CreateAppOptions {
 
 const apiError = (code: ApiErrorResponse["error"]["code"], message: string): ApiErrorResponse =>
   apiErrorResponseSchema.parse({ error: { code, message } });
+
+const renderApiError = (error: unknown, context: Context): Response => {
+  if (error instanceof NasaArchiveError) {
+    return context.json(
+      apiError("UPSTREAM_UNAVAILABLE", "NASA Exoplanet Archive is temporarily unavailable."),
+      502,
+    );
+  }
+
+  if (error instanceof SimbadArchiveError) {
+    return context.json(
+      apiError("UPSTREAM_UNAVAILABLE", "SIMBAD star archive is temporarily unavailable."),
+      502,
+    );
+  }
+
+  if (error instanceof HorizonsError) {
+    return context.json(
+      apiError(
+        "UPSTREAM_UNAVAILABLE",
+        "JPL Horizons is temporarily unavailable and no cached ephemeris covers this time.",
+      ),
+      502,
+    );
+  }
+
+  if (error instanceof SbdbError) {
+    return context.json(
+      apiError(
+        "UPSTREAM_UNAVAILABLE",
+        "JPL SBDB is temporarily unavailable and no cached small-body record covers this search.",
+      ),
+      502,
+    );
+  }
+
+  if (error instanceof DatabaseError) {
+    return context.json(
+      apiError("UPSTREAM_UNAVAILABLE", "The catalog database is temporarily unavailable."),
+      503,
+    );
+  }
+
+  return context.json(
+    apiError("UPSTREAM_UNAVAILABLE", "The API could not complete the request."),
+    500,
+  );
+};
 
 /** The longest a name either archive could plausibly carry; longer is a malformed request. */
 const MAX_NAME_LENGTH = 100;
@@ -187,6 +240,8 @@ export const createApp = ({
   horizonsRepository = new JplHorizonsRepository(),
   missionRateLimiter = createRateLimiter({ limit: 8, windowMs: 60_000 }),
   missionTrajectoryRepository = new JplMissionTrajectoryRepository(),
+  observability = new ApiObservability(),
+  planetDataSource = "nasa",
   rateLimiter = createRateLimiter(DEFAULT_RATE_LIMIT),
   repository = new NasaPlanetRepository(),
   sbdbRateLimiter = createRateLimiter({ limit: 20, windowMs: 60_000 }),
@@ -196,6 +251,21 @@ export const createApp = ({
   trustVercelProxy = false,
 }: CreateAppOptions = {}) => {
   const app = new Hono();
+  const handleError = (error: unknown, context: Context): Response => {
+    observability.recordFailure(context, error);
+    return renderApiError(error, context);
+  };
+
+  // This middleware is registered before every route so scheduled/internal requests and errors
+  // receive the same correlation header and completion record as the public API.
+  app.use("*", observability.middleware(handleError));
+
+  const dependency = <T>(
+    context: Context,
+    source: Dependency,
+    operation: string,
+    work: () => Promise<T>,
+  ): Promise<T> => observability.dependency(context, source, operation, work);
 
   // Vercel only schedules this short dispatch. The archive-wide work runs on a durable external
   // worker because its upstream timeout alone is longer than this function's deployment limit.
@@ -299,7 +369,9 @@ export const createApp = ({
       return context.json(apiError("INVALID_REQUEST", "Ephemeris target list is invalid."), 400);
     }
 
-    const result = await horizonsRepository.positions(naifIds, epoch);
+    const result = await dependency(context, "jpl", "horizons.positions", () =>
+      horizonsRepository.positions(naifIds, epoch),
+    );
     setCachePolicy(context, CACHE_POLICY.liveLookup);
     return context.json(
       ephemerisResponseSchema.parse({
@@ -366,7 +438,9 @@ export const createApp = ({
       );
     }
 
-    const result = await missionTrajectoryRepository.trajectory(spkId, start, stop, stepDays);
+    const result = await dependency(context, "jpl", "horizons.trajectory", () =>
+      missionTrajectoryRepository.trajectory(spkId, start, stop, stepDays),
+    );
     setCachePolicy(context, CACHE_POLICY.missionTrajectory);
     return context.json(
       missionTrajectoryResponseSchema.parse({
@@ -422,7 +496,9 @@ export const createApp = ({
       return context.json(apiError("INVALID_REQUEST", "SPK identifiers must be numeric."), 400);
     }
 
-    const result = await sbdbRepository.search(query, lookup);
+    const result = await dependency(context, "jpl", "sbdb.search", () =>
+      sbdbRepository.search(query, lookup),
+    );
     setCachePolicy(context, CACHE_POLICY.liveLookup);
     return context.json(
       smallBodySearchResponseSchema.parse({
@@ -449,7 +525,9 @@ export const createApp = ({
     const browse = context.req.query("browse")?.trim() ?? "";
 
     if (browse === "physical-controls") {
-      const result = await repository.browse(requestedLimit(context, 120));
+      const result = await dependency(context, planetDataSource, "planets.browse", () =>
+        repository.browse(requestedLimit(context, 120)),
+      );
       return planetCollection(context, result, "physical-controls", CACHE_POLICY.catalog);
     }
 
@@ -457,7 +535,9 @@ export const createApp = ({
       if (hostStar.length > MAX_NAME_LENGTH) {
         return context.json(apiError("INVALID_REQUEST", "Host star name is invalid."), 400);
       }
-      const result = await repository.findByHost(hostStar, requestedLimit(context, 12));
+      const result = await dependency(context, planetDataSource, "planets.find_by_host", () =>
+        repository.findByHost(hostStar, requestedLimit(context, 12)),
+      );
       return planetCollection(context, result, hostStar, CACHE_POLICY.catalog);
     }
 
@@ -468,9 +548,8 @@ export const createApp = ({
           400,
         );
       }
-      const result = await repository.discover(
-        category as PlanetDiscoveryCategory,
-        requestedLimit(context, 12),
+      const result = await dependency(context, planetDataSource, "planets.discover", () =>
+        repository.discover(category as PlanetDiscoveryCategory, requestedLimit(context, 12)),
       );
       return planetCollection(context, result, category, CACHE_POLICY.catalog);
     }
@@ -482,12 +561,16 @@ export const createApp = ({
       );
     }
 
-    const result = await repository.search(query, requestedLimit(context, 12));
+    const result = await dependency(context, planetDataSource, "planets.search", () =>
+      repository.search(query, requestedLimit(context, 12)),
+    );
     return planetCollection(context, result, query, CACHE_POLICY.planetSearch);
   });
 
   app.get("/api/planets/featured", async (context) => {
-    const result = await repository.findByName("Kepler-297 b");
+    const result = await dependency(context, planetDataSource, "planets.find_by_name", () =>
+      repository.findByName("Kepler-297 b"),
+    );
 
     if (!result.value) {
       return context.json(apiError("NOT_FOUND", "Featured planet was not found."), 404);
@@ -510,7 +593,9 @@ export const createApp = ({
       return context.json(apiError("INVALID_REQUEST", "Planet name is invalid."), 400);
     }
 
-    const result = await repository.findByName(name);
+    const result = await dependency(context, planetDataSource, "planets.find_by_name", () =>
+      repository.findByName(name),
+    );
 
     if (!result.value) {
       return context.json(
@@ -530,7 +615,9 @@ export const createApp = ({
   });
 
   app.get("/api/stars/featured", async (context) => {
-    const result = await starRepository.featured();
+    const result = await dependency(context, "simbad", "stars.featured", () =>
+      starRepository.featured(),
+    );
     return starCollection(context, result, "", CACHE_POLICY.starFeatured);
   });
 
@@ -544,9 +631,8 @@ export const createApp = ({
           400,
         );
       }
-      const result = await starRepository.discover(
-        category as StarDiscoveryCategory,
-        requestedLimit(context, 12),
+      const result = await dependency(context, "simbad", "stars.discover", () =>
+        starRepository.discover(category as StarDiscoveryCategory, requestedLimit(context, 12)),
       );
       return starCollection(context, result, category, CACHE_POLICY.starDiscovery);
     }
@@ -557,7 +643,9 @@ export const createApp = ({
       );
     }
 
-    const featuredResult = await starRepository.featured();
+    const featuredResult = await dependency(context, "simbad", "stars.featured", () =>
+      starRepository.featured(),
+    );
     const normalizedQuery = query.toLowerCase();
     const predictiveStars = featuredResult.value.filter(
       (star) =>
@@ -576,7 +664,9 @@ export const createApp = ({
       );
     }
 
-    const result = await starRepository.search(query, requestedLimit(context, 12));
+    const result = await dependency(context, "simbad", "stars.search", () =>
+      starRepository.search(query, requestedLimit(context, 12)),
+    );
     return starCollection(context, result, query, CACHE_POLICY.catalog);
   });
 
@@ -586,12 +676,17 @@ export const createApp = ({
       return context.json(apiError("INVALID_REQUEST", "Star name is invalid."), 400);
     }
 
-    const starResult = await starRepository.findByName(name);
+    const starResult = await dependency(context, "simbad", "stars.find_by_name", () =>
+      starRepository.findByName(name),
+    );
     if (!starResult.value) {
       return context.json(apiError("NOT_FOUND", `No stellar object named ${name} was found.`), 404);
     }
+    const star = starResult.value;
 
-    const hostResult = await systemAliasRepository.resolveHost(starResult.value);
+    const hostResult = await dependency(context, "nasa", "system_aliases.resolve_host", () =>
+      systemAliasRepository.resolveHost(star),
+    );
     if (!hostResult.value) {
       return planetCollection(
         context,
@@ -600,9 +695,12 @@ export const createApp = ({
         CACHE_POLICY.catalog,
       );
     }
+    const host = hostResult.value;
 
-    const planets = await repository.findByHost(hostResult.value, requestedLimit(context, 12));
-    return planetCollection(context, planets, hostResult.value, CACHE_POLICY.catalog);
+    const planets = await dependency(context, planetDataSource, "planets.find_by_host", () =>
+      repository.findByHost(host, requestedLimit(context, 12)),
+    );
+    return planetCollection(context, planets, host, CACHE_POLICY.catalog);
   });
 
   app.get("/api/stars/:name", async (context) => {
@@ -611,7 +709,9 @@ export const createApp = ({
       return context.json(apiError("INVALID_REQUEST", "Star name is invalid."), 400);
     }
 
-    const result = await starRepository.findByName(name);
+    const result = await dependency(context, "simbad", "stars.find_by_name", () =>
+      starRepository.findByName(name),
+    );
     if (!result.value) {
       return context.json(apiError("NOT_FOUND", `No stellar object named ${name} was found.`), 404);
     }
@@ -629,48 +729,7 @@ export const createApp = ({
     context.json(apiError("NOT_FOUND", "The requested API route does not exist."), 404),
   );
 
-  app.onError((error, context) => {
-    console.error(error);
-
-    if (error instanceof NasaArchiveError) {
-      return context.json(
-        apiError("UPSTREAM_UNAVAILABLE", "NASA Exoplanet Archive is temporarily unavailable."),
-        502,
-      );
-    }
-
-    if (error instanceof SimbadArchiveError) {
-      return context.json(
-        apiError("UPSTREAM_UNAVAILABLE", "SIMBAD star archive is temporarily unavailable."),
-        502,
-      );
-    }
-
-    if (error instanceof HorizonsError) {
-      return context.json(
-        apiError(
-          "UPSTREAM_UNAVAILABLE",
-          "JPL Horizons is temporarily unavailable and no cached ephemeris covers this time.",
-        ),
-        502,
-      );
-    }
-
-    if (error instanceof SbdbError) {
-      return context.json(
-        apiError(
-          "UPSTREAM_UNAVAILABLE",
-          "JPL SBDB is temporarily unavailable and no cached small-body record covers this search.",
-        ),
-        502,
-      );
-    }
-
-    return context.json(
-      apiError("UPSTREAM_UNAVAILABLE", "The API could not complete the request."),
-      500,
-    );
-  });
+  app.onError(handleError);
 
   return app;
 };

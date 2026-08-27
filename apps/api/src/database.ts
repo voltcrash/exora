@@ -1,4 +1,5 @@
 import postgres from "postgres";
+import { ClassifiedError, DatabaseError } from "./errors.ts";
 
 export interface DatabaseClient {
   close(): Promise<void>;
@@ -28,15 +29,24 @@ class PostgresDatabaseClient implements DatabaseClient {
     statement: string,
     parameters: readonly unknown[] = [],
   ): Promise<T[]> {
-    const rows = await this.#sql.unsafe(statement, [...parameters] as never[]);
-    return rows as unknown as T[];
+    try {
+      const rows = await this.#sql.unsafe(statement, [...parameters] as never[]);
+      return rows as unknown as T[];
+    } catch (error) {
+      throw new DatabaseError("Database query failed.", { cause: error });
+    }
   }
 
   async transaction<T>(callback: (client: DatabaseClient) => Promise<T>): Promise<T> {
-    const result = await this.#sql.begin((transaction) =>
-      callback(new PostgresDatabaseClient(transaction as unknown as SqlClient, false)),
-    );
-    return result as unknown as T;
+    try {
+      const result = await this.#sql.begin((transaction) =>
+        callback(new PostgresDatabaseClient(transaction as unknown as SqlClient, false)),
+      );
+      return result as unknown as T;
+    } catch (error) {
+      if (error instanceof ClassifiedError) throw error;
+      throw new DatabaseError("Database transaction failed.", { cause: error });
+    }
   }
 
   async close(): Promise<void> {

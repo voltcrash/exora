@@ -31,6 +31,7 @@ const catalogRefresh =
 export const app = createApp({
   ...(catalogRefresh ? { catalogRefresh } : {}),
   horizonsRepository: new JplHorizonsRepository(),
+  planetDataSource: database ? "database" : "nasa",
   repository,
   sbdbRepository: new JplSbdbRepository(),
   starRepository: new SimbadStarRepository(),

@@ -1,6 +1,7 @@
 import { exoplanetProfileSchema, type ExoplanetProfile, type PlanetKind } from "@exora/contracts";
 import { z } from "zod";
 import { createArchiveCache, createRequestCoalescer } from "./archive-cache.ts";
+import { UpstreamError } from "./errors.ts";
 import {
   NASA_DIALECT,
   PLANET_DISCOVERY_FILTERS,
@@ -120,7 +121,7 @@ export interface NasaPlanetRepositoryOptions {
   timeoutMs?: number;
 }
 
-export class NasaArchiveError extends Error {
+export class NasaArchiveError extends UpstreamError {
   constructor(message: string, options?: ErrorOptions) {
     super(message, options);
     this.name = "NasaArchiveError";

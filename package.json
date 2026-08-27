@@ -17,6 +17,9 @@
     "db:sync": "vp run @exora/api#db:sync",
     "prepare": "vp config"
   },
+  "dependencies": {
+    "@vercel/otel": "catalog:"
+  },
   "devDependencies": {
     "@types/node": "catalog:",
     "typescript": "catalog:",

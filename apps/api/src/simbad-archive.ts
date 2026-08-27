@@ -1,6 +1,7 @@
 import { starProfileSchema, type StarKind, type StarProfile } from "@exora/contracts";
 import { z } from "zod";
 import { createArchiveCache, createRequestCoalescer } from "./archive-cache.ts";
+import { UpstreamError } from "./errors.ts";
 import type { RepositoryResult } from "./nasa-archive.ts";
 
 const SIMBAD_TAP_ENDPOINT = "https://simbad.cds.unistra.fr/simbad/sim-tap/sync";
@@ -181,7 +182,7 @@ export interface SimbadStarRepositoryOptions {
   timeoutMs?: number;
 }
 
-export class SimbadArchiveError extends Error {
+export class SimbadArchiveError extends UpstreamError {
   constructor(message: string, options?: ErrorOptions) {
     super(message, options);
     this.name = "SimbadArchiveError";

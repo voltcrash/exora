@@ -1,5 +1,6 @@
 import { ephemerisVectorSchema, type EphemerisVector } from "@exora/contracts";
 import { createRequestCoalescer } from "./archive-cache.ts";
+import { UpstreamError } from "./errors.ts";
 
 const HORIZONS_ENDPOINT = "https://ssd.jpl.nasa.gov/api/horizons.api";
 export const HORIZONS_API_VERSION = "1.2";
@@ -34,7 +35,7 @@ const TARGET_BY_NAIF = new Map<number, HorizonsTarget>(
   HORIZONS_TARGETS.map((target) => [target.naifId, target]),
 );
 
-export class HorizonsError extends Error {
+export class HorizonsError extends UpstreamError {
   constructor(message: string, options?: ErrorOptions) {
     super(message, options);
     this.name = "HorizonsError";

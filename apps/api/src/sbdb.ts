@@ -7,6 +7,7 @@ import type {
 } from "@exora/contracts";
 import { smallBodyMatchSchema, smallBodyProfileSchema } from "@exora/contracts";
 import { createRequestCoalescer } from "./archive-cache.ts";
+import { UpstreamError } from "./errors.ts";
 
 const SBDB_ENDPOINT = "https://ssd-api.jpl.nasa.gov/sbdb.api";
 export const SBDB_API_VERSION = "1.3";
@@ -106,7 +107,7 @@ export interface JplSbdbRepositoryOptions {
   timeoutMs?: number;
 }
 
-export class SbdbError extends Error {
+export class SbdbError extends UpstreamError {
   constructor(message: string, options?: ErrorOptions) {
     super(message, options);
     this.name = "SbdbError";
