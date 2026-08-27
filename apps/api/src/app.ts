@@ -90,16 +90,48 @@ const MAX_NAME_LENGTH = 100;
  * refreshes behind the request. Curated collections and single objects move on the archives'
  * schedule rather than ours, so they are held far longer than a free-text search.
  */
+interface CachePolicy {
+  browser: string;
+  cdn: string;
+}
+
 const CACHE_POLICY = {
   /** Curated collections, host-system lookups, and single objects. */
-  catalog: "public, max-age=900, stale-while-revalidate=21600",
+  catalog: {
+    browser: "public, max-age=60",
+    cdn: "public, max-age=900, stale-while-revalidate=21600, stale-if-error=86400",
+  },
+  /** Ephemerides and small-body lookups that can change as upstream solutions are updated. */
+  liveLookup: {
+    browser: "public, max-age=60",
+    cdn: "public, max-age=300, stale-while-revalidate=86400, stale-if-error=86400",
+  },
+  /** Historical mission samples change rarely but should still recover from solution updates. */
+  missionTrajectory: {
+    browser: "public, max-age=3600",
+    cdn: "public, max-age=86400, stale-while-revalidate=2592000, stale-if-error=2592000",
+  },
   /** Free-text planet search: the most likely thing to be retried with a different spelling. */
-  planetSearch: "public, max-age=300, stale-while-revalidate=3600",
+  planetSearch: {
+    browser: "public, max-age=0, must-revalidate",
+    cdn: "public, max-age=300, stale-while-revalidate=3600, stale-if-error=21600",
+  },
   /** SIMBAD's curated star collections. */
-  starDiscovery: "public, max-age=1800, stale-while-revalidate=43200",
+  starDiscovery: {
+    browser: "public, max-age=120",
+    cdn: "public, max-age=1800, stale-while-revalidate=43200, stale-if-error=86400",
+  },
   /** The fixed featured set, which only changes when this file does. */
-  starFeatured: "public, max-age=3600, stale-while-revalidate=43200",
+  starFeatured: {
+    browser: "public, max-age=300",
+    cdn: "public, max-age=3600, stale-while-revalidate=43200, stale-if-error=86400",
+  },
 } as const;
+
+const setCachePolicy = (context: Context, policy: CachePolicy): void => {
+  context.header("Cache-Control", policy.browser);
+  context.header("CDN-Cache-Control", policy.cdn);
+};
 
 /**
  * The page size the caller asked for, or `fallback` when they did not ask for a usable one.
@@ -116,9 +148,9 @@ const planetCollection = (
   context: Context,
   result: RepositoryResult<ExoplanetProfile[]>,
   query: string,
-  cachePolicy: string,
+  cachePolicy: CachePolicy,
 ): Response => {
-  context.header("Cache-Control", cachePolicy);
+  setCachePolicy(context, cachePolicy);
   return context.json(
     planetSearchResponseSchema.parse({
       data: result.value,
@@ -136,9 +168,9 @@ const starCollection = (
   context: Context,
   result: RepositoryResult<StarProfile[]>,
   query: string,
-  cachePolicy: string,
+  cachePolicy: CachePolicy,
 ): Response => {
-  context.header("Cache-Control", cachePolicy);
+  setCachePolicy(context, cachePolicy);
   return context.json(
     starSearchResponseSchema.parse({
       data: result.value,
@@ -269,7 +301,7 @@ export const createApp = ({
     }
 
     const result = await horizonsRepository.positions(naifIds, epoch);
-    context.header("Cache-Control", "public, max-age=300, stale-while-revalidate=86400");
+    setCachePolicy(context, CACHE_POLICY.liveLookup);
     return context.json(
       ephemerisResponseSchema.parse({
         data: result.value,
@@ -338,7 +370,7 @@ export const createApp = ({
     }
 
     const result = await missionTrajectoryRepository.trajectory(spkId, start, stop, stepDays);
-    context.header("Cache-Control", "public, max-age=86400, stale-while-revalidate=2592000");
+    setCachePolicy(context, CACHE_POLICY.missionTrajectory);
     return context.json(
       missionTrajectoryResponseSchema.parse({
         data: result.value,
@@ -396,7 +428,7 @@ export const createApp = ({
     }
 
     const result = await sbdbRepository.search(query, lookup);
-    context.header("Cache-Control", "public, max-age=300, stale-while-revalidate=86400");
+    setCachePolicy(context, CACHE_POLICY.liveLookup);
     return context.json(
       smallBodySearchResponseSchema.parse({
         data: result.data,
@@ -466,7 +498,7 @@ export const createApp = ({
       return context.json(apiError("NOT_FOUND", "Featured planet was not found."), 404);
     }
 
-    context.header("Cache-Control", CACHE_POLICY.catalog);
+    setCachePolicy(context, CACHE_POLICY.catalog);
 
     return context.json(
       planetResponseSchema.parse({
@@ -492,7 +524,7 @@ export const createApp = ({
       );
     }
 
-    context.header("Cache-Control", CACHE_POLICY.catalog);
+    setCachePolicy(context, CACHE_POLICY.catalog);
 
     return context.json(
       planetResponseSchema.parse({
@@ -589,7 +621,7 @@ export const createApp = ({
       return context.json(apiError("NOT_FOUND", `No stellar object named ${name} was found.`), 404);
     }
 
-    context.header("Cache-Control", CACHE_POLICY.catalog);
+    setCachePolicy(context, CACHE_POLICY.catalog);
     return context.json(
       starResponseSchema.parse({
         data: result.value,

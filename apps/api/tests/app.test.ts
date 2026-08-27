@@ -251,7 +251,7 @@ test("returns cached heliocentric Horizons vectors through the backend", async (
   );
 
   expect(response.status).toBe(200);
-  expect(response.headers.get("Cache-Control")).toContain("stale-while-revalidate");
+  expect(response.headers.get("CDN-Cache-Control")).toContain("stale-while-revalidate");
   expect(await response.json()).toMatchObject({
     data: [{ naifId: 399, spkId: "399" }],
     meta: {
@@ -300,7 +300,7 @@ test("returns a bounded mission trajectory through the backend", async () => {
   );
 
   expect(response.status).toBe(200);
-  expect(response.headers.get("Cache-Control")).toContain("stale-while-revalidate");
+  expect(response.headers.get("CDN-Cache-Control")).toContain("stale-while-revalidate");
   expect(await response.json()).toMatchObject({
     data: [{ calendarTdb: expect.stringContaining("TDB") }, { julianDateTdb: 2_443_757.5 }],
     meta: {
@@ -340,7 +340,7 @@ test("returns normalized JPL small-body data through the backend", async () => {
   );
 
   expect(response.status).toBe(200);
-  expect(response.headers.get("Cache-Control")).toContain("stale-while-revalidate");
+  expect(response.headers.get("CDN-Cache-Control")).toContain("stale-while-revalidate");
   expect(await response.json()).toMatchObject({
     data: {
       designation: "99942",
@@ -421,6 +421,10 @@ test("returns normalized planet search results", async () => {
     data: [{ id: "hip-65426-b" }],
     meta: { cached: true, count: 1, query: "hip" },
   });
+  expect(response.headers.get("Cache-Control")).toBe("public, max-age=0, must-revalidate");
+  expect(response.headers.get("CDN-Cache-Control")).toBe(
+    "public, max-age=300, stale-while-revalidate=3600, stale-if-error=21600",
+  );
 });
 
 test("refuses malformed repository data instead of exposing it as an API payload", async () => {
@@ -471,6 +475,8 @@ test("returns a broad planet field for physical controls", async () => {
     data: [{ id: "hip-65426-b" }],
     meta: { count: 1, query: "physical-controls" },
   });
+  expect(response.headers.get("Cache-Control")).toBe("public, max-age=60");
+  expect(response.headers.get("CDN-Cache-Control")).toContain("stale-if-error=86400");
 });
 
 test("returns category-driven planet and star discovery results", async () => {
