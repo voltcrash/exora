@@ -20,6 +20,7 @@ export default defineConfig({
       "apps/*/tests/**/*.test.{ts,tsx}",
       "packages/*/src/**/*.test.{ts,tsx}",
       "packages/*/tests/**/*.test.{ts,tsx}",
+      "scripts/**/*.test.mjs",
     ],
     exclude: ["apps/*/src/**/*.browser.test.{ts,tsx}"],
   },
