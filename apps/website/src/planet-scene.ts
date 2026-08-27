@@ -2,33 +2,24 @@ import { ActionManager } from "@babylonjs/core/Actions/actionManager.js";
 import { ExecuteCodeAction } from "@babylonjs/core/Actions/directActions.js";
 import "@babylonjs/core/Culling/ray.js";
 import { Engine } from "@babylonjs/core/Engines/engine.js";
-import { DirectionalLight } from "@babylonjs/core/Lights/directionalLight.js";
 import { Color3, Color4 } from "@babylonjs/core/Maths/math.color.js";
 import { Vector2, Vector3 } from "@babylonjs/core/Maths/math.vector.js";
 import { Effect } from "@babylonjs/core/Materials/effect.js";
 import { ShaderMaterial } from "@babylonjs/core/Materials/shaderMaterial.js";
 import { StandardMaterial } from "@babylonjs/core/Materials/standardMaterial.js";
-import { Texture } from "@babylonjs/core/Materials/Textures/texture.js";
-import type { FloatArray } from "@babylonjs/core/types.js";
 import type { AbstractMesh } from "@babylonjs/core/Meshes/abstractMesh.js";
 import { Mesh } from "@babylonjs/core/Meshes/mesh.js";
 import { MeshBuilder } from "@babylonjs/core/Meshes/meshBuilder.js";
 import "@babylonjs/core/Meshes/instancedMesh.js";
-import { VertexBuffer } from "@babylonjs/core/Buffers/buffer.js";
 import { VertexData } from "@babylonjs/core/Meshes/mesh.vertexData.js";
 import { Scene } from "@babylonjs/core/scene.js";
 import { TransformNode } from "@babylonjs/core/Meshes/transformNode.js";
 import type { ExoplanetProfile, StarProfile } from "@exora/contracts";
-import type {
-  CustomStar,
-  CustomWorld,
-  Rgb,
-  RingRecipe,
-  RockyWorldRecipe,
-  WorldRecipe,
-} from "@exora/worldgen";
+import type { CustomStar, CustomWorld, Rgb, RingRecipe, WorldRecipe } from "@exora/worldgen";
 import { type RenderQualityProfile, shaderDefines } from "./render-quality.ts";
-import { buildCraterField, sampleTerrainHeight } from "./planet-terrain.ts";
+import { createPlanetKeyLight } from "./planet-lighting.ts";
+import { bindPlanetSurfaceAssets } from "./planet-material-assets.ts";
+import { displaceRockyPlanet } from "./planet-mesh-terrain.ts";
 import { type SurfaceGeology, cloudDeckGeology, deriveSurfaceGeology } from "./surface-geology.ts";
 import { type SurfaceMotes, createSurfaceMotes } from "./surface-motes.ts";
 import { createSurfaceScatter } from "./surface-scatter.ts";
@@ -37,8 +28,6 @@ import type { MountedWorld, SceneHost, WorldConsole } from "./scene-host.ts";
 import { skyViewpointFrom } from "./sky-catalog.ts";
 import { createStellarSurface, type StellarSurface } from "./star-surface.ts";
 import { createStarfield } from "./star-visuals.ts";
-import { getSurfaceDetailTextures, surfaceDetailSelectionForPalette } from "./texture-cache.ts";
-import { solarMosaicPathForTier } from "./route-assets.ts";
 import { markAsVirtualBackground } from "./world-presentation.ts";
 import {
   easeAway,
@@ -1361,107 +1350,6 @@ const createRingSystem = (
   return { material, system: ringSystem };
 };
 
-/**
- * How much CPU-side terrain displacement (in scene units) a fully-elevated world gets, kept
- * separate from `recipe.radiusSceneUnits` (display radius) and any physical radius derived from
- * catalog data — this is a purely artistic knob so mountains read as visible relief without
- * implying kilometer-accurate heights.
- */
-const TERRAIN_DISPLAY_EXAGGERATION = 0.5;
-
-/**
- * Averages computed normals across vertices that share a position.
- *
- * Babylon's icosphere emits an unshared vertex per triangle corner — 19,440 vertices over 6,480
- * triangles at subdivision 18, three per face, for only 3,242 distinct positions — and gets its
- * smooth look from `normal = normalize(position)` rather than from shared topology. Recomputing
- * normals from that index buffer therefore hands every vertex the normal of the single face it
- * belongs to, which flat-shades the planet: the terrain reads as a lattice of hard-edged facets
- * instead of a surface. Merging the per-face normals back together by position gives each corner
- * the average of the faces actually meeting there, which is the smooth normal the displaced
- * surface has.
- *
- * Coincident vertices are exact duplicates of the same source floats and the displacement above
- * is a pure function of the vertex direction, so equality on the position triple is a safe key —
- * no epsilon needed.
- */
-const weldNormals = (positions: FloatArray, normals: Float32Array): void => {
-  const vertexCount = normals.length / 3;
-  const representatives = new Map<string, number>();
-  const representativeOf = new Int32Array(vertexCount);
-  const sums = new Float32Array(normals.length);
-
-  for (let vertex = 0; vertex < vertexCount; vertex += 1) {
-    const offset = vertex * 3;
-    const key = `${positions[offset]!},${positions[offset + 1]!},${positions[offset + 2]!}`;
-    let representative = representatives.get(key);
-    if (representative === undefined) {
-      representative = vertex;
-      representatives.set(key, vertex);
-    }
-    representativeOf[vertex] = representative;
-    const target = representative * 3;
-    sums[target] = sums[target]! + normals[offset]!;
-    sums[target + 1] = sums[target + 1]! + normals[offset + 1]!;
-    sums[target + 2] = sums[target + 2]! + normals[offset + 2]!;
-  }
-
-  for (let vertex = 0; vertex < vertexCount; vertex += 1) {
-    const source = representativeOf[vertex]! * 3;
-    const x = sums[source]!;
-    const y = sums[source + 1]!;
-    const z = sums[source + 2]!;
-    const length = Math.hypot(x, y, z) || 1;
-    const offset = vertex * 3;
-    normals[offset] = x / length;
-    normals[offset + 1] = y / length;
-    normals[offset + 2] = z / length;
-  }
-};
-
-/**
- * Displaces a rocky planet's icosphere vertices with multi-scale procedural terrain (continents,
- * mountains, ridges, roughness, craters — see planet-terrain.ts) and recomputes normals from the
- * displaced geometry so directional lighting responds to the actual shape instead of the
- * original sphere's normals. Runs once at mesh-build time, in object space, so it is unaffected
- * by the mesh's later rotation/position/orbit transforms.
- */
-const displaceRockyPlanet = (planet: Mesh, recipe: RockyWorldRecipe): void => {
-  const positions = planet.getVerticesData(VertexBuffer.PositionKind);
-  const indices = planet.getIndices();
-  if (!positions || !indices) return;
-
-  const craters = buildCraterField(
-    recipe.seed,
-    recipe.terrain.craterDensity,
-    recipe.terrain.craterScale,
-  );
-  const radius = recipe.radiusSceneUnits;
-
-  for (let vertex = 0; vertex < positions.length; vertex += 3) {
-    const x = positions[vertex]!;
-    const y = positions[vertex + 1]!;
-    const z = positions[vertex + 2]!;
-    const length = Math.hypot(x, y, z) || 1;
-    const direction = { x: x / length, y: y / length, z: z / length };
-    const { height } = sampleTerrainHeight(direction, recipe.terrain, recipe.seed, craters);
-    const rawOffset = height * recipe.surface.elevation * TERRAIN_DISPLAY_EXAGGERATION;
-    // Clamp relative to radius so extreme parameter combinations (max mountains + max craters)
-    // cannot fold the mesh in on itself.
-    const offset = Math.min(radius * 0.4, Math.max(-radius * 0.4, rawOffset));
-    const displaced = radius + offset;
-    positions[vertex] = direction.x * displaced;
-    positions[vertex + 1] = direction.y * displaced;
-    positions[vertex + 2] = direction.z * displaced;
-  }
-
-  const normals = new Float32Array(positions.length);
-  VertexData.ComputeNormals(positions, indices, normals);
-  weldNormals(positions, normals);
-  planet.updateVerticesData(VertexBuffer.PositionKind, positions);
-  planet.setVerticesData(VertexBuffer.NormalKind, normals);
-};
-
 const createPlanet = (
   scene: Scene,
   recipe: WorldRecipe,
@@ -1696,77 +1584,8 @@ const createPlanet = (
   shader.setColor3("stellarColor", toColor3(recipe.star.color));
   shader.setFloat("stellarIntensity", recipe.star.intensity);
 
-  if (knownTexture) {
-    const surfaceMap = new Texture(
-      solarMosaicPathForTier(knownTexture.path, profile.tier),
-      scene,
-      true,
-      false,
-    );
-    surfaceMap.name = `${planetProfile.id}-spacecraft-mosaic`;
-    surfaceMap.anisotropicFilteringLevel = profile.anisotropicFiltering;
-    surfaceMap.wrapU = Texture.WRAP_ADDRESSMODE;
-    surfaceMap.wrapV = Texture.CLAMP_ADDRESSMODE;
-    shader.setTexture("surfaceMap", surfaceMap);
-    const topography = knownTexture.topography;
-    const heightMap = topography ? new Texture(topography.path, scene, true, false) : surfaceMap;
-    heightMap.name = `${planetProfile.id}-measured-topography`;
-    heightMap.anisotropicFilteringLevel = profile.anisotropicFiltering;
-    heightMap.wrapU = Texture.WRAP_ADDRESSMODE;
-    heightMap.wrapV = Texture.CLAMP_ADDRESSMODE;
-    shader.setTexture("heightMap", heightMap);
-    shader.setFloat(
-      "topographyScale",
-      topography ? recipe.radiusSceneUnits * topography.reliefScale : 0,
-    );
-    shader.setFloat("useTopography", topography ? 1 : 0);
-  } else if (recipe.renderer === "rocky") {
-    shader.setFloat("elevation", recipe.surface.elevation);
-    shader.setFloat("planetRadius", recipe.radiusSceneUnits);
-    shader.setFloat("roughness", recipe.surface.roughness);
-    shader.setFloat("craterDensity", recipe.surface.craterDensity);
-    shader.setFloat("waterLevel", recipe.surface.waterLevel);
-    shader.setFloat("lavaStrength", recipe.surface.lavaStrength);
-    shader.setFloat("iceCapStrength", recipe.surface.iceCapStrength);
-    shader.setColor3("lowColor", toColor3(recipe.surface.lowColor));
-    shader.setColor3("midColor", toColor3(recipe.surface.midColor));
-    shader.setColor3("highColor", toColor3(recipe.surface.highColor));
-    shader.setColor3("waterColor", toColor3(recipe.surface.waterColor));
-    shader.setColor3("waterColorShallow", toColor3(recipe.surface.waterColorShallow));
-    shader.setColor3("emissiveColor", toColor3(recipe.surface.emissiveColor));
-
-    if (profile.surfaceColorDetail || profile.surfaceMicrodetail) {
-      const selection = surfaceDetailSelectionForPalette(recipe.terrain.paletteFamily);
-      const detail = getSurfaceDetailTextures(
-        scene,
-        selection,
-        profile.surfaceMicrodetail,
-        profile.anisotropicFiltering,
-      );
-
-      if (profile.surfaceColorDetail) {
-        shader.setTexture("chemistryColorMap", detail.chemistry);
-        shader.setFloat("chemistryScale", selection.chemistryScale);
-        shader.setFloat("chemistryStrength", selection.chemistryStrength);
-        // Chemistry variation should remain legible from orbit, especially on Quest where it is
-        // the only texture path, but fade before it can shimmer at sub-pixel scale.
-        shader.setFloat("colorDetailFadeStart", recipe.radiusSceneUnits * 7);
-        shader.setFloat("colorDetailFadeEnd", recipe.radiusSceneUnits * 24);
-      }
-
-      if (profile.surfaceMicrodetail) {
-        shader.setTexture("primaryNormalMap", detail.primary.normal);
-        shader.setTexture("primaryRoughnessMap", detail.primary.roughness);
-        shader.setTexture("secondaryNormalMap", detail.secondary.normal);
-        shader.setTexture("secondaryRoughnessMap", detail.secondary.roughness);
-        shader.setFloat("primaryDetailScale", selection.primaryScale);
-        shader.setFloat("secondaryDetailScale", selection.secondaryScale);
-        // Full-resolution detail up close, fading out well before orbital distance so the surface
-        // does not read as sandpaper from far away.
-        shader.setFloat("detailFadeStart", recipe.radiusSceneUnits * 4);
-        shader.setFloat("detailFadeEnd", recipe.radiusSceneUnits * 16);
-      }
-    }
+  if (knownTexture || recipe.renderer === "rocky") {
+    bindPlanetSurfaceAssets(scene, shader, recipe, profile, planetProfile);
   } else if (recipe.renderer === "ice-giant") {
     shader.setFloat("bandScale", recipe.atmosphereBands.bandScale);
     shader.setFloat("bandContrast", recipe.bandDetail.bandContrast);
@@ -2312,9 +2131,7 @@ export const createPlanetWorld = (
   camera.radius = 17.2;
   if (!host.isInXr()) camera.attachControl(canvas, true);
 
-  const keyLight = new DirectionalLight("stellarLight", LIGHT_DIRECTION.scale(-1), scene);
-  keyLight.diffuse = toColor3(recipe.star.color);
-  keyLight.intensity = 2.2 * recipe.star.intensity;
+  createPlanetKeyLight(scene, LIGHT_DIRECTION, recipe.star);
 
   // The archive reports where this planet's host system is on the sky and how far away it is, so
   // the orbital view can be given the sky that system actually has. A procedural world, or a
