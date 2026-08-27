@@ -33,6 +33,16 @@ test("clients are budgeted separately", () => {
   expect(limiter.check("a", 0).allowed).toBe(false);
 });
 
+test("separate serverless instances have independent in-memory budgets", () => {
+  const firstInstance = createRateLimiter({ limit: 1, windowMs: 1_000 });
+  const secondInstance = createRateLimiter({ limit: 1, windowMs: 1_000 });
+
+  expect(firstInstance.check("client", 0).allowed).toBe(true);
+  expect(firstInstance.check("client", 0).allowed).toBe(false);
+  // This is deliberately allowed: local memory is a per-instance safeguard, not a global limit.
+  expect(secondInstance.check("client", 0).allowed).toBe(true);
+});
+
 test("a refused caller is told to wait past the end of the window", () => {
   const limiter = createRateLimiter({ limit: 1, windowMs: 60_000 });
   limiter.check("a", 0);
@@ -74,16 +84,21 @@ test("eviction drops the least recently seen client", () => {
   expect(limiter.check("b", 4).allowed).toBe(true);
 });
 
-test("the caller is identified by the left-most forwarded address", () => {
-  // Proxies append hop by hop, so the original client is first and the rest are infrastructure.
-  expect(clientKey({ forwardedFor: "203.0.113.7, 70.41.3.18, 150.172.238.178" })).toBe(
-    "203.0.113.7",
-  );
+test("Vercel's forwarding header is trusted only behind the configured proxy boundary", () => {
+  const headers = { vercelForwardedFor: "203.0.113.7" };
+
+  expect(clientKey(headers)).toBe("unknown");
+  expect(clientKey(headers, { trustVercelProxy: true })).toBe("203.0.113.7");
 });
 
-test("identification falls back through the headers a proxy might set", () => {
-  expect(clientKey({ realIp: "203.0.113.9" })).toBe("203.0.113.9");
-  expect(clientKey({ forwardedFor: "   ", realIp: "203.0.113.9" })).toBe("203.0.113.9");
+test("spoofed or malformed proxy identities share the conservative fallback bucket", () => {
+  expect(clientKey({ vercelForwardedFor: "203.0.113.7" })).toBe("unknown");
+  expect(
+    clientKey({ vercelForwardedFor: "203.0.113.7, 198.51.100.4" }, { trustVercelProxy: true }),
+  ).toBe("unknown");
+  expect(clientKey({ vercelForwardedFor: "not-an-ip" }, { trustVercelProxy: true })).toBe(
+    "unknown",
+  );
   expect(clientKey({})).toBe("unknown");
 });
 

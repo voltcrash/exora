@@ -1,3 +1,5 @@
+import { isIP } from "node:net";
+
 /**
  * A per-client request budget, kept in the instance's own memory.
  *
@@ -29,6 +31,11 @@ export interface RateLimiter {
   /** Accounts for one request from `client` and reports whether it may proceed. */
   check(client: string, now: number): RateLimitDecision & { allowed: boolean };
   size(): number;
+}
+
+export interface ClientIdentityHeaders {
+  /** Vercel's deployment-provided copy of the connecting client's public address. */
+  vercelForwardedFor?: string | undefined;
 }
 
 export interface RateLimiterOptions {
@@ -93,17 +100,22 @@ export const createRateLimiter = ({
 };
 
 /**
- * Identifies the caller behind a proxy.
+ * Identifies the caller behind Vercel's trusted proxy boundary.
  *
- * Vercel terminates TLS and forwards the client address, so the socket address is useless here.
- * `x-forwarded-for` is a list appended to hop by hop; the left-most entry is the original client.
- * A caller can forge it, which is another reason this is a budget rather than a control — but the
- * alternative, treating every request as one client, would limit the whole world together.
+ * Only the deployed runtime opts into this trust. Tests and direct/local servers do not turn
+ * caller-supplied forwarding headers into identities, because those requests did not cross a
+ * proxy boundary that overwrites them. Vercel documents `x-vercel-forwarded-for` as its copy of
+ * the connecting public address; requiring one valid IP also refuses attacker-controlled lists.
+ *
+ * The fallback intentionally groups unidentified callers. It is safer for a best-effort budget
+ * to share one bucket than to let arbitrary header values manufacture unlimited buckets.
  */
-export const clientKey = (headers: {
-  forwardedFor?: string | undefined;
-  realIp?: string | undefined;
-}): string => {
-  const forwarded = headers.forwardedFor?.split(",")[0]?.trim();
-  return forwarded || headers.realIp?.trim() || "unknown";
+export const clientKey = (
+  headers: ClientIdentityHeaders,
+  { trustVercelProxy = false }: { trustVercelProxy?: boolean } = {},
+): string => {
+  if (!trustVercelProxy) return "unknown";
+
+  const forwarded = headers.vercelForwardedFor?.trim() ?? "";
+  return isIP(forwarded) ? forwarded : "unknown";
 };

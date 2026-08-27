@@ -77,6 +77,8 @@ interface CreateAppOptions {
   sbdbRepository?: SbdbRepository;
   starRepository?: StarRepository;
   systemAliasRepository?: SystemAliasRepository;
+  /** Trust Vercel's deployment-provided client address. Leave false outside Vercel. */
+  trustVercelProxy?: boolean;
 }
 
 const apiError = (code: ApiErrorResponse["error"]["code"], message: string): ApiErrorResponse =>
@@ -191,6 +193,7 @@ export const createApp = ({
   sbdbRepository = new JplSbdbRepository(),
   starRepository = new SimbadStarRepository(),
   systemAliasRepository = new NasaSystemAliasRepository(),
+  trustVercelProxy = false,
 }: CreateAppOptions = {}) => {
   const app = new Hono();
 
@@ -223,10 +226,10 @@ export const createApp = ({
 
   app.use("/api/*", async (context, next) => {
     const decision = rateLimiter.check(
-      clientKey({
-        forwardedFor: context.req.header("x-forwarded-for"),
-        realIp: context.req.header("x-real-ip"),
-      }),
+      clientKey(
+        { vercelForwardedFor: context.req.header("x-vercel-forwarded-for") },
+        { trustVercelProxy },
+      ),
       Date.now(),
     );
 
@@ -235,6 +238,7 @@ export const createApp = ({
     context.header("RateLimit-Reset", String(Math.ceil(decision.resetAt / 1_000)));
 
     if (!decision.allowed) {
+      context.header("Cache-Control", "no-store");
       context.header("Retry-After", String(decision.retryAfterSeconds));
       return context.json(
         apiError("RATE_LIMITED", "Too many requests. Please slow down and try again shortly."),
@@ -253,15 +257,16 @@ export const createApp = ({
 
   app.get("/api/ephemerides", async (context) => {
     const decision = horizonsRateLimiter.check(
-      clientKey({
-        forwardedFor: context.req.header("x-forwarded-for"),
-        realIp: context.req.header("x-real-ip"),
-      }),
+      clientKey(
+        { vercelForwardedFor: context.req.header("x-vercel-forwarded-for") },
+        { trustVercelProxy },
+      ),
       Date.now(),
     );
     context.header("Ephemeris-RateLimit-Limit", String(decision.limit));
     context.header("Ephemeris-RateLimit-Remaining", String(decision.remaining));
     if (!decision.allowed) {
+      context.header("Cache-Control", "no-store");
       context.header("Retry-After", String(decision.retryAfterSeconds));
       return context.json(
         apiError("RATE_LIMITED", "Too many ephemeris requests. Please wait before trying again."),
@@ -321,15 +326,16 @@ export const createApp = ({
 
   app.get("/api/mission-trajectories", async (context) => {
     const decision = missionRateLimiter.check(
-      clientKey({
-        forwardedFor: context.req.header("x-forwarded-for"),
-        realIp: context.req.header("x-real-ip"),
-      }),
+      clientKey(
+        { vercelForwardedFor: context.req.header("x-vercel-forwarded-for") },
+        { trustVercelProxy },
+      ),
       Date.now(),
     );
     context.header("Mission-RateLimit-Limit", String(decision.limit));
     context.header("Mission-RateLimit-Remaining", String(decision.remaining));
     if (!decision.allowed) {
+      context.header("Cache-Control", "no-store");
       context.header("Retry-After", String(decision.retryAfterSeconds));
       return context.json(
         apiError("RATE_LIMITED", "Too many mission requests. Please wait before trying again."),
@@ -393,15 +399,16 @@ export const createApp = ({
 
   app.get("/api/small-bodies", async (context) => {
     const decision = sbdbRateLimiter.check(
-      clientKey({
-        forwardedFor: context.req.header("x-forwarded-for"),
-        realIp: context.req.header("x-real-ip"),
-      }),
+      clientKey(
+        { vercelForwardedFor: context.req.header("x-vercel-forwarded-for") },
+        { trustVercelProxy },
+      ),
       Date.now(),
     );
     context.header("SmallBody-RateLimit-Limit", String(decision.limit));
     context.header("SmallBody-RateLimit-Remaining", String(decision.remaining));
     if (!decision.allowed) {
+      context.header("Cache-Control", "no-store");
       context.header("Retry-After", String(decision.retryAfterSeconds));
       return context.json(
         apiError("RATE_LIMITED", "Too many small-body searches. Please wait before trying again."),

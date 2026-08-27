@@ -554,8 +554,9 @@ test("a caller past its budget is refused with a wait", async () => {
   const app = createApp({
     repository,
     rateLimiter: createRateLimiter({ limit: 2, windowMs: 60_000 }),
+    trustVercelProxy: true,
   });
-  const headers = { "x-forwarded-for": "203.0.113.7" };
+  const headers = { "x-vercel-forwarded-for": "203.0.113.7" };
 
   const allowed = await Promise.all([
     app.request("/api/health", { headers }),
@@ -566,6 +567,8 @@ test("a caller past its budget is refused with a wait", async () => {
   expect(allowed.map((response) => response.status)).toEqual([200, 200]);
   expect(refused.status).toBe(429);
   expect(await refused.json()).toMatchObject({ error: { code: "RATE_LIMITED" } });
+  expect(refused.headers.get("Cache-Control")).toBe("no-store");
+  expect(refused.headers.get("RateLimit-Remaining")).toBe("0");
   expect(Number(refused.headers.get("Retry-After"))).toBeGreaterThan(0);
 });
 
@@ -573,18 +576,36 @@ test("one caller exhausting its budget does not refuse another", async () => {
   const app = createApp({
     repository,
     rateLimiter: createRateLimiter({ limit: 1, windowMs: 60_000 }),
+    trustVercelProxy: true,
   });
 
-  await app.request("/api/health", { headers: { "x-forwarded-for": "203.0.113.7" } });
+  await app.request("/api/health", { headers: { "x-vercel-forwarded-for": "203.0.113.7" } });
   const sameCaller = await app.request("/api/health", {
-    headers: { "x-forwarded-for": "203.0.113.7" },
+    headers: { "x-vercel-forwarded-for": "203.0.113.7" },
   });
   const otherCaller = await app.request("/api/health", {
-    headers: { "x-forwarded-for": "198.51.100.4" },
+    headers: { "x-vercel-forwarded-for": "198.51.100.4" },
   });
 
   expect(sameCaller.status).toBe(429);
   expect(otherCaller.status).toBe(200);
+});
+
+test("caller-supplied forwarding headers cannot manufacture fresh local budgets", async () => {
+  const app = createApp({
+    repository,
+    rateLimiter: createRateLimiter({ limit: 1, windowMs: 60_000 }),
+  });
+
+  const first = await app.request("/api/health", {
+    headers: { "x-forwarded-for": "203.0.113.7", "x-vercel-forwarded-for": "203.0.113.7" },
+  });
+  const spoofed = await app.request("/api/health", {
+    headers: { "x-forwarded-for": "198.51.100.4", "x-vercel-forwarded-for": "198.51.100.4" },
+  });
+
+  expect(first.status).toBe(200);
+  expect(spoofed.status).toBe(429);
 });
 
 test("an unreachable NASA archive is reported as an upstream failure, not a crash", async () => {

@@ -30,6 +30,16 @@ test("a missing key is simply absent", () => {
   expect(cache.size()).toBe(0);
 });
 
+test("separate serverless instances miss independently", () => {
+  const firstInstance = createArchiveCache<string>();
+  const secondInstance = createArchiveCache<string>();
+  firstInstance.set("query", "result", 100);
+
+  expect(firstInstance.get("query", 0)).toBe("result");
+  // A warm value in one instance is not durable or visible to another instance.
+  expect(secondInstance.get("query", 0)).toBeUndefined();
+});
+
 test("the entry count never exceeds the bound, however many queries arrive", () => {
   const cache = createArchiveCache<number>(4);
 
