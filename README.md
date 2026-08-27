@@ -107,6 +107,11 @@ The function resolves its repository at startup. With `DATABASE_URL` set it read
 
 Both upstream adapters wrap their TAP queries in an in-memory cache with a request timeout, six hours for planets and twelve for stars, and every response also carries `Cache-Control` with `stale-while-revalidate` so Vercel's CDN absorbs repeated reads. Catalog synchronization runs as a separate job against the same database, so the request path never waits on an archive-wide refresh.
 
+The in-process caches and request budgets are intentionally per-instance safeguards, not global
+quotas. See [API rate limiting and caching](docs/api-rate-limiting-and-caching.md) for the trust
+boundary, shared-cache behavior, operational tradeoffs, and the evidence threshold for adding a
+globally enforced control.
+
 The browser holds one Babylon engine for the lifetime of the page. Worlds are built into and removed from that single scene, which is what lets an immersive session survive travel between destinations.
 
 ```mermaid
