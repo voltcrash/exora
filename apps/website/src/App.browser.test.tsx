@@ -10,7 +10,9 @@ import "./style.css";
 const fetchBundledAsset = globalThis.fetch.bind(globalThis);
 
 const planetSceneStub = vi.hoisted(() => ({
+  resolveViewModeReady: null as (() => void) | null,
   setViewMode: null as ((mode: "orbit" | "surface" | "transition") => void) | null,
+  viewModeReady: Promise.resolve(),
 }));
 
 /**
@@ -134,6 +136,7 @@ vi.mock("./planet-scene.ts", () => ({
     },
   ) => {
     planetSceneStub.setViewMode = options.onViewModeChange;
+    planetSceneStub.resolveViewModeReady?.();
     options.onFirstFrame();
     return mountedWorld();
   },
@@ -502,6 +505,9 @@ const openDiscoverSection = async (
 
 beforeEach(() => {
   planetSceneStub.setViewMode = null;
+  planetSceneStub.viewModeReady = new Promise<void>((resolve) => {
+    planetSceneStub.resolveViewModeReady = () => resolve();
+  });
   stubbedHost().setDiscoverVisibility(false);
   stubbedHost().setInXr(false);
   document.head.querySelector('link[rel="canonical"]')?.remove();
@@ -1184,8 +1190,8 @@ test("terrain view fades every interface region and reveals the hovered one", as
   const shell = document.querySelector<HTMLElement>(".experience-shell");
   expect(shell).not.toBeNull();
   // The heading can commit one render before the async world-mount effect installs this callback.
-  // Busy CI runners expose that gap even though a local browser usually completes both together.
-  await expect.poll(() => typeof planetSceneStub.setViewMode).toBe("function");
+  // Await the mocked scene's lifecycle signal instead of making runner speed part of the test.
+  await planetSceneStub.viewModeReady;
   planetSceneStub.setViewMode?.("surface");
   await expect.poll(() => shell!.classList.contains("view-surface")).toBe(true);
   const canvas = document.querySelector<HTMLCanvasElement>("canvas");
