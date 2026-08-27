@@ -932,6 +932,12 @@ const createSceneHost = (canvas: HTMLCanvasElement): SceneHost => {
         setDiscoverOpen(open);
         const sessionManager = createdXr.baseExperience.sessionManager;
         if (!sessionManager.isFixedFoveationSupported) return;
+        // DOM capture is intentionally outside the steady-state world workload. Do not let its
+        // short main-thread stall poison the following three-second quality sample and leave the
+        // world unnecessarily blurry after the panel closes.
+        qualitySampleSeconds = 0;
+        engine.performanceMonitor.reset();
+        if (!open) sessionFoveation = profile.xrFixedFoveation;
         sessionManager.fixedFoveation = open ? 0 : sessionFoveation;
       });
       xrDiscoverSurface.attach(createdXr);
@@ -956,7 +962,11 @@ const createSceneHost = (canvas: HTMLCanvasElement): SceneHost => {
           if (createdXr.baseExperience.sessionManager.isFixedFoveationSupported) {
             createdXr.baseExperience.sessionManager.fixedFoveation = sessionFoveation;
           }
-          xrDiscoverSurface?.setVisible(activeImmersiveMode === "vr");
+          // Enter directly into the world. Discover is a summonable window, not a full-session
+          // viewport: opening it here hid most of the world and immediately started an expensive
+          // DOM snapshot on the same thread responsible for head tracking.
+          setDiscoverOpen(false);
+          xrDiscoverSurface?.setVisible(false);
           setXrStatus("in-xr");
         }
         if (state === runtime.WebXRState.NOT_IN_XR) {

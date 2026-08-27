@@ -10,8 +10,9 @@ from a plain LAN HTTP address.
 3. Orbit around one gas giant, one rocky world, and one ice giant.
 4. Confirm the planet, atmosphere, and ice-giant rings render in both eyes, with no smearing of
    the previous frame at the edges of either eye.
-5. Verify a controller ray can point at the in-headset panel and that every entry on it
-   responds: change view, recentre, travel, and exit.
+5. Verify VR opens directly onto the full world, then summon Discover with a controller menu
+   button. Confirm a controller ray can point at the in-headset panel and that every entry on it
+   responds: browse, travel, recentre, and return to the world.
 6. Walk the surface excursion with the thumbstick and confirm the wearer stays on the terrain.
 7. Exit and re-enter VR, then switch worlds and enter again.
 8. Open a system diorama on a host with several worlds — TRAPPIST-1, Kepler-90 and our own Sun
@@ -50,6 +51,8 @@ controller ray only points and selects.
 ## Performance target
 
 - Target the headset's 72 Hz refresh rate with no sustained drops below 60 FPS.
+- Opening Discover may cause one brief frame-time spike while its DOM is captured, but leaving the
+  panel still must hold 60 FPS and must not trigger continuous recaptures while it is idle.
 - Brief shader compilation drops during the first frame of a new world family are acceptable.
 - The session raises fixed foveation on its own after three seconds below 62 FPS and relaxes it
   again above 70 FPS, so a brief soft periphery under load is expected rather than a fault.

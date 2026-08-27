@@ -35,7 +35,8 @@ import {
 const PANEL_MAXIMUM = { height: 1.7, width: 2.72 };
 const INITIAL_TEXTURE = { height: 900, width: 1440 };
 const MAXIMUM_CAPTURE_PIXELS = 1_600_000;
-const CAPTURE_INTERVAL_MS = 250;
+/** Coalesce React/hover mutations without turning DOM capture into part of the render loop. */
+const CAPTURE_DEBOUNCE_MS = 100;
 const OPEN_SECONDS = 0.16;
 export interface XrDiscoverSurface {
   attach: (xr: WebXRDefaultExperience) => void;
@@ -113,7 +114,7 @@ export const createXrDiscoverSurface = (
   let resizeObserver: ResizeObserver | null = null;
   let captureTimer = 0;
   let captureInFlight = false;
-  let lastCaptureAt = 0;
+  let captureQueued = false;
   let visible = false;
   let openProgress = 0;
   let hovered: Element | null = null;
@@ -129,7 +130,9 @@ export const createXrDiscoverSurface = (
   };
 
   const scheduleCapture = (delay = 0): void => {
-    if (!visible || !dialog || captureTimer !== 0 || captureInFlight) return;
+    if (!visible || !dialog) return;
+    captureQueued = true;
+    if (captureTimer !== 0 || captureInFlight) return;
     captureTimer = window.setTimeout(() => {
       captureTimer = 0;
       void capture();
@@ -154,6 +157,7 @@ export const createXrDiscoverSurface = (
     if (bounds.width < 1 || bounds.height < 1) return;
 
     captureInFlight = true;
+    captureQueued = false;
     try {
       const ratio = Math.min(1, Math.sqrt(MAXIMUM_CAPTURE_PIXELS / (bounds.width * bounds.height)));
       const width = Math.max(1, Math.round(bounds.width * ratio));
@@ -161,6 +165,21 @@ export const createXrDiscoverSurface = (
       const { domToCanvas } = await import("modern-screenshot");
       const canvas = await domToCanvas(element, {
         backgroundColor: "#040708",
+        // Discover catalogs contain hundreds of cards below the scrollport. Serializing and
+        // styling every one of those invisible descendants blocked the XR frame callback for
+        // seconds even though the snapshot is clipped to the dialog. Keep ancestors and
+        // zero-sized structural nodes, but omit painted elements wholly outside the capture.
+        filter: (node) => {
+          if (!(node instanceof Element) || node === element) return true;
+          const rect = node.getBoundingClientRect();
+          if (rect.width === 0 && rect.height === 0) return true;
+          return !(
+            rect.right < bounds.left ||
+            rect.left > bounds.right ||
+            rect.bottom < bounds.top ||
+            rect.top > bounds.bottom
+          );
+        },
         height: bounds.height,
         maximumCanvasSize: MAXIMUM_CAPTURE_PIXELS,
         scale: ratio,
@@ -175,11 +194,13 @@ export const createXrDiscoverSurface = (
       context.drawImage(canvas, 0, 0, width, height);
       texture.update();
       resizeSurface(bounds.width, bounds.height);
-      lastCaptureAt = performance.now();
     } catch (error) {
       console.warn("Could not mirror Discover into the VR window", error);
     } finally {
       captureInFlight = false;
+      // A mutation that landed during the asynchronous snapshot still needs one fresh capture.
+      // Coalesce it with any immediately following React work instead of starting back-to-back.
+      if (captureQueued) scheduleCapture(CAPTURE_DEBOUNCE_MS);
     }
   };
 
@@ -322,6 +343,7 @@ export const createXrDiscoverSurface = (
       root.setEnabled(false);
       if (captureTimer !== 0) window.clearTimeout(captureTimer);
       captureTimer = 0;
+      captureQueued = false;
     }
     notifyVisibility();
   };
@@ -444,9 +466,8 @@ export const createXrDiscoverSurface = (
       const axis = scrollStick?.axes.y ?? 0;
       if (Math.abs(axis) > 0.18 && dialog) {
         scrollContainer(hovered, dialog).scrollBy({ top: axis * 32 });
-        scheduleCapture();
+        scheduleCapture(CAPTURE_DEBOUNCE_MS);
       }
-      if (performance.now() - lastCaptureAt >= CAPTURE_INTERVAL_MS) scheduleCapture();
     },
   };
 };
