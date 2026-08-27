@@ -1,15 +1,14 @@
-import type {
-  EphemerisResponse,
-  ExoplanetProfile,
-  PlanetResponse,
-  PlanetSearchResponse,
-  MissionTrajectoryResponse,
-  SmallBodyLookup,
-  SmallBodyParameter,
-  SmallBodySearchResponse,
-  StarProfile,
-  StarResponse,
-  StarSearchResponse,
+import {
+  type EphemerisResponse,
+  type ExoplanetProfile,
+  type MissionTrajectoryResponse,
+  type PlanetResponse,
+  type PlanetSearchResponse,
+  type SmallBodyLookup,
+  type SmallBodySearchResponse,
+  type StarProfile,
+  type StarResponse,
+  type StarSearchResponse,
 } from "@exora/contracts";
 import { requestDeadline } from "./request-deadline.ts";
 
@@ -46,6 +45,26 @@ interface SmallBodySearchOptions extends CollectionOptions {
   lookup?: SmallBodyLookup;
 }
 
+type RuntimeSchemaName =
+  | "ephemerisResponseSchema"
+  | "missionTrajectoryResponseSchema"
+  | "planetResponseSchema"
+  | "planetSearchResponseSchema"
+  | "smallBodySearchResponseSchema"
+  | "starResponseSchema"
+  | "starSearchResponseSchema";
+
+const parseApiPayload = async <Payload>(
+  schemaName: RuntimeSchemaName,
+  value: unknown,
+): Promise<Payload> => {
+  // Contracts are loaded only when the first API response arrives. Zod and the full schema graph
+  // stay out of Exora's latency-sensitive renderer chunk while every network payload still passes
+  // through the same runtime contract used by the server.
+  const contracts = await import("@exora/contracts");
+  return contracts[schemaName].parse(value) as Payload;
+};
+
 /**
  * Fetches and validates one list endpoint.
  *
@@ -59,7 +78,7 @@ const requestCollection = async <Payload>(
   { fetcher = fetch, signal }: CollectionOptions,
   timeoutMs: number,
   subject: string,
-  isValid: (value: unknown) => value is Payload,
+  schemaName: RuntimeSchemaName,
 ): Promise<Payload> => {
   const response = await fetcher(path, {
     headers: { accept: "application/json" },
@@ -69,8 +88,11 @@ const requestCollection = async <Payload>(
   if (!response.ok) throw new Error(`${subject} failed with status ${response.status}.`);
 
   const payload: unknown = await response.json();
-  if (!isValid(payload)) throw new Error(`${subject} returned an invalid response.`);
-  return payload;
+  try {
+    return await parseApiPayload<Payload>(schemaName, payload);
+  } catch {
+    throw new Error(`${subject} returned an invalid response.`);
+  }
 };
 
 const requestPlanetCollection = (
@@ -78,7 +100,13 @@ const requestPlanetCollection = (
   options: CollectionOptions,
   subject: string,
 ): Promise<PlanetSearchResult> =>
-  requestCollection(path, options, PLANET_COLLECTION_TIMEOUT_MS, subject, isPlanetSearchResponse) //
+  requestCollection<PlanetSearchResponse>(
+    path,
+    options,
+    PLANET_COLLECTION_TIMEOUT_MS,
+    subject,
+    "planetSearchResponseSchema",
+  ) //
     .then(({ data, meta }) => ({ cached: meta.cached, planets: data, query: meta.query }));
 
 const requestStarCollection = (
@@ -86,7 +114,13 @@ const requestStarCollection = (
   options: CollectionOptions,
   subject: string,
 ): Promise<StarSearchResult> =>
-  requestCollection(path, options, STAR_COLLECTION_TIMEOUT_MS, subject, isStarSearchResponse) //
+  requestCollection<StarSearchResponse>(
+    path,
+    options,
+    STAR_COLLECTION_TIMEOUT_MS,
+    subject,
+    "starSearchResponseSchema",
+  ) //
     .then(({ data, meta }) => ({ cached: meta.cached, query: meta.query, stars: data }));
 
 export interface PlanetLoadResult {
@@ -136,187 +170,17 @@ export interface RandomStarResult {
   star: StarProfile;
 }
 
-const isPlanetResponse = (value: unknown): value is PlanetResponse => {
-  if (!value || typeof value !== "object") return false;
-
-  const candidate = value as Partial<PlanetResponse>;
-  return Boolean(
-    candidate.data &&
-    typeof candidate.data.id === "string" &&
-    typeof candidate.data.name === "string" &&
-    candidate.meta?.source === "NASA Exoplanet Archive",
-  );
-};
-
-const isPlanetSearchResponse = (value: unknown): value is PlanetSearchResponse => {
-  if (!value || typeof value !== "object") return false;
-
-  const candidate = value as Partial<PlanetSearchResponse>;
-  return Boolean(
-    Array.isArray(candidate.data) &&
-    candidate.data.every(
-      (planet) => typeof planet.id === "string" && typeof planet.name === "string",
-    ) &&
-    typeof candidate.meta?.query === "string" &&
-    candidate.meta.source === "NASA Exoplanet Archive",
-  );
-};
-
-const isStarResponse = (value: unknown): value is StarResponse => {
-  if (!value || typeof value !== "object") return false;
-  const candidate = value as Partial<StarResponse>;
-  return Boolean(
-    candidate.data &&
-    typeof candidate.data.id === "string" &&
-    typeof candidate.data.name === "string" &&
-    candidate.meta?.source === "SIMBAD",
-  );
-};
-
-const isStarSearchResponse = (value: unknown): value is StarSearchResponse => {
-  if (!value || typeof value !== "object") return false;
-  const candidate = value as Partial<StarSearchResponse>;
-  return Boolean(
-    Array.isArray(candidate.data) &&
-    candidate.data.every((star) => typeof star.id === "string" && typeof star.name === "string") &&
-    typeof candidate.meta?.query === "string" &&
-    candidate.meta.source === "SIMBAD",
-  );
-};
-
-const isFiniteVector = (value: unknown): boolean =>
-  Boolean(
-    value &&
-    typeof value === "object" &&
-    ["x", "y", "z"].every((axis) => Number.isFinite((value as Record<string, unknown>)[axis])),
-  );
-
-const isEphemerisResponse = (value: unknown): value is EphemerisResponse => {
-  if (!value || typeof value !== "object") return false;
-  const candidate = value as Partial<EphemerisResponse>;
-  return Boolean(
-    Array.isArray(candidate.data) &&
-    candidate.data.length > 0 &&
-    candidate.data.every(
-      (vector) =>
-        Number.isInteger(vector.naifId) &&
-        typeof vector.spkId === "string" &&
-        typeof vector.solution === "string" &&
-        typeof vector.epoch === "string" &&
-        isFiniteVector(vector.positionAu) &&
-        isFiniteVector(vector.velocityAuPerDay),
-    ) &&
-    candidate.meta?.source === "NASA/JPL Horizons API" &&
-    candidate.meta.center === "Sun (10)" &&
-    candidate.meta.coordinateFrame === "Ecliptic J2000" &&
-    typeof candidate.meta.sourceVersion === "string" &&
-    typeof candidate.meta.cached === "boolean" &&
-    typeof candidate.meta.stale === "boolean",
-  );
-};
-
-const isMissionTrajectoryResponse = (value: unknown): value is MissionTrajectoryResponse => {
-  if (!value || typeof value !== "object") return false;
-  const candidate = value as Partial<MissionTrajectoryResponse>;
-  return Boolean(
-    Array.isArray(candidate.data) &&
-    candidate.data.length >= 2 &&
-    candidate.data.length <= 400 &&
-    candidate.data.every(
-      (point) =>
-        typeof point.calendarTdb === "string" &&
-        point.calendarTdb.includes("TDB") &&
-        Number.isFinite(point.julianDateTdb) &&
-        isFiniteVector(point.positionAu) &&
-        isFiniteVector(point.velocityAuPerDay),
-    ) &&
-    candidate.meta?.source === "NASA/JPL Horizons API" &&
-    candidate.meta.center === "Sun (10)" &&
-    candidate.meta.coordinateFrame === "Ecliptic J2000" &&
-    typeof candidate.meta.spkId === "string" &&
-    typeof candidate.meta.targetName === "string" &&
-    typeof candidate.meta.solution === "string" &&
-    Number.isInteger(candidate.meta.stepDays) &&
-    typeof candidate.meta.cached === "boolean" &&
-    typeof candidate.meta.stale === "boolean",
-  );
-};
-
-const isSmallBodyParameter = (value: unknown): value is SmallBodyParameter => {
-  if (!value || typeof value !== "object") return false;
-  const candidate = value as Partial<SmallBodyParameter>;
-  return (
-    typeof candidate.name === "string" &&
-    typeof candidate.title === "string" &&
-    typeof candidate.value === "string" &&
-    (candidate.uncertainty === null || typeof candidate.uncertainty === "string") &&
-    (candidate.units === null || typeof candidate.units === "string") &&
-    (candidate.reference === null || typeof candidate.reference === "string")
-  );
-};
-
-const isNullableBoolean = (value: unknown): boolean => value === null || typeof value === "boolean";
-const isNullableNumber = (value: unknown): boolean =>
-  value === null || (typeof value === "number" && Number.isFinite(value));
-
-const isSmallBodySearchResponse = (value: unknown): value is SmallBodySearchResponse => {
-  if (!value || typeof value !== "object") return false;
-  const candidate = value as Partial<SmallBodySearchResponse>;
-  const status = candidate.meta?.status;
-  const profile = candidate.data;
-  const profileValid = Boolean(
-    profile &&
-    ["asteroid", "comet"].includes(profile.kind) &&
-    typeof profile.designation === "string" &&
-    typeof profile.fullName === "string" &&
-    typeof profile.spkId === "string" &&
-    isNullableBoolean(profile.nearEarth) &&
-    isNullableBoolean(profile.potentiallyHazardous) &&
-    Array.isArray(profile.orbit?.elements) &&
-    profile.orbit.elements.every(isSmallBodyParameter) &&
-    Array.isArray(profile.physicalParameters) &&
-    profile.physicalParameters.every(isSmallBodyParameter) &&
-    Array.isArray(profile.closeApproaches) &&
-    profile.closeApproaches.every(
-      (approach) =>
-        typeof approach.body === "string" &&
-        typeof approach.calendarDate === "string" &&
-        Number.isFinite(approach.distanceAu) &&
-        isNullableNumber(approach.distanceMinimumAu) &&
-        isNullableNumber(approach.distanceMaximumAu) &&
-        isNullableNumber(approach.julianDate) &&
-        isNullableNumber(approach.relativeVelocityKilometersPerSecond) &&
-        isNullableNumber(approach.timeUncertaintySeconds),
-    ),
-  );
-  return Boolean(
-    ["ambiguous", "match", "not-found"].includes(status ?? "") &&
-    candidate.meta?.source === "NASA/JPL Small-Body Database (SBDB) API" &&
-    typeof candidate.meta.sourceVersion === "string" &&
-    typeof candidate.meta.query === "string" &&
-    typeof candidate.meta.retrievedAt === "string" &&
-    ["auto", "designation", "spk"].includes(candidate.meta.lookup ?? "") &&
-    typeof candidate.meta.cached === "boolean" &&
-    typeof candidate.meta.stale === "boolean" &&
-    Array.isArray(candidate.matches) &&
-    candidate.matches.every(
-      (match) => typeof match.designation === "string" && typeof match.name === "string",
-    ) &&
-    (status === "match" ? profileValid : profile === null),
-  );
-};
-
 export const searchSmallBodies = async (
   query: string,
   { lookup = "auto", ...options }: SmallBodySearchOptions = {},
 ): Promise<SmallBodySearchResponse> => {
   const parameters = new URLSearchParams({ lookup, q: query.trim() });
-  return requestCollection(
+  return requestCollection<SmallBodySearchResponse>(
     `/api/small-bodies?${parameters.toString()}`,
     options,
     SMALL_BODY_TIMEOUT_MS,
     "JPL small-body search",
-    isSmallBodySearchResponse,
+    "smallBodySearchResponseSchema",
   );
 };
 
@@ -329,12 +193,12 @@ export const loadSolarEphemeris = async (
     at: epoch.toISOString(),
     ids: naifIds.join(","),
   });
-  const response = await requestCollection(
+  const response = await requestCollection<EphemerisResponse>(
     `/api/ephemerides?${parameters.toString()}`,
     options,
     EPHEMERIS_TIMEOUT_MS,
     "JPL ephemeris",
-    isEphemerisResponse,
+    "ephemerisResponseSchema",
   );
   const expected = new Set(naifIds);
   if (
@@ -359,12 +223,12 @@ export const loadMissionTrajectory = async (
     step: String(range.stepDays),
     stop: range.stop,
   });
-  const response = await requestCollection(
+  const response = await requestCollection<MissionTrajectoryResponse>(
     `/api/mission-trajectories?${parameters.toString()}`,
     options,
     MISSION_TRAJECTORY_TIMEOUT_MS,
     "JPL mission trajectory",
-    isMissionTrajectoryResponse,
+    "missionTrajectoryResponseSchema",
   );
   if (response.meta.spkId !== spkId || response.meta.stepDays !== range.stepDays) {
     throw new Error("JPL mission trajectory returned a different target or sample interval.");
@@ -385,8 +249,7 @@ const requestPlanet = async (
 
     if (!response.ok) return null;
 
-    const payload: unknown = await response.json();
-    return isPlanetResponse(payload) ? payload : null;
+    return await parseApiPayload<PlanetResponse>("planetResponseSchema", await response.json());
   } catch {
     return null;
   }
@@ -510,8 +373,7 @@ const requestStar = async (
       signal: requestDeadline(OBJECT_LOOKUP_TIMEOUT_MS, signal),
     });
     if (!response.ok) return null;
-    const payload: unknown = await response.json();
-    return isStarResponse(payload) ? payload : null;
+    return await parseApiPayload<StarResponse>("starResponseSchema", await response.json());
   } catch {
     return null;
   }

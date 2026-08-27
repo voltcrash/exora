@@ -38,6 +38,17 @@ test("falls back when the API is unavailable", async () => {
   expect(result).toMatchObject({ mode: "fallback", planet: featuredPlanet });
 });
 
+test("rejects an id-and-name-only planet payload instead of treating it as live data", async () => {
+  const result = await loadFeaturedPlanet(featuredPlanet, async () =>
+    Response.json({
+      data: { id: "plausible-id", name: "Plausible Name" },
+      meta: { cached: false, source: "NASA Exoplanet Archive" },
+    }),
+  );
+
+  expect(result).toMatchObject({ mode: "fallback", planet: featuredPlanet });
+});
+
 test("loads a planet by its exact archive name", async () => {
   const result = await loadPlanetByName("WASP-39 b", async (input) => {
     const requestUrl =
@@ -67,6 +78,28 @@ test("returns normalized planet search results", async () => {
   });
 
   expect(result).toMatchObject({ planets: [{ id: featuredPlanet.id }], query: "wasp" });
+});
+
+test("rejects malformed scientific fields in planet collections", async () => {
+  await expect(
+    searchPlanets("wasp", {
+      fetcher: async () =>
+        Response.json({
+          data: [
+            {
+              ...featuredPlanet,
+              observation: { ...featuredPlanet.observation, orbitalEccentricity: "unknown" },
+            },
+          ],
+          meta: {
+            cached: false,
+            count: 1,
+            query: "wasp",
+            source: "NASA Exoplanet Archive",
+          },
+        }),
+    }),
+  ).rejects.toThrow("invalid response");
 });
 
 test("loads the confirmed planets connected to a star", async () => {
@@ -390,6 +423,17 @@ const starPayload = {
 test("loads a star by its familiar name", async () => {
   const result = await loadStarByName("Sirius", async () => Response.json(starPayload));
   expect(result?.star).toMatchObject({ id: "alf-cma", name: "Sirius" });
+});
+
+test("rejects an id-and-name-only star payload", async () => {
+  const result = await loadStarByName("Sirius", async () =>
+    Response.json({
+      data: { id: "alf-cma", name: "Sirius" },
+      meta: { cached: false, source: "SIMBAD" },
+    }),
+  );
+
+  expect(result).toBeNull();
 });
 
 test("loads featured stars for an empty catalog query", async () => {
