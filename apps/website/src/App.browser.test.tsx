@@ -7,6 +7,8 @@ import { acquireSceneHost } from "./scene-host.ts";
 import { featuredPlanet } from "./planet-profile.ts";
 import "./style.css";
 
+const fetchBundledAsset = globalThis.fetch.bind(globalThis);
+
 const planetSceneStub = vi.hoisted(() => ({
   setViewMode: null as ((mode: "orbit" | "surface" | "transition") => void) | null,
 }));
@@ -260,6 +262,10 @@ const stubArchive = ({ missing = [] as string[] } = {}) => {
     const url = new URL(path, window.location.origin);
     const requested = decodeURIComponent(url.pathname.split("/").pop() ?? "");
 
+    // API stubbing must not turn a missing production asset into the renderer's intentional
+    // seeded-sky fallback. Pass the real catalog request through to Vite's public directory.
+    if (url.pathname === "/sky/hyg-v44-vmag65.bin") return fetchBundledAsset(url);
+
     if (missing.includes(requested)) return new Response(null, { status: 404 });
 
     if (url.pathname === "/api/ephemerides") {
@@ -509,6 +515,15 @@ test("the landing page reaches a rendered world", async () => {
   // The loading overlay is fixed at z-index 10 over everything, so a control being visible is
   // also the assertion that the first frame was reported and the overlay stood down.
   await expect.element(page.getByRole("button", { name: "Open Discover" })).toBeVisible();
+});
+
+test("the browser test server exposes the production sky catalog", async () => {
+  stubArchive();
+  const response = await fetch("/sky/hyg-v44-vmag65.bin");
+  const header = new DataView(await response.arrayBuffer());
+
+  expect(response.status).toBe(200);
+  expect(header.getUint32(0, true)).toBe(0x4b_53_58_45);
 });
 
 test("Discover opens directly into the Solar System at this width", async () => {

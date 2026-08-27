@@ -18,7 +18,7 @@ module.exports = {
       assertions: {
         "categories:accessibility": ["error", { minScore: 0.95 }],
         "categories:best-practices": ["error", { minScore: 0.9 }],
-        "categories:performance": ["warn", { minScore: 0.6 }],
+        "categories:performance": ["warn", { minScore: 0.85 }],
         "categories:seo": ["error", { minScore: 0.9 }],
         "cumulative-layout-shift": ["error", { maxNumericValue: 0.1 }],
         "first-contentful-paint": ["error", { maxNumericValue: 3000 }],
@@ -26,7 +26,7 @@ module.exports = {
         // Software-rendered CI does not consistently produce TBT for a live WebGL animation loop.
         // FCP, LCP, CLS, transfer weight, and the non-performance categories remain hard gates.
         "total-blocking-time": ["warn", { maxNumericValue: 4000 }],
-        "total-byte-weight": ["error", { maxNumericValue: 8_000_000 }],
+        "total-byte-weight": ["error", { maxNumericValue: 7_500_000 }],
         "unused-javascript": "warn",
       },
     },

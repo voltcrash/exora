@@ -39,6 +39,7 @@ import { skyViewpointFrom } from "./sky-catalog.ts";
 import { createStellarSurface, type StellarSurface } from "./star-surface.ts";
 import { createStarfield } from "./star-visuals.ts";
 import { getSurfaceDetailTextures, surfaceDetailSelectionForPalette } from "./texture-cache.ts";
+import { solarMosaicPathForTier } from "./route-assets.ts";
 import { markAsVirtualBackground } from "./world-presentation.ts";
 import {
   easeAway,
@@ -1697,7 +1698,12 @@ const createPlanet = (
   shader.setFloat("stellarIntensity", recipe.star.intensity);
 
   if (knownTexture) {
-    const surfaceMap = new Texture(knownTexture.path, scene, true, false);
+    const surfaceMap = new Texture(
+      solarMosaicPathForTier(knownTexture.path, profile.tier),
+      scene,
+      true,
+      false,
+    );
     surfaceMap.name = `${planetProfile.id}-spacecraft-mosaic`;
     surfaceMap.anisotropicFilteringLevel = profile.anisotropicFiltering;
     surfaceMap.wrapU = Texture.WRAP_ADDRESSMODE;

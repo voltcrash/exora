@@ -64,6 +64,12 @@ quantisation.
 | Neptune | `textures/solar-system/neptune.jpg` | NASA/JPL Solar System Simulator visualization                   | `science.nasa.gov/3d-resources/neptune/`                                       |
 | Pluto   | `textures/solar-system/pluto.jpg`   | New Horizons MVIC global color map / NASA/JHUAPL                | `science.nasa.gov/resource/pluto-global-color-map/`                            |
 
+Mobile and Quest routes use 1024×512 JPEG derivatives of only the source mosaics larger than
+900 kB. They preserve the source pixels and coverage with no retouching: `callisto-mobile.jpg`,
+`dione-mobile.jpg`, `enceladus-mobile.jpg`, `europa-mobile.jpg`, `ganymede-mobile.jpg`,
+`mars-mobile.jpg`, `mercury-mobile.jpg`, `mimas-mobile.jpg`, `rhea-mobile.jpg`,
+`tethys-mobile.jpg`, and `venus-mobile.jpg`.
+
 ### Principal moon mosaics
 
 The 21 principal moons below are the complete set for which NASA's current public visualization
