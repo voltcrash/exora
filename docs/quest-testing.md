@@ -10,54 +10,40 @@ from a plain LAN HTTP address.
 3. Orbit around one gas giant, one rocky world, and one ice giant.
 4. Confirm the planet, atmosphere, and ice-giant rings render in both eyes, with no smearing of
    the previous frame at the edges of either eye.
-5. Verify VR opens directly onto the full world, then summon Discover with a controller menu
-   button. Confirm a controller ray can point at the in-headset panel and that every entry on it
-   responds: browse, travel, recentre, and return to the world. In orbit, hold A/X while moving a
-   controller and confirm the view circles the planet without displacing the planet or its star;
-   release without moving to select it.
+5. Verify VR opens directly onto the full world and never creates a Discover panel, DOM capture,
+   or other browser UI in the immersive scene. In orbit, hold A/X while moving a controller and
+   confirm the view circles the planet without displacing the planet or its star; release without
+   moving to select it.
 6. Walk the surface excursion with the thumbstick, then hold A/X and move a controller to orbit
    the terrain view. Confirm the wearer stays on the terrain and the terrain itself does not move.
-7. Exit and re-enter VR, then switch worlds and enter again.
-8. Open a system diorama on a host with several worlds — TRAPPIST-1, Kepler-90 and our own Sun
+7. Press either trigger to exit VR. If the runtime continues exposing the controller on the flat
+   page, press either trigger again to re-enter; otherwise use the page's immersive control, as
+   WebXR does not expose disconnected XR controllers to page input. Switch worlds and enter again.
+8. While VR is active, press either grip and confirm the browser/desktop Discover dialog toggles
+   on the mirrored page without adding anything to the headset scene. Repeat with the left
+   application-menu button. Each press must open or close the same React dialog immediately.
+9. Open a system diorama on a host with several worlds — TRAPPIST-1, Kepler-90 and our own Sun
    are the three worth checking, being the most compact, the most spread out, and the one with
    the most worlds. A session opens on a deck above the plane, so confirm the orbits read as
-   rings rather than a flat line. Then take "Stand in the plane" from the panel and confirm the
-   wearer drops to the orbits themselves and can walk between them with the thumbstick.
-9. From inside the diorama, point at a world and travel to it, then use "View the whole system" on
-   the panel to come back. Do the same between a world and its host star.
-10. Travel from a world to its host star from inside the headset, then on to a world in that
+   rings rather than a flat line.
+10. From inside the diorama, point at a world and travel to it, then return from the browser page.
+    Do the same between a world and its host star.
+11. Travel from a world to its host star from inside the headset, then on to a world in that
     star's system. The session must never end: the view fades to black, the new object fades in
     around the wearer, and the headset is never returned to the flat page or the VR entry prompt
-    in between. The panel stays open on the page it was on, now describing the new object.
-11. Enter VR from each of the Solar System's own destinations — an asteroid, a comet, a region,
-    a mission and a black hole — and confirm each one offers the immersive entry on the page, and
-    that from inside it the panel's Worlds, Stars and Forge pages travel and generate rather than
-    browsing to a dead end. On a mission, confirm the panel's own switch draws the flown path,
-    and that the page agrees with it after the headset comes off.
-12. Leave the experience running for ten minutes to catch thermal throttling or memory growth.
+    in between.
+12. Enter VR from each of the Solar System's own destinations — an asteroid, a comet, a region,
+    a mission and a black hole — and confirm each one offers the immersive entry on the page.
+13. Leave the experience running for ten minutes to catch thermal throttling or memory growth.
 
-## Known gaps
-
-These work on the page and have no in-headset equivalent yet. They are omissions rather than
-faults, but a smoke test should not report them as new:
-
-- A star or diorama lists the first five of its worlds on the panel and does not page past them,
-  so a host with more — our own Sun has thirteen — cannot reach the rest without leaving VR.
-- A planet's moon subsystem is a page control only, so Jupiter's moons cannot be opened, or left,
-  from inside a session.
-- The Solar System diorama's live ephemeris clock and a comet's heliocentric-distance slider are
-  page controls with no console entries.
-
-Movement is thumbstick locomotion with smooth turning; teleportation is deliberately off, so a
-controller ray only points and selects.
+Movement is thumbstick locomotion with smooth turning; teleportation and Babylon's default
+trigger/grip pointer selection are deliberately off. A/X owns immersive selection and view drag.
 
 ## Performance target
 
 - Target the headset's 72 Hz refresh rate with no sustained drops below 60 FPS.
-- Opening Discover may cause one brief frame-time spike while its DOM is captured, but leaving the
-  panel still must hold 60 FPS and must not trigger continuous recaptures while it is idle.
-- Moving either controller ray across Discover must not change frame rate or produce hover
-  vibration. Haptics are reserved for a deliberate selection.
+- Toggling browser Discover from a grip or the left application-menu button must not affect the
+  headset frame rate; there is no DOM capture or in-headset UI texture.
 - Brief shader compilation drops during the first frame of a new world family are acceptable.
 - The session raises fixed foveation on its own after three seconds below 62 FPS and relaxes it
   again above 70 FPS, so a brief soft periphery under load is expected rather than a fault.

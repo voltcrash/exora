@@ -173,10 +173,6 @@ export const App = () => {
   const [discoverOpen, setDiscoverOpen] = useState(false);
   useEffect(() => sceneHost?.onDiscoverVisibility(setDiscoverOpen), [sceneHost]);
   useEffect(() => sceneHost?.setDiscoverVisibility(discoverOpen), [discoverOpen, sceneHost]);
-  const discoverSurfaceRef = useCallback(
-    (element: HTMLDialogElement | null): void => sceneHost?.setDiscoverElement(element),
-    [sceneHost],
-  );
   const [activeObject, setActiveObject] = useState<ActiveObject | null>(() => {
     const parameters = new URLSearchParams(window.location.search);
     return parameters.has("blackHole") ||
@@ -208,9 +204,8 @@ export const App = () => {
   // being rendered for nobody. Parking the loop gives that work back to the interface.
   const overlayOpen = discoverOpen;
   useEffect(() => {
-    // In immersive VR the Discover dialog is the source texture for a Babylon surface. Parking
-    // the renderer there would freeze the very window the wearer just opened; this optimization
-    // is only for the flat page, where the DOM dialog itself owns the display.
+    // The desktop dialog may be toggled by a controller while VR remains active. Keep the headset
+    // loop running in that case; only the flat page can safely park rendering behind the dialog.
     if (!sceneHost || !overlayOpen || sceneHost.isInXr()) return;
     return sceneHost.suspendRendering();
   }, [overlayOpen, sceneHost]);
@@ -670,7 +665,6 @@ export const App = () => {
             onSelectPlanet={selectPlanet}
             onSelectRegion={selectRegion}
             onSelectStar={selectStar}
-            surfaceRef={discoverSurfaceRef}
           />
         </Suspense>
       ) : null}

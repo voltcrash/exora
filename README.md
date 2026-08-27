@@ -20,7 +20,7 @@ The system diorama is where that discipline is most visible, because a picture o
 - **World Forge:** A two-mode builder for procedural planets and custom stars, seeded and reproducible, using the same recipe engine as the catalog.
 - **Persistent immersive session:** The engine, scene, camera, and WebXR session outlive any single destination. Travelling between a system, a world in it, that world's surface, and the host star swaps the contents of one scene instead of rebuilding the context, so the headset never drops back to the flat page.
 - **iPhone and Android AR:** The same immersive control prefers the established Meta Quest VR session, selects native `immersive-ar` on an AR-only phone, and uses Variant Launch's App Clip handoff on iPhone. AR presents the existing Babylon world at tabletop scale over camera passthrough, with hit-tested placement, drag repositioning, and pinch scaling — no GLB or USDZ export path.
-- **In-headset console:** A holographic panel that rebuilds every browser dialog as a page in VR — collection browsing, an in-world keyboard for search, the archive's own numbers for the object in front of you, the World Forge, and travel — so nothing requires taking the headset off.
+- **Direct Quest shortcuts:** Either trigger toggles immersive VR when the runtime exposes the controller, while either grip or the left application-menu button toggles the unchanged browser Discover dialog. No browser UI is captured or rendered inside VR.
 - **Adaptive rendering budget:** Separate desktop, mobile, and Quest profiles govern shader octaves, sphere tessellation, star count, texture detail, and render scale. Immersive sessions raise fixed foveation after three seconds below 62 FPS and relax it again above 70.
 - **Desktop WebXR emulation:** An opt-in Immersive Web Emulation Runtime installs a synthetic Quest over `navigator.xr`, so the immersive path runs unmodified in a normal tab.
 - **Graceful degradation:** A six-hour planet cache, a twelve-hour star cache, and a bundled local profile keep the experience alive when NASA, SIMBAD, or the API is unreachable.
@@ -97,7 +97,7 @@ packages/contracts   Shared API, exoplanet, and star types
 packages/worldgen    Deterministic data-to-world recipe engine
 ```
 
-`packages/worldgen` is the only place a catalog row becomes an appearance, so the API, the browser renderer, and the in-headset console all describe an object the same way. Texture provenance and licensing for the close-range detail maps are recorded in [THIRD_PARTY_ASSETS.md](THIRD_PARTY_ASSETS.md).
+`packages/worldgen` is the only place a catalog row becomes an appearance, so the API and browser renderer describe an object the same way. Texture provenance and licensing for the close-range detail maps are recorded in [THIRD_PARTY_ASSETS.md](THIRD_PARTY_ASSETS.md).
 
 ## Current deployment architecture
 
@@ -120,7 +120,6 @@ flowchart TB
     subgraph Browser["Browser runtime"]
         UI["React interface<br/>catalogs + World Forge"]
         Host["Scene host<br/>one Babylon engine + XR session"]
-        Console["In-headset console"]
         Worldgen["@exora/worldgen<br/>deterministic recipes"]
     end
 
@@ -144,12 +143,9 @@ flowchart TB
     Phone --> Static
     Static --> UI
     UI --> Host
-    Host --> Console
     Host --> Worldgen
-    Console --> Worldgen
 
     UI -->|/api/planets, /api/stars| Fn
-    Console -->|search + travel| Fn
 
     Fn -->|when DATABASE_URL is set| Neon
     Fn -->|fallback + featured lookups| NASA

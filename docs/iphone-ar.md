@@ -46,8 +46,8 @@ by desktop emulation. Run this pass on a physical iPhone in a non-private Safari
 8. Exit AR. The flat desktop/mobile view must return at its original camera framing, with its
    virtual sky restored.
 9. Repeat with one planet, one star, and one black hole. Then re-run the existing Meta Quest
-   checklist to confirm the same control still enters `immersive-vr`, retains thumbstick
-   locomotion, and opens the in-headset Discover screen.
+   checklist to confirm the same control still enters `immersive-vr` and retains thumbstick
+   locomotion. Discover must remain browser-only.
 
 If Safari never offers AR, check the Variant SDK key, authorized hostname, HTTPS certificate,
 Safari/private-browsing state, and whether a content blocker prevented `launchar.app` from

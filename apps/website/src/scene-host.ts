@@ -8,9 +8,9 @@
  * visible re-entry. Two black transitions and a compositor hand-off for what should be a step
  * across a room.
  *
- * So the engine, the scene, the desktop camera, the immersive session and the in-headset Discover
- * all live here, for as long as the page does, and a destination is just the *contents* of that
- * one scene. Travelling swaps the contents. The session never notices.
+ * So the engine, the scene, the desktop camera and the immersive session all live here, for as
+ * long as the page does, and a destination is just the *contents* of that one scene. Travelling
+ * swaps the contents. The session never notices.
  *
  * What the host owns, no world may dispose; what a world adds, `world-scope.ts` takes back out.
  */
@@ -32,7 +32,6 @@ import type { WebXRCamera } from "@babylonjs/core/XR/webXRCamera.js";
 import type { WebXRAbstractMotionController } from "@babylonjs/core/XR/motionController/webXRAbstractMotionController.js";
 import type { WebXRControllerComponent } from "@babylonjs/core/XR/motionController/webXRControllerComponent.js";
 import type { WebXRInputSource } from "@babylonjs/core/XR/webXRInputSource.js";
-import type { WebXRControllerMovement } from "@babylonjs/core/XR/features/WebXRControllerMovement.pure.js";
 import type { WebXRDefaultExperience } from "@babylonjs/core/XR/webXRDefaultExperience.js";
 import { createArPresentation } from "./ar-presentation.ts";
 import type { BlackHoleProfile } from "./black-holes.ts";
@@ -68,7 +67,7 @@ import {
   type TravelPhase,
 } from "./travel-transition.ts";
 import type { XrConsoleHost } from "./xr-console.ts";
-import type { XrDiscoverSurface } from "./xr-discover-surface.ts";
+import { xrControllerAction } from "./xr-controller-input.ts";
 import {
   chooseImmersiveDestination,
   getVariantLaunchUrl,
@@ -201,13 +200,11 @@ export interface SceneHost {
   mountWorld: <World extends MountedWorld>(
     build: () => Promise<World> | World,
   ) => Promise<World | null>;
-  /** Subscribes to the shared desktop/VR Discover state. */
+  /** Subscribes to the desktop Discover state. */
   onDiscoverVisibility: (listener: (open: boolean) => void) => () => void;
   /** Repaints the console, for when a world's own entries change after it was mounted. */
   refreshConsole: () => void;
-  /** Supplies the actual React dialog mirrored onto the VR window. */
-  setDiscoverElement: (element: HTMLDialogElement | null) => void;
-  /** Keeps React and the controller-summoned VR window on the same open state. */
+  /** Keeps React and controller shortcuts on the same desktop Discover state. */
   setDiscoverVisibility: (visible: boolean) => void;
   /** Registers the page-level destinations the console falls back to. See `ConsoleNavigator`. */
   setConsoleNavigator: (navigator: ConsoleNavigator | null) => void;
@@ -369,8 +366,6 @@ const createSceneHost = (canvas: HTMLCanvasElement): SceneHost => {
   let xr: WebXRDefaultExperience | null = null;
   let xrRuntime: typeof XrRuntime | null = null;
   let xrInitialization: Promise<WebXRDefaultExperience | null> | null = null;
-  let xrDiscoverSurface: XrDiscoverSurface | null = null;
-  let xrMovement: WebXRControllerMovement | null = null;
   interface XrDragState {
     component: WebXRControllerComponent;
     controller: WebXRInputSource;
@@ -385,26 +380,17 @@ const createSceneHost = (canvas: HTMLCanvasElement): SceneHost => {
   const boundXrDragControllers = new WeakSet<WebXRInputSource>();
   const boundXrDragMotionControllers = new WeakSet<WebXRAbstractMotionController>();
   let xrDragObserver: ReturnType<typeof scene.onBeforeRenderObservable.add> | null = null;
-  let discoverElement: HTMLDialogElement | null = null;
   let currentWorld: MountedWorld | null = null;
   let currentScope: WorldScope | null = null;
   let mountToken = 0;
   let worldBuildGate = Promise.resolve();
   let sessionFoveation = profile.xrFixedFoveation;
-  /** Whether the in-headset Discover screen currently owns the view. */
+  /** Whether the browser/desktop Discover dialog is open. */
   let discoverOpen = false;
   const discoverListeners = new Set<(open: boolean) => void>();
-  const syncDiscoverElementPresentation = (): void => {
-    discoverElement?.toggleAttribute(
-      "data-xr-mirrored",
-      isInXr && activeImmersiveMode === "vr" && discoverOpen,
-    );
-  };
   const setDiscoverOpen = (open: boolean): void => {
     if (discoverOpen === open) return;
     discoverOpen = open;
-    if (xrMovement) xrMovement.movementEnabled = !open;
-    syncDiscoverElementPresentation();
     for (const listener of discoverListeners) listener(open);
   };
   let qualitySampleSeconds = 0;
@@ -474,8 +460,6 @@ const createSceneHost = (canvas: HTMLCanvasElement): SceneHost => {
   const adaptSessionFoveation = (fps: number): void => {
     const sessionManager = xr?.baseExperience.sessionManager;
     if (!sessionManager?.isFixedFoveationSupported) return;
-    // Keep the UI text sharp while Discover is open and park the adaptive ladder until it closes.
-    if (discoverOpen) return;
     const next = adaptFixedFoveation(sessionFoveation, fps, profile);
     if (next === sessionFoveation) return;
     sessionFoveation = next;
@@ -495,7 +479,6 @@ const createSceneHost = (canvas: HTMLCanvasElement): SceneHost => {
     if (
       !isInXr ||
       activeImmersiveMode !== "vr" ||
-      discoverOpen ||
       xrDragStates.has(controller) ||
       xrDragStates.size > 0
     )
@@ -521,7 +504,7 @@ const createSceneHost = (canvas: HTMLCanvasElement): SceneHost => {
   };
   const updateXrDrags = (): void => {
     for (const state of xrDragStates.values()) {
-      if (!state.component.pressed || !isInXr || activeImmersiveMode !== "vr" || discoverOpen) {
+      if (!state.component.pressed || !isInXr || activeImmersiveMode !== "vr") {
         finishXrDrag(state.controller, false);
         continue;
       }
@@ -566,7 +549,6 @@ const createSceneHost = (canvas: HTMLCanvasElement): SceneHost => {
     if (rigAwaitingWorld && isInXr && activeImmersiveMode === "vr") {
       rigAwaitingWorld = false;
       currentWorld?.focusXrRig(false);
-      xrDiscoverSurface?.recall();
     }
 
     if (veilAlpha !== veilTarget || veil.isEnabled()) {
@@ -581,10 +563,6 @@ const createSceneHost = (canvas: HTMLCanvasElement): SceneHost => {
       if (eye) veil.position.copyFrom(eye);
       if (veilAlpha === veilTarget) resolveVeil();
     }
-
-    // Locomotion owns the XR rig after entry. Rewriting its position here causes visible
-    // snap-backs on room-scale headsets, so only the head-locked console needs a frame update.
-    if (isInXr && activeImmersiveMode === "vr") xrDiscoverSurface?.update(deltaSeconds);
 
     qualitySampleSeconds += deltaSeconds;
     if (qualitySampleSeconds >= 3) {
@@ -881,10 +859,6 @@ const createSceneHost = (canvas: HTMLCanvasElement): SceneHost => {
     build: () => Promise<World> | World,
   ): Promise<World | null> => {
     const token = (mountToken += 1);
-    // Choosing a destination closes Discover, the way it closes on the flat page. In a headset
-    // this also makes the newly selected world the focus instead of leaving the catalog window in
-    // front of it after the jump.
-    xrDiscoverSurface?.setVisible(false);
     // The outgoing world keeps rendering through the flight, so the jump never shows an empty
     // sky: it is watched receding, and only the swap itself happens behind the dark.
     if (currentWorld) {
@@ -976,17 +950,14 @@ const createSceneHost = (canvas: HTMLCanvasElement): SceneHost => {
       const createdXr = await runtime.WebXRDefaultExperience.CreateAsync(scene, {
         disableDefaultUI: true,
         disableNearInteraction: true,
+        // World interaction is owned by A/X below. Triggers and grips are deliberately free for
+        // the session and desktop-menu shortcuts, so Babylon must not bind either as selection.
+        disablePointerSelection: true,
         disableTeleportation: true,
         // The rigged hand mesh is a remote glTF and no loader is bundled, so joint spheres are used.
         handSupportOptions: { handMeshes: { disableDefaultMeshes: true } },
         inputOptions: { doNotLoadControllerMeshes: true },
         optionalFeatures: ["hand-tracking"],
-        // Quest triggers open Discover. Squeeze remains Babylon's pointer-selection fallback;
-        // A/X is handled below as a tap action or a held gesture that orbits the immersive view.
-        pointerSelectionOptions: {
-          enablePointerSelectionOnAllControllers: true,
-          overrideButtonId: "xr-standard-squeeze",
-        },
         outputCanvasOptions: {
           canvasOptions: {
             // Quest 2's compositor is unreliable with an explicitly opaque WebGL layer. Babylon's
@@ -1005,7 +976,7 @@ const createSceneHost = (canvas: HTMLCanvasElement): SceneHost => {
       }
 
       xr = createdXr;
-      xrMovement = createdXr.baseExperience.featuresManager.enableFeature(
+      createdXr.baseExperience.featuresManager.enableFeature(
         runtime.WebXRFeatureName.MOVEMENT,
         "latest",
         {
@@ -1019,19 +990,65 @@ const createSceneHost = (canvas: HTMLCanvasElement): SceneHost => {
           rotationThreshold: 0.18,
           xrInput: createdXr.input,
         },
-      ) as WebXRControllerMovement;
-      const bindXrDragMotionController = (
+      );
+      let changingVr = false;
+      const toggleVr = async (): Promise<void> => {
+        if (changingVr) return;
+        changingVr = true;
+        try {
+          if (isInXr) {
+            if (activeImmersiveMode === "vr") {
+              await createdXr.baseExperience.sessionManager.exitXRAsync();
+            }
+            return;
+          }
+          if (!isVrSupported) return;
+          activeImmersiveMode = "vr";
+          await createdXr.baseExperience.enterXRAsync(
+            "immersive-vr",
+            "local-floor",
+            createdXr.renderTarget,
+          );
+        } catch (error) {
+          activeImmersiveMode = null;
+          setXrStatus(readyXrStatus());
+          console.error("[xr] controller VR toggle failed", error);
+        } finally {
+          changingVr = false;
+        }
+      };
+      const handleXrBack = (): void => {
+        if (currentWorld?.handleXrBack?.()) return;
+        if (window.location.search) window.history.back();
+      };
+      const bindXrMotionController = (
         controller: WebXRInputSource,
         motionController: WebXRAbstractMotionController,
       ): void => {
         if (boundXrDragMotionControllers.has(motionController)) return;
         boundXrDragMotionControllers.add(motionController);
-        for (const id of ["a-button", "x-button"]) {
+        for (const id of motionController.getComponentIds()) {
           const component = motionController.getComponent(id);
           if (!component) continue;
           component.onButtonStateChangedObservable.add((changed) => {
-            if (changed.changes.pressed?.current === true) beginXrDrag(controller, component);
-            if (changed.changes.pressed?.current === false) finishXrDrag(controller);
+            const pressed = changed.changes.pressed?.current;
+            if (id === "a-button" || id === "x-button") {
+              if (pressed === true) beginXrDrag(controller, component);
+              if (pressed === false) finishXrDrag(controller);
+              return;
+            }
+            if (pressed !== true) return;
+            switch (xrControllerAction(id, controller.inputSource.handedness)) {
+              case "immersive":
+                void toggleVr();
+                break;
+              case "discover":
+                setDiscoverOpen(!discoverOpen);
+                break;
+              case "back":
+                handleXrBack();
+                break;
+            }
           });
         }
       };
@@ -1039,9 +1056,9 @@ const createSceneHost = (canvas: HTMLCanvasElement): SceneHost => {
         if (boundXrDragControllers.has(controller)) return;
         boundXrDragControllers.add(controller);
         const motionController = controller.motionController;
-        if (motionController) bindXrDragMotionController(controller, motionController);
+        if (motionController) bindXrMotionController(controller, motionController);
         controller.onMotionControllerInitObservable.add((initializedMotionController) =>
-          bindXrDragMotionController(controller, initializedMotionController),
+          bindXrMotionController(controller, initializedMotionController),
         );
       };
       for (const controller of createdXr.input.controllers) bindXrDragController(controller);
@@ -1049,29 +1066,6 @@ const createSceneHost = (canvas: HTMLCanvasElement): SceneHost => {
       createdXr.input.onControllerRemovedObservable.add((controller) =>
         finishXrDrag(controller, false),
       );
-      xrDiscoverSurface = runtime.createXrDiscoverSurface(
-        scene,
-        profile.anisotropicFiltering,
-        () => {
-          if (currentWorld?.handleXrBack?.()) return;
-          if (window.location.search) window.history.back();
-        },
-      );
-      xrDiscoverSurface.onVisibility((open) => {
-        setDiscoverOpen(open);
-        const sessionManager = createdXr.baseExperience.sessionManager;
-        if (!sessionManager.isFixedFoveationSupported) return;
-        // DOM capture is intentionally outside the steady-state world workload. Do not let its
-        // short main-thread stall poison the following three-second quality sample and leave the
-        // world unnecessarily blurry after the panel closes.
-        qualitySampleSeconds = 0;
-        engine.performanceMonitor.reset();
-        if (!open) sessionFoveation = profile.xrFixedFoveation;
-        sessionManager.fixedFoveation = open ? 0 : sessionFoveation;
-      });
-      xrDiscoverSurface.attach(createdXr);
-      xrDiscoverSurface.setElement(discoverElement);
-
       // The rig lands wherever the headset happens to face, so the view has to be aimed at the
       // subject; otherwise a VR session opens on empty starfield and looks broken. AR must leave
       // the tracked camera at the physical device pose, so its world moves instead of the rig.
@@ -1091,11 +1085,9 @@ const createSceneHost = (canvas: HTMLCanvasElement): SceneHost => {
           if (createdXr.baseExperience.sessionManager.isFixedFoveationSupported) {
             createdXr.baseExperience.sessionManager.fixedFoveation = sessionFoveation;
           }
-          // Enter directly into the world. Discover is a summonable window, not a full-session
-          // viewport: opening it here hid most of the world and immediately started an expensive
-          // DOM snapshot on the same thread responsible for head tracking.
+          // Enter directly into the world. Discover remains a browser/desktop dialog and is not
+          // projected into the immersive scene.
           setDiscoverOpen(false);
-          xrDiscoverSurface?.setVisible(false);
           setXrStatus("in-xr");
         }
         if (state === runtime.WebXRState.NOT_IN_XR) {
@@ -1103,7 +1095,6 @@ const createSceneHost = (canvas: HTMLCanvasElement): SceneHost => {
           isInXr = false;
           if (suspensions > 0) stopRenderLoop();
           rigAwaitingWorld = false;
-          xrDiscoverSurface?.setVisible(false);
           veilTarget = 0;
           veilAlpha = 0;
           veilMaterial.alpha = 0;
@@ -1161,14 +1152,8 @@ const createSceneHost = (canvas: HTMLCanvasElement): SceneHost => {
     },
     refreshConsole: () => undefined,
     setConsoleNavigator: () => undefined,
-    setDiscoverElement: (element) => {
-      discoverElement = element;
-      syncDiscoverElementPresentation();
-      xrDiscoverSurface?.setElement(element);
-    },
     setDiscoverVisibility: (open) => {
       setDiscoverOpen(open);
-      if (isInXr && activeImmersiveMode === "vr") xrDiscoverSurface?.setVisible(open);
     },
     suspendRendering,
     xrCamera: () => xr?.baseExperience.camera ?? null,
@@ -1277,14 +1262,10 @@ const createSceneHost = (canvas: HTMLCanvasElement): SceneHost => {
       currentWorld = null;
       currentScope = null;
       discoverListeners.clear();
-      xrDiscoverSurface?.dispose();
-      xrDiscoverSurface = null;
-      xrMovement = null;
       for (const controller of xrDragStates.keys()) finishXrDrag(controller, false);
       xrDragStates.clear();
       if (xrDragObserver) scene.onBeforeRenderObservable.remove(xrDragObserver);
       xrDragObserver = null;
-      discoverElement = null;
       xr?.dispose();
       xr = null;
       looping = false;

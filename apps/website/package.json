@@ -20,7 +20,6 @@
     "@exora/worldgen": "workspace:*",
     "@vercel/analytics": "catalog:",
     "@vercel/speed-insights": "catalog:",
-    "modern-screenshot": "catalog:",
     "react": "catalog:",
     "react-dom": "catalog:"
   },
