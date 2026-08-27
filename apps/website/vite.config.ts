@@ -149,24 +149,8 @@ const variantLaunchSdk = (key: string): Plugin => ({
   },
 });
 
-/** A hard ceiling rather than Vite's advisory-only large-chunk warning. */
-const MAX_JAVASCRIPT_CHUNK_BYTES = 800_000;
-
-const enforceJavaScriptBudget = (): Plugin => ({
-  name: "exora:javascript-size-budget",
-  generateBundle(_options, bundle) {
-    for (const output of Object.values(bundle)) {
-      if (output.type !== "chunk") continue;
-      const bytes = new TextEncoder().encode(output.code).byteLength;
-      if (bytes <= MAX_JAVASCRIPT_CHUNK_BYTES) continue;
-
-      this.error(
-        `${output.fileName} is ${bytes.toLocaleString("en-US")} bytes; ` +
-          `the JavaScript chunk budget is ${MAX_JAVASCRIPT_CHUNK_BYTES.toLocaleString("en-US")} bytes.`,
-      );
-    }
-  },
-});
+/** Mirrors the hard post-build emitted-file budget for Vite's advisory warning. */
+const MAX_JAVASCRIPT_FILE_BYTES = 800_000;
 
 export default defineConfig(({ mode }) => {
   const variantLaunchKey = loadEnv(mode, process.cwd(), "").VITE_VARIANT_LAUNCH_KEY?.trim() ?? "";
@@ -225,20 +209,14 @@ export default defineConfig(({ mode }) => {
       ],
     },
     build: {
-      chunkSizeWarningLimit: MAX_JAVASCRIPT_CHUNK_BYTES / 1_000,
+      chunkSizeWarningLimit: MAX_JAVASCRIPT_FILE_BYTES / 1_000,
       rolldownOptions: {
         // Naming from the finished graph keeps dynamic boundaries intact. Grouping by dependency
         // here would hoist Babylon into the entry chunk and add roughly 1.7 MB to first paint.
         output: { chunkFileNames: chunkFileName },
       },
     },
-    plugins: [
-      variantLaunchSdk(variantLaunchKey),
-      react(),
-      dropWebGpuShaders(),
-      emitSitemap(),
-      enforceJavaScriptBudget(),
-    ],
+    plugins: [variantLaunchSdk(variantLaunchKey), react(), dropWebGpuShaders(), emitSitemap()],
     server: {
       proxy: {
         "/api": {
