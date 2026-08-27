@@ -1,14 +1,14 @@
 import {
+  type ContractSchema,
   type EphemerisResponse,
   type ExoplanetProfile,
   type MissionTrajectoryResponse,
   type PlanetResponse,
-  type PlanetSearchResponse,
+  type SchemaOutput,
   type SmallBodyLookup,
   type SmallBodySearchResponse,
   type StarProfile,
   type StarResponse,
-  type StarSearchResponse,
 } from "@exora/contracts";
 import { requestDeadline } from "./request-deadline.ts";
 
@@ -45,24 +45,28 @@ interface SmallBodySearchOptions extends CollectionOptions {
   lookup?: SmallBodyLookup;
 }
 
-type RuntimeSchemaName =
-  | "ephemerisResponseSchema"
-  | "missionTrajectoryResponseSchema"
-  | "planetResponseSchema"
-  | "planetSearchResponseSchema"
-  | "smallBodySearchResponseSchema"
-  | "starResponseSchema"
-  | "starSearchResponseSchema";
+type ContractModule = typeof import("@exora/contracts");
+type SchemaSelector<Schema extends ContractSchema> = (contracts: ContractModule) => Schema;
 
-const parseApiPayload = async <Payload>(
-  schemaName: RuntimeSchemaName,
+const responseSchema = {
+  Ephemeris: (contracts: ContractModule) => contracts.ephemerisResponseSchema,
+  MissionTrajectory: (contracts: ContractModule) => contracts.missionTrajectoryResponseSchema,
+  Planet: (contracts: ContractModule) => contracts.planetResponseSchema,
+  PlanetSearch: (contracts: ContractModule) => contracts.planetSearchResponseSchema,
+  SmallBodySearch: (contracts: ContractModule) => contracts.smallBodySearchResponseSchema,
+  Star: (contracts: ContractModule) => contracts.starResponseSchema,
+  StarSearch: (contracts: ContractModule) => contracts.starSearchResponseSchema,
+} as const;
+
+const parseApiPayload = async <Schema extends ContractSchema>(
+  selectSchema: SchemaSelector<Schema>,
   value: unknown,
-): Promise<Payload> => {
+): Promise<SchemaOutput<Schema>> => {
   // Contracts are loaded only when the first API response arrives. Zod and the full schema graph
   // stay out of Exora's latency-sensitive renderer chunk while every network payload still passes
   // through the same runtime contract used by the server.
   const contracts = await import("@exora/contracts");
-  return contracts[schemaName].parse(value) as Payload;
+  return selectSchema(contracts).parse(value);
 };
 
 /**
@@ -73,13 +77,13 @@ const parseApiPayload = async <Payload>(
  * `subject` names the request in that message, which is the only thing that varied between the
  * four copies of this that used to exist.
  */
-const requestCollection = async <Payload>(
+const requestCollection = async <Schema extends ContractSchema>(
   path: string,
   { fetcher = fetch, signal }: CollectionOptions,
   timeoutMs: number,
   subject: string,
-  schemaName: RuntimeSchemaName,
-): Promise<Payload> => {
+  selectSchema: SchemaSelector<Schema>,
+): Promise<SchemaOutput<Schema>> => {
   const response = await fetcher(path, {
     headers: { accept: "application/json" },
     signal: requestDeadline(timeoutMs, signal),
@@ -89,7 +93,7 @@ const requestCollection = async <Payload>(
 
   const payload: unknown = await response.json();
   try {
-    return await parseApiPayload<Payload>(schemaName, payload);
+    return await parseApiPayload(selectSchema, payload);
   } catch {
     throw new Error(`${subject} returned an invalid response.`);
   }
@@ -100,12 +104,12 @@ const requestPlanetCollection = (
   options: CollectionOptions,
   subject: string,
 ): Promise<PlanetSearchResult> =>
-  requestCollection<PlanetSearchResponse>(
+  requestCollection(
     path,
     options,
     PLANET_COLLECTION_TIMEOUT_MS,
     subject,
-    "planetSearchResponseSchema",
+    responseSchema.PlanetSearch,
   ) //
     .then(({ data, meta }) => ({ cached: meta.cached, planets: data, query: meta.query }));
 
@@ -114,13 +118,7 @@ const requestStarCollection = (
   options: CollectionOptions,
   subject: string,
 ): Promise<StarSearchResult> =>
-  requestCollection<StarSearchResponse>(
-    path,
-    options,
-    STAR_COLLECTION_TIMEOUT_MS,
-    subject,
-    "starSearchResponseSchema",
-  ) //
+  requestCollection(path, options, STAR_COLLECTION_TIMEOUT_MS, subject, responseSchema.StarSearch) //
     .then(({ data, meta }) => ({ cached: meta.cached, query: meta.query, stars: data }));
 
 export interface PlanetLoadResult {
@@ -175,12 +173,12 @@ export const searchSmallBodies = async (
   { lookup = "auto", ...options }: SmallBodySearchOptions = {},
 ): Promise<SmallBodySearchResponse> => {
   const parameters = new URLSearchParams({ lookup, q: query.trim() });
-  return requestCollection<SmallBodySearchResponse>(
+  return requestCollection(
     `/api/small-bodies?${parameters.toString()}`,
     options,
     SMALL_BODY_TIMEOUT_MS,
     "JPL small-body search",
-    "smallBodySearchResponseSchema",
+    responseSchema.SmallBodySearch,
   );
 };
 
@@ -193,12 +191,12 @@ export const loadSolarEphemeris = async (
     at: epoch.toISOString(),
     ids: naifIds.join(","),
   });
-  const response = await requestCollection<EphemerisResponse>(
+  const response = await requestCollection(
     `/api/ephemerides?${parameters.toString()}`,
     options,
     EPHEMERIS_TIMEOUT_MS,
     "JPL ephemeris",
-    "ephemerisResponseSchema",
+    responseSchema.Ephemeris,
   );
   const expected = new Set(naifIds);
   if (
@@ -223,12 +221,12 @@ export const loadMissionTrajectory = async (
     step: String(range.stepDays),
     stop: range.stop,
   });
-  const response = await requestCollection<MissionTrajectoryResponse>(
+  const response = await requestCollection(
     `/api/mission-trajectories?${parameters.toString()}`,
     options,
     MISSION_TRAJECTORY_TIMEOUT_MS,
     "JPL mission trajectory",
-    "missionTrajectoryResponseSchema",
+    responseSchema.MissionTrajectory,
   );
   if (response.meta.spkId !== spkId || response.meta.stepDays !== range.stepDays) {
     throw new Error("JPL mission trajectory returned a different target or sample interval.");
@@ -249,7 +247,7 @@ const requestPlanet = async (
 
     if (!response.ok) return null;
 
-    return await parseApiPayload<PlanetResponse>("planetResponseSchema", await response.json());
+    return await parseApiPayload(responseSchema.Planet, await response.json());
   } catch {
     return null;
   }
@@ -373,7 +371,7 @@ const requestStar = async (
       signal: requestDeadline(OBJECT_LOOKUP_TIMEOUT_MS, signal),
     });
     if (!response.ok) return null;
-    return await parseApiPayload<StarResponse>("starResponseSchema", await response.json());
+    return await parseApiPayload(responseSchema.Star, await response.json());
   } catch {
     return null;
   }

@@ -485,7 +485,7 @@ export class SimbadStarRepository implements StarRepository {
             return normalizeSimbadStar(row.data, retrievedOn);
           })
           .filter((star): star is StarProfile => star !== null)
-          .map((star) => starProfileSchema.parse(star) as unknown as StarProfile);
+          .map((star) => starProfileSchema.parse(star));
 
         this.#cache.set(adql, stars, requestTime + this.#cacheTtlMs);
         return { cached: false, value: stars };

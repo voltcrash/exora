@@ -1,15 +1,11 @@
-import type {
-  ApiErrorResponse,
-  ExoplanetProfile,
-  SmallBodyLookup,
-  StarProfile,
-} from "@exora/contracts";
+import type { ApiErrorResponse, ExoplanetProfile, StarProfile } from "@exora/contracts";
 import {
   apiErrorResponseSchema,
   ephemerisResponseSchema,
   missionTrajectoryResponseSchema,
   planetResponseSchema,
   planetSearchResponseSchema,
+  smallBodyLookupSchema,
   smallBodySearchResponseSchema,
   starResponseSchema,
   starSearchResponseSchema,
@@ -509,7 +505,9 @@ export const createApp = ({
     }
 
     const query = context.req.query("q")?.trim() ?? "";
-    const lookup = (context.req.query("lookup")?.trim() || "auto") as SmallBodyLookup;
+    const lookupResult = smallBodyLookupSchema.safeParse(
+      context.req.query("lookup")?.trim() || "auto",
+    );
     if (query.length < 1 || query.length > MAX_NAME_LENGTH || query.includes("*")) {
       return context.json(
         apiError(
@@ -519,9 +517,10 @@ export const createApp = ({
         400,
       );
     }
-    if (!(["auto", "designation", "spk"] as const).includes(lookup)) {
+    if (!lookupResult.success) {
       return context.json(apiError("INVALID_REQUEST", "Small-body lookup mode is invalid."), 400);
     }
+    const lookup = lookupResult.data;
     if (lookup === "spk" && !/^\d+$/.test(query)) {
       return context.json(apiError("INVALID_REQUEST", "SPK identifiers must be numeric."), 400);
     }

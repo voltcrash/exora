@@ -10,35 +10,6 @@ import {
 } from "./discovery-categories.ts";
 import type { PlanetRepository, RepositoryResult } from "./nasa-archive.ts";
 
-interface PlanetRow extends Record<string, unknown> {
-  declination_degrees: number | null;
-  discovery_method: string;
-  discovery_year: number | null;
-  distance_parsecs: number | null;
-  equilibrium_temperature_kelvin: number | null;
-  host_spectral_type: string | null;
-  host_temperature_kelvin: number | null;
-  host_radius_solar: number | null;
-  host_mass_solar: number | null;
-  host_luminosity_log_solar: number | null;
-  host_star: string;
-  id: string;
-  kind: ExoplanetProfile["kind"];
-  mass_earth: number | null;
-  mass_jupiter: number | null;
-  name: string;
-  orbital_eccentricity: number | null;
-  orbital_inclination_degrees: number | null;
-  orbital_period_days: number | null;
-  radius_earth: number | null;
-  radius_jupiter: number | null;
-  retrieved_on: string | Date;
-  right_ascension_degrees: number | null;
-  semi_major_axis_au: number | null;
-  source_archive: "NASA Exoplanet Archive";
-  source_table: "pscomppars";
-}
-
 const nullableFiniteNumber = z.number().finite().nullable();
 const nullableText = z.string().nullable();
 const planetRowSchema = z.strictObject({
@@ -69,6 +40,7 @@ const planetRowSchema = z.strictObject({
   source_archive: z.literal("NASA Exoplanet Archive"),
   source_table: z.literal("pscomppars"),
 });
+type PlanetRow = z.infer<typeof planetRowSchema>;
 
 const PLANET_COLUMNS = `
   id,
@@ -103,7 +75,7 @@ const toIsoDate = (value: string | Date): string =>
   value instanceof Date ? value.toISOString().slice(0, 10) : value.slice(0, 10);
 
 const toPlanet = (value: unknown): ExoplanetProfile => {
-  const row = planetRowSchema.parse(value) as PlanetRow;
+  const row: PlanetRow = planetRowSchema.parse(value);
   return exoplanetProfileSchema.parse({
     hostStar: row.host_star,
     id: row.id,
@@ -135,7 +107,7 @@ const toPlanet = (value: unknown): ExoplanetProfile => {
       retrievedOn: toIsoDate(row.retrieved_on),
       table: row.source_table,
     },
-  }) as unknown as ExoplanetProfile;
+  });
 };
 
 /**

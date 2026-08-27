@@ -314,7 +314,7 @@ export class NasaPlanetRepository implements PlanetRepository {
         const planets = rows.data
           .map((row) => normalizeNasaPlanet(row, retrievedOn))
           .filter((planet): planet is ExoplanetProfile => planet !== null)
-          .map((planet) => exoplanetProfileSchema.parse(planet) as unknown as ExoplanetProfile);
+          .map((planet) => exoplanetProfileSchema.parse(planet));
 
         this.#cache.set(adql, planets, requestTime + this.#cacheTtlMs);
 

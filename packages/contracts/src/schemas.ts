@@ -13,7 +13,7 @@ const vectorSchema = z.strictObject({
   z: finiteNumber,
 });
 
-const solarSystemSourceSchema = z.strictObject({
+export const solarSystemSourceSchema = z.strictObject({
   archive: z.enum(["NASA/JPL Small-Body Database", "NASA/JPL Solar System Dynamics"]),
   retrievedOn: retrievedDate,
   table: z.enum([
@@ -60,7 +60,9 @@ export const solarSystemIdentitySchema = z.strictObject({
     .optional(),
 });
 
-const exoplanetObservationSchema = z.strictObject({
+export const planetKindSchema = z.enum(["gas-giant", "ice-giant", "rocky", "unknown"]);
+
+export const exoplanetObservationSchema = z.strictObject({
   declinationDegrees: nullableFiniteNumber,
   discoveryMethod: nonEmptyString,
   discoveryYear: nullableFiniteNumber,
@@ -99,14 +101,14 @@ const exoplanetSourceSchema = z.union([
 export const exoplanetProfileSchema = z.strictObject({
   hostStar: nonEmptyString,
   id: nonEmptyString,
-  kind: z.enum(["gas-giant", "ice-giant", "rocky", "unknown"]),
+  kind: planetKindSchema,
   name: nonEmptyString,
   observation: exoplanetObservationSchema,
   solarSystem: solarSystemIdentitySchema.optional(),
   source: exoplanetSourceSchema,
 });
 
-const planetMetadataSchema = z.strictObject({
+export const planetMetadataSchema = z.strictObject({
   cached: z.boolean(),
   source: z.literal("NASA Exoplanet Archive"),
 });
@@ -124,7 +126,17 @@ export const planetSearchResponseSchema = z.strictObject({
   }),
 });
 
-const starObservationSchema = z.strictObject({
+export const starKindSchema = z.enum([
+  "binary",
+  "evolved",
+  "main-sequence",
+  "neutron-star",
+  "star",
+  "variable",
+  "white-dwarf",
+]);
+
+export const starObservationSchema = z.strictObject({
   declinationDegrees: nullableFiniteNumber,
   diameterKilometers: nullableFiniteNumber.optional(),
   distanceParsecs: nullableFiniteNumber,
@@ -177,15 +189,7 @@ export const starProfileSchema = z.strictObject({
     })
     .optional(),
   id: nonEmptyString,
-  kind: z.enum([
-    "binary",
-    "evolved",
-    "main-sequence",
-    "neutron-star",
-    "star",
-    "variable",
-    "white-dwarf",
-  ]),
+  kind: starKindSchema,
   name: nonEmptyString,
   objectType: nonEmptyString,
   observation: starObservationSchema,
@@ -193,7 +197,10 @@ export const starProfileSchema = z.strictObject({
   source: starSourceSchema,
 });
 
-const starMetadataSchema = z.strictObject({ cached: z.boolean(), source: z.literal("SIMBAD") });
+export const starMetadataSchema = z.strictObject({
+  cached: z.boolean(),
+  source: z.literal("SIMBAD"),
+});
 
 export const starResponseSchema = z.strictObject({
   data: starProfileSchema,
@@ -276,11 +283,14 @@ export const smallBodyCloseApproachSchema = z.strictObject({
   timeUncertaintySeconds: nullableFiniteNumber,
 });
 
+export const smallBodyKindSchema = z.enum(["asteroid", "comet"]);
+export const smallBodyLookupSchema = z.enum(["auto", "designation", "spk"]);
+
 export const smallBodyProfileSchema = z.strictObject({
   closeApproaches: z.array(smallBodyCloseApproachSchema),
   designation: nonEmptyString,
   fullName: nonEmptyString,
-  kind: z.enum(["asteroid", "comet"]),
+  kind: smallBodyKindSchema,
   nearEarth: z.boolean().nullable(),
   orbit: z.strictObject({
     conditionCode: nullableString,
@@ -309,7 +319,7 @@ export const smallBodySearchResponseSchema = z
     matches: z.array(smallBodyMatchSchema),
     meta: z.strictObject({
       cached: z.boolean(),
-      lookup: z.enum(["auto", "designation", "spk"]),
+      lookup: smallBodyLookupSchema,
       query: nonEmptyString,
       retrievedAt: timestamp,
       source: z.literal("NASA/JPL Small-Body Database (SBDB) API"),
