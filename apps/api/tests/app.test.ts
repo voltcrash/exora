@@ -556,7 +556,7 @@ test("a caller past its budget is refused with a wait", async () => {
     rateLimiter: createRateLimiter({ limit: 2, windowMs: 60_000 }),
     trustVercelProxy: true,
   });
-  const headers = { "x-vercel-forwarded-for": "203.0.113.7" };
+  const headers = { "x-forwarded-for": "203.0.113.7" };
 
   const allowed = await Promise.all([
     app.request("/api/health", { headers }),
@@ -579,12 +579,12 @@ test("one caller exhausting its budget does not refuse another", async () => {
     trustVercelProxy: true,
   });
 
-  await app.request("/api/health", { headers: { "x-vercel-forwarded-for": "203.0.113.7" } });
+  await app.request("/api/health", { headers: { "x-forwarded-for": "203.0.113.7" } });
   const sameCaller = await app.request("/api/health", {
-    headers: { "x-vercel-forwarded-for": "203.0.113.7" },
+    headers: { "x-forwarded-for": "203.0.113.7" },
   });
   const otherCaller = await app.request("/api/health", {
-    headers: { "x-vercel-forwarded-for": "198.51.100.4" },
+    headers: { "x-forwarded-for": "198.51.100.4" },
   });
 
   expect(sameCaller.status).toBe(429);
@@ -598,10 +598,10 @@ test("caller-supplied forwarding headers cannot manufacture fresh local budgets"
   });
 
   const first = await app.request("/api/health", {
-    headers: { "x-forwarded-for": "203.0.113.7", "x-vercel-forwarded-for": "203.0.113.7" },
+    headers: { "x-forwarded-for": "203.0.113.7" },
   });
   const spoofed = await app.request("/api/health", {
-    headers: { "x-forwarded-for": "198.51.100.4", "x-vercel-forwarded-for": "198.51.100.4" },
+    headers: { "x-forwarded-for": "198.51.100.4" },
   });
 
   expect(first.status).toBe(200);

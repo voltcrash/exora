@@ -226,10 +226,7 @@ export const createApp = ({
 
   app.use("/api/*", async (context, next) => {
     const decision = rateLimiter.check(
-      clientKey(
-        { vercelForwardedFor: context.req.header("x-vercel-forwarded-for") },
-        { trustVercelProxy },
-      ),
+      clientKey({ forwardedFor: context.req.header("x-forwarded-for") }, { trustVercelProxy }),
       Date.now(),
     );
 
@@ -257,10 +254,7 @@ export const createApp = ({
 
   app.get("/api/ephemerides", async (context) => {
     const decision = horizonsRateLimiter.check(
-      clientKey(
-        { vercelForwardedFor: context.req.header("x-vercel-forwarded-for") },
-        { trustVercelProxy },
-      ),
+      clientKey({ forwardedFor: context.req.header("x-forwarded-for") }, { trustVercelProxy }),
       Date.now(),
     );
     context.header("Ephemeris-RateLimit-Limit", String(decision.limit));
@@ -326,10 +320,7 @@ export const createApp = ({
 
   app.get("/api/mission-trajectories", async (context) => {
     const decision = missionRateLimiter.check(
-      clientKey(
-        { vercelForwardedFor: context.req.header("x-vercel-forwarded-for") },
-        { trustVercelProxy },
-      ),
+      clientKey({ forwardedFor: context.req.header("x-forwarded-for") }, { trustVercelProxy }),
       Date.now(),
     );
     context.header("Mission-RateLimit-Limit", String(decision.limit));
@@ -399,10 +390,7 @@ export const createApp = ({
 
   app.get("/api/small-bodies", async (context) => {
     const decision = sbdbRateLimiter.check(
-      clientKey(
-        { vercelForwardedFor: context.req.header("x-vercel-forwarded-for") },
-        { trustVercelProxy },
-      ),
+      clientKey({ forwardedFor: context.req.header("x-forwarded-for") }, { trustVercelProxy }),
       Date.now(),
     );
     context.header("SmallBody-RateLimit-Limit", String(decision.limit));

@@ -32,11 +32,11 @@ useful back-pressure signals, but must not be interpreted as a durable global qu
 
 ## Client identity
 
-Production trusts `x-vercel-forwarded-for` only when the runtime has Vercel's system environment
-marker. Vercel supplies this header at its ingress; direct and local runtimes do not trust either
-`x-forwarded-for` or `x-real-ip`. The value must be one valid IP address. Missing, malformed,
-comma-separated, and untrusted values all share the `unknown` bucket, so a caller cannot obtain new
-local budgets merely by changing a forwarding header.
+Production trusts `x-forwarded-for` only when the runtime has Vercel's system environment marker.
+Vercel overwrites this header at its ingress to prevent spoofing; direct and local runtimes do not
+trust it. The value must be one valid IP address. Missing, malformed, comma-separated, and untrusted
+values all share the `unknown` bucket, so a caller cannot obtain new local budgets merely by changing
+a forwarding header.
 
 If another reverse proxy is placed in front of Vercel, revisit this boundary before deployment.
 The proxy can collapse identity to its own egress address unless Vercel's supported trusted-proxy

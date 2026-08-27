@@ -34,8 +34,8 @@ export interface RateLimiter {
 }
 
 export interface ClientIdentityHeaders {
-  /** Vercel's deployment-provided copy of the connecting client's public address. */
-  vercelForwardedFor?: string | undefined;
+  /** Vercel's overwritten copy of the connecting client's public address. */
+  forwardedFor?: string | undefined;
 }
 
 export interface RateLimiterOptions {
@@ -104,8 +104,9 @@ export const createRateLimiter = ({
  *
  * Only the deployed runtime opts into this trust. Tests and direct/local servers do not turn
  * caller-supplied forwarding headers into identities, because those requests did not cross a
- * proxy boundary that overwrites them. Vercel documents `x-vercel-forwarded-for` as its copy of
- * the connecting public address; requiring one valid IP also refuses attacker-controlled lists.
+ * proxy boundary that overwrites them. Vercel documents `x-forwarded-for` as the connecting public
+ * address and explicitly overwrites incoming values to prevent spoofing. Requiring one valid IP
+ * also refuses attacker-controlled lists.
  *
  * The fallback intentionally groups unidentified callers. It is safer for a best-effort budget
  * to share one bucket than to let arbitrary header values manufacture unlimited buckets.
@@ -116,6 +117,6 @@ export const clientKey = (
 ): string => {
   if (!trustVercelProxy) return "unknown";
 
-  const forwarded = headers.vercelForwardedFor?.trim() ?? "";
+  const forwarded = headers.forwardedFor?.trim() ?? "";
   return isIP(forwarded) ? forwarded : "unknown";
 };

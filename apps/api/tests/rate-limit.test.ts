@@ -85,20 +85,18 @@ test("eviction drops the least recently seen client", () => {
 });
 
 test("Vercel's forwarding header is trusted only behind the configured proxy boundary", () => {
-  const headers = { vercelForwardedFor: "203.0.113.7" };
+  const headers = { forwardedFor: "203.0.113.7" };
 
   expect(clientKey(headers)).toBe("unknown");
   expect(clientKey(headers, { trustVercelProxy: true })).toBe("203.0.113.7");
 });
 
 test("spoofed or malformed proxy identities share the conservative fallback bucket", () => {
-  expect(clientKey({ vercelForwardedFor: "203.0.113.7" })).toBe("unknown");
-  expect(
-    clientKey({ vercelForwardedFor: "203.0.113.7, 198.51.100.4" }, { trustVercelProxy: true }),
-  ).toBe("unknown");
-  expect(clientKey({ vercelForwardedFor: "not-an-ip" }, { trustVercelProxy: true })).toBe(
+  expect(clientKey({ forwardedFor: "203.0.113.7" })).toBe("unknown");
+  expect(clientKey({ forwardedFor: "203.0.113.7, 198.51.100.4" }, { trustVercelProxy: true })).toBe(
     "unknown",
   );
+  expect(clientKey({ forwardedFor: "not-an-ip" }, { trustVercelProxy: true })).toBe("unknown");
   expect(clientKey({})).toBe("unknown");
 });
 
