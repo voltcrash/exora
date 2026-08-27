@@ -150,7 +150,7 @@ const variantLaunchSdk = (key: string): Plugin => ({
 });
 
 /** Mirrors the hard post-build emitted-file budget for Vite's advisory warning. */
-const MAX_JAVASCRIPT_FILE_BYTES = 800_000;
+const MAX_JAVASCRIPT_FILE_BYTES = 400_000;
 
 export default defineConfig(({ mode }) => {
   const variantLaunchKey = loadEnv(mode, process.cwd(), "").VITE_VARIANT_LAUNCH_KEY?.trim() ?? "";

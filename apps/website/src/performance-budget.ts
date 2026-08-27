@@ -9,8 +9,8 @@ export interface JavaScriptBudget {
 }
 
 export const DEFAULT_JAVASCRIPT_BUDGET: JavaScriptBudget = {
-  initialBytes: 1_500_000,
-  largestFileBytes: 800_000,
+  initialBytes: 450_000,
+  largestFileBytes: 400_000,
 };
 
 export const budgetViolations = (
