@@ -16,6 +16,7 @@ import {
 } from "@exora/contracts";
 import { Hono, type Context } from "hono";
 import { cors } from "hono/cors";
+import { isAuthorizedCatalogRefresh, type CatalogRefreshDispatcher } from "./catalog-refresh.ts";
 import {
   HORIZONS_API_VERSION,
   HORIZONS_SOURCE,
@@ -61,6 +62,10 @@ import {
 } from "./simbad-archive.ts";
 
 interface CreateAppOptions {
+  catalogRefresh?: {
+    dispatcher: CatalogRefreshDispatcher;
+    secret: string;
+  };
   horizonsRateLimiter?: RateLimiter;
   horizonsRepository?: HorizonsRepository;
   missionRateLimiter?: RateLimiter;
@@ -143,6 +148,7 @@ const starCollection = (
 };
 
 export const createApp = ({
+  catalogRefresh,
   horizonsRateLimiter = createRateLimiter({ limit: 8, windowMs: 60_000 }),
   horizonsRepository = new JplHorizonsRepository(),
   missionRateLimiter = createRateLimiter({ limit: 8, windowMs: 60_000 }),
@@ -155,6 +161,21 @@ export const createApp = ({
   systemAliasRepository = new NasaSystemAliasRepository(),
 }: CreateAppOptions = {}) => {
   const app = new Hono();
+
+  // Vercel only schedules this short dispatch. The archive-wide work runs on a durable external
+  // worker because its upstream timeout alone is longer than this function's deployment limit.
+  app.get("/api/internal/catalog-refresh", async (context) => {
+    context.header("Cache-Control", "no-store");
+    if (
+      !catalogRefresh ||
+      !isAuthorizedCatalogRefresh(context.req.header("authorization"), catalogRefresh.secret)
+    ) {
+      return context.json({ accepted: false }, 401);
+    }
+
+    await catalogRefresh.dispatcher.dispatch();
+    return context.json({ accepted: true }, 202);
+  });
 
   app.use(
     "/api/*",

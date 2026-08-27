@@ -93,6 +93,40 @@ test("returns service health", async () => {
   expect(await response.json()).toEqual({ service: "exora-api", status: "ok" });
 });
 
+test("rejects unauthorized scheduled catalog refresh calls without dispatching work", async () => {
+  const dispatch = vi.fn(async () => undefined);
+  const app = createApp({
+    catalogRefresh: { dispatcher: { dispatch }, secret: "scheduled-secret" },
+    repository,
+  });
+
+  const missing = await app.request("/api/internal/catalog-refresh");
+  const wrong = await app.request("/api/internal/catalog-refresh", {
+    headers: { authorization: "Bearer wrong-secret" },
+  });
+
+  expect([missing.status, wrong.status]).toEqual([401, 401]);
+  expect(missing.headers.get("Cache-Control")).toBe("no-store");
+  expect(dispatch).not.toHaveBeenCalled();
+});
+
+test("authorized catalog refresh calls only dispatch the external worker", async () => {
+  const dispatch = vi.fn(async () => undefined);
+  const app = createApp({
+    catalogRefresh: { dispatcher: { dispatch }, secret: "scheduled-secret" },
+    repository,
+  });
+
+  const response = await app.request("/api/internal/catalog-refresh", {
+    headers: { authorization: "Bearer scheduled-secret" },
+  });
+
+  expect(response.status).toBe(202);
+  expect(response.headers.get("Cache-Control")).toBe("no-store");
+  expect(await response.json()).toEqual({ accepted: true });
+  expect(dispatch).toHaveBeenCalledOnce();
+});
+
 test("publishes an OpenAPI 3.1 document backed by the runtime response schemas", async () => {
   const response = await createApp({ repository }).request("/api/openapi.json");
   const document = await response.json();

@@ -7,6 +7,7 @@ interface HeaderRule {
 }
 
 interface VercelConfig {
+  crons: { path: string; schedule: string }[];
   headers: HeaderRule[];
 }
 
@@ -40,4 +41,11 @@ test("large destination models are cached at the edge and revalidated in the bac
   );
 
   expect(headers["cache-control"]).toBe("public, max-age=604800, stale-while-revalidate=2592000");
+});
+
+test("schedules the authenticated catalog trigger outside the full synchronization worker", async () => {
+  const path = new URL("../../../vercel.json", import.meta.url);
+  const config = JSON.parse(await readFile(path, "utf8")) as VercelConfig;
+
+  expect(config.crons).toEqual([{ path: "/api/internal/catalog-refresh", schedule: "17 3 * * *" }]);
 });

@@ -70,10 +70,13 @@ const planetRow = {
 const UPSERT_COLUMN_COUNT = 27;
 
 class FakeDatabase implements DatabaseClient {
+  failUpsertAt: number | undefined;
   readonly queries: { parameters: readonly unknown[]; statement: string }[] = [];
   /** How many of the next upsert's rows the database should report as newly inserted. */
   insertedRows = Number.POSITIVE_INFINITY;
   selectedRows: Record<string, unknown>[] = [planetRow];
+  transactionCalls = 0;
+  upsertCalls = 0;
 
   async close(): Promise<void> {}
 
@@ -84,6 +87,8 @@ class FakeDatabase implements DatabaseClient {
     this.queries.push({ statement, parameters });
 
     if (statement.includes("INSERT INTO exoplanets")) {
+      this.upsertCalls += 1;
+      if (this.upsertCalls === this.failUpsertAt) throw new Error("simulated batch failure");
       const rows = parameters.length / UPSERT_COLUMN_COUNT;
       return Array.from({ length: rows }, (_, index) => ({
         inserted: index < this.insertedRows,
@@ -99,6 +104,7 @@ class FakeDatabase implements DatabaseClient {
   }
 
   async transaction<T>(callback: (client: DatabaseClient) => Promise<T>): Promise<T> {
+    this.transactionCalls += 1;
     return callback(this);
   }
 }
@@ -170,7 +176,65 @@ test("synchronizes planets and removes stale rows in one transaction", async () 
   expect(database.queries.some(({ statement }) => statement.includes("ON CONFLICT (id)"))).toBe(
     true,
   );
+  const staleDelete = database.queries.find(({ statement }) =>
+    statement.includes("DELETE FROM exoplanets"),
+  );
+  expect(staleDelete?.statement).toContain("source_archive = 'NASA Exoplanet Archive'");
+  expect(staleDelete?.statement).toContain("last_seen_at < $1");
+  expect(staleDelete?.parameters).toEqual(["2026-08-13T12:00:00.000Z"]);
   expect(database.queries.at(-1)?.parameters).toEqual(["2026-08-13T12:00:00.000Z", 1, 1, 1]);
+});
+
+test("repeated syncs update existing rows without creating duplicates", async () => {
+  const database = new FakeDatabase();
+
+  const first = await syncPlanetCatalog(database, [planet], {
+    minimumCatalogSize: 1,
+    now: new Date("2026-08-13T12:00:00.000Z"),
+  });
+  database.insertedRows = 0;
+  const repeated = await syncPlanetCatalog(database, [planet], {
+    minimumCatalogSize: 1,
+    now: new Date("2026-08-14T12:00:00.000Z"),
+  });
+
+  expect(first).toMatchObject({ inserted: 1, updated: 0, upserted: 1 });
+  expect(repeated).toMatchObject({ inserted: 0, updated: 1, upserted: 1 });
+  expect(database.transactionCalls).toBe(2);
+  const upserts = database.queries.filter(({ statement }) =>
+    statement.includes("INSERT INTO exoplanets"),
+  );
+  expect(upserts).toHaveLength(2);
+  expect(upserts.every(({ statement }) => statement.includes("ON CONFLICT (id) DO UPDATE"))).toBe(
+    true,
+  );
+  expect(upserts.every(({ statement }) => statement.includes("GREATEST"))).toBe(true);
+});
+
+test("stops a partially failed batch run before deleting stale records or logging success", async () => {
+  const database = new FakeDatabase();
+  database.failUpsertAt = 2;
+  const planets = Array.from({ length: 251 }, (_, index) => ({
+    ...planet,
+    id: `planet-${index}`,
+    name: `Planet ${index}`,
+  }));
+
+  await expect(
+    syncPlanetCatalog(database, planets, {
+      minimumCatalogSize: 1,
+      now: new Date("2026-08-13T12:00:00.000Z"),
+    }),
+  ).rejects.toThrow("simulated batch failure");
+
+  expect(database.transactionCalls).toBe(1);
+  expect(database.upsertCalls).toBe(2);
+  expect(
+    database.queries.some(({ statement }) => statement.includes("DELETE FROM exoplanets")),
+  ).toBe(false);
+  expect(
+    database.queries.some(({ statement }) => statement.includes("INSERT INTO catalog_sync_runs")),
+  ).toBe(false);
 });
 
 test("refuses incomplete archive payloads before deleting catalog rows", async () => {
