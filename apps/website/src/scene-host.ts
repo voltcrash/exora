@@ -68,6 +68,7 @@ import {
 } from "./travel-transition.ts";
 import type { XrConsoleHost } from "./xr-console.ts";
 import { advanceXrButtonPressGate, xrControllerAction } from "./xr-controller-input.ts";
+import { createSceneMountSlot } from "./scene-mount.ts";
 import {
   chooseImmersiveDestination,
   getVariantLaunchUrl,
@@ -75,7 +76,6 @@ import {
   type ImmersiveDestination,
   type ImmersiveMode,
 } from "./variant-launch.ts";
-import { openWorldScope, type WorldScope } from "./world-scope.ts";
 import { VIRTUAL_BACKGROUND_LAYER_MASK } from "./world-presentation.ts";
 import type * as XrRuntime from "./xr-runtime.ts";
 
@@ -363,10 +363,7 @@ const createSceneHost = (canvas: HTMLCanvasElement): SceneHost => {
   const boundXrControllers = new WeakSet<WebXRInputSource>();
   const boundXrMotionControllers = new WeakSet<WebXRAbstractMotionController>();
   const xrImmersiveButtonArmed = new WeakMap<WebXRControllerComponent, boolean>();
-  let currentWorld: MountedWorld | null = null;
-  let currentScope: WorldScope | null = null;
   let mountToken = 0;
-  let worldBuildGate = Promise.resolve();
   let sessionFoveation = profile.xrFixedFoveation;
   /** Whether the browser/desktop Discover dialog is open. */
   let discoverOpen = false;
@@ -468,7 +465,7 @@ const createSceneHost = (canvas: HTMLCanvasElement): SceneHost => {
     // the rig's pose may be read. The veil is still opaque here, so the move is never seen.
     if (rigAwaitingWorld && isInXr && activeImmersiveMode === "vr") {
       rigAwaitingWorld = false;
-      currentWorld?.focusXrRig(false);
+      worldMount.current?.focusXrRig(false);
     }
 
     if (veilAlpha !== veilTarget || veil.isEnabled()) {
@@ -564,6 +561,11 @@ const createSceneHost = (canvas: HTMLCanvasElement): SceneHost => {
     scene.setRenderingAutoClearDepthStencil(1, true, true, true);
   };
 
+  const worldMount = createSceneMountSlot<MountedWorld>(scene, {
+    beforeRemove: () => arPresentation.setWorld(null),
+    prepareScene: resetSceneDefaults,
+  });
+
   let travelPhase: TravelPhase = "idle";
   const travelListeners = new Set<(phase: TravelPhase) => void>();
   const setTravelPhase = (next: TravelPhase): void => {
@@ -594,7 +596,9 @@ const createSceneHost = (canvas: HTMLCanvasElement): SceneHost => {
    * decorating one — it is the honest picture of what the page is doing.
    */
   const flightRadius = (resting: number): number =>
-    prefersReducedMotion() ? resting : departureRadius(resting, currentWorld?.farthestView?.());
+    prefersReducedMotion()
+      ? resting
+      : departureRadius(resting, worldMount.current?.farthestView?.());
 
   /**
    * Makes room for a flight that leaves the distances the current view was built around.
@@ -670,7 +674,7 @@ const createSceneHost = (canvas: HTMLCanvasElement): SceneHost => {
   };
 
   const beginTravel = (): void => {
-    if (disposed || isInXr || !currentWorld || departure) return;
+    if (disposed || isInXr || !worldMount.current || departure) return;
     travelOrigin = {
       lower: camera.lowerRadiusLimit,
       radius: camera.radius,
@@ -781,86 +785,46 @@ const createSceneHost = (canvas: HTMLCanvasElement): SceneHost => {
     const token = (mountToken += 1);
     // The outgoing world keeps rendering through the flight, so the jump never shows an empty
     // sky: it is watched receding, and only the swap itself happens behind the dark.
-    if (currentWorld) {
+    if (worldMount.current) {
       await fadeVeil(1);
       await departFromWorld();
     }
     if (token !== mountToken || disposed) return null;
 
-    // Asset-backed destinations can yield while Babylon fetches a model. Serialize that interval:
-    // a second mount must never open another world scope while the first scope is still observing
-    // additions to the shared scene.
-    const precedingBuild = worldBuildGate;
-    let releaseBuildGate = (): void => undefined;
-    worldBuildGate = new Promise<void>((resolve) => {
-      releaseBuildGate = resolve;
-    });
-    await precedingBuild;
-
+    let world: World | null;
     try {
-      if (token !== mountToken || disposed) return null;
-
-      currentWorld?.dispose();
-      arPresentation.setWorld(null);
-      currentScope?.dispose();
-      currentWorld = null;
-      currentScope = null;
-      resetSceneDefaults();
-
-      // Nothing may interleave between opening the scope and sealing it: the scope's reading of
-      // what the world added depends on the build being uninterrupted. See `world-scope.ts`.
-      const scope = openWorldScope(scene);
-      let world: World;
-      try {
-        world = await build();
-      } catch (error) {
-        // A build that failed part-way still left geometry in a scene that is not thrown away any
-        // more, so the half-built world is swept out before the failure is reported.
-        scope.seal();
-        scope.dispose();
-        void fadeVeil(0);
-        // There is no destination to fly in to, so the flight is abandoned rather than landed:
-        // the recovery screen that answers this has to be visible, not behind a jump that never
-        // ends.
-        endGlide(null, false);
-        departure = null;
-        travelOrigin = null;
-        setTravelPhase("idle");
-        dispatchRendererEvent("render-failed");
-        throw error;
-      }
-      scope.seal();
-
-      // A newer request may have arrived while the model was in flight. The completed scene is
-      // scientifically valid but no longer the requested destination, so release it unseen.
-      if (token !== mountToken || disposed) {
-        world.dispose();
-        scope.dispose();
-        return null;
-      }
-
-      currentScope = scope;
-      currentWorld = world;
-      arPresentation.setWorld(scope.presentation);
-      rigAwaitingWorld = isInXr && activeImmersiveMode === "vr";
+      world = await worldMount.replace(build, () => token === mountToken && !disposed);
+    } catch (error) {
       void fadeVeil(0);
-      arriveAtWorld(token);
-      // A destination can be chosen from a dialog that is still open over the canvas — the
-      // catalog closes and the world mounts in the same commit, and nothing says which lands
-      // first. One frame here means the scrim is never left blurring the world the visitor just
-      // left.
-      if (!looping) renderFrame();
-      // Building a world stalls the frame loop, and the rolling average knows nothing about why:
-      // left alone it reports the stall as a run of enormous frames for seconds afterwards, which
-      // shows up as a heads-up display insisting on single digits and — worse — as the quality
-      // adapter deciding the machine cannot keep up and dropping the render scale, which
-      // reallocates the framebuffer and hitches the arrival it was supposed to be helping.
-      engine.performanceMonitor.reset();
-      qualitySampleSeconds = 0;
-      return world;
-    } finally {
-      releaseBuildGate();
+      // There is no destination to fly in to, so the flight is abandoned rather than landed:
+      // the recovery screen that answers this has to be visible, not behind a jump that never
+      // ends.
+      endGlide(null, false);
+      departure = null;
+      travelOrigin = null;
+      setTravelPhase("idle");
+      dispatchRendererEvent("render-failed");
+      throw error;
     }
+    if (!world) return null;
+
+    arPresentation.setWorld(worldMount.scope?.presentation ?? null);
+    rigAwaitingWorld = isInXr && activeImmersiveMode === "vr";
+    void fadeVeil(0);
+    arriveAtWorld(token);
+    // A destination can be chosen from a dialog that is still open over the canvas — the
+    // catalog closes and the world mounts in the same commit, and nothing says which lands
+    // first. One frame here means the scrim is never left blurring the world the visitor just
+    // left.
+    if (!looping) renderFrame();
+    // Building a world stalls the frame loop, and the rolling average knows nothing about why:
+    // left alone it reports the stall as a run of enormous frames for seconds afterwards, which
+    // shows up as a heads-up display insisting on single digits and — worse — as the quality
+    // adapter deciding the machine cannot keep up and dropping the render scale, which
+    // reallocates the framebuffer and hitches the arrival it was supposed to be helping.
+    engine.performanceMonitor.reset();
+    qualitySampleSeconds = 0;
+    return world;
   };
 
   const initializeXr = async (): Promise<WebXRDefaultExperience | null> => {
@@ -938,7 +902,7 @@ const createSceneHost = (canvas: HTMLCanvasElement): SceneHost => {
         }
       };
       const handleXrBack = (): void => {
-        if (currentWorld?.handleXrBack?.()) return;
+        if (worldMount.current?.handleXrBack?.()) return;
         if (window.location.search) window.history.back();
       };
       const bindXrMotionController = (
@@ -994,7 +958,7 @@ const createSceneHost = (canvas: HTMLCanvasElement): SceneHost => {
       // subject; otherwise a VR session opens on empty starfield and looks broken. AR must leave
       // the tracked camera at the physical device pose, so its world moves instead of the rig.
       createdXr.baseExperience.onInitialXRPoseSetObservable.add(() => {
-        if (activeImmersiveMode === "vr") currentWorld?.focusXrRig(true);
+        if (activeImmersiveMode === "vr") worldMount.current?.focusXrRig(true);
       });
 
       createdXr.baseExperience.onStateChangedObservable.add((state) => {
@@ -1035,7 +999,7 @@ const createSceneHost = (canvas: HTMLCanvasElement): SceneHost => {
             );
           }
           activeImmersiveMode = null;
-          currentWorld?.restoreDesktopView();
+          worldMount.current?.restoreDesktopView();
           setXrStatus(readyXrStatus());
         }
       });
@@ -1143,7 +1107,7 @@ const createSceneHost = (canvas: HTMLCanvasElement): SceneHost => {
         arPresentation.begin(
           hitTest,
           readyXr.baseExperience.sessionManager,
-          currentScope?.presentation ?? null,
+          worldMount.scope?.presentation ?? null,
           (spaceBackground) => {
             arCamera.layerMask = spaceBackground
               ? xrCameraLayerMask
@@ -1180,11 +1144,8 @@ const createSceneHost = (canvas: HTMLCanvasElement): SceneHost => {
       endGlide(null, false);
       stopWatchingVariantLaunch();
       window.removeEventListener("resize", resize);
-      currentWorld?.dispose();
+      const worldDisposed = worldMount.dispose();
       arPresentation.dispose();
-      currentScope?.dispose();
-      currentWorld = null;
-      currentScope = null;
       discoverListeners.clear();
       xr?.dispose();
       xr = null;
@@ -1194,7 +1155,7 @@ const createSceneHost = (canvas: HTMLCanvasElement): SceneHost => {
       // shared scene alive until that build leaves its serialized scope; disposing it underneath
       // the loader turns a routine React unmount into a late `clearColor`/mesh write on null
       // internals. The disposed flag still prevents the completed destination from mounting.
-      void worldBuildGate.then(() => {
+      void worldDisposed.then(() => {
         scene.dispose();
         engine.dispose();
       });
