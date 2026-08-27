@@ -93,6 +93,26 @@ test("returns service health", async () => {
   expect(await response.json()).toEqual({ service: "exora-api", status: "ok" });
 });
 
+test("public read-only API CORS is wildcard and never credentialed", async () => {
+  const app = createApp({ repository });
+  const response = await app.request("/api/health", {
+    headers: { origin: "https://catalog.example" },
+  });
+  const preflight = await app.request("/api/health", {
+    headers: {
+      "access-control-request-method": "GET",
+      origin: "https://catalog.example",
+    },
+    method: "OPTIONS",
+  });
+
+  expect(response.headers.get("Access-Control-Allow-Origin")).toBe("*");
+  expect(response.headers.get("Access-Control-Allow-Credentials")).toBeNull();
+  expect(preflight.status).toBe(204);
+  expect(preflight.headers.get("Access-Control-Allow-Methods")).toBe("GET,OPTIONS");
+  expect(preflight.headers.get("Access-Control-Allow-Credentials")).toBeNull();
+});
+
 test("rejects unauthorized scheduled catalog refresh calls without dispatching work", async () => {
   const dispatch = vi.fn(async () => undefined);
   const app = createApp({
@@ -556,7 +576,7 @@ test("a caller past its budget is refused with a wait", async () => {
     rateLimiter: createRateLimiter({ limit: 2, windowMs: 60_000 }),
     trustVercelProxy: true,
   });
-  const headers = { "x-forwarded-for": "203.0.113.7" };
+  const headers = { "x-vercel-forwarded-for": "203.0.113.7" };
 
   const allowed = await Promise.all([
     app.request("/api/health", { headers }),
@@ -579,12 +599,12 @@ test("one caller exhausting its budget does not refuse another", async () => {
     trustVercelProxy: true,
   });
 
-  await app.request("/api/health", { headers: { "x-forwarded-for": "203.0.113.7" } });
+  await app.request("/api/health", { headers: { "x-vercel-forwarded-for": "203.0.113.7" } });
   const sameCaller = await app.request("/api/health", {
-    headers: { "x-forwarded-for": "203.0.113.7" },
+    headers: { "x-vercel-forwarded-for": "203.0.113.7" },
   });
   const otherCaller = await app.request("/api/health", {
-    headers: { "x-forwarded-for": "198.51.100.4" },
+    headers: { "x-vercel-forwarded-for": "198.51.100.4" },
   });
 
   expect(sameCaller.status).toBe(429);
@@ -602,6 +622,24 @@ test("caller-supplied forwarding headers cannot manufacture fresh local budgets"
   });
   const spoofed = await app.request("/api/health", {
     headers: { "x-forwarded-for": "198.51.100.4" },
+  });
+
+  expect(first.status).toBe(200);
+  expect(spoofed.status).toBe(429);
+});
+
+test("generic proxy headers cannot manufacture fresh deployed budgets", async () => {
+  const app = createApp({
+    repository,
+    rateLimiter: createRateLimiter({ limit: 1, windowMs: 60_000 }),
+    trustVercelProxy: true,
+  });
+
+  const first = await app.request("/api/health", {
+    headers: { "x-forwarded-for": "203.0.113.7", "x-real-ip": "203.0.113.7" },
+  });
+  const spoofed = await app.request("/api/health", {
+    headers: { "x-forwarded-for": "198.51.100.4", "x-real-ip": "198.51.100.4" },
   });
 
   expect(first.status).toBe(200);

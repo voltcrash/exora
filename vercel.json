@@ -27,6 +27,10 @@
       "source": "/(.*)",
       "headers": [
         {
+          "key": "Content-Security-Policy",
+          "value": "default-src 'self'; base-uri 'self'; connect-src 'self' https://launchar.app; font-src 'self' https://fonts.gstatic.com; form-action 'self'; frame-ancestors 'none'; frame-src 'none'; img-src 'self' data: blob:; manifest-src 'self'; media-src 'self' blob:; object-src 'none'; script-src 'self' 'sha256-vV0ddcMIpbgwrPAv9wjcD4L8TiMCMddgAaD32HbbQo4=' 'wasm-unsafe-eval' 'unsafe-eval' https://launchar.app; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; worker-src 'self' blob:; upgrade-insecure-requests"
+        },
+        {
           "key": "Cross-Origin-Opener-Policy",
           "value": "same-origin"
         },
@@ -44,7 +48,7 @@
         },
         {
           "key": "Strict-Transport-Security",
-          "value": "max-age=31536000"
+          "value": "max-age=63072000; includeSubDomains"
         },
         {
           "key": "X-Content-Type-Options",

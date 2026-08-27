@@ -289,14 +289,23 @@ export const createApp = ({
       // with no cookies or credentials attached, and the browser's origin check would not slow
       // down the abuse this API actually has to worry about — a script calling it server-side
       // never sends an Origin at all. The request budget below is what bounds that.
+      allowHeaders: [],
       allowMethods: ["GET", "OPTIONS"],
+      credentials: false,
       maxAge: 86_400,
     }),
   );
 
   app.use("/api/*", async (context, next) => {
     const decision = rateLimiter.check(
-      clientKey({ forwardedFor: context.req.header("x-forwarded-for") }, { trustVercelProxy }),
+      clientKey(
+        {
+          forwardedFor: context.req.header("x-forwarded-for"),
+          realIp: context.req.header("x-real-ip"),
+          vercelForwardedFor: context.req.header("x-vercel-forwarded-for"),
+        },
+        { trustVercelProxy },
+      ),
       Date.now(),
     );
 
@@ -324,7 +333,14 @@ export const createApp = ({
 
   app.get("/api/ephemerides", async (context) => {
     const decision = horizonsRateLimiter.check(
-      clientKey({ forwardedFor: context.req.header("x-forwarded-for") }, { trustVercelProxy }),
+      clientKey(
+        {
+          forwardedFor: context.req.header("x-forwarded-for"),
+          realIp: context.req.header("x-real-ip"),
+          vercelForwardedFor: context.req.header("x-vercel-forwarded-for"),
+        },
+        { trustVercelProxy },
+      ),
       Date.now(),
     );
     context.header("Ephemeris-RateLimit-Limit", String(decision.limit));
@@ -392,7 +408,14 @@ export const createApp = ({
 
   app.get("/api/mission-trajectories", async (context) => {
     const decision = missionRateLimiter.check(
-      clientKey({ forwardedFor: context.req.header("x-forwarded-for") }, { trustVercelProxy }),
+      clientKey(
+        {
+          forwardedFor: context.req.header("x-forwarded-for"),
+          realIp: context.req.header("x-real-ip"),
+          vercelForwardedFor: context.req.header("x-vercel-forwarded-for"),
+        },
+        { trustVercelProxy },
+      ),
       Date.now(),
     );
     context.header("Mission-RateLimit-Limit", String(decision.limit));
@@ -464,7 +487,14 @@ export const createApp = ({
 
   app.get("/api/small-bodies", async (context) => {
     const decision = sbdbRateLimiter.check(
-      clientKey({ forwardedFor: context.req.header("x-forwarded-for") }, { trustVercelProxy }),
+      clientKey(
+        {
+          forwardedFor: context.req.header("x-forwarded-for"),
+          realIp: context.req.header("x-real-ip"),
+          vercelForwardedFor: context.req.header("x-vercel-forwarded-for"),
+        },
+        { trustVercelProxy },
+      ),
       Date.now(),
     );
     context.header("SmallBody-RateLimit-Limit", String(decision.limit));

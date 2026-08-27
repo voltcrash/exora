@@ -35,7 +35,7 @@ export const app = createApp({
   repository,
   sbdbRepository: new JplSbdbRepository(),
   starRepository: new SimbadStarRepository(),
-  // Vercel overwrites its forwarding headers at the public ingress. Direct/local requests have
-  // no equivalent trusted proxy boundary and remain grouped in the conservative fallback bucket.
+  // Only Vercel's ingress-owned forwarding header is trusted. Direct/local requests have no
+  // equivalent trusted proxy boundary and remain grouped in the conservative fallback bucket.
   trustVercelProxy: Boolean(process.env.VERCEL),
 });

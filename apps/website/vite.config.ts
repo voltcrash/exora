@@ -7,6 +7,7 @@ import { FEATURED_COMET_NAMES } from "./src/solar-comets.ts";
 import { FEATURED_REGION_NAMES } from "./src/solar-regions.ts";
 import { FEATURED_MISSION_NAMES } from "./src/solar-missions.ts";
 import { FEATURED_BLACK_HOLE_NAMES } from "./src/black-holes.ts";
+import { VARIANT_LAUNCH_INITIALIZER } from "./variant-launch-embed.ts";
 
 /**
  * Drops Babylon's WGSL shader sources from the bundle.
@@ -134,8 +135,7 @@ const variantLaunchSdk = (key: string): Plugin => ({
       key
         ? [
             {
-              children:
-                "window.addEventListener('vlaunch-initialized',function(event){window.__exoraVariantLaunchDetail=event.detail;window.dispatchEvent(new Event('exora:variant-launch-ready'))})",
+              children: VARIANT_LAUNCH_INITIALIZER,
               injectTo: "head" as const,
               tag: "script",
             },
