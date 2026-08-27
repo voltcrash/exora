@@ -2486,8 +2486,7 @@ export const createPlanetWorld = (
     onViewModeChange("transition");
   };
 
-  // A stationary A/X press still takes the direct route to terrain. A held, moving press is
-  // consumed by scene-host as a view-orbit gesture and does not manipulate this mesh.
+  // A/X has one immersive-world action: point at the planet and press once to enter terrain.
   planet.metadata = {
     ...planet.metadata,
     exoraXrPrimaryAction: () => {
@@ -2680,45 +2679,6 @@ export const createPlanetWorld = (
     }
   };
 
-  let xrViewDragTarget: Vector3 | null = null;
-  const beginXrViewDrag = (): void => {
-    const rig = host.xrCamera();
-    if (!rig || viewState === "entering" || viewState === "leaving") return;
-    if (viewState === "orbit") {
-      xrViewDragTarget = PLANET_POSITION.clone();
-      return;
-    }
-    const forward = rig.getForwardRay().direction;
-    const horizontalForward = new Vector3(forward.x, 0, forward.z);
-    if (horizontalForward.lengthSquared() < 0.001) horizontalForward.set(0, 0, 1);
-    horizontalForward.normalize();
-    xrViewDragTarget = rig.position.add(horizontalForward.scale(18));
-    xrViewDragTarget.y = rig.position.y - 0.3;
-  };
-  const dragXrView = (yawRadians: number, pitchRadians: number): void => {
-    const rig = host.xrCamera();
-    const target = xrViewDragTarget;
-    if (!rig || !target) return;
-    const offset = rig.position.subtract(target);
-    const radius = offset.length();
-    if (radius < 0.001) return;
-    const azimuth = Math.atan2(offset.z, offset.x) - yawRadians;
-    const elevation = Math.asin(Math.min(1, Math.max(-1, offset.y / radius)));
-    const minimumElevation = viewState === "surface" ? 0 : -Math.PI * 0.38;
-    const maximumElevation = viewState === "surface" ? Math.PI / 3 : Math.PI * 0.38;
-    const nextElevation = Math.min(
-      maximumElevation,
-      Math.max(minimumElevation, elevation + pitchRadians),
-    );
-    const horizontalRadius = Math.cos(nextElevation) * radius;
-    rig.position.set(
-      target.x + Math.cos(azimuth) * horizontalRadius,
-      target.y + Math.sin(nextElevation) * radius,
-      target.z + Math.sin(azimuth) * horizontalRadius,
-    );
-    rig.setTarget(target);
-  };
-
   /** Restores the desktop camera so leaving the headset lands on the view the wearer left in. */
   const syncDesktopCamera = (surface: boolean): void => {
     camera.fov = surface ? SURFACE_FIELD_OF_VIEW : ORBIT_FIELD_OF_VIEW;
@@ -2803,7 +2763,6 @@ export const createPlanetWorld = (
   };
 
   return {
-    beginXrViewDrag,
     console: consoleContributions,
     /**
      * How far a jump may pull back from this world before it stops holding up.
@@ -2815,10 +2774,6 @@ export const createPlanetWorld = (
      */
     farthestView: () => (viewState === "surface" ? SURFACE_DEPARTURE_RADIUS : undefined),
     focusXrRig: (initial) => applyXrView(viewState === "surface", initial),
-    dragXrView,
-    endXrViewDrag: () => {
-      xrViewDragTarget = null;
-    },
     handleXrBack: () => {
       if (viewState !== "surface") return false;
       applyXrView(false, false);

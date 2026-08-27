@@ -30,7 +30,6 @@ import "@babylonjs/core/Meshes/instancedMesh.js";
 import { Scene, ScenePerformancePriority } from "@babylonjs/core/scene.js";
 import type { WebXRCamera } from "@babylonjs/core/XR/webXRCamera.js";
 import type { WebXRAbstractMotionController } from "@babylonjs/core/XR/motionController/webXRAbstractMotionController.js";
-import type { WebXRControllerComponent } from "@babylonjs/core/XR/motionController/webXRControllerComponent.js";
 import type { WebXRInputSource } from "@babylonjs/core/XR/webXRInputSource.js";
 import type { WebXRDefaultExperience } from "@babylonjs/core/XR/webXRDefaultExperience.js";
 import { createArPresentation } from "./ar-presentation.ts";
@@ -146,12 +145,6 @@ export interface MountedWorld {
    * height to the rig; every later call happens mid-session, where the height is already there.
    */
   focusXrRig: (initial: boolean) => void;
-  /** Captures the focal point used while A/X orbits the immersive view. */
-  beginXrViewDrag?: () => void;
-  /** Orbits the immersive rig by the controller's accumulated angular motion. */
-  dragXrView?: (yawRadians: number, pitchRadians: number) => void;
-  /** Releases any focal point captured for an A/X view drag. */
-  endXrViewDrag?: () => void;
   /** Handles B/Y within a world's own nested view before browser history is asked to go back. */
   handleXrBack?: () => boolean;
   /** Restores the desktop camera so leaving the headset lands on the view the wearer left in. */
@@ -366,20 +359,8 @@ const createSceneHost = (canvas: HTMLCanvasElement): SceneHost => {
   let xr: WebXRDefaultExperience | null = null;
   let xrRuntime: typeof XrRuntime | null = null;
   let xrInitialization: Promise<WebXRDefaultExperience | null> | null = null;
-  interface XrDragState {
-    component: WebXRControllerComponent;
-    controller: WebXRInputSource;
-    moved: boolean;
-    primaryAction?: () => void;
-    previousDirection: Vector3;
-    previousOrigin: Vector3;
-    startDirection: Vector3;
-    startOrigin: Vector3;
-  }
-  const xrDragStates = new Map<WebXRInputSource, XrDragState>();
-  const boundXrDragControllers = new WeakSet<WebXRInputSource>();
-  const boundXrDragMotionControllers = new WeakSet<WebXRAbstractMotionController>();
-  let xrDragObserver: ReturnType<typeof scene.onBeforeRenderObservable.add> | null = null;
+  const boundXrControllers = new WeakSet<WebXRInputSource>();
+  const boundXrMotionControllers = new WeakSet<WebXRAbstractMotionController>();
   let currentWorld: MountedWorld | null = null;
   let currentScope: WorldScope | null = null;
   let mountToken = 0;
@@ -466,80 +447,17 @@ const createSceneHost = (canvas: HTMLCanvasElement): SceneHost => {
     sessionManager.fixedFoveation = next;
   };
 
-  const xrDragRay = new Ray(Vector3.Zero(), Vector3.Forward(), 100);
-  const finishXrDrag = (controller: WebXRInputSource, activate = true): void => {
-    const state = xrDragStates.get(controller);
-    if (!state) return;
-    controller.getWorldPointerRayToRef(xrDragRay);
-    xrDragStates.delete(controller);
-    currentWorld?.endXrViewDrag?.();
-    if (activate && !state.moved) state.primaryAction?.();
-  };
-  const beginXrDrag = (controller: WebXRInputSource, component: WebXRControllerComponent): void => {
-    if (
-      !isInXr ||
-      activeImmersiveMode !== "vr" ||
-      xrDragStates.has(controller) ||
-      xrDragStates.size > 0
-    )
-      return;
-    controller.getWorldPointerRayToRef(xrDragRay);
-    const pick = scene.pickWithRay(xrDragRay);
+  const xrPrimaryRay = new Ray(Vector3.Zero(), Vector3.Forward(), 100);
+  const activateXrPrimary = (controller: WebXRInputSource): void => {
+    if (!isInXr || activeImmersiveMode !== "vr") return;
+    controller.getWorldPointerRayToRef(xrPrimaryRay);
+    const pick = scene.pickWithRay(xrPrimaryRay);
     const metadata = pick?.pickedMesh?.metadata as
       | { exoraXrPrimaryAction?: () => void }
       | null
       | undefined;
-    const state: XrDragState = {
-      component,
-      controller,
-      moved: false,
-      ...(metadata?.exoraXrPrimaryAction ? { primaryAction: metadata.exoraXrPrimaryAction } : {}),
-      previousDirection: xrDragRay.direction.clone(),
-      previousOrigin: xrDragRay.origin.clone(),
-      startDirection: xrDragRay.direction.clone(),
-      startOrigin: xrDragRay.origin.clone(),
-    };
-    xrDragStates.set(controller, state);
-    currentWorld?.beginXrViewDrag?.();
+    metadata?.exoraXrPrimaryAction?.();
   };
-  const updateXrDrags = (): void => {
-    for (const state of xrDragStates.values()) {
-      if (!state.component.pressed || !isInXr || activeImmersiveMode !== "vr") {
-        finishXrDrag(state.controller, false);
-        continue;
-      }
-      state.controller.getWorldPointerRayToRef(xrDragRay);
-      const originDelta = xrDragRay.origin.subtract(state.previousOrigin);
-      const previousYaw = Math.atan2(state.previousDirection.x, state.previousDirection.z);
-      const currentYaw = Math.atan2(xrDragRay.direction.x, xrDragRay.direction.z);
-      let yawDelta = currentYaw - previousYaw;
-      if (yawDelta > Math.PI) yawDelta -= Math.PI * 2;
-      if (yawDelta < -Math.PI) yawDelta += Math.PI * 2;
-      const pitchDelta =
-        Math.asin(Math.min(1, Math.max(-1, xrDragRay.direction.y))) -
-        Math.asin(Math.min(1, Math.max(-1, state.previousDirection.y)));
-      const viewForward = scene.activeCamera?.getForwardRay().direction ?? Vector3.Forward();
-      const viewRight = Vector3.Cross(Vector3.Up(), viewForward);
-      if (viewRight.lengthSquared() > 0.0001) viewRight.normalize();
-      else viewRight.set(1, 0, 0);
-      const viewUp = Vector3.Cross(viewForward, viewRight).normalize();
-      // Translating a held controller across the view should work as well as sweeping its ray.
-      // At arm's length, 1.6 radians/metre gives a deliberate hand motion roughly the same
-      // response as the corresponding angular sweep, without amplifying tracking jitter.
-      yawDelta += Vector3.Dot(originDelta, viewRight) * 1.6;
-      const combinedPitchDelta = pitchDelta + Vector3.Dot(originDelta, viewUp) * 1.6;
-      if (
-        Vector3.DistanceSquared(state.startOrigin, xrDragRay.origin) > 0.0001 ||
-        Vector3.Dot(state.startDirection, xrDragRay.direction) < 0.9994
-      ) {
-        state.moved = true;
-      }
-      if (state.moved) currentWorld?.dragXrView?.(yawDelta, combinedPitchDelta);
-      state.previousDirection.copyFrom(xrDragRay.direction);
-      state.previousOrigin.copyFrom(xrDragRay.origin);
-    }
-  };
-  xrDragObserver = scene.onBeforeRenderObservable.add(updateXrDrags);
 
   scene.onBeforeRenderObservable.add(() => {
     const deltaSeconds = Math.min(engine.getDeltaTime() / 1_000, 0.05);
@@ -950,8 +868,8 @@ const createSceneHost = (canvas: HTMLCanvasElement): SceneHost => {
       const createdXr = await runtime.WebXRDefaultExperience.CreateAsync(scene, {
         disableDefaultUI: true,
         disableNearInteraction: true,
-        // World interaction is owned by A/X below. Triggers and grips are deliberately free for
-        // the session and desktop-menu shortcuts, so Babylon must not bind either as selection.
+        // A/X only activates the planet's terrain action below. Triggers and grips are deliberately
+        // free for the session and desktop-menu shortcuts, so Babylon must not bind selection.
         disablePointerSelection: true,
         disableTeleportation: true,
         // The rigged hand mesh is a remote glTF and no loader is bundled, so joint spheres are used.
@@ -1025,16 +943,15 @@ const createSceneHost = (canvas: HTMLCanvasElement): SceneHost => {
         controller: WebXRInputSource,
         motionController: WebXRAbstractMotionController,
       ): void => {
-        if (boundXrDragMotionControllers.has(motionController)) return;
-        boundXrDragMotionControllers.add(motionController);
+        if (boundXrMotionControllers.has(motionController)) return;
+        boundXrMotionControllers.add(motionController);
         for (const id of motionController.getComponentIds()) {
           const component = motionController.getComponent(id);
           if (!component) continue;
           component.onButtonStateChangedObservable.add((changed) => {
             const pressed = changed.changes.pressed?.current;
             if (id === "a-button" || id === "x-button") {
-              if (pressed === true) beginXrDrag(controller, component);
-              if (pressed === false) finishXrDrag(controller);
+              if (pressed === true) activateXrPrimary(controller);
               return;
             }
             if (pressed !== true) return;
@@ -1052,20 +969,17 @@ const createSceneHost = (canvas: HTMLCanvasElement): SceneHost => {
           });
         }
       };
-      const bindXrDragController = (controller: WebXRInputSource): void => {
-        if (boundXrDragControllers.has(controller)) return;
-        boundXrDragControllers.add(controller);
+      const bindXrController = (controller: WebXRInputSource): void => {
+        if (boundXrControllers.has(controller)) return;
+        boundXrControllers.add(controller);
         const motionController = controller.motionController;
         if (motionController) bindXrMotionController(controller, motionController);
         controller.onMotionControllerInitObservable.add((initializedMotionController) =>
           bindXrMotionController(controller, initializedMotionController),
         );
       };
-      for (const controller of createdXr.input.controllers) bindXrDragController(controller);
-      createdXr.input.onControllerAddedObservable.add(bindXrDragController);
-      createdXr.input.onControllerRemovedObservable.add((controller) =>
-        finishXrDrag(controller, false),
-      );
+      for (const controller of createdXr.input.controllers) bindXrController(controller);
+      createdXr.input.onControllerAddedObservable.add(bindXrController);
       // The rig lands wherever the headset happens to face, so the view has to be aimed at the
       // subject; otherwise a VR session opens on empty starfield and looks broken. AR must leave
       // the tracked camera at the physical device pose, so its world moves instead of the rig.
@@ -1262,10 +1176,6 @@ const createSceneHost = (canvas: HTMLCanvasElement): SceneHost => {
       currentWorld = null;
       currentScope = null;
       discoverListeners.clear();
-      for (const controller of xrDragStates.keys()) finishXrDrag(controller, false);
-      xrDragStates.clear();
-      if (xrDragObserver) scene.onBeforeRenderObservable.remove(xrDragObserver);
-      xrDragObserver = null;
       xr?.dispose();
       xr = null;
       looping = false;

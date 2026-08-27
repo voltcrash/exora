@@ -11,11 +11,9 @@ from a plain LAN HTTP address.
 4. Confirm the planet, atmosphere, and ice-giant rings render in both eyes, with no smearing of
    the previous frame at the edges of either eye.
 5. Verify VR opens directly onto the full world and never creates a Discover panel, DOM capture,
-   or other browser UI in the immersive scene. In orbit, hold A/X while moving a controller and
-   confirm the view circles the planet without displacing the planet or its star; release without
-   moving to select it.
-6. Walk the surface excursion with the thumbstick, then hold A/X and move a controller to orbit
-   the terrain view. Confirm the wearer stays on the terrain and the terrain itself does not move.
+   or other browser UI in the immersive scene. In orbit, point at the planet and press A/X once;
+   confirm it enters the terrain view. Holding A/X or moving the controller must do nothing else.
+6. Walk the surface excursion with the thumbstick and confirm the wearer stays on the terrain.
 7. Press either trigger to exit VR. If the runtime continues exposing the controller on the flat
    page, press either trigger again to re-enter; otherwise use the page's immersive control, as
    WebXR does not expose disconnected XR controllers to page input. Switch worlds and enter again.
@@ -37,7 +35,7 @@ from a plain LAN HTTP address.
 13. Leave the experience running for ten minutes to catch thermal throttling or memory growth.
 
 Movement is thumbstick locomotion with smooth turning; teleportation and Babylon's default
-trigger/grip pointer selection are deliberately off. A/X owns immersive selection and view drag.
+trigger/grip pointer selection are deliberately off. A/X only enters terrain when aimed at a planet.
 
 ## Performance target
 
