@@ -53,6 +53,8 @@ controller ray only points and selects.
 - Target the headset's 72 Hz refresh rate with no sustained drops below 60 FPS.
 - Opening Discover may cause one brief frame-time spike while its DOM is captured, but leaving the
   panel still must hold 60 FPS and must not trigger continuous recaptures while it is idle.
+- Moving either controller ray across Discover must not change frame rate or produce hover
+  vibration. Haptics are reserved for a deliberate selection.
 - Brief shader compilation drops during the first frame of a new world family are acceptable.
 - The session raises fixed foveation on its own after three seconds below 62 FPS and relaxes it
   again above 70 FPS, so a brief soft periphery under load is expected rather than a fault.

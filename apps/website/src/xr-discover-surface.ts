@@ -249,17 +249,6 @@ export const createXrDiscoverSurface = (
 
   const resolve = (info: PointerInfo) => resolvePick(info.pickInfo);
 
-  const dispatchPointer = (
-    target: Element,
-    type: "pointermove" | "pointerout" | "pointerover",
-    clientX: number,
-    clientY: number,
-  ): void => {
-    target.dispatchEvent(
-      new PointerEvent(type, { bubbles: true, clientX, clientY, pointerType: "mouse" }),
-    );
-  };
-
   const activate = (target: HTMLElement, clientX: number): void => {
     if (target instanceof HTMLInputElement && target.type === "range") {
       const bounds = target.getBoundingClientRect();
@@ -282,15 +271,11 @@ export const createXrDiscoverSurface = (
     if (!visible) return;
     const hit = resolve(info);
     if (info.type === PointerEventTypes.POINTERMOVE) {
-      if (hit?.element === hovered) return;
-      if (hovered) dispatchPointer(hovered, "pointerout", hit?.clientX ?? 0, hit?.clientY ?? 0);
-      hovered = hit?.element ?? null;
-      if (hovered && hit) {
-        dispatchPointer(hovered, "pointerover", hit.clientX, hit.clientY);
-        dispatchPointer(hovered, "pointermove", hit.clientX, hit.clientY);
-        pulse(0.08, 12);
-      }
-      scheduleCapture();
+      // A tracked controller never holds perfectly still. The raw hit therefore jitters between
+      // a button and its nested label/icon on adjacent frames. Treat the complete control as one
+      // stable target and keep hover read-only: recapturing the DOM (and pulsing haptics) for
+      // every few pixels of ray motion turned normal hand tremor into a render/vibration loop.
+      hovered = interactiveTarget(hit?.element ?? null);
       return;
     }
     if (info.type !== PointerEventTypes.POINTERDOWN || !hit) return;
