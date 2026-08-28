@@ -6,12 +6,10 @@ import { findAssetProvenanceGaps } from "./check-asset-provenance.mjs";
 
 const fixtureDirectories = [];
 
-const createFixture = async (files) => {
+const createFixture = async (files, directories = ["models", "textures"]) => {
   const publicRootPath = await mkdtemp(path.join(tmpdir(), "exora-asset-provenance-"));
   fixtureDirectories.push(publicRootPath);
-  await Promise.all(
-    ["models", "textures"].map((directory) => mkdir(path.join(publicRootPath, directory))),
-  );
+  await Promise.all(directories.map((directory) => mkdir(path.join(publicRootPath, directory))));
   await Promise.all(
     files.map(async (file) => {
       const filePath = path.join(publicRootPath, file);
@@ -51,6 +49,16 @@ test("reports undocumented supported assets", async () => {
   });
 
   expect(result.undocumented).toEqual(["textures/missing.png"]);
+});
+
+test("accepts a public directory that ships only textures", async () => {
+  const publicRootPath = await createFixture(["textures/surface.jpg"], ["textures"]);
+  const result = await findAssetProvenanceGaps({
+    provenance: "Documented asset: `textures/surface.jpg`.",
+    publicRootPath,
+  });
+
+  expect(result).toEqual({ assets: ["textures/surface.jpg"], undocumented: [] });
 });
 
 test("requires full paths when supported assets have duplicate basenames", async () => {

@@ -1,4 +1,4 @@
-import { readdir, readFile } from "node:fs/promises";
+import { readdir, readFile, stat } from "node:fs/promises";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -15,7 +15,12 @@ export const findAssetProvenanceGaps = async ({ publicRootPath, provenance }) =>
   const assets = (
     await Promise.all(
       [...supportedAssetExtensions].map(async ([directory, extensions]) => {
-        const entries = await readdir(path.join(publicRootPath, directory), {
+        const directoryPath = path.join(publicRootPath, directory);
+        // Git does not retain empty directories. A route may stop shipping one asset class
+        // entirely without leaving a directory for CI to scan.
+        if (!(await stat(directoryPath).catch(() => null))) return [];
+
+        const entries = await readdir(directoryPath, {
           recursive: true,
           withFileTypes: true,
         });
