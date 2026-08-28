@@ -36,6 +36,24 @@ test("reports context restoration only after a complete recovery frame", () => {
 
   expect(statuses).toEqual(["ready", "context-lost", "recovering", "ready"]);
   expect(engine.resize).toHaveBeenCalledOnce();
+  expect(engine.stopRenderLoop).toHaveBeenCalledOnce();
+  expect(engine.runRenderLoop).toHaveBeenCalledTimes(2);
+});
+
+test("does not turn a queued frame after context loss into a permanent failure", () => {
+  const { engine, frame, lifecycle, scene } = createHarness();
+  const statuses: string[] = [];
+  lifecycle.onStatus((status) => statuses.push(status));
+  scene.render.mockImplementationOnce(() => {
+    throw new Error("context unavailable");
+  });
+
+  engine.onContextLostObservable.notifyObservers();
+  frame();
+
+  expect(statuses).toEqual(["ready", "context-lost"]);
+  expect(lifecycle.isRunning).toBe(false);
+  expect(engine.stopRenderLoop).toHaveBeenCalledOnce();
 });
 
 test("contains a failed frame and leaves the renderer failed", () => {

@@ -48,6 +48,10 @@ export const createRenderLifecycle = ({
 
   const renderFrame = (): void => {
     if (disposed) return;
+    // Browsers can deliver one callback that was already queued when WebGL reports a lost
+    // context. Rendering that callback throws from the unavailable context and used to turn a
+    // recoverable interruption into the permanent recovery screen.
+    if (status === "context-lost") return;
     try {
       scene.render();
       dispatch("frame-rendered");
@@ -95,12 +99,17 @@ export const createRenderLifecycle = ({
   };
 
   engine.onContextLostObservable.add(() => {
-    if (!disposed) dispatch("context-lost");
+    if (disposed) return;
+    dispatch("context-lost");
+    // Do not give a lost context another frame to fail on. Babylon will notify restoration when
+    // the browser has re-established the underlying WebGL resources.
+    stop();
   });
   engine.onContextRestoredObservable.add(() => {
     if (disposed) return;
     dispatch("context-restored");
     engine.resize();
+    if (suspensions === 0) start();
   });
   resizeTarget.addEventListener("resize", resize);
   start();
