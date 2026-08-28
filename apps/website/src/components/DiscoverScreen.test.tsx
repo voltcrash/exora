@@ -2,11 +2,11 @@ import { renderToStaticMarkup } from "react-dom/server";
 import { expect, test, vi } from "vite-plus/test";
 import { DiscoverScreen, type DiscoverSection } from "./DiscoverScreen.tsx";
 
-const discoverMarkup = (initialSection: DiscoverSection = "solar"): string =>
+const discoverMarkup = (initialSection?: DiscoverSection): string =>
   renderToStaticMarkup(
     <DiscoverScreen
       initialForgeMode="planet"
-      initialSection={initialSection}
+      {...(initialSection ? { initialSection } : {})}
       onClose={vi.fn()}
       onGeneratePlanet={vi.fn()}
       onGenerateStar={vi.fn()}
@@ -17,7 +17,7 @@ const discoverMarkup = (initialSection: DiscoverSection = "solar"): string =>
     />,
   );
 
-test("Discover starts directly in the Solar System catalog", () => {
+test("Discover starts directly in the Exoplanet catalog", () => {
   const markup = discoverMarkup();
   const navigation = markup.slice(markup.indexOf("<nav"), markup.indexOf("</nav>"));
 
@@ -27,8 +27,8 @@ test("Discover starts directly in the Solar System catalog", () => {
   expect(markup).toContain("Black Holes");
   expect(markup).toContain("World Forge");
   expect(markup).toContain('aria-label="Discover destinations"');
-  expect(markup).toContain('aria-label="Solar System catalog"');
-  expect(markup).toContain("Start close to home.");
+  expect(markup).toContain('aria-label="Exoplanet catalog"');
+  expect(markup).toContain("Find another world.");
   expect(markup).toContain('data-icon="solar"');
   expect(markup).toContain('data-icon="worlds"');
   expect(markup).toContain('data-icon="stars"');
@@ -41,7 +41,7 @@ test("Discover starts directly in the Solar System catalog", () => {
 });
 
 test("the Solar System catalog retains regions without removed feature collections", () => {
-  const markup = discoverMarkup();
+  const markup = discoverMarkup("solar");
 
   expect(markup).toContain("Regions · statistical populations and measured boundaries");
   expect(markup).not.toContain("Missions · optional trajectories and exploration sites");

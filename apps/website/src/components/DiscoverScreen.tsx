@@ -126,7 +126,7 @@ const sectionCopy: Record<DiscoverSection, { eyebrow: string; title: string; sum
 
 export const DiscoverScreen = ({
   initialForgeMode,
-  initialSection = "solar",
+  initialSection = "worlds",
   onClose,
   onGeneratePlanet,
   onGenerateStar,

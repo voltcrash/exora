@@ -322,7 +322,7 @@ const openDiscoverSection = async (
   name: "Black Holes" | "Exoplanets" | "Solar System" | "Stars" | "World Forge",
 ): Promise<void> => {
   await userEvent.click(page.getByRole("button", { name: "Open Discover" }));
-  await expect.element(page.getByRole("dialog", { name: /Start close to home/ })).toBeVisible();
+  await expect.element(page.getByRole("dialog", { name: /Find another world/ })).toBeVisible();
   await userEvent.click(page.getByRole("button", { name: new RegExp(name) }).first());
 };
 
@@ -364,17 +364,17 @@ test("the browser test server exposes the production sky catalog", async () => {
   expect(header.getUint32(0, true)).toBe(0x4b_53_58_45);
 });
 
-test("Discover opens directly into the Solar System at this width", async () => {
+test("Discover opens directly into Exoplanets at this width", async () => {
   stubArchive();
   mountApp();
 
   await expect.element(page.getByRole("button", { name: "Open Discover" })).toBeVisible();
   await userEvent.click(page.getByRole("button", { name: "Open Discover" }));
-  await expect.element(page.getByRole("dialog", { name: /Start close to home/ })).toBeVisible();
-  await expect.element(page.getByRole("region", { name: "Solar System catalog" })).toBeVisible();
+  await expect.element(page.getByRole("dialog", { name: /Find another world/ })).toBeVisible();
+  await expect.element(page.getByRole("region", { name: "Exoplanet catalog" })).toBeVisible();
 
   if (window.innerWidth <= 760) {
-    for (const label of ["Solar System", "Exoplanets", "Stars", "Black Holes", "World Forge"]) {
+    for (const label of ["Exoplanets", "Stars", "Solar System", "Black Holes", "World Forge"]) {
       const button = page.getByRole("button", { name: new RegExp(label) }).first();
       await expect.element(button).toBeVisible();
     }
@@ -815,7 +815,7 @@ test("Backspace toggles Discover open and closed", async () => {
   await expect.element(page.getByRole("heading", { level: 1 })).toBeVisible();
 
   await userEvent.keyboard("{Backspace}");
-  await expect.element(page.getByRole("dialog", { name: /Start close to home/ })).toBeVisible();
+  await expect.element(page.getByRole("dialog", { name: /Find another world/ })).toBeVisible();
 
   await userEvent.keyboard("{Backspace}");
   await expect.element(page.getByRole("dialog")).not.toBeInTheDocument();
