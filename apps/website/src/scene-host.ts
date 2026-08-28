@@ -149,7 +149,7 @@ export interface SceneHost {
   beginTravel: () => void;
   /** Flies back to the view a jump left from, for a destination that turned out not to exist. */
   cancelTravel: () => void;
-  dispose: () => void;
+  dispose: () => Promise<void>;
   enterImmersive: () => Promise<void>;
   getFps: () => number;
   isArSupported: () => boolean;
@@ -954,7 +954,7 @@ const createSceneHost = (canvas: HTMLCanvasElement): SceneHost => {
         throw error;
       }
     },
-    dispose: () => {
+    dispose: async () => {
       if (disposed) return;
       disposed = true;
       // Test remounts and client-side renderer recovery can present the same canvas node again.
@@ -976,10 +976,10 @@ const createSceneHost = (canvas: HTMLCanvasElement): SceneHost => {
       // An OBJ/GLB import cannot be cancelled once Babylon has handed it to a loader. Keep the
       // shared scene alive until that build leaves its serialized scope; disposing it underneath
       // the loader turns a routine React unmount into a late `clearColor`/mesh write on null
-      // internals. The disposed flag still prevents the completed destination from mounting.
-      void worldDisposed.then(() => {
-        resources.dispose();
-      });
+      // internals. Recovery also awaits this promise before asking the same canvas for another
+      // WebGL context, so the retiring engine cannot tear its replacement down afterward.
+      await worldDisposed;
+      resources.dispose();
     },
   };
   return sceneHost;
@@ -999,6 +999,6 @@ export const acquireSceneHost = (canvas: HTMLCanvasElement): SceneHost => {
 };
 
 /** Replaces a failed renderer while retaining the page-owned canvas and React destination. */
-export const recreateSceneHost = (canvas: HTMLCanvasElement): SceneHost => {
+export const recreateSceneHost = (canvas: HTMLCanvasElement): Promise<SceneHost> => {
   return sceneHostRegistry.recreate(canvas);
 };

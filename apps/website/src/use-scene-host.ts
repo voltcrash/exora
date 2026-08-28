@@ -84,9 +84,14 @@ export const useSceneHost = (canvas: HTMLCanvasElement | null): SceneHostControl
       // arrival from rendering a frame or two of empty space before its stars appear.
       void import("./sky-catalog.ts").then(({ loadSkyCatalog }) => loadSkyCatalog());
       void import("./scene-host.ts")
-        .then(({ acquireSceneHost, recreateSceneHost }) => {
+        .then(async ({ acquireSceneHost, recreateSceneHost }) => {
           if (cancelled) return;
-          const nextHost = attempt === 0 ? acquireSceneHost(canvas) : recreateSceneHost(canvas);
+          const nextHost =
+            attempt === 0 ? acquireSceneHost(canvas) : await recreateSceneHost(canvas);
+          if (cancelled) {
+            await nextHost.dispose();
+            return;
+          }
           unsubscribe = nextHost.onRendererStatus((nextStatus) => {
             if (!cancelled) setStatus(nextStatus);
           });
