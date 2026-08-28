@@ -10,7 +10,6 @@
   "dependencies": {
     "@exora/contracts": "workspace:*",
     "@hono/node-server": "catalog:",
-    "@opentelemetry/api": "catalog:",
     "hono": "catalog:",
     "zod": "catalog:"
   },

@@ -26,8 +26,6 @@ import {
   type RepositoryResult,
 } from "./nasa-archive.ts";
 import { NasaSystemAliasRepository, type SystemAliasRepository } from "./nasa-system-aliases.ts";
-import { ApiObservability, type Dependency } from "./observability.ts";
-import { openApiDocument } from "./openapi.ts";
 import {
   clientKey,
   createRateLimiter,
@@ -45,7 +43,6 @@ import {
 interface CreateAppOptions {
   horizonsRateLimiter?: RateLimiter;
   horizonsRepository?: HorizonsRepository;
-  observability?: ApiObservability;
   /** Overridable so a test can exercise the limit without issuing a hundred requests. */
   rateLimiter?: RateLimiter;
   repository?: PlanetRepository;
@@ -184,7 +181,6 @@ const starCollection = (
 export const createApp = ({
   horizonsRateLimiter = createRateLimiter({ limit: 8, windowMs: 60_000 }),
   horizonsRepository = new JplHorizonsRepository(),
-  observability = new ApiObservability(),
   rateLimiter = createRateLimiter(DEFAULT_RATE_LIMIT),
   repository = new NasaPlanetRepository(),
   starRepository = new SimbadStarRepository(),
@@ -193,20 +189,13 @@ export const createApp = ({
 }: CreateAppOptions = {}) => {
   const app = new Hono();
   const handleError = (error: unknown, context: Context): Response => {
-    observability.recordFailure(context, error);
+    console.error("API request failed", {
+      error,
+      method: context.req.method,
+      path: context.req.path,
+    });
     return renderApiError(error, context);
   };
-
-  // This middleware is registered before every route so requests and errors receive the same
-  // correlation header and completion record.
-  app.use("*", observability.middleware(handleError));
-
-  const dependency = <T>(
-    context: Context,
-    source: Dependency,
-    operation: string,
-    work: () => Promise<T>,
-  ): Promise<T> => observability.dependency(context, source, operation, work);
 
   app.use(
     "/api/*",
@@ -254,8 +243,6 @@ export const createApp = ({
   app.get("/api/health", (context) =>
     context.json({ service: "exora-api", status: "ok" as const }),
   );
-
-  app.get("/api/openapi.json", (context) => context.json(openApiDocument));
 
   app.get("/api/ephemerides", async (context) => {
     const decision = horizonsRateLimiter.check(
@@ -311,9 +298,7 @@ export const createApp = ({
       return context.json(apiError("INVALID_REQUEST", "Ephemeris target list is invalid."), 400);
     }
 
-    const result = await dependency(context, "jpl", "horizons.positions", () =>
-      horizonsRepository.positions(naifIds, epoch),
-    );
+    const result = await horizonsRepository.positions(naifIds, epoch);
     setCachePolicy(context, CACHE_POLICY.liveLookup);
     return context.json(
       ephemerisResponseSchema.parse({
@@ -339,9 +324,7 @@ export const createApp = ({
     const browse = context.req.query("browse")?.trim() ?? "";
 
     if (browse === "physical-controls") {
-      const result = await dependency(context, "nasa", "planets.browse", () =>
-        repository.browse(requestedLimit(context, 120)),
-      );
+      const result = await repository.browse(requestedLimit(context, 120));
       return planetCollection(context, result, "physical-controls", CACHE_POLICY.catalog);
     }
 
@@ -349,9 +332,7 @@ export const createApp = ({
       if (hostStar.length > MAX_NAME_LENGTH) {
         return context.json(apiError("INVALID_REQUEST", "Host star name is invalid."), 400);
       }
-      const result = await dependency(context, "nasa", "planets.find_by_host", () =>
-        repository.findByHost(hostStar, requestedLimit(context, 12)),
-      );
+      const result = await repository.findByHost(hostStar, requestedLimit(context, 12));
       return planetCollection(context, result, hostStar, CACHE_POLICY.catalog);
     }
 
@@ -362,8 +343,9 @@ export const createApp = ({
           400,
         );
       }
-      const result = await dependency(context, "nasa", "planets.discover", () =>
-        repository.discover(category as PlanetDiscoveryCategory, requestedLimit(context, 12)),
+      const result = await repository.discover(
+        category as PlanetDiscoveryCategory,
+        requestedLimit(context, 12),
       );
       return planetCollection(context, result, category, CACHE_POLICY.catalog);
     }
@@ -375,16 +357,12 @@ export const createApp = ({
       );
     }
 
-    const result = await dependency(context, "nasa", "planets.search", () =>
-      repository.search(query, requestedLimit(context, 12)),
-    );
+    const result = await repository.search(query, requestedLimit(context, 12));
     return planetCollection(context, result, query, CACHE_POLICY.planetSearch);
   });
 
   app.get("/api/planets/featured", async (context) => {
-    const result = await dependency(context, "nasa", "planets.find_by_name", () =>
-      repository.findByName("Kepler-297 b"),
-    );
+    const result = await repository.findByName("Kepler-297 b");
 
     if (!result.value) {
       return context.json(apiError("NOT_FOUND", "Featured planet was not found."), 404);
@@ -407,9 +385,7 @@ export const createApp = ({
       return context.json(apiError("INVALID_REQUEST", "Planet name is invalid."), 400);
     }
 
-    const result = await dependency(context, "nasa", "planets.find_by_name", () =>
-      repository.findByName(name),
-    );
+    const result = await repository.findByName(name);
 
     if (!result.value) {
       return context.json(
@@ -429,9 +405,7 @@ export const createApp = ({
   });
 
   app.get("/api/stars/featured", async (context) => {
-    const result = await dependency(context, "simbad", "stars.featured", () =>
-      starRepository.featured(),
-    );
+    const result = await starRepository.featured();
     return starCollection(context, result, "", CACHE_POLICY.starFeatured);
   });
 
@@ -445,8 +419,9 @@ export const createApp = ({
           400,
         );
       }
-      const result = await dependency(context, "simbad", "stars.discover", () =>
-        starRepository.discover(category as StarDiscoveryCategory, requestedLimit(context, 12)),
+      const result = await starRepository.discover(
+        category as StarDiscoveryCategory,
+        requestedLimit(context, 12),
       );
       return starCollection(context, result, category, CACHE_POLICY.starDiscovery);
     }
@@ -457,9 +432,7 @@ export const createApp = ({
       );
     }
 
-    const featuredResult = await dependency(context, "simbad", "stars.featured", () =>
-      starRepository.featured(),
-    );
+    const featuredResult = await starRepository.featured();
     const normalizedQuery = query.toLowerCase();
     const predictiveStars = featuredResult.value.filter(
       (star) =>
@@ -478,9 +451,7 @@ export const createApp = ({
       );
     }
 
-    const result = await dependency(context, "simbad", "stars.search", () =>
-      starRepository.search(query, requestedLimit(context, 12)),
-    );
+    const result = await starRepository.search(query, requestedLimit(context, 12));
     return starCollection(context, result, query, CACHE_POLICY.catalog);
   });
 
@@ -490,17 +461,13 @@ export const createApp = ({
       return context.json(apiError("INVALID_REQUEST", "Star name is invalid."), 400);
     }
 
-    const starResult = await dependency(context, "simbad", "stars.find_by_name", () =>
-      starRepository.findByName(name),
-    );
+    const starResult = await starRepository.findByName(name);
     if (!starResult.value) {
       return context.json(apiError("NOT_FOUND", `No stellar object named ${name} was found.`), 404);
     }
     const star = starResult.value;
 
-    const hostResult = await dependency(context, "nasa", "system_aliases.resolve_host", () =>
-      systemAliasRepository.resolveHost(star),
-    );
+    const hostResult = await systemAliasRepository.resolveHost(star);
     if (!hostResult.value) {
       return planetCollection(
         context,
@@ -511,9 +478,7 @@ export const createApp = ({
     }
     const host = hostResult.value;
 
-    const planets = await dependency(context, "nasa", "planets.find_by_host", () =>
-      repository.findByHost(host, requestedLimit(context, 12)),
-    );
+    const planets = await repository.findByHost(host, requestedLimit(context, 12));
     return planetCollection(context, planets, host, CACHE_POLICY.catalog);
   });
 
@@ -523,9 +488,7 @@ export const createApp = ({
       return context.json(apiError("INVALID_REQUEST", "Star name is invalid."), 400);
     }
 
-    const result = await dependency(context, "simbad", "stars.find_by_name", () =>
-      starRepository.findByName(name),
-    );
+    const result = await starRepository.findByName(name);
     if (!result.value) {
       return context.json(apiError("NOT_FOUND", `No stellar object named ${name} was found.`), 404);
     }

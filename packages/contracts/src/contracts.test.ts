@@ -1,8 +1,7 @@
-import { expect, expectTypeOf, test } from "vite-plus/test";
+import { expectTypeOf, test } from "vite-plus/test";
 import type { z } from "zod";
 import {
   apiErrorResponseSchema,
-  apiResponseSchemas,
   ephemerisResponseSchema,
   ephemerisVectorSchema,
   exoplanetObservationSchema,
@@ -21,7 +20,6 @@ import {
   starSearchResponseSchema,
   type ApiErrorResponse,
   type ApiMetadata,
-  type ApiResponse,
   type EphemerisResponse,
   type EphemerisVector,
   type ExoplanetObservation,
@@ -59,22 +57,4 @@ test("exports contract types inferred from their schemas", () => {
   expectTypeOf<EphemerisVector>().toEqualTypeOf<z.infer<typeof ephemerisVectorSchema>>();
   expectTypeOf<EphemerisResponse>().toEqualTypeOf<z.infer<typeof ephemerisResponseSchema>>();
   expectTypeOf<ApiErrorResponse>().toEqualTypeOf<z.infer<typeof apiErrorResponseSchema>>();
-});
-
-test("maps response schema names to their exact inferred response types", () => {
-  expectTypeOf<ApiResponse<"ApiError">>().toEqualTypeOf<ApiErrorResponse>();
-  expectTypeOf<ApiResponse<"Ephemeris">>().toEqualTypeOf<EphemerisResponse>();
-  expectTypeOf<ApiResponse<"Planet">>().toEqualTypeOf<PlanetResponse>();
-  expectTypeOf<ApiResponse<"PlanetSearch">>().toEqualTypeOf<PlanetSearchResponse>();
-  expectTypeOf<ApiResponse<"Star">>().toEqualTypeOf<StarResponse>();
-  expectTypeOf<ApiResponse<"StarSearch">>().toEqualTypeOf<StarSearchResponse>();
-
-  expect(apiResponseSchemas).toEqual({
-    ApiError: apiErrorResponseSchema,
-    Ephemeris: ephemerisResponseSchema,
-    Planet: planetResponseSchema,
-    PlanetSearch: planetSearchResponseSchema,
-    Star: starResponseSchema,
-    StarSearch: starSearchResponseSchema,
-  });
 });

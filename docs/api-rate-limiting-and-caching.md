@@ -62,8 +62,8 @@ concerns.
 If measurements demonstrate a need for globally enforceable request limits, prefer a Vercel WAF
 rate-limit rule on `/api/*` or only the expensive JPL/SIMBAD paths. It executes at ingress before
 function and upstream cost, uses Vercel's source identity, and is compatible with the current
-deployment. Start the rule in log mode, compare its counts with function/upstream telemetry, then
-choose a fixed-window threshold and `429` action.
+deployment. Start the rule in log mode, review its counts and Vercel function logs, then choose a
+fixed-window threshold and `429` action.
 
 Reference: [Vercel WAF rate limiting](https://vercel.com/docs/vercel-firewall/vercel-waf/rate-limiting).
 

@@ -241,13 +241,3 @@ export const apiErrorResponseSchema = z.strictObject({
     message: nonEmptyString,
   }),
 });
-
-/** Named response schemas used by both runtime validation and the OpenAPI document. */
-export const apiResponseSchemas = {
-  ApiError: apiErrorResponseSchema,
-  Ephemeris: ephemerisResponseSchema,
-  Planet: planetResponseSchema,
-  PlanetSearch: planetSearchResponseSchema,
-  Star: starResponseSchema,
-  StarSearch: starSearchResponseSchema,
-} as const;

@@ -1,7 +1,6 @@
 import type { z } from "zod";
 import {
   apiErrorResponseSchema,
-  apiResponseSchemas,
   ephemerisResponseSchema,
   ephemerisVectorSchema,
   exoplanetObservationSchema,
@@ -40,8 +39,6 @@ export type EphemerisVector = z.infer<typeof ephemerisVectorSchema>;
 export type EphemerisResponse = z.infer<typeof ephemerisResponseSchema>;
 export type ApiErrorResponse = z.infer<typeof apiErrorResponseSchema>;
 
-export type ApiResponseName = keyof typeof apiResponseSchemas;
-export type ApiResponse<Name extends ApiResponseName> = z.infer<(typeof apiResponseSchemas)[Name]>;
 export type ContractSchema = z.ZodType;
 export type SchemaOutput<Schema extends ContractSchema> = z.infer<Schema>;
 

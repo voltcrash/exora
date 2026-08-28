@@ -111,24 +111,12 @@ test("public read-only API CORS is wildcard and never credentialed", async () =>
   expect(preflight.headers.get("Access-Control-Allow-Credentials")).toBeNull();
 });
 
-test("publishes an OpenAPI 3.1 document backed by the runtime response schemas", async () => {
+test("does not expose an OpenAPI document", async () => {
   const response = await createApp({ repository }).request("/api/openapi.json");
-  const document = await response.json();
 
-  expect(response.status).toBe(200);
-  expect(document).toMatchObject({
-    components: {
-      schemas: {
-        ApiError: { type: "object" },
-        Planet: { type: "object" },
-        Star: { type: "object" },
-      },
-    },
-    openapi: "3.1.0",
-    paths: {
-      "/api/ephemerides": { get: { responses: { 200: expect.any(Object) } } },
-      "/api/planets": { get: { responses: { 200: expect.any(Object) } } },
-    },
+  expect(response.status).toBe(404);
+  expect(await response.json()).toEqual({
+    error: { code: "NOT_FOUND", message: "The requested API route does not exist." },
   });
 });
 
@@ -421,6 +409,7 @@ test("an unreachable NASA archive is reported as an upstream failure, not a cras
       throw new NasaArchiveError("NASA TAP request failed.");
     },
   };
+  const logged = vi.spyOn(console, "error").mockImplementation(() => undefined);
 
   const response = await createApp({ repository: failing }).request("/api/planets?q=hip");
 
@@ -428,6 +417,7 @@ test("an unreachable NASA archive is reported as an upstream failure, not a cras
   expect(await response.json()).toMatchObject({
     error: { code: "UPSTREAM_UNAVAILABLE", message: expect.stringContaining("NASA") },
   });
+  logged.mockRestore();
 });
 
 test("an unreachable SIMBAD archive is reported as an upstream failure", async () => {
@@ -437,6 +427,7 @@ test("an unreachable SIMBAD archive is reported as an upstream failure", async (
       throw new SimbadArchiveError("SIMBAD TAP request failed.");
     },
   };
+  const logged = vi.spyOn(console, "error").mockImplementation(() => undefined);
 
   const response = await createApp({ repository, starRepository: failing }).request(
     "/api/stars/featured",
@@ -446,22 +437,31 @@ test("an unreachable SIMBAD archive is reported as an upstream failure", async (
   expect(await response.json()).toMatchObject({
     error: { code: "UPSTREAM_UNAVAILABLE", message: expect.stringContaining("SIMBAD") },
   });
+  logged.mockRestore();
 });
 
 test("an unexpected failure does not leak its message to the caller", async () => {
+  const failure = new Error("secret-bearing upstream detail");
   const failing: PlanetRepository = {
     ...repository,
     search: async () => {
-      throw new Error("secret-bearing upstream detail");
+      throw failure;
     },
   };
+  const logged = vi.spyOn(console, "error").mockImplementation(() => undefined);
 
   const response = await createApp({ repository: failing }).request("/api/planets?q=hip");
   const payload = await response.json();
 
   expect(response.status).toBe(500);
-  expect(JSON.stringify(payload)).not.toContain("hunter2");
+  expect(JSON.stringify(payload)).not.toContain("secret-bearing upstream detail");
   expect(payload).toMatchObject({ error: { code: "UPSTREAM_UNAVAILABLE" } });
+  expect(logged).toHaveBeenCalledWith("API request failed", {
+    error: failure,
+    method: "GET",
+    path: "/api/planets",
+  });
+  logged.mockRestore();
 });
 
 test("an unknown planet is a 404 rather than an empty success", async () => {
