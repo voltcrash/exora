@@ -1,5 +1,3 @@
-import { ActionManager } from "@babylonjs/core/Actions/actionManager.js";
-import { ExecuteCodeAction } from "@babylonjs/core/Actions/directActions.js";
 import "@babylonjs/core/Culling/ray.js";
 import { Engine } from "@babylonjs/core/Engines/engine.js";
 import { Color3, Color4 } from "@babylonjs/core/Maths/math.color.js";
@@ -14,8 +12,8 @@ import "@babylonjs/core/Meshes/instancedMesh.js";
 import { VertexData } from "@babylonjs/core/Meshes/mesh.vertexData.js";
 import { Scene } from "@babylonjs/core/scene.js";
 import { TransformNode } from "@babylonjs/core/Meshes/transformNode.js";
-import type { ExoplanetProfile, StarProfile } from "@exora/contracts";
-import type { CustomStar, CustomWorld, Rgb, RingRecipe, WorldRecipe } from "@exora/worldgen";
+import type { ExoplanetProfile } from "@exora/contracts";
+import type { Rgb, RingRecipe, WorldRecipe } from "@exora/worldgen";
 import { type RenderQualityProfile, shaderDefines } from "./render-quality.ts";
 import { createPlanetKeyLight } from "./planet-lighting.ts";
 import { bindPlanetSurfaceAssets } from "./planet-material-assets.ts";
@@ -24,7 +22,7 @@ import { type SurfaceGeology, cloudDeckGeology, deriveSurfaceGeology } from "./s
 import { type SurfaceMotes, createSurfaceMotes } from "./surface-motes.ts";
 import { createSurfaceScatter } from "./surface-scatter.ts";
 import { type SurfaceVista, createSurfaceVista } from "./surface-vista.ts";
-import type { MountedWorld, SceneHost, WorldConsole } from "./scene-host.ts";
+import type { MountedWorld, SceneHost } from "./scene-host.ts";
 import { skyViewpointFrom } from "./sky-catalog.ts";
 import { createStellarSurface, type StellarSurface } from "./star-surface.ts";
 import { createStarfield } from "./star-visuals.ts";
@@ -35,8 +33,6 @@ import {
   SURFACE_SWAP_AT,
   SURFACE_TRANSITION_MS,
 } from "./travel-transition.ts";
-import { planetFacts } from "./xr-console-model.ts";
-import type { XrCell } from "./xr-panel-layout.ts";
 
 const PLANET_POSITION = new Vector3(0, 1.35, 9.5);
 const XR_ORBIT_STAND = new Vector3(0, 0, -7.4);
@@ -1182,14 +1178,6 @@ export type ViewMode = "orbit" | "subsystem" | "surface" | "transition";
 
 interface PlanetWorldOptions {
   onFirstFrame: () => void;
-  /** Immersive-only travel, so a wearer can leave for anywhere without removing the headset. */
-  onForgeStar?: (star: CustomStar) => void;
-  onForgeWorld?: (world: CustomWorld) => void;
-  onSelectHostStar?: () => void;
-  onSelectPlanet?: (planet: ExoplanetProfile) => void;
-  onSelectStar?: (star: StarProfile) => void;
-  /** Pull back to the whole host system, the counterpart of travelling in to the host star. */
-  onSelectSystem?: () => void;
   onViewModeChange: (mode: ViewMode) => void;
   planet: ExoplanetProfile;
   recipe: WorldRecipe;
@@ -1213,13 +1201,12 @@ const createHostStar = (
   recipe: WorldRecipe,
   profile: RenderQualityProfile,
   parent: TransformNode,
-  onSelectHostStar?: () => void,
 ): StellarSurface => {
   const surface = createStellarSurface({
     detail: "distant",
     diameter: recipe.star.radiusSceneUnits * 2,
     parent,
-    pickable: Boolean(onSelectHostStar),
+    pickable: false,
     position: PLANET_POSITION.add(HOST_STAR_OFFSET),
     profile,
     recipe: recipe.star,
@@ -1227,15 +1214,6 @@ const createHostStar = (
     seed: recipe.seed,
     spotCoverage: recipe.star.spotCoverage,
   });
-
-  if (onSelectHostStar) {
-    for (const target of surface.meshes) {
-      target.actionManager = new ActionManager(scene);
-      target.actionManager.registerAction(
-        new ExecuteCodeAction(ActionManager.OnPickTrigger, onSelectHostStar),
-      );
-    }
-  }
 
   return surface;
 };
@@ -1899,7 +1877,6 @@ const createSurfaceEnvironment = (
   recipe: WorldRecipe,
   geology: SurfaceGeology | null,
   profile: RenderQualityProfile,
-  onSelectHostStar?: () => void,
 ): {
   cloudLayers: Mesh[];
   /** World-space ground height under any point a visitor can reach. */
@@ -2023,7 +2000,7 @@ const createSurfaceEnvironment = (
     diameter:
       SURFACE_STAR_DISTANCE * 2 * surfaceStarAngularRadius(recipe.star.apparentRadiusRadians),
     parent: skyAnchor,
-    pickable: Boolean(onSelectHostStar),
+    pickable: false,
     position: SURFACE_STAR_DIRECTION.scale(SURFACE_STAR_DISTANCE),
     profile,
     recipe: recipe.star,
@@ -2044,15 +2021,6 @@ const createSurfaceEnvironment = (
       target.setEnabled(false);
     }
     meshes.splice(0, meshes.length, ...meshes.filter((mesh) => !surfaceStar.meshes.includes(mesh)));
-  }
-
-  if (onSelectHostStar) {
-    for (const target of surfaceStar.meshes) {
-      target.actionManager = new ActionManager(scene);
-      target.actionManager.registerAction(
-        new ExecuteCodeAction(ActionManager.OnPickTrigger, onSelectHostStar),
-      );
-    }
   }
 
   for (const mesh of meshes) {
@@ -2094,18 +2062,7 @@ const setEnvironmentEnabled = (
  */
 export const createPlanetWorld = (
   host: SceneHost,
-  {
-    onFirstFrame,
-    onForgeStar,
-    onForgeWorld,
-    onSelectHostStar,
-    onSelectPlanet,
-    onSelectStar,
-    onSelectSystem,
-    onViewModeChange,
-    planet: planetProfile,
-    recipe,
-  }: PlanetWorldOptions,
+  { onFirstFrame, onViewModeChange, planet: planetProfile, recipe }: PlanetWorldOptions,
 ): MountedWorld => {
   const { camera, canvas, engine, profile, scene } = host;
 
@@ -2153,7 +2110,7 @@ export const createPlanetWorld = (
     ringSystem,
     shader,
   } = createPlanet(scene, recipe, profile, planetProfile);
-  const hostStar = createHostStar(scene, recipe, profile, orbitalRoot, onSelectHostStar);
+  const hostStar = createHostStar(scene, recipe, profile, orbitalRoot);
   orbitalMeshes.push(...hostStar.meshes);
   // The deep-space starfield belongs to the orbital view only. Down on the surface the sky shader
   // owns what the sky contains, and it has to: stars there are seen through an atmosphere that
@@ -2174,13 +2131,7 @@ export const createPlanetWorld = (
           }
         : null,
     ) ?? cloudDeckGeology(recipe);
-  const surfaceEnvironment = createSurfaceEnvironment(
-    scene,
-    recipe,
-    surfaceGeology,
-    profile,
-    onSelectHostStar,
-  );
+  const surfaceEnvironment = createSurfaceEnvironment(scene, recipe, surfaceGeology, profile);
 
   let elapsedSeconds = 0;
   const displayRotationSpeed = planetProfile.solarSystem?.rotationPeriodHours
@@ -2516,71 +2467,10 @@ export const createPlanetWorld = (
     viewTransitionSeconds = 0;
     applyViewEnvironment(surface);
     placeXrCamera(surface, initial);
-    host.refreshConsole();
     onViewModeChange(surface ? "surface" : "orbit");
   };
 
-  const buildSceneActions = (): XrCell[] => {
-    const surface = viewState === "surface";
-    const actions: XrCell[] = [
-      surface
-        ? {
-            detail: "See the whole world again",
-            id: "orbit",
-            label: "Return to orbit",
-            onSelect: () => applyXrView(false, false),
-          }
-        : {
-            detail: "Walk the terrain",
-            id: "surface",
-            label: "Descend to the surface",
-            onSelect: () => applyXrView(true, false),
-          },
-      {
-        detail: surface ? "Face the horizon" : "Face the planet",
-        id: "recentre",
-        label: "Recentre me",
-        onSelect: () => placeXrCamera(viewState === "surface", false),
-      },
-    ];
-
-    if (onSelectHostStar) {
-      actions.push({
-        detail: `Visit ${planetProfile.hostStar}`,
-        id: "host-star",
-        label: "Travel to the host star",
-        onSelect: onSelectHostStar,
-      });
-    }
-
-    if (onSelectSystem) {
-      actions.push({
-        detail: `See every world of ${planetProfile.hostStar}`,
-        id: "host-system",
-        label: "View the whole system",
-        onSelect: onSelectSystem,
-      });
-    }
-
-    return actions;
-  };
-
-  const consoleContributions: WorldConsole = {
-    facts: () => planetFacts(planetProfile),
-    ...(onForgeWorld ? { onForgePlanet: onForgeWorld } : {}),
-    ...(onForgeStar ? { onForgeStar } : {}),
-    ...(onSelectPlanet ? { onTravelPlanet: onSelectPlanet } : {}),
-    ...(onSelectStar ? { onTravelStar: onSelectStar } : {}),
-    sceneActions: buildSceneActions,
-    source: () => `${planetProfile.source.archive} · ${planetProfile.source.retrievedOn}`,
-    subtitle: () =>
-      `${recipe.classification} · ${viewState === "surface" ? "surface excursion" : "orbital view"}`,
-    summary: () => recipe.summary,
-    title: () => planetProfile.name,
-  };
-
   return {
-    console: consoleContributions,
     /**
      * How far a jump may pull back from this world before it stops holding up.
      *
@@ -2591,11 +2481,6 @@ export const createPlanetWorld = (
      */
     farthestView: () => (viewState === "surface" ? SURFACE_DEPARTURE_RADIUS : undefined),
     focusXrRig: (initial) => applyXrView(viewState === "surface", initial),
-    handleXrBack: () => {
-      if (viewState !== "surface") return false;
-      applyXrView(false, false);
-      return true;
-    },
     restoreDesktopView: () => syncDesktopCamera(viewState === "surface"),
     // Meshes, materials and the key light are removed by the world scope the host opened around
     // this build; what is left here is everything that lives outside the scene graph.

@@ -12,7 +12,7 @@
  * which span decades within a single host, and body radii, which are four to five orders of
  * magnitude smaller than the orbits they sit on. Nothing else is invented. A planet whose shape
  * or plane the archive never solved for is drawn circular and coplanar *and says so*, in the
- * readout and in the console, and a planet the archive places nowhere at all is not placed.
+ * browser readout, and a planet the archive places nowhere at all is not placed.
  *
  * On the render budget: the bodies are deliberately coarse spheres lit by one point light, at
  * `profile.systemBodySegments`, because a dozen of them are on screen at once and each covers a
@@ -25,8 +25,6 @@
  * added to a scene it does not own.
  */
 
-import { ActionManager } from "@babylonjs/core/Actions/actionManager.js";
-import { ExecuteCodeAction } from "@babylonjs/core/Actions/directActions.js";
 import "@babylonjs/core/Culling/ray.js";
 import { PointLight } from "@babylonjs/core/Lights/pointLight.js";
 import { Color3, Color4 } from "@babylonjs/core/Maths/math.color.js";
@@ -38,18 +36,16 @@ import { VertexData } from "@babylonjs/core/Meshes/mesh.vertexData.js";
 import { TransformNode } from "@babylonjs/core/Meshes/transformNode.js";
 import "@babylonjs/core/Meshes/instancedMesh.js";
 import type { Scene } from "@babylonjs/core/scene.js";
-import type { EphemerisVector, ExoplanetProfile, StarProfile } from "@exora/contracts";
+import type { EphemerisVector, ExoplanetProfile } from "@exora/contracts";
 import {
   deriveHostStar,
   deriveWorldRecipe,
   hashObjectId,
-  type CustomStar,
-  type CustomWorld,
   type Rgb,
   type WorldRecipe,
 } from "@exora/worldgen";
 import type { RenderQualityProfile } from "./render-quality.ts";
-import type { MountedWorld, SceneHost, WorldConsole } from "./scene-host.ts";
+import type { MountedWorld, SceneHost } from "./scene-host.ts";
 import { skyViewpointFrom } from "./sky-catalog.ts";
 import { propagateEphemerisVector } from "./solar-ephemeris.ts";
 import { tuneSolarWorldRecipe } from "./solar-system.ts";
@@ -60,14 +56,11 @@ import {
   mapDistance,
   orbitRadiusAu,
   orbitStateAt,
-  orbitSummary,
   type DistanceMapping,
   type OrbitElements,
   type PlacedOrbit,
   type SystemLayout,
 } from "./system-layout.ts";
-import { systemFacts } from "./xr-console-model.ts";
-import type { XrCell } from "./xr-panel-layout.ts";
 
 /**
  * Where the middle of the diorama sits above the floor.
@@ -87,8 +80,7 @@ const XR_SYSTEM_STAND = new Vector3(0, 0, -16.5);
  * runs through the room at eye height, so a standing wearer sixteen metres out looked along it
  * within about a degree and every orbit collapsed into the same bright streak. Twenty degrees is
  * enough to open them back into rings while still reading as standing over a system rather than
- * looking down at a table. The in-plane pose is not lost — it is the second entry on the console,
- * for a wearer who wants the orbits running past them at shoulder height.
+ * looking down at a table.
  */
 const XR_SYSTEM_ELEVATION_RADIANS = (14 * Math.PI) / 180;
 /** The eye height a wearer is assumed to arrive at, used only to aim the deck before tracking. */
@@ -99,16 +91,6 @@ const ORBIT_THICKNESS = 0.011;
 export interface SystemWorldOptions {
   hostName: string;
   onFirstFrame: () => void;
-  /** Immersive-only travel, so a wearer can leave for anywhere without removing the headset. */
-  onForgeStar?: (star: CustomStar) => void;
-  onForgeWorld?: (world: CustomWorld) => void;
-  /** Travel to the star at the centre of this diorama. */
-  onSelectHostStar?: () => void;
-  /** Travel to a planet chosen from the console's own catalog, which can be anywhere. */
-  onSelectPlanet?: (planet: ExoplanetProfile) => void;
-  onSelectStar?: (star: StarProfile) => void;
-  /** Travel to one of this system's own worlds, by pointing at it or picking it off the console. */
-  onSelectWorld?: (planet: ExoplanetProfile) => void;
   planets: readonly ExoplanetProfile[];
 }
 
@@ -271,7 +253,6 @@ const buildWorld = (
   layout: SystemLayout,
   orbit: PlacedOrbit,
   root: TransformNode,
-  onSelect: (planet: ExoplanetProfile) => void,
 ): DrawnWorld => {
   const { planet } = orbit;
   const recipe = tuneSolarWorldRecipe(planet, deriveWorldRecipe(planet));
@@ -320,47 +301,12 @@ const buildWorld = (
   bodyMaterial.freeze();
   body.material = bodyMaterial;
 
-  // The bodies are small on purpose, and a controller ray has to be able to find one anyway.
-  const pickTarget = MeshBuilder.CreateSphere(
-    `diorama-world-target-${planet.id}`,
-    { diameter: Math.max(0.62, orbit.bodyRadiusSceneUnits * 4.4), segments: 10 },
-    scene,
-  );
-  pickTarget.parent = body;
-  pickTarget.applyFog = false;
-  pickTarget.isPickable = true;
-  const targetMaterial = new StandardMaterial(`diorama-world-target-material-${planet.id}`, scene);
-  targetMaterial.disableLighting = true;
-  targetMaterial.emissiveColor = color;
-  targetMaterial.alpha = 0.05;
-  targetMaterial.disableDepthWrite = true;
-  targetMaterial.freeze();
-  pickTarget.material = targetMaterial;
-
-  for (const target of [body, pickTarget]) {
-    const manager = new ActionManager(scene);
-    manager.registerAction(
-      new ExecuteCodeAction(ActionManager.OnPickTrigger, () => onSelect(planet)),
-    );
-    target.actionManager = manager;
-  }
-
   return { body, bodyPlane, orbit };
 };
 
 export const createSystemWorld = (
   host: SceneHost,
-  {
-    hostName,
-    onFirstFrame,
-    onForgeStar,
-    onForgeWorld,
-    onSelectHostStar,
-    onSelectPlanet,
-    onSelectStar,
-    onSelectWorld,
-    planets,
-  }: SystemWorldOptions,
+  { hostName, onFirstFrame, planets }: SystemWorldOptions,
 ): SystemWorld => {
   const { camera, canvas, engine, profile, scene } = host;
   const layout = deriveSystemLayout(planets);
@@ -411,7 +357,7 @@ export const createSystemWorld = (
     ? createStellarSurface({
         detail: "subject",
         diameter: layout.hostRadiusSceneUnits * 2,
-        pickable: Boolean(onSelectHostStar),
+        pickable: false,
         position: SYSTEM_CENTRE,
         profile,
         recipe: starRecipe,
@@ -420,15 +366,6 @@ export const createSystemWorld = (
         spotCoverage: starRecipe.spotCoverage,
       })
     : null;
-
-  if (stellarSurface && onSelectHostStar) {
-    for (const target of stellarSurface.meshes) {
-      target.actionManager = new ActionManager(scene);
-      target.actionManager.registerAction(
-        new ExecuteCodeAction(ActionManager.OnPickTrigger, onSelectHostStar),
-      );
-    }
-  }
 
   /**
    * One light for the whole system, at the star, which is exactly where a planetary system's
@@ -443,7 +380,7 @@ export const createSystemWorld = (
   starLight.intensity = 1.45;
 
   const drawn: DrawnWorld[] = layout.orbits.map((orbit) =>
-    buildWorld(scene, profile, layout, orbit, root, (planet) => onSelectWorld?.(planet)),
+    buildWorld(scene, profile, layout, orbit, root),
   );
 
   // Placed once at the phase they start from, so the very first frame already shows a system
@@ -514,71 +451,7 @@ export const createSystemWorld = (
     rig.setTarget(new Vector3(XR_SYSTEM_STAND.x, deckY, SYSTEM_CENTRE.z));
   };
 
-  const buildSceneActions = (): XrCell[] => {
-    const actions: XrCell[] = [
-      {
-        detail: "Look down on the whole system from outside it",
-        id: "recentre",
-        label: "Recentre me",
-        onSelect: () => placeXrCamera(false),
-      },
-      {
-        detail: "Drop to the orbital plane and walk among the orbits",
-        id: "in-plane",
-        label: "Stand in the plane",
-        onSelect: () => placeXrCamera(false, 0),
-      },
-    ];
-
-    if (onSelectHostStar) {
-      actions.push({
-        detail: `Visit ${hostName} itself`,
-        id: "host-star",
-        label: "Travel to the host star",
-        onSelect: onSelectHostStar,
-      });
-    }
-
-    const travel = onSelectWorld;
-    if (travel) {
-      for (const orbit of layout.orbits.slice(0, 5)) {
-        actions.push({
-          ...(orbit.planet.kind === "unknown"
-            ? {}
-            : { badge: orbit.planet.kind.replace("-", " ") }),
-          detail: orbitSummary(orbit),
-          id: `world-${orbit.planet.id}`,
-          label: orbit.planet.name,
-          onSelect: () => travel(orbit.planet),
-        });
-      }
-    }
-
-    return actions;
-  };
-
-  const consoleContributions: WorldConsole = {
-    facts: () => systemFacts(hostName, layout),
-    ...(onForgeWorld ? { onForgePlanet: onForgeWorld } : {}),
-    ...(onForgeStar ? { onForgeStar } : {}),
-    ...(onSelectPlanet ? { onTravelPlanet: onSelectPlanet } : {}),
-    ...(onSelectStar ? { onTravelStar: onSelectStar } : {}),
-    sceneActions: buildSceneActions,
-    source: () =>
-      primary
-        ? `${primary.source.archive} · ${primary.source.retrievedOn}`
-        : "NASA Exoplanet Archive",
-    subtitle: () =>
-      `system diorama · ${layout.orbits.length} orbit${layout.orbits.length === 1 ? "" : "s"} drawn`,
-    summary: () =>
-      `The ${hostName} system, drawn from its measured orbits. Radii and body sizes are compressed to fit a room — ${
-        layout.orbits.length
-      } world${layout.orbits.length === 1 ? "" : "s"} on a logarithmic radial scale, turning at their real relative periods.`,
-    title: () => `${hostName} system`,
-  };
-
   return {
-    console: consoleContributions,
     focusXrRig: placeXrCamera,
     layout,
     setEphemeris: (vectors) => {

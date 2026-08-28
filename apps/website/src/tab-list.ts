@@ -5,7 +5,7 @@
  * arrow keys move between the rest. Tabbing through eleven curated collections to reach the search
  * field is exactly the behaviour that rule exists to prevent.
  *
- * Kept pure so the traversal is unit-testable, in the same spirit as `xr-panel-layout.ts`.
+ * Kept pure so the traversal is unit-testable in isolation.
  */
 
 /**

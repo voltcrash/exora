@@ -180,8 +180,6 @@ export const App = () => {
     status: sceneHostStatus,
   } = useSceneHost(canvas);
   const [discoverOpen, setDiscoverOpen] = useState(false);
-  useEffect(() => sceneHost?.onDiscoverVisibility(setDiscoverOpen), [sceneHost]);
-  useEffect(() => sceneHost?.setDiscoverVisibility(discoverOpen), [discoverOpen, sceneHost]);
   const [activeObject, setActiveObject] = useState<ActiveObject | null>(() => {
     const parameters = new URLSearchParams(window.location.search);
     return parameters.has("blackHole") ||
@@ -321,8 +319,7 @@ export const App = () => {
       ?.setAttribute("content", canonical);
   }, [activeObject]);
 
-  // Stable identities: the immersive console hands these to the Babylon scene, and a new
-  // function on every render would tear the renderer down and rebuild it mid-session.
+  // Stable identities keep destination changes deterministic while a scene is mounted.
   const selectPlanet = useCallback((planet: ExoplanetProfile, cached: boolean): void => {
     window.history.pushState({}, "", `?planet=${encodeURIComponent(planet.name)}`);
     setDiscoverOpen(false);
@@ -361,7 +358,7 @@ export const App = () => {
   }, []);
 
   /**
-   * Travel to a whole host system, from a world in it, from its star, or from the console.
+   * Travel to a whole host system from the browser interface.
    *
    * Reports back whether the archive had anything to place, the way `selectHostStar` does, so
    * the view that asked can say so rather than the page going somewhere empty.
@@ -529,8 +526,6 @@ export const App = () => {
           chromeHidden={chromeHidden}
           host={sceneHost}
           result={activeObject.result}
-          onGeneratePlanet={generatePlanet}
-          onGenerateStar={generateStar}
           onToggleChrome={toggleChrome}
           onOpenDiscover={openDiscover}
           onSelectHostStar={selectHostStar}
@@ -547,8 +542,6 @@ export const App = () => {
             chromeHidden={chromeHidden}
             host={sceneHost}
             result={activeObject.result}
-            onGeneratePlanet={generatePlanet}
-            onGenerateStar={generateStar}
             onToggleChrome={toggleChrome}
             onSelectHostStar={selectHostStar}
             onSelectPlanet={selectPlanet}
@@ -565,11 +558,8 @@ export const App = () => {
             host={sceneHost}
             result={activeObject.result}
             systemHostName={systemHostName}
-            onGeneratePlanet={generatePlanet}
-            onGenerateStar={generateStar}
             onToggleChrome={toggleChrome}
             onSelectPlanet={selectPlanet}
-            onSelectStar={selectStar}
             onSelectSystem={selectSystem}
             onOpenDiscover={openDiscover}
             travelPhase={travelPhase}

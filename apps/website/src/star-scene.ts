@@ -2,42 +2,19 @@ import { GlowLayer } from "@babylonjs/core/Layers/glowLayer.js";
 import { Color4 } from "@babylonjs/core/Maths/math.color.js";
 import { Vector3 } from "@babylonjs/core/Maths/math.vector.js";
 import "@babylonjs/core/Meshes/instancedMesh.js";
-import type { ExoplanetProfile, StarProfile } from "@exora/contracts";
-import { deriveStarRecipe, type CustomStar, type CustomWorld } from "@exora/worldgen";
-import type { MountedWorld, SceneHost, WorldConsole } from "./scene-host.ts";
+import type { StarProfile } from "@exora/contracts";
+import { deriveStarRecipe } from "@exora/worldgen";
+import type { MountedWorld, SceneHost } from "./scene-host.ts";
 import { createStellarSurface } from "./star-surface.ts";
 import { skyViewpointFrom } from "./sky-catalog.ts";
-import { starKindLabel, starSummary } from "./star-utils.ts";
 import { createStarfield } from "./star-visuals.ts";
-import { starFacts } from "./xr-console-model.ts";
-import type { XrCell } from "./xr-panel-layout.ts";
 
 const STAR_POSITION = new Vector3(0, 0.8, 7.5);
 /** Initial immersive viewpoint, far enough out that the star reads as a body rather than a wall. */
 const XR_STAR_STAND = new Vector3(0, 0, -9);
 
-export interface StarWorld extends MountedWorld {
-  /**
-   * Hands this view the worlds the archive links to the star, once it has answered.
-   *
-   * They become console entries, not scene objects: somewhere a wearer can travel to without
-   * taking the headset off. Nothing is drawn for them here — see the note above `createStarWorld`.
-   */
-  setSystemWorlds: (
-    planets: readonly ExoplanetProfile[],
-    onSelectPlanet: (planet: ExoplanetProfile) => void,
-  ) => void;
-}
-
 interface StarWorldOptions {
   onFirstFrame: () => void;
-  /** Immersive-only travel, so a wearer can leave for anywhere without removing the headset. */
-  onForgeStar?: (star: CustomStar) => void;
-  onForgeWorld?: (world: CustomWorld) => void;
-  onSelectPlanet?: (planet: ExoplanetProfile) => void;
-  onSelectStar?: (star: StarProfile) => void;
-  /** Pull back to the whole host system this star sits at the middle of. */
-  onSelectSystem?: () => void;
   star: StarProfile;
 }
 
@@ -52,8 +29,7 @@ interface StarWorldOptions {
  *
  * The measured orbits do exist, and are drawn: `system-scene.ts` places every world of a host on
  * the semi-major axis, eccentricity, inclination and period the archive reports for it, through
- * the stated mapping in `system-layout.ts`. "View the whole system" on the console here, and the
- * matching entry on the page, are the route there. So this view is about the star — its
+ * the stated mapping in `system-layout.ts`. The browser is the route there. So this view is about the star — its
  * photosphere, its corona, and the real sky seen from where it stands — and its system reaches a
  * visitor as a list of places to go rather than as invented geometry.
  *
@@ -64,16 +40,8 @@ interface StarWorldOptions {
  */
 export const createStarWorld = (
   host: SceneHost,
-  {
-    onFirstFrame,
-    onForgeStar,
-    onForgeWorld,
-    onSelectPlanet,
-    onSelectStar,
-    onSelectSystem,
-    star,
-  }: StarWorldOptions,
-): StarWorld => {
+  { onFirstFrame, star }: StarWorldOptions,
+): MountedWorld => {
   const { camera, canvas, engine, profile, scene } = host;
 
   scene.clearColor = new Color4(0.001, 0.002, 0.006, 1);
@@ -133,20 +101,6 @@ export const createStarWorld = (
   glow.intensity = 0.75 + activity * 0.35;
   glow.addIncludedOnlyMesh(starMesh);
 
-  let menuPlanets: readonly ExoplanetProfile[] = [];
-  let selectPlanet: ((planet: ExoplanetProfile) => void) | null = null;
-
-  const setSystemWorlds = (
-    planets: readonly ExoplanetProfile[],
-    onSelect: (planet: ExoplanetProfile) => void,
-  ): void => {
-    menuPlanets = planets;
-    selectPlanet = onSelect;
-    // The archive answers after the console has already been painted from an empty system, so the
-    // panel has to be told to repaint rather than waiting for the wearer to reopen it.
-    host.refreshConsole();
-  };
-
   let elapsed = 0;
   const renderObserver = scene.onBeforeRenderObservable.add(() => {
     elapsed += Math.min(engine.getDeltaTime() / 1_000, 0.05);
@@ -171,57 +125,7 @@ export const createStarWorld = (
     rig.setTarget(STAR_POSITION);
   };
 
-  const buildSceneActions = (): XrCell[] => {
-    const actions: XrCell[] = [
-      {
-        detail: "Face the star",
-        id: "recentre",
-        label: "Recentre me",
-        onSelect: () => placeXrCamera(false),
-      },
-    ];
-
-    if (onSelectSystem) {
-      actions.push({
-        detail: "Stand among the measured orbits",
-        id: "host-system",
-        label: "View the whole system",
-        onSelect: onSelectSystem,
-      });
-    }
-
-    const travel = selectPlanet;
-    if (travel) {
-      for (const planet of menuPlanets.slice(0, 5)) {
-        actions.push({
-          ...(planet.kind === "unknown" ? {} : { badge: planet.kind.replace("-", " ") }),
-          detail: "Travel to this world",
-          id: `planet-${planet.id}`,
-          label: planet.name,
-          onSelect: () => travel(planet),
-        });
-      }
-    }
-
-    return actions;
-  };
-
-  const consoleContributions: WorldConsole = {
-    facts: () => starFacts(star),
-    ...(onForgeWorld ? { onForgePlanet: onForgeWorld } : {}),
-    ...(onForgeStar ? { onForgeStar } : {}),
-    ...(onSelectPlanet ? { onTravelPlanet: onSelectPlanet } : {}),
-    ...(onSelectStar ? { onTravelStar: onSelectStar } : {}),
-    sceneActions: buildSceneActions,
-    source: () => `${star.source.archive} · ${star.source.retrievedOn}`,
-    subtitle: () => `${starKindLabel(star)} · orbital view`,
-    summary: () => starSummary(star),
-    title: () => star.name,
-  };
-
   return {
-    console: consoleContributions,
-    setSystemWorlds,
     focusXrRig: placeXrCamera,
     restoreDesktopView: () => camera.attachControl(canvas, true),
     dispose: () => {

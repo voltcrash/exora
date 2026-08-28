@@ -1,11 +1,5 @@
 import type { ExoplanetProfile, StarProfile } from "@exora/contracts";
-import {
-  deriveWorldRecipe,
-  WORLDGEN_VERSION,
-  type CustomStar,
-  type CustomWorld,
-  type WorldRecipe,
-} from "@exora/worldgen";
+import { deriveWorldRecipe, WORLDGEN_VERSION, type WorldRecipe } from "@exora/worldgen";
 import { useEffect, useMemo, useState, type CSSProperties } from "react";
 import type { PlanetLoadResult } from "../api-client.ts";
 import { warmDestinations } from "../destination-cache.ts";
@@ -21,8 +15,6 @@ import { MobileSheet } from "./MobileSheet.tsx";
 interface PlanetExperienceProps {
   chromeHidden: boolean;
   host: SceneHost | null;
-  onGeneratePlanet: (world: CustomWorld) => void;
-  onGenerateStar: (star: CustomStar) => void;
   onToggleChrome: () => void;
   onOpenDiscover: () => void;
   onSelectHostStar: (hostStar: string) => Promise<boolean>;
@@ -37,8 +29,6 @@ interface PlanetExperienceProps {
 export const PlanetExperience = ({
   chromeHidden,
   host,
-  onGeneratePlanet,
-  onGenerateStar,
   onToggleChrome,
   onOpenDiscover,
   onSelectHostStar,
@@ -163,10 +153,6 @@ export const PlanetExperience = ({
               onFirstFrame: () => {
                 if (!abandoned) setSceneState("ready");
               },
-              onSelectMoon: (name) => {
-                const destination = findSolarWorld?.(name);
-                if (destination) onSelectPlanet(destination, true);
-              },
               planet,
               subsystem,
             }),
@@ -178,18 +164,6 @@ export const PlanetExperience = ({
               planet,
               recipe,
               onViewModeChange: setViewMode,
-              ...(result.mode === "custom"
-                ? {}
-                : {
-                    onSelectHostStar: () => void openHostStar(),
-                    onSelectSystem: () => void openHostSystem(),
-                  }),
-              // The console inside the headset can travel anywhere the browser catalog can, so the
-              // same selection handlers the DOM dialogs use are handed to the scene.
-              onSelectPlanet: (destination) => onSelectPlanet(destination, false),
-              onSelectStar: (destination) => onSelectStar(destination, false),
-              onForgeWorld: onGeneratePlanet,
-              onForgeStar: onGenerateStar,
               onFirstFrame: () => {
                 if (!abandoned) setSceneState("ready");
               },
@@ -207,8 +181,6 @@ export const PlanetExperience = ({
     };
   }, [
     host,
-    onGeneratePlanet,
-    onGenerateStar,
     onSelectHostStar,
     onSelectPlanet,
     onSelectStar,

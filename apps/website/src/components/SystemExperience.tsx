@@ -1,5 +1,4 @@
 import type { EphemerisResponse, ExoplanetProfile, StarProfile } from "@exora/contracts";
-import type { CustomStar, CustomWorld } from "@exora/worldgen";
 import { useEffect, useRef, useState } from "react";
 import { loadSolarEphemeris, type SystemLoadResult } from "../api-client.ts";
 import { reachStar } from "../destination-cache.ts";
@@ -22,8 +21,6 @@ import { MobileSheet } from "./MobileSheet.tsx";
 interface SystemExperienceProps {
   chromeHidden: boolean;
   host: SceneHost | null;
-  onGeneratePlanet: (world: CustomWorld) => void;
-  onGenerateStar: (star: CustomStar) => void;
   onToggleChrome: () => void;
   onOpenDiscover: () => void;
   onSelectHostStar: (hostStar: string) => Promise<boolean>;
@@ -57,8 +54,6 @@ const PLAYBACK_RATES = [
 export const SystemExperience = ({
   chromeHidden,
   host,
-  onGeneratePlanet,
-  onGenerateStar,
   onToggleChrome,
   onOpenDiscover,
   onSelectHostStar,
@@ -187,14 +182,6 @@ export const SystemExperience = ({
           createSystemWorld(host, {
             hostName: hostStar,
             planets,
-            onSelectHostStar: () => void openHostStar(),
-            onSelectWorld: (planet) => onSelectPlanet(planet, cached),
-            // The console inside the headset can travel anywhere the browser catalog can, so the
-            // same selection handlers the DOM dialogs use are handed to the scene.
-            onSelectPlanet: (destination) => onSelectPlanet(destination, false),
-            onSelectStar: (destination) => onSelectStar(destination, false),
-            onForgeWorld: onGeneratePlanet,
-            onForgeStar: onGenerateStar,
             onFirstFrame: () => {
               if (!abandoned) setSceneState("ready");
             },
@@ -219,17 +206,7 @@ export const SystemExperience = ({
       abandoned = true;
       worldRef.current = null;
     };
-  }, [
-    cached,
-    host,
-    hostStar,
-    onGeneratePlanet,
-    onGenerateStar,
-    onSelectHostStar,
-    onSelectPlanet,
-    onSelectStar,
-    planets,
-  ]);
+  }, [cached, host, hostStar, onSelectHostStar, onSelectPlanet, onSelectStar, planets]);
 
   const drawn = layout?.orbits ?? [];
   const unplaced = layout?.unplaced ?? [];

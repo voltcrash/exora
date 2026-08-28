@@ -7,14 +7,13 @@ test("ignores a trigger inherited from VR entry until it is released", () => {
   expect(advanceXrButtonPressGate(true, true)).toEqual({ activate: true, armed: false });
 });
 
-test("maps Quest face buttons, grips, triggers, and the left application menu control", () => {
+test("maps only controller input needed for immersive viewing", () => {
   expect(xrControllerAction("a-button")).toBe("primary");
   expect(xrControllerAction("x-button")).toBe("primary");
-  expect(xrControllerAction("b-button")).toBe("back");
-  expect(xrControllerAction("y-button")).toBe("back");
-  expect(xrControllerAction("xr-standard-squeeze")).toBe("discover");
   expect(xrControllerAction("xr-standard-trigger")).toBe("immersive");
-  expect(xrControllerAction("menu", "left")).toBe("discover");
-  expect(xrControllerAction("menu", "right")).toBeNull();
+  expect(xrControllerAction("b-button")).toBeNull();
+  expect(xrControllerAction("y-button")).toBeNull();
+  expect(xrControllerAction("xr-standard-squeeze")).toBeNull();
+  expect(xrControllerAction("menu")).toBeNull();
   expect(xrControllerAction("xr-standard-thumbstick")).toBeNull();
 });

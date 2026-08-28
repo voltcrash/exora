@@ -13,7 +13,7 @@
  * visibly cheaper but still fluid, and under twenty-five is a slideshow.
  *
  * Kept pure and out of React so the thresholds can be read and tested on their own, in the same
- * spirit as `xr-panel-layout.ts`.
+ * spirit as the other small, pure UI helpers.
  */
 
 /** How many of the four bars are lit for a reading, `0` before the host has produced one. */

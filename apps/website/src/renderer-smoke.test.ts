@@ -182,8 +182,6 @@ const createHarness = (
     prefersReducedMotion: () => false,
     onTravelPhase: () => () => undefined,
     isVrSupported: () => false,
-    refreshConsole: () => undefined,
-    setConsoleNavigator: () => undefined,
     xrCamera: () => null,
   } as unknown as SceneHost;
 
@@ -297,7 +295,6 @@ test("a planetary subsystem renders measured tracks and releases every explanato
   if (!subsystem) throw new Error("Expected Jupiter subsystem fixture.");
   const world = createSubsystemWorld(host, {
     onFirstFrame: firstFrame,
-    onSelectMoon: vi.fn(),
     planet: JUPITER,
     subsystem,
   });
@@ -536,36 +533,21 @@ test("the corona shell winds inward, so approaching a star cannot clip its halo 
  * semi-major axis, eccentricity, inclination and period, so this scene draws none of it — and
  * this is the test that keeps a future edit from putting the invented version back.
  */
-test("the star world adds no geometry for the system's known worlds, and still routes to them", async () => {
+test("the star world adds no geometry for the system's known worlds", async () => {
   const { engine, host, scene } = createHarness();
   const empty = sceneCounts(scene);
   const scope = openWorldScope(scene);
-  const travelled: string[] = [];
   const world = createStarWorld(host, {
     onFirstFrame: vi.fn(),
-    onSelectSystem: () => travelled.push("system"),
     star,
   });
   scope.seal();
   await settleSky();
 
-  // The star, its corona and glare, and the sky — and that is still all of it once a system with
-  // three worlds in it has been handed over.
+  // The star, its corona and glare, and the sky — without destination controls in the immersive
+  // scene.
   const starAlone = sceneCounts(scene);
-  world.setSystemWorlds(planets, (planet) => travelled.push(planet.name));
   expect(sceneCounts(scene)).toEqual(starAlone);
-
-  // What a system does reach the wearer as: entries on the console, alongside the route to the
-  // diorama where the orbits the archive actually reports are drawn.
-  const actions = world.console.sceneActions();
-  expect(actions.map(({ label }) => label)).toEqual([
-    "Recentre me",
-    "View the whole system",
-    ...planets.map(({ name }) => name),
-  ]);
-  actions.find(({ id }) => id === "host-system")?.onSelect?.();
-  actions.find(({ id }) => id === `planet-${gasGiant.id}`)?.onSelect?.();
-  expect(travelled).toEqual(["system", gasGiant.name]);
 
   expect(() => scene.render()).not.toThrow();
 
@@ -672,13 +654,10 @@ test("the system diorama renders one headless frame and releases its scene conte
   const { engine, host, scene } = createHarness();
   const before = sceneCounts(scene);
   const firstFrame = vi.fn();
-  const travelled: string[] = [];
   const scope = openWorldScope(scene);
   const world = createSystemWorld(host, {
     hostName: "Renderer Prime",
     onFirstFrame: firstFrame,
-    onSelectHostStar: () => travelled.push("star"),
-    onSelectWorld: (planet) => travelled.push(planet.name),
     planets: systemPlanets,
   });
   scope.seal();
@@ -696,9 +675,8 @@ test("the system diorama renders one headless frame and releases its scene conte
   expect(() => scene.render()).not.toThrow();
   expect(firstFrame).toHaveBeenCalledOnce();
 
-  // Pointing at a world is what travels to it, so the pick targets have to be reachable.
-  const target = scene.meshes.find((mesh) => mesh.name === "diorama-world-system-inner");
-  expect(target?.isPickable).toBe(true);
+  // Worlds are view-only in VR; no enlarged destination-selection targets are mounted.
+  expect(scene.getMeshByName("diorama-world-target-system-inner")).toBeNull();
 
   world.dispose();
   scope.dispose();

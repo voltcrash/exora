@@ -40,8 +40,6 @@ const planetMarkup = (): string =>
     <PlanetExperience
       chromeHidden={false}
       host={null}
-      onGeneratePlanet={vi.fn()}
-      onGenerateStar={vi.fn()}
       onToggleChrome={vi.fn()}
       onOpenDiscover={vi.fn()}
       onSelectHostStar={vi.fn()}
@@ -59,12 +57,9 @@ const starMarkup = (): string =>
     <StarExperience
       chromeHidden={false}
       host={null}
-      onGeneratePlanet={vi.fn()}
-      onGenerateStar={vi.fn()}
       onToggleChrome={vi.fn()}
       onOpenDiscover={vi.fn()}
       onSelectPlanet={vi.fn()}
-      onSelectStar={vi.fn()}
       onSelectSystem={vi.fn()}
       result={{ cached: false, mode: "live", star: sirius }}
       systemHostName={null}
@@ -157,8 +152,6 @@ test("the clear-view control becomes the way back when the interface is hidden",
     <PlanetExperience
       chromeHidden
       host={null}
-      onGeneratePlanet={vi.fn()}
-      onGenerateStar={vi.fn()}
       onToggleChrome={vi.fn()}
       onOpenDiscover={vi.fn()}
       onSelectHostStar={vi.fn()}

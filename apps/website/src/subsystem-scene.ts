@@ -1,5 +1,3 @@
-import { ActionManager } from "@babylonjs/core/Actions/actionManager.js";
-import { ExecuteCodeAction } from "@babylonjs/core/Actions/directActions.js";
 import { DirectionalLight } from "@babylonjs/core/Lights/directionalLight.js";
 import { HemisphericLight } from "@babylonjs/core/Lights/hemisphericLight.js";
 import { Color3, Color4 } from "@babylonjs/core/Maths/math.color.js";
@@ -12,18 +10,16 @@ import { TransformNode } from "@babylonjs/core/Meshes/transformNode.js";
 import { VertexData } from "@babylonjs/core/Meshes/mesh.vertexData.js";
 import type { Scene } from "@babylonjs/core/scene.js";
 import type { ExoplanetProfile } from "@exora/contracts";
-import type { MountedWorld, SceneHost, WorldConsole } from "./scene-host.ts";
+import type { MountedWorld, SceneHost } from "./scene-host.ts";
 import {
   subsystemOrbitRadius,
   type PlanetarySubsystem,
   type SubsystemMoon,
 } from "./planetary-subsystems.ts";
 import { createStarfield } from "./star-visuals.ts";
-import type { XrCell } from "./xr-panel-layout.ts";
 
 export interface SubsystemWorldOptions {
   onFirstFrame: () => void;
-  onSelectMoon: (name: string) => void;
   planet: ExoplanetProfile;
   subsystem: PlanetarySubsystem;
 }
@@ -120,7 +116,7 @@ const systemColor = (name: string): Color3 =>
 
 export const createSubsystemWorld = (
   host: SceneHost,
-  { onFirstFrame, onSelectMoon, planet, subsystem }: SubsystemWorldOptions,
+  { onFirstFrame, planet, subsystem }: SubsystemWorldOptions,
 ): MountedWorld => {
   const { camera, canvas, engine, profile, scene } = host;
   scene.clearColor = new Color4(0.0005, 0.0012, 0.0035, 1);
@@ -243,10 +239,6 @@ export const createSubsystemWorld = (
     }
     body.material = moonMaterial;
     body.parent = orbitalRoot;
-    body.actionManager = new ActionManager(scene);
-    body.actionManager.registerAction(
-      new ExecuteCodeAction(ActionManager.OnPickTrigger, () => onSelectMoon(descriptor.name)),
-    );
     meshes.push(body);
     materials.push(moonMaterial);
     nodes.push(orbitalRoot);
@@ -436,44 +428,7 @@ export const createSubsystemWorld = (
     rig.setTarget(Vector3.Zero());
   };
 
-  const sceneActions = (): XrCell[] => [
-    {
-      detail: "Frame the complete parent-centered subsystem",
-      id: "recentre-subsystem",
-      label: "Recentre me",
-      onSelect: () => placeXrCamera(false),
-    },
-    ...subsystem.moons
-      .filter((candidate) => candidate.principal)
-      .map((candidate) => ({
-        badge: candidate.surface,
-        detail: `${candidate.retrograde ? "Retrograde" : "Prograde"} · NAIF ${candidate.naifId}`,
-        id: `subsystem-moon-${candidate.naifId}`,
-        label: candidate.name,
-        onSelect: () => onSelectMoon(candidate.name),
-      })),
-  ];
-  const consoleContributions: WorldConsole = {
-    facts: () => [
-      { label: "PRIMARY", value: `NAIF ${subsystem.parentNaifId}` },
-      { label: "MOONS", value: subsystem.moons.length.toLocaleString() },
-      {
-        label: "RINGS",
-        value: subsystem.rings.length ? `${subsystem.rings.length} layers` : "none",
-      },
-      { label: "RESONANCES", value: subsystem.resonances.length.toLocaleString() },
-      { label: "ORBITS", value: "JPL mean elements" },
-      { label: "SCALE", value: "log-compressed" },
-    ],
-    sceneActions,
-    source: () => "NASA/JPL SSD · NAIF generic satellite SPKs · 2026-08-24",
-    subtitle: () => `${subsystem.moons.length} selected moons · parent ${subsystem.parent}`,
-    summary: () => subsystem.disclosure,
-    title: () => `${subsystem.parent} subsystem`,
-  };
-
   return {
-    console: consoleContributions,
     farthestView: () => camera.upperRadiusLimit ?? undefined,
     focusXrRig: placeXrCamera,
     restoreDesktopView: () => camera.attachControl(canvas, true),

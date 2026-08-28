@@ -9,7 +9,7 @@
  * would be both invasive and easy to get quietly wrong.
  *
  * So the scope records what the scene held before the world was built and again the moment it
- * finished. World construction is synchronous, so no other code — not the immersive console, not
+ * finished. World construction is synchronous, so no other code — not the immersive runtime, not
  * a controller connecting, not a texture finishing its decode — can add to the scene inside that
  * window: the difference between the two readings is exactly the world and nothing else.
  *

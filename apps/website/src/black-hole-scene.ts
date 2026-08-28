@@ -5,15 +5,9 @@ import { Vector3 } from "@babylonjs/core/Maths/math.vector.js";
 import type { Mesh } from "@babylonjs/core/Meshes/mesh.js";
 import { MeshBuilder } from "@babylonjs/core/Meshes/meshBuilder.js";
 import { TransformNode } from "@babylonjs/core/Meshes/transformNode.js";
-import {
-  blackHoleKindLabel,
-  formatBlackHoleMass,
-  schwarzschildDiameterKilometers,
-  type BlackHoleProfile,
-} from "./black-holes.ts";
-import type { MountedWorld, SceneHost, WorldConsole } from "./scene-host.ts";
+import type { BlackHoleProfile } from "./black-holes.ts";
+import type { MountedWorld, SceneHost } from "./scene-host.ts";
 import { createStarfield } from "./star-visuals.ts";
-import type { XrCell } from "./xr-panel-layout.ts";
 
 const BLACK_HOLE_POSITION = new Vector3(0, 0.7, 7.5);
 const XR_BLACK_HOLE_STAND = new Vector3(0, 0, -10);
@@ -46,30 +40,6 @@ const arcPath = (radius: number, start: number, end: number, segments: number): 
     const angle = start + ((end - start) * index) / segments;
     return new Vector3(Math.cos(angle) * radius, Math.sin(angle) * radius, 0);
   });
-
-const scientific = (value: number, digits = 2): string => {
-  if (value < 1_000_000) return value.toLocaleString("en-US", { maximumFractionDigits: digits });
-  return value.toExponential(digits).replace("e+", " × 10^");
-};
-
-const distanceLabel = (blackHole: BlackHoleProfile): string =>
-  blackHole.distanceLightYears === null
-    ? blackHole.observation.redshift === null
-      ? "Not reported"
-      : `z ${blackHole.observation.redshift}`
-    : `${blackHole.distanceLightYears.toLocaleString("en-US")} ly`;
-
-const blackHoleFacts = (blackHole: BlackHoleProfile) => [
-  { label: "Mass", value: formatBlackHoleMass(blackHole.massSolar) },
-  { label: "Distance", value: distanceLabel(blackHole) },
-  { label: "Host", value: blackHole.host },
-  { label: "Constellation", value: blackHole.constellation },
-  { label: "Accretion", value: blackHole.observation.accretion },
-  {
-    label: "Schwarzschild Ø",
-    value: `${scientific(schwarzschildDiameterKilometers(blackHole))} km`,
-  },
-];
 
 export interface BlackHoleWorld extends MountedWorld {}
 
@@ -260,26 +230,7 @@ export const createBlackHoleWorld = (
     rig.setTarget(BLACK_HOLE_POSITION);
   };
 
-  const sceneActions = (): XrCell[] => [
-    {
-      detail: "Face the event-horizon model",
-      id: "recentre-black-hole",
-      label: "Recentre me",
-      onSelect: () => placeXrCamera(false),
-    },
-  ];
-
-  const consoleContributions: WorldConsole = {
-    facts: () => blackHoleFacts(blackHole),
-    sceneActions,
-    source: () => `${blackHole.source.archive} · ${blackHole.source.retrievedOn}`,
-    subtitle: () => `${blackHoleKindLabel(blackHole)} · interpretive horizon view`,
-    summary: () => blackHole.observation.summary,
-    title: () => blackHole.name,
-  };
-
   return {
-    console: consoleContributions,
     focusXrRig: placeXrCamera,
     restoreDesktopView: () => camera.attachControl(canvas, true),
     dispose: () => {

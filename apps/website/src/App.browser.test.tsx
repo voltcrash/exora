@@ -38,7 +38,6 @@ const planetSceneStub = vi.hoisted(() => ({
  * full-screen loading overlay sits over every control they are trying to reach.
  */
 const mountedWorld = () => ({
-  console: { entries: [], title: "" },
   dispose: () => undefined,
   focusXrRig: () => undefined,
   restoreDesktopView: () => undefined,
@@ -47,9 +46,7 @@ const mountedWorld = () => ({
 });
 
 vi.mock("./scene-host.ts", () => {
-  let discoverOpen = false;
   let insideHeadset = false;
-  const discoverListeners = new Set<(open: boolean) => void>();
   const host = {
     // Travel is flown by the real renderer's camera, which this suite does not have one of. The
     // page's own half of a jump — panels leaving with the world, the dark over the swap — is
@@ -60,18 +57,15 @@ vi.mock("./scene-host.ts", () => {
     canvas: null,
     dispose: () => undefined,
     engine: null,
-    enterImmersive: async () => undefined,
+    enterImmersive: async () => {
+      insideHeadset = true;
+    },
     getFps: () => 60,
     isArSupported: () => false,
     isInXr: () => insideHeadset,
     isVrSupported: () => false,
     prefersReducedMotion: () => false,
     mountWorld: async (build: () => unknown) => build(),
-    onDiscoverVisibility: (listener: (open: boolean) => void) => {
-      discoverListeners.add(listener);
-      listener(discoverOpen);
-      return () => discoverListeners.delete(listener);
-    },
     onRendererStatus: (listener: (status: string) => void) => {
       listener("ready");
       return () => undefined;
@@ -81,19 +75,11 @@ vi.mock("./scene-host.ts", () => {
       return () => undefined;
     },
     onXrStatus: (listener: (status: string) => void) => {
-      listener("unavailable");
+      listener("ready-vr");
       return () => undefined;
     },
     profile: { hardwareScalingLevel: 1, tier: "desktop" },
     qualityTier: "desktop",
-    refreshConsole: () => undefined,
-    setConsoleNavigator: () => undefined,
-    setDiscoverElement: () => undefined,
-    setDiscoverVisibility: (open: boolean) => {
-      if (discoverOpen === open) return;
-      discoverOpen = open;
-      for (const listener of discoverListeners) listener(open);
-    },
     setInXr: (value: boolean) => {
       insideHeadset = value;
     },
@@ -118,12 +104,10 @@ vi.mock("./scene-host.ts", () => {
 /** The stub above, reached through the module the app imports it from. */
 const stubbedHost = (): {
   renderSuspensions: number;
-  setDiscoverVisibility: (open: boolean) => void;
   setInXr: (value: boolean) => void;
 } =>
   acquireSceneHost(document.createElement("canvas")) as unknown as {
     renderSuspensions: number;
-    setDiscoverVisibility: (open: boolean) => void;
     setInXr: (value: boolean) => void;
   };
 
@@ -402,7 +386,6 @@ beforeEach(() => {
   planetSceneStub.viewModeReady = new Promise<void>((resolve) => {
     planetSceneStub.resolveViewModeReady = () => resolve();
   });
-  stubbedHost().setDiscoverVisibility(false);
   stubbedHost().setInXr(false);
   document.head.querySelector('link[rel="canonical"]')?.remove();
   const canonical = document.createElement("link");
@@ -1065,15 +1048,21 @@ test("an open overlay parks the renderer, and closing it starts the loop again",
   expect(stubbedHost().renderSuspensions).toBe(0);
 });
 
-test("Discover keeps the renderer running inside an immersive session", async () => {
+test("VR presents the active destination without a console and exits to the same browser view", async () => {
   stubArchive();
-  stubbedHost().setInXr(true);
   mountApp();
-  await expect.element(page.getByRole("heading", { level: 1 })).toBeVisible();
+  const destination = page.getByRole("heading", { level: 1 });
+  await expect.element(destination).toBeVisible();
+  const destinationName = destination.element().textContent;
 
-  await openDiscoverSection("Exoplanets");
-  await expect.element(page.getByRole("dialog")).toBeVisible();
-  expect(stubbedHost().renderSuspensions).toBe(0);
+  await userEvent.click(page.getByRole("button", { name: "XR: VR AVAILABLE" }));
+  expect(page.getByRole("dialog")).not.toBeInTheDocument();
+
+  // Session exit does not select another destination or alter the browser interface.
+  stubbedHost().setInXr(false);
+  await expect.element(destination).toBeVisible();
+  expect(destination.element().textContent).toBe(destinationName);
+  expect(page.getByRole("dialog")).not.toBeInTheDocument();
 });
 
 test("Discover uses one scrolling surface without a viewport blur", async () => {

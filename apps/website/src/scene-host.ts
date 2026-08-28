@@ -15,8 +15,6 @@
  * What the host owns, no world may dispose; what a world adds, `world-scope.ts` takes back out.
  */
 
-import type { ExoplanetProfile, StarProfile } from "@exora/contracts";
-import type { CustomStar, CustomWorld } from "@exora/worldgen";
 import { ArcRotateCamera } from "@babylonjs/core/Cameras/arcRotateCamera.js";
 import "@babylonjs/core/Culling/ray.js";
 import { Ray } from "@babylonjs/core/Culling/ray.js";
@@ -34,8 +32,6 @@ import type { WebXRControllerComponent } from "@babylonjs/core/XR/motionControll
 import type { WebXRInputSource } from "@babylonjs/core/XR/webXRInputSource.js";
 import type { WebXRDefaultExperience } from "@babylonjs/core/XR/webXRDefaultExperience.js";
 import { createArPresentation } from "./ar-presentation.ts";
-import type { BlackHoleProfile } from "./black-holes.ts";
-import type { SolarRegionProfile } from "./solar-regions.ts";
 import {
   adaptFixedFoveation,
   adaptHardwareScaling,
@@ -59,7 +55,6 @@ import {
   TRAVEL_RECALL_MS,
   type TravelPhase,
 } from "./travel-transition.ts";
-import type { XrConsoleHost } from "./xr-console.ts";
 import { advanceXrButtonPressGate, xrControllerAction } from "./xr-controller-input.ts";
 import { createSceneMountSlot } from "./scene-mount.ts";
 import { createSceneHostRegistry } from "./scene-host-registry.ts";
@@ -77,33 +72,8 @@ const XR_MOVE_SPEED = 2.2;
 /** How long the in-headset fade takes in each direction. */
 const VEIL_FADE_SECONDS = 0.22;
 
-/** Everything a world contributes to the console, minus the parts the host answers for itself. */
-export type WorldConsole = Omit<XrConsoleHost, "onExit">;
-
-/**
- * The page's own answer to the console's catalog, used wherever the world has no answer of its own.
- *
- * The in-headset Discover screen offers the same journeys the flat one does — the home system,
- * the NASA and SIMBAD catalogs, the black-hole atlas, the world forge — from every destination,
- * because a wearer cannot reach the browser screen without taking the headset off. Travel is
- * registered here so every destination can hand a selected result back to the page.
- *
- * Travel is a property of the page rather than of the world being left, so it is registered once
- * here and every destination inherits it. A world that wants to say something more specific still
- * overrides it through its own `WorldConsole`.
- */
-export interface ConsoleNavigator {
-  onForgePlanet?: (world: CustomWorld) => void;
-  onForgeStar?: (star: CustomStar) => void;
-  onTravelBlackHole?: (blackHole: BlackHoleProfile) => void;
-  onTravelPlanet?: (planet: ExoplanetProfile) => void;
-  onTravelRegion?: (region: SolarRegionProfile) => void;
-  onTravelStar?: (star: StarProfile) => void;
-}
-
 /** A destination occupying the shared scene. */
 export interface MountedWorld {
-  console: WorldConsole;
   /**
    * The farthest the camera may be pulled back before this world stops holding up, if it has a
    * limit at all.
@@ -124,8 +94,6 @@ export interface MountedWorld {
    * height to the rig; every later call happens mid-session, where the height is already there.
    */
   focusXrRig: (initial: boolean) => void;
-  /** Handles B/Y within a world's own nested view before browser history is asked to go back. */
-  handleXrBack?: () => boolean;
   /** Restores the desktop camera so leaving the headset lands on the view the wearer left in. */
   restoreDesktopView: () => void;
 }
@@ -172,14 +140,6 @@ export interface SceneHost {
   mountWorld: <World extends MountedWorld>(
     build: () => Promise<World> | World,
   ) => Promise<World | null>;
-  /** Subscribes to the desktop Discover state. */
-  onDiscoverVisibility: (listener: (open: boolean) => void) => () => void;
-  /** Repaints the console, for when a world's own entries change after it was mounted. */
-  refreshConsole: () => void;
-  /** Keeps React and controller shortcuts on the same desktop Discover state. */
-  setDiscoverVisibility: (visible: boolean) => void;
-  /** Registers the page-level destinations the console falls back to. See `ConsoleNavigator`. */
-  setConsoleNavigator: (navigator: ConsoleNavigator | null) => void;
   /** Subscribes to immersive status, called immediately with the current one. */
   onXrStatus: (listener: (status: XrStatus) => void) => () => void;
   /** Subscribes to WebGL availability and recovery, called immediately with the current state. */
@@ -249,7 +209,7 @@ const createSceneHost = (canvas: HTMLCanvasElement): SceneHost => {
   veil.isPickable = false;
   veil.applyFog = false;
   veil.alwaysSelectAsActiveMesh = true;
-  // Above the console's own group, so a jump hides the panel the wearer travelled from.
+  // Above the world's scenery, so a jump hides the view the wearer travelled from.
   veil.renderingGroupId = 3;
   veil.setEnabled(false);
 
@@ -303,14 +263,6 @@ const createSceneHost = (canvas: HTMLCanvasElement): SceneHost => {
   const xrImmersiveButtonArmed = new WeakMap<WebXRControllerComponent, boolean>();
   let mountToken = 0;
   let sessionFoveation = profile.xrFixedFoveation;
-  /** Whether the browser/desktop Discover dialog is open. */
-  let discoverOpen = false;
-  const discoverListeners = new Set<(open: boolean) => void>();
-  const setDiscoverOpen = (open: boolean): void => {
-    if (discoverOpen === open) return;
-    discoverOpen = open;
-    for (const listener of discoverListeners) listener(open);
-  };
   let qualitySampleSeconds = 0;
 
   const xrIntegration = createXrIntegration({
@@ -735,10 +687,6 @@ const createSceneHost = (canvas: HTMLCanvasElement): SceneHost => {
           changingVr = false;
         }
       };
-      const handleXrBack = (): void => {
-        if (worldMount.current?.handleXrBack?.()) return;
-        if (window.location.search) window.history.back();
-      };
       const bindXrMotionController = (
         controller: WebXRInputSource,
         motionController: WebXRAbstractMotionController,
@@ -748,7 +696,8 @@ const createSceneHost = (canvas: HTMLCanvasElement): SceneHost => {
         for (const id of motionController.getComponentIds()) {
           const component = motionController.getComponent(id);
           if (!component) continue;
-          const action = xrControllerAction(id, controller.inputSource.handedness);
+          const action = xrControllerAction(id);
+          if (action !== "immersive" && action !== "primary") continue;
           if (action === "immersive") xrImmersiveButtonArmed.set(component, !component.pressed);
           component.onButtonStateChangedObservable.add((changed) => {
             const pressed = changed.changes.pressed?.current;
@@ -764,15 +713,6 @@ const createSceneHost = (canvas: HTMLCanvasElement): SceneHost => {
               xrImmersiveButtonArmed.set(component, gate.armed);
               if (gate.activate) void toggleVr();
               return;
-            }
-            if (pressed !== true) return;
-            switch (action) {
-              case "discover":
-                setDiscoverOpen(!discoverOpen);
-                break;
-              case "back":
-                handleXrBack();
-                break;
             }
           });
         }
@@ -807,9 +747,6 @@ const createSceneHost = (canvas: HTMLCanvasElement): SceneHost => {
           if (createdXr.baseExperience.sessionManager.isFixedFoveationSupported) {
             createdXr.baseExperience.sessionManager.fixedFoveation = sessionFoveation;
           }
-          // Enter directly into the world. Discover remains a browser/desktop dialog and is not
-          // projected into the immersive scene.
-          setDiscoverOpen(false);
           xrIntegration.markInXr();
         }
         if (state === runtime.WebXRState.NOT_IN_XR) {
@@ -867,16 +804,6 @@ const createSceneHost = (canvas: HTMLCanvasElement): SceneHost => {
     isInXr: () => isInXr,
     isVrSupported: xrIntegration.isVrSupported,
     mountWorld,
-    onDiscoverVisibility: (listener) => {
-      discoverListeners.add(listener);
-      listener(discoverOpen);
-      return () => discoverListeners.delete(listener);
-    },
-    refreshConsole: () => undefined,
-    setConsoleNavigator: () => undefined,
-    setDiscoverVisibility: (open) => {
-      setDiscoverOpen(open);
-    },
     suspendRendering: renderLifecycle.suspend,
     xrCamera: () => xr?.baseExperience.camera ?? null,
     onXrStatus: xrIntegration.onStatus,
@@ -970,7 +897,6 @@ const createSceneHost = (canvas: HTMLCanvasElement): SceneHost => {
       renderLifecycle.dispose();
       const worldDisposed = worldMount.dispose();
       arPresentation.dispose();
-      discoverListeners.clear();
       xr?.dispose();
       xr = null;
       // An OBJ/GLB import cannot be cancelled once Babylon has handed it to a loader. Keep the

@@ -6,14 +6,13 @@ import { Mesh } from "@babylonjs/core/Meshes/mesh.js";
 import { MeshBuilder } from "@babylonjs/core/Meshes/meshBuilder.js";
 import { VertexBuffer } from "@babylonjs/core/Buffers/buffer.js";
 import type { Scene } from "@babylonjs/core/scene.js";
-import type { MountedWorld, SceneHost, WorldConsole } from "./scene-host.ts";
+import type { MountedWorld, SceneHost } from "./scene-host.ts";
 import {
   sampleRegionParticles,
   type RegionParticle,
   type SolarRegionProfile,
 } from "./solar-regions.ts";
 import { createStarfield } from "./star-visuals.ts";
-import type { XrCell } from "./xr-panel-layout.ts";
 
 interface SolarRegionWorldOptions {
   onFirstFrame: () => void;
@@ -200,30 +199,7 @@ export const createSolarRegionWorld = (
     rig.position.set(0, initial ? 0 : rig.realWorldHeight, -17);
     rig.setTarget(Vector3.Zero());
   };
-  const sceneActions = (): XrCell[] => [
-    {
-      detail: "Frame the complete regional model",
-      id: "recentre-region",
-      label: "Recentre me",
-      onSelect: () => placeXrCamera(false),
-    },
-  ];
-  const consoleContributions: WorldConsole = {
-    facts: () => [
-      { label: "EVIDENCE", value: region.evidence.replaceAll("-", " ") },
-      { label: "INNER", value: `${region.distanceAu.inner.toLocaleString()} AU` },
-      { label: "OUTER", value: `${region.distanceAu.outer.toLocaleString()} AU` },
-      { label: "ANCHOR", value: `NAIF ${region.anchorNaifId}` },
-    ],
-    sceneActions,
-    source: () => `${region.sources[0]?.datasetId ?? "NASA"} · 2026-08-23`,
-    subtitle: () => `${region.evidence.replaceAll("-", " ")} · parent ${region.parent}`,
-    summary: () => region.disclosure,
-    title: () => region.name,
-  };
-
   return {
-    console: consoleContributions,
     farthestView: () => camera.upperRadiusLimit ?? undefined,
     focusXrRig: placeXrCamera,
     restoreDesktopView: () => camera.attachControl(canvas, true),

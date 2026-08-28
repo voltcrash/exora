@@ -1,9 +1,8 @@
-import type { ExoplanetProfile, StarProfile } from "@exora/contracts";
-import { WORLDGEN_VERSION, type CustomStar, type CustomWorld } from "@exora/worldgen";
+import type { ExoplanetProfile } from "@exora/contracts";
+import { WORLDGEN_VERSION } from "@exora/worldgen";
 import { useEffect, useRef, useState } from "react";
 import type { StarLoadResult } from "../api-client.ts";
 import { reachStarSystem, reachSystem } from "../destination-cache.ts";
-import type { StarWorld } from "../star-scene.ts";
 import { formatNumber } from "../planet-utils.tsx";
 import type { SceneHost, XrStatus } from "../scene-host.ts";
 import { deriveStarVisual, starKindLabel, starSummary } from "../star-utils.ts";
@@ -15,12 +14,9 @@ import { MobileSheet } from "./MobileSheet.tsx";
 interface StarExperienceProps {
   chromeHidden: boolean;
   host: SceneHost | null;
-  onGeneratePlanet: (world: CustomWorld) => void;
-  onGenerateStar: (star: CustomStar) => void;
   onToggleChrome: () => void;
   onOpenDiscover: () => void;
   onSelectPlanet: (planet: ExoplanetProfile, cached: boolean) => void;
-  onSelectStar: (star: StarProfile, cached: boolean) => void;
   onSelectSystem: (hostStar: string) => Promise<boolean>;
   result: StarLoadResult;
   systemHostName: string | null;
@@ -30,18 +26,14 @@ interface StarExperienceProps {
 export const StarExperience = ({
   chromeHidden,
   host,
-  onGeneratePlanet,
-  onGenerateStar,
   onToggleChrome,
   onOpenDiscover,
   onSelectPlanet,
-  onSelectStar,
   onSelectSystem,
   result,
   systemHostName,
   travelPhase,
 }: StarExperienceProps) => {
-  const worldRef = useRef<StarWorld | null>(null);
   const [fps, setFps] = useState("--");
   const [sceneState, setSceneState] = useState<"loading" | "ready" | "error">("loading");
   const [xrStatus, setXrStatus] = useState<XrStatus>("checking");
@@ -64,9 +56,8 @@ export const StarExperience = ({
    * The name the archive files this system under.
    *
    * SIMBAD and NASA rarely spell a host the same way, so the diorama is asked for under whichever
-   * alias actually returned worlds, falling back to the star's own name. Held in a ref because
-   * the console entry inside the headset is handed to the scene at mount, before the archive has
-   * answered — reading the state directly would leave it travelling to whatever was known then.
+   * alias actually returned worlds, falling back to the star's own name. Held in a ref so the
+   * browser action always uses the latest archive result.
    */
   const dioramaHostRef = useRef(star.name);
   useEffect(() => {
@@ -111,12 +102,6 @@ export const StarExperience = ({
     return () => controller.abort();
   }, [custom, solar, star.name, systemHostName]);
 
-  useEffect(() => {
-    worldRef.current?.setSystemWorlds(systemPlanets, (planet) =>
-      onSelectPlanet(planet, systemCached),
-    );
-  }, [onSelectPlanet, sceneState, systemCached, systemPlanets]);
-
   useEffect(() => host?.onXrStatus(setXrStatus), [host]);
 
   useEffect(() => {
@@ -137,24 +122,12 @@ export const StarExperience = ({
         host.mountWorld(() =>
           createStarWorld(host, {
             star,
-            // The console inside the headset can travel anywhere the browser catalog can, so the
-            // same selection handlers the DOM dialogs use are handed to the scene.
-            onSelectPlanet: (destination) => onSelectPlanet(destination, false),
-            onSelectStar: (destination) => onSelectStar(destination, false),
-            ...(custom ? {} : { onSelectSystem: () => void openSystem() }),
-            onForgeWorld: onGeneratePlanet,
-            onForgeStar: onGenerateStar,
             onFirstFrame: () => {
               if (!abandoned) setSceneState("ready");
             },
           }),
         ),
       )
-      .then((world) => {
-        if (!world) return;
-        worldRef.current = world;
-        world.setSystemWorlds(systemPlanets, (planet) => onSelectPlanet(planet, systemCached));
-      })
       .catch((error: unknown) => {
         console.error(error);
         if (!abandoned) setSceneState("error");
@@ -162,7 +135,7 @@ export const StarExperience = ({
     return () => {
       abandoned = true;
     };
-  }, [custom, host, onGeneratePlanet, onGenerateStar, onSelectPlanet, onSelectStar, star]);
+  }, [host, star]);
 
   return (
     <div
