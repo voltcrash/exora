@@ -33,14 +33,8 @@ const afterFirstPaint = (callback: () => void): (() => void) => {
 /** Starts fetching the destination renderer while the shared Babylon host is being evaluated. */
 const preloadInitialScene = (asset: InitialSceneAsset): Promise<unknown> => {
   switch (asset) {
-    case "asteroid":
-      return import("./small-body-scene.ts");
     case "black-hole":
       return import("./black-hole-scene.ts");
-    case "comet":
-      return import("./comet-scene.ts");
-    case "mission":
-      return import("./mission-scene.ts");
     case "region":
       return import("./solar-region-scene.ts");
     case "star":

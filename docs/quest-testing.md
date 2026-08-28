@@ -32,8 +32,8 @@ from a plain LAN HTTP address.
     star's system. The session must never end: the view fades to black, the new object fades in
     around the wearer, and the headset is never returned to the flat page or the VR entry prompt
     in between.
-12. Enter VR from each of the Solar System's own destinations — an asteroid, a comet, a region,
-    a mission and a black hole — and confirm each one offers the immersive entry on the page.
+12. Enter VR from a Solar System region and a black hole, and confirm each one offers the
+    immersive entry on the page.
 13. Leave the experience running for ten minutes to catch thermal throttling or memory growth.
 
 Movement is thumbstick locomotion with smooth turning; teleportation and Babylon's default

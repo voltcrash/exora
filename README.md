@@ -91,7 +91,7 @@ packages/worldgen    Deterministic data-to-world recipe engine
 
 The website builds to static output served from Vercel's edge, and the Hono application is bundled into a single Vercel Function pinned to `sin1`. A rewrite sends every `/api/*` path to that one function, which keeps routing inside Hono rather than splitting it across per-route handlers.
 
-The function always loads planets from the live NASA Exoplanet Archive. Stars resolve through SIMBAD, which needs no registration or key; ephemerides, mission trajectories, and small bodies resolve through NASA/JPL services.
+The function always loads planets from the live NASA Exoplanet Archive. Stars resolve through SIMBAD, which needs no registration or key; Solar System ephemerides resolve through NASA/JPL services.
 
 The upstream adapters wrap their queries in bounded in-memory caches with request timeouts, including six hours for planets and twelve for stars. Responses also carry `Cache-Control` with `stale-while-revalidate` so Vercel's CDN absorbs repeated reads.
 
@@ -124,7 +124,7 @@ flowchart TB
     subgraph Archives["Archives"]
         NASA["NASA Exoplanet Archive<br/>TAP"]
         SIMBAD["SIMBAD<br/>TAP, keyless"]
-        JPL["NASA/JPL<br/>Horizons + SBDB"]
+        JPL["NASA/JPL<br/>Horizons"]
     end
 
     Desktop --> Static
@@ -135,6 +135,7 @@ flowchart TB
     Host --> Worldgen
 
     UI -->|/api/planets, /api/stars| Fn
+    Host -->|/api/ephemerides| Fn
 
     Fn --> NASA
     Fn --> SIMBAD

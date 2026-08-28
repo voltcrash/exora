@@ -7,7 +7,6 @@ catalogMode: prefer
 
 catalog:
   "@babylonjs/core": ^9.22.0
-  "@babylonjs/loaders": ^9.22.1
   "@hono/node-server": ^2.1.0
   "@iwer/devui": ^2.3.0
   "@lhci/cli": ^0.15.1

@@ -2,9 +2,6 @@ import type { ExoplanetProfile, StarProfile } from "@exora/contracts";
 import type { CustomStar, CustomWorld } from "@exora/worldgen";
 import { useEffect, useRef, useState } from "react";
 import type { BlackHoleProfile } from "../black-holes.ts";
-import type { AsteroidProfile } from "../solar-asteroids.ts";
-import type { CometProfile } from "../solar-comets.ts";
-import type { SolarMissionProfile } from "../solar-missions.ts";
 import type { SolarRegionProfile } from "../solar-regions.ts";
 import { WorldForge } from "./CustomPlanetBuilder.tsx";
 import { BlackHoleCatalog } from "./BlackHoleCatalog.tsx";
@@ -20,10 +17,7 @@ interface DiscoverScreenProps {
   onClose: () => void;
   onGeneratePlanet: (world: CustomWorld) => void;
   onGenerateStar: (star: CustomStar) => void;
-  onSelectAsteroid: (asteroid: AsteroidProfile) => void;
   onSelectBlackHole: (blackHole: BlackHoleProfile) => void;
-  onSelectComet: (comet: CometProfile) => void;
-  onSelectMission: (mission: SolarMissionProfile) => void;
   onSelectPlanet: (planet: ExoplanetProfile, cached: boolean) => void;
   onSelectRegion: (region: SolarRegionProfile) => void;
   onSelectStar: (star: StarProfile, cached: boolean) => void;
@@ -107,7 +101,7 @@ const sectionCopy: Record<DiscoverSection, { eyebrow: string; title: string; sum
   solar: {
     eyebrow: "NASA / JPL HOME SYSTEM",
     title: "Start close to home.",
-    summary: "Search measured bodies, mission targets, dynamic regions and exploration history.",
+    summary: "Search measured worlds and dynamic regions across our home system.",
   },
   worlds: {
     eyebrow: "NASA EXOPLANET ARCHIVE",
@@ -137,10 +131,7 @@ export const DiscoverScreen = ({
   onClose,
   onGeneratePlanet,
   onGenerateStar,
-  onSelectAsteroid,
   onSelectBlackHole,
-  onSelectComet,
-  onSelectMission,
   onSelectPlanet,
   onSelectRegion,
   onSelectStar,
@@ -254,9 +245,6 @@ export const DiscoverScreen = ({
               <SolarSystemCatalog
                 embedded
                 onClose={() => setSection("solar")}
-                onSelectAsteroid={onSelectAsteroid}
-                onSelectComet={onSelectComet}
-                onSelectMission={onSelectMission}
                 onSelectPlanet={onSelectPlanet}
                 onSelectRegion={onSelectRegion}
                 onSelectStar={onSelectStar}

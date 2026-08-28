@@ -1,9 +1,6 @@
 import type { ExoplanetProfile, StarProfile } from "@exora/contracts";
 import type { CustomStar, CustomWorld } from "@exora/worldgen";
 import type { BlackHoleProfile } from "./black-holes.ts";
-import type { AsteroidProfile } from "./solar-asteroids.ts";
-import type { CometProfile } from "./solar-comets.ts";
-import type { SolarMissionProfile } from "./solar-missions.ts";
 import type { SolarRegionProfile } from "./solar-regions.ts";
 import type { XrCell } from "./xr-panel-layout.ts";
 
@@ -18,10 +15,7 @@ export interface XrConsoleHost {
   onExit: () => void;
   onForgePlanet?: (world: CustomWorld) => void;
   onForgeStar?: (star: CustomStar) => void;
-  onTravelAsteroid?: (asteroid: AsteroidProfile) => void;
   onTravelBlackHole?: (blackHole: BlackHoleProfile) => void;
-  onTravelComet?: (comet: CometProfile) => void;
-  onTravelMission?: (mission: SolarMissionProfile) => void;
   onTravelPlanet?: (planet: ExoplanetProfile) => void;
   onTravelRegion?: (region: SolarRegionProfile) => void;
   onTravelStar?: (star: StarProfile) => void;

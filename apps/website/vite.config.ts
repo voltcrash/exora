@@ -2,10 +2,7 @@ import { defineConfig, loadEnv, type Plugin } from "vite-plus";
 import react from "@vitejs/plugin-react";
 import { playwright } from "vite-plus/test/browser-playwright";
 import { NOTABLE_PLANET_NAMES, NOTABLE_STAR_NAMES } from "./src/search-discovery.ts";
-import { FEATURED_ASTEROID_NAMES } from "./src/solar-asteroids.ts";
-import { FEATURED_COMET_NAMES } from "./src/solar-comets.ts";
 import { FEATURED_REGION_NAMES } from "./src/solar-regions.ts";
-import { FEATURED_MISSION_NAMES } from "./src/solar-missions.ts";
 import { FEATURED_BLACK_HOLE_NAMES } from "./src/black-holes.ts";
 import { VARIANT_LAUNCH_INITIALIZER } from "./variant-launch-embed.ts";
 
@@ -84,10 +81,7 @@ const buildSitemap = (): string => {
   const destinations = [
     "/",
     ...FEATURED_BLACK_HOLE_NAMES.map((name) => `/?blackHole=${encodeURIComponent(name)}`),
-    ...FEATURED_MISSION_NAMES.map((name) => `/?mission=${encodeURIComponent(name)}`),
     ...FEATURED_REGION_NAMES.map((name) => `/?region=${encodeURIComponent(name)}`),
-    ...FEATURED_COMET_NAMES.map((name) => `/?comet=${encodeURIComponent(name)}`),
-    ...FEATURED_ASTEROID_NAMES.map((name) => `/?asteroid=${encodeURIComponent(name)}`),
     ...NOTABLE_PLANET_NAMES.map((name) => `/?planet=${encodeURIComponent(name)}`),
     ...NOTABLE_STAR_NAMES.map((name) => `/?star=${encodeURIComponent(name)}`),
   ];
@@ -156,17 +150,6 @@ export default defineConfig(({ mode }) => {
   const variantLaunchKey = loadEnv(mode, process.cwd(), "").VITE_VARIANT_LAUNCH_KEY?.trim() ?? "";
 
   return {
-    optimizeDeps: {
-      // The irregular-body route is lazy, but browser journeys open it after the dev server has
-      // already started. Pre-bundling its loader/material modules prevents Vite from reloading the
-      // entire test page halfway through a journey when that route is first visited.
-      include: [
-        "@babylonjs/core/Lights/Shadows/shadowGenerator.js",
-        "@babylonjs/core/Loading/sceneLoader.js",
-        "@babylonjs/core/Materials/PBR/pbrMaterial.js",
-        "@babylonjs/loaders/dynamic.js",
-      ],
-    },
     /**
      * The two suites this package runs, kept as separate projects so neither pays for the other.
      *
@@ -213,7 +196,24 @@ export default defineConfig(({ mode }) => {
       rolldownOptions: {
         // Naming from the finished graph keeps dynamic boundaries intact. Grouping by dependency
         // here would hoist Babylon into the entry chunk and add roughly 1.7 MB to first paint.
-        output: { chunkFileNames: chunkFileName },
+        output: {
+          chunkFileNames: chunkFileName,
+          // Removing a lazy destination can reduce the number of natural graph boundaries and
+          // make a shared vendor chunk grow even though the application itself got smaller.
+          // Preserve those boundaries automatically while keeping every emitted file below the
+          // hard performance budget.
+          codeSplitting: {
+            groups: [
+              {
+                name: "babylon-vendor",
+                test: (moduleId) =>
+                  /[\\/]@babylonjs[\\/]/.test(moduleId) &&
+                  !/[\\/]Shaders[^\\/]*[\\/]/.test(moduleId),
+                maxSize: 350_000,
+              },
+            ],
+          },
+        },
       },
     },
     plugins: [variantLaunchSdk(variantLaunchKey), react(), dropWebGpuShaders(), emitSitemap()],

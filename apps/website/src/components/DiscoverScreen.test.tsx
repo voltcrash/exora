@@ -10,10 +10,7 @@ const discoverMarkup = (initialSection: DiscoverSection = "solar"): string =>
       onClose={vi.fn()}
       onGeneratePlanet={vi.fn()}
       onGenerateStar={vi.fn()}
-      onSelectAsteroid={vi.fn()}
       onSelectBlackHole={vi.fn()}
-      onSelectComet={vi.fn()}
-      onSelectMission={vi.fn()}
       onSelectPlanet={vi.fn()}
       onSelectRegion={vi.fn()}
       onSelectStar={vi.fn()}
@@ -37,6 +34,16 @@ test("Discover starts directly in the Solar System catalog", () => {
   expect(markup).toContain('data-icon="black-holes"');
   expect(markup).toContain('data-icon="forge"');
   expect(markup).not.toContain("All of space. One way in.");
+});
+
+test("the Solar System catalog retains regions without removed feature collections", () => {
+  const markup = discoverMarkup();
+
+  expect(markup).toContain("Regions · statistical populations and measured boundaries");
+  expect(markup).not.toContain("Missions · optional trajectories and exploration sites");
+  expect(markup).not.toContain("Asteroids · mission encounters and targets");
+  expect(markup).not.toContain("Dwarf-planet systems · 4 unresolved moons");
+  expect(markup).not.toContain("Comets · measured nuclei and simulated activity");
 });
 
 test("the black-hole destination exposes the five sourced landmarks", () => {

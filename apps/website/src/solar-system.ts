@@ -542,133 +542,6 @@ export const MAKEMAKE = planet({
 
 export const SOLAR_SYSTEM_DWARF_PLANETS = [CERES, PLUTO, ERIS, HAUMEA, MAKEMAKE] as const;
 
-const dwarfMoon = ({
-  discoveryYear,
-  name,
-  naifId,
-  orbitalPeriodDays,
-  orbitalSemiMajorAxisKilometers,
-  parent,
-  parentOrbitAu,
-  radiusKilometers,
-  spkId,
-  summary,
-}: {
-  discoveryYear: number;
-  name: string;
-  naifId: number;
-  orbitalPeriodDays: number | null;
-  orbitalSemiMajorAxisKilometers: number | null;
-  parent: "Eris" | "Haumea" | "Makemake";
-  parentOrbitAu: number;
-  radiusKilometers: number | null;
-  spkId: string;
-  summary: string;
-}): ExoplanetProfile => ({
-  hostStar: "Sun",
-  id: `solar-system-${name.toLocaleLowerCase().replaceAll("'", "").replaceAll(" ", "-")}`,
-  kind: "rocky",
-  name,
-  observation: {
-    declinationDegrees: null,
-    distanceParsecs: 0,
-    discoveryMethod: "Hubble Space Telescope imaging",
-    discoveryYear,
-    equilibriumTemperatureKelvin: null,
-    hostLuminosityLogSolar: 0,
-    hostMassSolar: 1,
-    hostRadiusSolar: 1,
-    hostSpectralType: "G2 V",
-    hostTemperatureKelvin: 5_772,
-    massEarth: null,
-    massJupiter: null,
-    orbitalEccentricity: null,
-    orbitalInclinationDegrees: null,
-    orbitalPeriodDays: null,
-    radiusEarth: radiusKilometers === null ? null : radiusKilometers / 6_371,
-    radiusJupiter: null,
-    rightAscensionDegrees: null,
-    semiMajorAxisAu: parentOrbitAu,
-  },
-  solarSystem: {
-    axialTiltDegrees: null,
-    bodyType: "moon",
-    naifId,
-    orbitalInclinationDegrees: null,
-    orbitalPeriodDays,
-    orbitalSemiMajorAxisKilometers,
-    parent,
-    rotationPeriodHours: null,
-    spkId,
-    summary,
-    surfaceNote:
-      "Only point-source or marginally resolved observations exist. The silhouette is neutral and does not claim surface geography.",
-    surfaceStatus: "unresolved",
-  },
-  source: {
-    archive: "NASA/JPL Small-Body Database",
-    retrievedOn: "2026-08-23",
-    table: "sbdb-api-v1.3",
-  },
-});
-
-export const DYSMONIA = dwarfMoon({
-  discoveryYear: 2005,
-  name: "Dysnomia",
-  naifId: 120_136_199,
-  orbitalPeriodDays: 15.786,
-  orbitalSemiMajorAxisKilometers: 37_460,
-  parent: "Eris",
-  parentOrbitAu: 67.93395,
-  radiusKilometers: 350,
-  spkId: "120136199",
-  summary:
-    "Eris's single known moon; its orbit supplies the system mass, while its own size and surface remain poorly constrained.",
-});
-
-export const HIIAKA = dwarfMoon({
-  discoveryYear: 2005,
-  name: "Hiʻiaka",
-  naifId: 120_136_108,
-  orbitalPeriodDays: 49.462,
-  orbitalSemiMajorAxisKilometers: 49_880,
-  parent: "Haumea",
-  parentOrbitAu: 43.06029,
-  radiusKilometers: 160,
-  spkId: "120136108",
-  summary: "Haumea's larger outer moon, detected as an unresolved water-ice-rich point source.",
-});
-
-export const NAMAKA = dwarfMoon({
-  discoveryYear: 2005,
-  name: "Namaka",
-  naifId: 220_136_108,
-  orbitalPeriodDays: 18.278,
-  orbitalSemiMajorAxisKilometers: 25_657,
-  parent: "Haumea",
-  parentOrbitAu: 43.06029,
-  radiusKilometers: 85,
-  spkId: "220136108",
-  summary:
-    "Haumea's smaller inner moon, moving through a dynamically perturbed orbit that helps constrain the system's shape and mass.",
-});
-
-export const MK2 = dwarfMoon({
-  discoveryYear: 2015,
-  name: "S/2015 (136472) 1",
-  naifId: 120_136_472,
-  orbitalPeriodDays: null,
-  orbitalSemiMajorAxisKilometers: 21_000,
-  parent: "Makemake",
-  parentOrbitAu: 45.57093,
-  radiusKilometers: 80,
-  spkId: "120136472",
-  summary:
-    "Makemake's provisional moon MK2, known from sparse Hubble detections; its orbit and physical properties remain incompletely solved.",
-});
-
-export const SOLAR_SYSTEM_DWARF_MOONS = [DYSMONIA, HIIAKA, NAMAKA, MK2] as const;
-
 export const SOLAR_SYSTEM_WORLDS = [
   ...SOLAR_SYSTEM_PLANETS,
   ...SOLAR_SYSTEM_DWARF_PLANETS,
@@ -682,7 +555,6 @@ export const SOLAR_SYSTEM_CATALOG: readonly SolarSystemCatalogEntry[] = [
   { profile: SUN, type: "star" },
   ...SOLAR_SYSTEM_WORLDS.map((profile) => ({ profile, type: "world" as const })),
   ...SOLAR_SYSTEM_MOONS.map((profile) => ({ profile, type: "world" as const })),
-  ...SOLAR_SYSTEM_DWARF_MOONS.map((profile) => ({ profile, type: "world" as const })),
 ];
 
 export const SOLAR_SYSTEM_CATALOG_GROUPS = [
@@ -705,10 +577,6 @@ export const SOLAR_SYSTEM_CATALOG_GROUPS = [
     entries: moons.map((profile) => ({ profile, type: "world" as const })),
     label: `${parent} system · ${moons.length} mapped moon${moons.length === 1 ? "" : "s"}`,
   })),
-  {
-    entries: SOLAR_SYSTEM_DWARF_MOONS.map((profile) => ({ profile, type: "world" as const })),
-    label: "Dwarf-planet systems · 4 unresolved moons",
-  },
 ] as const;
 
 export const findSolarStar = (name: string): StarProfile | null =>

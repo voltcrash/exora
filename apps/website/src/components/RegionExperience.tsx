@@ -105,12 +105,12 @@ export const RegionExperience = ({
             <span aria-hidden="true" /> {region.disclosure.toUpperCase()}
           </p>
           <p className="region-scale-note">{region.scaleNote}</p>
-          <p className="small-body-identifiers" aria-label="Permanent anchor identifiers">
+          <p className="region-identifiers" aria-label="Permanent anchor identifiers">
             <strong>ANCHOR SPK {region.anchorSpkId}</strong>
             <span>NAIF {region.anchorNaifId}</span>
           </p>
         </section>
-        <aside className="telemetry small-body-telemetry region-telemetry" aria-label="Region data">
+        <aside className="telemetry region-telemetry" aria-label="Region data">
           <div className="telemetry-heading">
             <span>
               <small>NASA / JPL · REGIONAL MODEL</small>Scale and evidence

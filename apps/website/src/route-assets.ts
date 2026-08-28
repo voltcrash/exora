@@ -1,22 +1,11 @@
 import type { RenderQualityTier } from "./render-quality.ts";
 
-export type InitialSceneAsset =
-  | "asteroid"
-  | "black-hole"
-  | "comet"
-  | "mission"
-  | "planet"
-  | "region"
-  | "star"
-  | "system";
+export type InitialSceneAsset = "black-hole" | "planet" | "region" | "star" | "system";
 
 /** Selects the renderer module needed by the URL before the scene host has finished booting. */
 export const initialSceneAssetForSearch = (search: string): InitialSceneAsset => {
   const parameters = new URLSearchParams(search);
   if (parameters.has("blackHole")) return "black-hole";
-  if (parameters.has("asteroid")) return "asteroid";
-  if (parameters.has("comet")) return "comet";
-  if (parameters.has("mission")) return "mission";
   if (parameters.has("region")) return "region";
   if (parameters.has("star") || parameters.has("customStar")) return "star";
   if (parameters.has("system")) return "system";

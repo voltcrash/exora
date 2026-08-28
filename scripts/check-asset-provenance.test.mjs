@@ -31,14 +31,14 @@ afterEach(async () => {
 });
 
 test("accepts documented model and texture assets", async () => {
-  const publicRootPath = await createFixture(["models/comet.obj", "textures/comet.jpg"]);
+  const publicRootPath = await createFixture(["models/body.obj", "textures/body.jpg"]);
   const result = await findAssetProvenanceGaps({
-    provenance: "Documented assets: `comet.obj` and `textures/comet.jpg`.",
+    provenance: "Documented assets: `body.obj` and `textures/body.jpg`.",
     publicRootPath,
   });
 
   expect(result).toEqual({
-    assets: ["models/comet.obj", "textures/comet.jpg"],
+    assets: ["models/body.obj", "textures/body.jpg"],
     undocumented: [],
   });
 });
@@ -67,14 +67,14 @@ test("requires full paths when supported assets have duplicate basenames", async
 });
 
 test("preserves nested asset paths for exact provenance matches", async () => {
-  const publicRootPath = await createFixture(["models/solar-system/comets/67p.obj"]);
+  const publicRootPath = await createFixture(["models/catalog/body.obj"]);
   const result = await findAssetProvenanceGaps({
-    provenance: "Documented asset: `models/solar-system/comets/67p.obj`.",
+    provenance: "Documented asset: `models/catalog/body.obj`.",
     publicRootPath,
   });
 
   expect(result).toEqual({
-    assets: ["models/solar-system/comets/67p.obj"],
+    assets: ["models/catalog/body.obj"],
     undocumented: [],
   });
 });
@@ -83,7 +83,7 @@ test("ignores hidden metadata and files with unsupported extensions", async () =
   const publicRootPath = await createFixture([
     "models/.DS_Store",
     "models/solar-system/.DS_Store",
-    "models/._asteroid.obj",
+    "models/._body.obj",
     "textures/.cache/preview.jpg",
     "textures/Thumbs.db",
     "textures/notes.txt",

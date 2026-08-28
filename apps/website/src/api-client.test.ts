@@ -3,7 +3,6 @@ import {
   discoverRandomPlanet,
   discoverRandomStar,
   loadFeaturedPlanet,
-  loadMissionTrajectory,
   loadPlanetFilterPool,
   loadPlanetByName,
   loadPlanetsByHost,
@@ -11,7 +10,6 @@ import {
   loadSolarEphemeris,
   loadStarByName,
   searchPlanets,
-  searchSmallBodies,
   searchStars,
 } from "./api-client.ts";
 import { featuredPlanet } from "./planet-profile.ts";
@@ -207,166 +205,6 @@ test("rejects a malformed Horizons contract instead of drawing unvalidated posit
         Response.json({
           data: [],
           meta: { source: "NASA/JPL Horizons API", sourceVersion: "changed" },
-        }),
-    }),
-  ).rejects.toThrow("invalid response");
-});
-
-test("loads a validated mission path only through Exora's API", async () => {
-  const result = await loadMissionTrajectory(
-    "-31",
-    { start: "1977-09-06", stepDays: 365, stop: "1978-09-06" },
-    {
-      fetcher: async (input) => {
-        const path =
-          typeof input === "string" ? input : input instanceof URL ? input.href : input.url;
-        expect(path).toContain("/api/mission-trajectories?");
-        expect(path).toContain("spk=-31");
-        expect(path).not.toContain("ssd.jpl.nasa.gov");
-        return Response.json({
-          data: [
-            {
-              calendarTdb: "A.D. 1977-Sep-06 00:00:00.0000 TDB",
-              julianDateTdb: 2_443_392.5,
-              positionAu: { x: 1, y: 0, z: 0 },
-              velocityAuPerDay: { x: 0, y: 0.02, z: 0 },
-            },
-            {
-              calendarTdb: "A.D. 1978-Sep-06 00:00:00.0000 TDB",
-              julianDateTdb: 2_443_757.5,
-              positionAu: { x: 3, y: 2, z: 0.1 },
-              velocityAuPerDay: { x: 0.01, y: 0.01, z: 0 },
-            },
-          ],
-          meta: {
-            cached: true,
-            center: "Sun (10)",
-            coordinateFrame: "Ecliptic J2000",
-            retrievedAt: "2026-08-24T12:00:00.000Z",
-            solution: "Voyager_1_ST+refit2022_m",
-            source: "NASA/JPL Horizons API",
-            sourceVersion: "1.2",
-            spkId: "-31",
-            stale: false,
-            stepDays: 365,
-            targetName: "Voyager 1",
-          },
-        });
-      },
-    },
-  );
-
-  expect(result.data[0]?.julianDateTdb).toBe(2_443_392.5);
-  expect(result.meta.spkId).toBe("-31");
-});
-
-const sbdbPayload = {
-  data: {
-    closeApproaches: [
-      {
-        body: "Earth",
-        calendarDate: "2029-Apr-13 21:46",
-        distanceAu: 0.000254,
-        distanceMaximumAu: 0.000256,
-        distanceMinimumAu: 0.000252,
-        julianDate: 2462239.407,
-        relativeVelocityKilometersPerSecond: 7.42,
-        timeUncertaintySeconds: 3.1,
-      },
-    ],
-    designation: "99942",
-    fullName: "99942 Apophis (2004 MN4)",
-    kind: "asteroid",
-    nearEarth: true,
-    orbit: {
-      conditionCode: "0",
-      dataArcDays: 7600,
-      elements: [
-        {
-          name: "a",
-          reference: null,
-          title: "semi-major axis",
-          uncertainty: "1e-10",
-          units: "au",
-          value: "0.9224",
-        },
-      ],
-      epochJulianDate: 2461000.5,
-      firstObservation: "2004-03-15",
-      lastObservation: "2026-08-01",
-      solutionDate: "2026-08-02 12:00:00",
-      solutionId: "220",
-    },
-    orbitClass: { code: "ATE", name: "Aten" },
-    physicalParameters: [],
-    potentiallyHazardous: true,
-    spkId: "2099942",
-  },
-  matches: [],
-  meta: {
-    cached: true,
-    lookup: "auto",
-    query: "Apophis",
-    retrievedAt: "2026-08-24T12:00:00.000Z",
-    source: "NASA/JPL Small-Body Database (SBDB) API",
-    sourceVersion: "1.3",
-    stale: false,
-    status: "match",
-  },
-} as const;
-
-test("searches small bodies only through Exora and validates the normalized SBDB contract", async () => {
-  const result = await searchSmallBodies("2099942", {
-    fetcher: async (input) => {
-      const path =
-        typeof input === "string" ? input : input instanceof URL ? input.href : input.url;
-      expect(path).toContain("/api/small-bodies?");
-      expect(path).toContain("q=2099942");
-      expect(path).not.toContain("ssd-api.jpl.nasa.gov");
-      return Response.json({
-        ...sbdbPayload,
-        meta: { ...sbdbPayload.meta, query: "2099942" },
-      });
-    },
-  });
-
-  expect(result).toMatchObject({
-    data: { potentiallyHazardous: true, spkId: "2099942" },
-    meta: { sourceVersion: "1.3", status: "match" },
-  });
-});
-
-test("requests an exact designation after an ambiguous SBDB name", async () => {
-  await searchSmallBodies("141P-A", {
-    lookup: "designation",
-    fetcher: async (input) => {
-      const path =
-        typeof input === "string" ? input : input instanceof URL ? input.href : input.url;
-      expect(path).toContain("lookup=designation");
-      return Response.json({
-        data: null,
-        matches: [],
-        meta: {
-          ...sbdbPayload.meta,
-          lookup: "designation",
-          query: "141P-A",
-          status: "not-found",
-        },
-      });
-    },
-  });
-});
-
-test("rejects a small-body response that drops its uncertainty-aware parameter contract", async () => {
-  await expect(
-    searchSmallBodies("Apophis", {
-      fetcher: async () =>
-        Response.json({
-          ...sbdbPayload,
-          data: {
-            ...sbdbPayload.data,
-            orbit: { ...sbdbPayload.data.orbit, elements: [{ name: "a", value: 0.9224 }] },
-          },
         }),
     }),
   ).rejects.toThrow("invalid response");

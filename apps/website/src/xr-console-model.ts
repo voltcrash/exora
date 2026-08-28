@@ -12,9 +12,6 @@ import type { ExoplanetProfile, StarProfile } from "@exora/contracts";
 import type { CustomPlanetParameters, CustomStarParameters } from "@exora/worldgen";
 import { blackHoleKindLabel, formatBlackHoleMass, type BlackHoleProfile } from "./black-holes.ts";
 import { formatNumber } from "./planet-utils.tsx";
-import type { AsteroidProfile } from "./solar-asteroids.ts";
-import type { CometProfile } from "./solar-comets.ts";
-import type { SolarMissionProfile } from "./solar-missions.ts";
 import type { SolarRegionProfile } from "./solar-regions.ts";
 import {
   bodyScaleLabel,
@@ -339,10 +336,7 @@ export const SOLAR_SHELVES = [
   { id: "planets", label: "Planets" },
   { id: "dwarfs", label: "Dwarfs" },
   { id: "moons", label: "Moons" },
-  { id: "asteroids", label: "Asteroids" },
-  { id: "comets", label: "Comets" },
   { id: "regions", label: "Regions" },
-  { id: "missions", label: "Missions" },
 ] as const;
 
 export type SolarShelf = (typeof SOLAR_SHELVES)[number]["id"];
@@ -368,26 +362,11 @@ export const blackHoleCellDetail = (blackHole: BlackHoleProfile): string =>
     .filter(Boolean)
     .join(" · ");
 
-export const asteroidCellDetail = (asteroid: AsteroidProfile): string =>
-  [asteroid.orbit.class, `${formatNumber(asteroid.diameterKilometers.value, 1)} km across`]
-    .filter(Boolean)
-    .join(" · ");
-
-export const cometCellDetail = (comet: CometProfile): string =>
-  [comet.orbit.class, `perihelion ${formatNumber(comet.orbit.perihelionAu, 2)} au`]
-    .filter(Boolean)
-    .join(" · ");
-
 export const regionCellDetail = (region: SolarRegionProfile): string =>
   [
     region.kind.replaceAll("-", " "),
     `${formatNumber(region.distanceAu.inner, 0)}–${formatNumber(region.distanceAu.outer, 0)} au`,
   ].join(" · ");
-
-export const missionCellDetail = (mission: SolarMissionProfile): string =>
-  [mission.agency, `${mission.startDate.slice(0, 4)}–${mission.endDate?.slice(0, 4) ?? "present"}`]
-    .filter(Boolean)
-    .join(" · ");
 
 export const starCellDetail = (star: StarProfile): string => {
   const { distanceParsecs, spectralType, visualMagnitude } = star.observation;

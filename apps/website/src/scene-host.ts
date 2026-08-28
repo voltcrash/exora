@@ -35,9 +35,6 @@ import type { WebXRInputSource } from "@babylonjs/core/XR/webXRInputSource.js";
 import type { WebXRDefaultExperience } from "@babylonjs/core/XR/webXRDefaultExperience.js";
 import { createArPresentation } from "./ar-presentation.ts";
 import type { BlackHoleProfile } from "./black-holes.ts";
-import type { AsteroidProfile } from "./solar-asteroids.ts";
-import type { CometProfile } from "./solar-comets.ts";
-import type { SolarMissionProfile } from "./solar-missions.ts";
 import type { SolarRegionProfile } from "./solar-regions.ts";
 import {
   adaptFixedFoveation,
@@ -88,10 +85,8 @@ export type WorldConsole = Omit<XrConsoleHost, "onExit">;
  *
  * The in-headset Discover screen offers the same journeys the flat one does — the home system,
  * the NASA and SIMBAD catalogs, the black-hole atlas, the world forge — from every destination,
- * because a wearer cannot reach the browser screen without taking the headset off. Only three of
- * the nine destinations used to hand it somewhere to send the result, though, so on a comet, an
- * asteroid, a region, a mission, a moon subsystem or a black hole those pages browsed and paged
- * and searched perfectly well and then did nothing at all when a row was chosen.
+ * because a wearer cannot reach the browser screen without taking the headset off. Travel is
+ * registered here so every destination can hand a selected result back to the page.
  *
  * Travel is a property of the page rather than of the world being left, so it is registered once
  * here and every destination inherits it. A world that wants to say something more specific still
@@ -100,10 +95,7 @@ export type WorldConsole = Omit<XrConsoleHost, "onExit">;
 export interface ConsoleNavigator {
   onForgePlanet?: (world: CustomWorld) => void;
   onForgeStar?: (star: CustomStar) => void;
-  onTravelAsteroid?: (asteroid: AsteroidProfile) => void;
   onTravelBlackHole?: (blackHole: BlackHoleProfile) => void;
-  onTravelComet?: (comet: CometProfile) => void;
-  onTravelMission?: (mission: SolarMissionProfile) => void;
   onTravelPlanet?: (planet: ExoplanetProfile) => void;
   onTravelRegion?: (region: SolarRegionProfile) => void;
   onTravelStar?: (star: StarProfile) => void;

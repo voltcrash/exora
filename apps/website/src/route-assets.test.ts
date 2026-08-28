@@ -9,9 +9,6 @@ test("initial routes preload the scene module they will mount", () => {
   expect(initialSceneAssetForSearch("?customStar=recipe")).toBe("star");
   expect(initialSceneAssetForSearch("?system=Sol")).toBe("system");
   expect(initialSceneAssetForSearch("?blackHole=Sagittarius+A*")).toBe("black-hole");
-  expect(initialSceneAssetForSearch("?asteroid=Ceres")).toBe("asteroid");
-  expect(initialSceneAssetForSearch("?comet=Halley")).toBe("comet");
-  expect(initialSceneAssetForSearch("?mission=Voyager+1")).toBe("mission");
   expect(initialSceneAssetForSearch("?region=Kuiper+belt")).toBe("region");
 });
 

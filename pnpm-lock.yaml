@@ -9,12 +9,6 @@ catalogs:
     '@babylonjs/core':
       specifier: ^9.22.0
       version: 9.22.0
-    '@babylonjs/loaders':
-      specifier: ^9.22.1
-      version: 9.22.1
-    '@hono/node-server':
-      specifier: ^2.1.0
-      version: 2.1.0
     '@iwer/devui':
       specifier: ^2.3.0
       version: 2.3.0
@@ -36,9 +30,6 @@ catalogs:
     '@vercel/analytics':
       specifier: ^2.0.1
       version: 2.0.1
-    '@vercel/otel':
-      specifier: ^2.1.3
-      version: 2.1.3
     '@vercel/speed-insights':
       specifier: ^2.0.0
       version: 2.0.0
@@ -48,9 +39,6 @@ catalogs:
     '@vitest/browser-playwright':
       specifier: 4.1.11
       version: 4.1.11
-    hono:
-      specifier: ^4.13.1
-      version: 4.13.1
     iwer:
       specifier: ^2.3.0
       version: 2.3.0
@@ -66,15 +54,9 @@ catalogs:
     typescript:
       specifier: ^7.0.2
       version: 7.0.2
-    vercel:
-      specifier: ^59.6.2
-      version: 59.6.2
     vite-plus:
       specifier: 0.3.0
       version: 0.3.0
-    zod:
-      specifier: ^4.4.3
-      version: 4.4.3
 
 overrides:
   vite: npm:@voidzero-dev/vite-plus-core@0.3.0
@@ -149,9 +131,6 @@ importers:
       '@babylonjs/core':
         specifier: 'catalog:'
         version: 9.22.0
-      '@babylonjs/loaders':
-        specifier: 'catalog:'
-        version: 9.22.1(@babylonjs/core@9.22.0)(babylonjs-gltf2interface@9.22.1)
       '@exora/contracts':
         specifier: workspace:*
         version: link:../../packages/contracts
@@ -259,12 +238,6 @@ packages:
 
   '@babylonjs/core@9.22.0':
     resolution: {integrity: sha512-rbQJWF9bUiVAMpUxGnEPQvqg/ZMzoKFZ8bahlzXs35vHyGENRSLPYRT14k5GtMPQGIerbWwkLVW8wNob3Kj6ug==}
-
-  '@babylonjs/loaders@9.22.1':
-    resolution: {integrity: sha512-Ecjaxa0/R/tWM7if3p/YwpcXwBHu8UtJr8y0u7Ka/2QsF0hH05T0TOSjZG1DYH5I1lwcmupJQfSG8CiGulsc2Q==}
-    peerDependencies:
-      '@babylonjs/core': ^9.0.0
-      babylonjs-gltf2interface: ^9.0.0
 
   '@blazediff/core@1.9.1':
     resolution: {integrity: sha512-ehg3jIkYKulZh+8om/O25vkvSsXXwC+skXmyA87FFx6A/45eqOkZsBltMw/TVteb0mloiGT8oGRTcjRAz66zaA==}
@@ -2190,9 +2163,6 @@ packages:
     peerDependenciesMeta:
       react-native-b4a:
         optional: true
-
-  babylonjs-gltf2interface@9.22.1:
-    resolution: {integrity: sha512-RfOiN+gTHOlf7Uj+HHZM9jqFnofo4sAUPyEe69A9UHw6794b4ySHYb59K+wW8Id6QN7jkPWNTg7Up1WYArtzOg==}
 
   balanced-match@1.0.2:
     resolution: {integrity: sha512-3oSeUO0TMV67hN1AmbXsK4yaqU7tjiHlbxRDZOpH0KW9+CeX4bRAaX0Anxt0tx2MrpRpWwQaPwIlISEJhYU5Pw==}
@@ -4228,11 +4198,6 @@ snapshots:
 
   '@babylonjs/core@9.22.0': {}
 
-  '@babylonjs/loaders@9.22.1(@babylonjs/core@9.22.0)(babylonjs-gltf2interface@9.22.1)':
-    dependencies:
-      '@babylonjs/core': 9.22.0
-      babylonjs-gltf2interface: 9.22.1
-
   '@blazediff/core@1.9.1': {}
 
   '@bytecodealliance/preview2-shim@0.17.6': {}
@@ -5809,8 +5774,6 @@ snapshots:
   axe-core@4.13.0: {}
 
   b4a@1.8.1: {}
-
-  babylonjs-gltf2interface@9.22.1: {}
 
   balanced-match@1.0.2: {}
 

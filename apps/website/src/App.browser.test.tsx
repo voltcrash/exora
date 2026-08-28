@@ -84,7 +84,7 @@ vi.mock("./scene-host.ts", () => {
       listener("unavailable");
       return () => undefined;
     },
-    profile: { hardwareScalingLevel: 1, maxIrregularBodyTriangles: 900_000, tier: "desktop" },
+    profile: { hardwareScalingLevel: 1, tier: "desktop" },
     qualityTier: "desktop",
     refreshConsole: () => undefined,
     setConsoleNavigator: () => undefined,
@@ -158,20 +158,6 @@ vi.mock("./star-scene.ts", () => ({
 
 vi.mock("./black-hole-scene.ts", () => ({
   createBlackHoleWorld: (_host: unknown, options: { onFirstFrame: () => void }) => {
-    options.onFirstFrame();
-    return mountedWorld();
-  },
-}));
-
-vi.mock("./small-body-scene.ts", () => ({
-  createSmallBodyWorld: (_host: unknown, options: { onFirstFrame: () => void }) => {
-    options.onFirstFrame();
-    return mountedWorld();
-  },
-}));
-
-vi.mock("./comet-scene.ts", () => ({
-  createCometWorld: (_host: unknown, options: { onFirstFrame: () => void }) => {
     options.onFirstFrame();
     return mountedWorld();
   },
@@ -280,7 +266,7 @@ const stubArchive = ({ missing = [] as string[] } = {}) => {
           name: `Body ${naifId}`,
           naifId,
           positionAu: { x: 1, y: naifId / 1_000, z: 0 },
-          solution: "DE441/JPL small-body solution",
+          solution: "DE441/JPL orbital solution",
           spkId: String(naifId),
           velocityAuPerDay: { x: 0, y: 0.01, z: 0 },
         })),
@@ -293,98 +279,6 @@ const stubArchive = ({ missing = [] as string[] } = {}) => {
           source: "NASA/JPL Horizons API",
           sourceVersion: "1.2",
           stale: false,
-        },
-      });
-    }
-
-    if (url.pathname === "/api/mission-trajectories") {
-      const spkId = url.searchParams.get("spk") ?? "-31";
-      const stepDays = Number(url.searchParams.get("step") ?? "60");
-      return Response.json({
-        data: [
-          {
-            calendarTdb: "A.D. 1977-Sep-06 00:00:00.0000 TDB",
-            julianDateTdb: 2_443_392.5,
-            positionAu: { x: 1, y: 0, z: 0 },
-            velocityAuPerDay: { x: 0, y: 0.02, z: 0 },
-          },
-          {
-            calendarTdb: "A.D. 2035-Jan-01 00:00:00.0000 TDB",
-            julianDateTdb: 2_464_327.5,
-            positionAu: { x: 190, y: 30, z: 4 },
-            velocityAuPerDay: { x: 0.01, y: 0, z: 0 },
-          },
-        ],
-        meta: {
-          cached: true,
-          center: "Sun (10)",
-          coordinateFrame: "Ecliptic J2000",
-          retrievedAt: "2026-08-24T12:00:00.000Z",
-          solution: "Voyager_1_ST+refit2022_m",
-          source: "NASA/JPL Horizons API",
-          sourceVersion: "1.2",
-          spkId,
-          stale: false,
-          stepDays,
-          targetName: "Voyager 1",
-        },
-      });
-    }
-
-    if (url.pathname === "/api/small-bodies") {
-      const query = url.searchParams.get("q") ?? "";
-      return Response.json({
-        data: {
-          closeApproaches: [
-            {
-              body: "Earth",
-              calendarDate: "2029-Apr-13 21:46",
-              distanceAu: 0.000254,
-              distanceMaximumAu: 0.000256,
-              distanceMinimumAu: 0.000252,
-              julianDate: 2462239.407,
-              relativeVelocityKilometersPerSecond: 7.42,
-              timeUncertaintySeconds: 3.1,
-            },
-          ],
-          designation: "99942",
-          fullName: "99942 Apophis (2004 MN4)",
-          kind: "asteroid",
-          nearEarth: true,
-          orbit: {
-            conditionCode: "0",
-            dataArcDays: 7600,
-            elements: [
-              {
-                name: "a",
-                reference: null,
-                title: "semi-major axis",
-                uncertainty: "1e-10",
-                units: "au",
-                value: "0.9224",
-              },
-            ],
-            epochJulianDate: 2461000.5,
-            firstObservation: "2004-03-15",
-            lastObservation: "2026-08-01",
-            solutionDate: "2026-08-02 12:00:00",
-            solutionId: "220",
-          },
-          orbitClass: { code: "ATE", name: "Aten" },
-          physicalParameters: [],
-          potentiallyHazardous: true,
-          spkId: "2099942",
-        },
-        matches: [],
-        meta: {
-          cached: true,
-          lookup: "auto",
-          query,
-          retrievedAt: "2026-08-24T12:00:00.000Z",
-          source: "NASA/JPL Small-Body Database (SBDB) API",
-          sourceVersion: "1.3",
-          stale: false,
-          status: "match",
         },
       });
     }
@@ -598,22 +492,6 @@ test("a black-hole deep link resolves without an archive request", async () => {
   expect(calls.filter((path) => path.includes("/api/")).length).toBe(0);
 });
 
-test("a mission deep link keeps its optional trajectory hidden until requested", async () => {
-  stubArchive();
-  mountApp("?mission=Voyager%201");
-
-  await expect.element(page.getByRole("heading", { level: 1 })).toHaveTextContent("Voyager 1");
-  const toggle = page.getByRole("button", { name: "SHOW MISSION LAYER" });
-  await expect.element(toggle).toHaveAttribute("aria-pressed", "false");
-  await userEvent.click(toggle);
-  await expect
-    .element(page.getByRole("button", { name: "HIDE MISSION LAYER" }))
-    .toHaveAttribute("aria-pressed", "true");
-  expect(document.querySelector('link[rel="canonical"]')?.getAttribute("href")).toContain(
-    "?mission=Voyager%201",
-  );
-});
-
 test("a deep link to a system resolves to the diorama, and says what it compressed", async () => {
   stubArchive();
   mountApp("?system=Kepler-90");
@@ -763,95 +641,13 @@ test("the black-hole atlas opens and travels to a sourced horizon", async () => 
   expect(window.location.search).toBe("?blackHole=Sagittarius%20A*");
 });
 
-test("the Home System catalog filters mission asteroids and opens measured geometry", async () => {
-  stubArchive();
-  mountApp();
-
-  await openDiscoverSection("Solar System");
-  await expect.element(page.getByRole("heading", { name: "Start close to home." })).toBeVisible();
-
-  await userEvent.click(page.getByRole("button", { name: "ASTEROIDS" }));
-  await userEvent.fill(page.getByPlaceholder("Name, designation, or SPK ID"), "20101955");
-  const bennu = page.getByRole("button", { name: /101955 Bennu/ });
-  await expect.element(bennu).toBeVisible();
-  await userEvent.click(bennu);
-
-  await expect.element(page.getByRole("heading", { level: 1 })).toHaveTextContent("101955 Bennu");
-  await expect.element(page.getByText("MEASURED GEOMETRY", { exact: true })).toBeVisible();
-  await expect
-    .element(page.getByLabelText("Permanent identifiers"))
-    .toHaveTextContent("SPK 20101955");
-  expect(window.location.search).toBe("?asteroid=101955%20Bennu");
-});
-
-test("the Home System mission filter opens measured sites as an optional layer", async () => {
-  stubArchive();
-  mountApp();
-
-  await openDiscoverSection("Solar System");
-  await userEvent.click(page.getByRole("button", { exact: true, name: "MISSIONS" }));
-  await userEvent.fill(page.getByPlaceholder("Name, designation, or SPK ID"), "Apollo");
-  const apollo = page.getByRole("button", { name: /Apollo landing sites/ });
-  await expect.element(apollo).toBeVisible();
-  await userEvent.click(apollo);
-
-  await expect.element(page.getByRole("heading", { level: 1 })).toHaveTextContent("Apollo");
-  const toggle = page.getByRole("button", { name: "SHOW MISSION LAYER" });
-  await expect.element(toggle).toHaveAttribute("aria-pressed", "false");
-  await userEvent.click(toggle);
-  await expect
-    .element(page.getByRole("button", { name: "HIDE MISSION LAYER" }))
-    .toHaveAttribute("aria-pressed", "true");
-  expect(window.location.search).toBe("?mission=Apollo%20landing%20sites");
-});
-
-test("the Home System catalog searches JPL SBDB without inventing missing physical data", async () => {
-  const calls = stubArchive();
-  mountApp();
-
-  await openDiscoverSection("Solar System");
-  await userEvent.fill(page.getByPlaceholder("Name, designation, or SPK ID"), "Apophis");
-  await userEvent.click(page.getByRole("button", { name: "SEARCH JPL SBDB" }));
-
-  await expect
-    .element(page.getByRole("heading", { name: "99942 Apophis (2004 MN4)" }))
-    .toBeVisible();
-  await expect.element(page.getByText("POTENTIALLY HAZARDOUS", { exact: true })).toBeVisible();
-  await expect
-    .element(page.getByText("No physical parameters are available in this SBDB record."))
-    .toBeVisible();
-  expect(calls.some((path) => path.includes("/api/small-bodies?"))).toBe(true);
-});
-
-test("the Home System catalog opens a measured comet with explicitly simulated activity", async () => {
-  stubArchive();
-  mountApp();
-
-  await openDiscoverSection("Solar System");
-  await userEvent.click(page.getByRole("button", { exact: true, name: "COMETS" }));
-  await userEvent.fill(page.getByPlaceholder("Name, designation, or SPK ID"), "1000012");
-  const rosettaComet = page.getByRole("button", { name: /67P\/Churyumov/ });
-  await expect.element(rosettaComet).toBeVisible();
-  await userEvent.click(rosettaComet);
-
-  await expect
-    .element(page.getByRole("heading", { level: 1 }))
-    .toHaveTextContent("67P/Churyumov–Gerasimenko");
-  await expect.element(page.getByText("SIMULATED ACTIVITY", { exact: true })).toBeVisible();
-  await expect
-    .element(page.getByLabelText("Permanent identifiers"))
-    .toHaveTextContent("SPK 1000012");
-  await expect.element(page.getByLabelText("Heliocentric distance")).toBeVisible();
-  expect(window.location.search).toBe("?comet=67P%2FChuryumov%E2%80%93Gerasimenko");
-});
-
 test("the Home System catalog opens the Oort Cloud with an explicit inferred-model warning", async () => {
   stubArchive();
   mountApp();
 
   await openDiscoverSection("Solar System");
   await userEvent.click(page.getByRole("button", { exact: true, name: "REGIONS" }));
-  await userEvent.fill(page.getByPlaceholder("Name, designation, or SPK ID"), "Oort");
+  await userEvent.fill(page.getByPlaceholder("Name or SPK ID"), "Oort");
   const oortCloud = page.getByRole("button", { name: /Oort Cloud/ });
   await expect.element(oortCloud).toBeVisible();
   await userEvent.click(oortCloud);

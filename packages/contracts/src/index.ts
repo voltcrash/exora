@@ -6,19 +6,10 @@ import {
   ephemerisVectorSchema,
   exoplanetObservationSchema,
   exoplanetProfileSchema,
-  missionTrajectoryPointSchema,
-  missionTrajectoryResponseSchema,
   planetKindSchema,
   planetMetadataSchema,
   planetResponseSchema,
   planetSearchResponseSchema,
-  smallBodyCloseApproachSchema,
-  smallBodyKindSchema,
-  smallBodyLookupSchema,
-  smallBodyMatchSchema,
-  smallBodyParameterSchema,
-  smallBodyProfileSchema,
-  smallBodySearchResponseSchema,
   solarSystemIdentitySchema,
   solarSystemSourceSchema,
   starKindSchema,
@@ -47,16 +38,6 @@ export type StarSearchResponse = z.infer<typeof starSearchResponseSchema>;
 
 export type EphemerisVector = z.infer<typeof ephemerisVectorSchema>;
 export type EphemerisResponse = z.infer<typeof ephemerisResponseSchema>;
-export type MissionTrajectoryPoint = z.infer<typeof missionTrajectoryPointSchema>;
-export type MissionTrajectoryResponse = z.infer<typeof missionTrajectoryResponseSchema>;
-
-export type SmallBodyKind = z.infer<typeof smallBodyKindSchema>;
-export type SmallBodyLookup = z.infer<typeof smallBodyLookupSchema>;
-export type SmallBodyParameter = z.infer<typeof smallBodyParameterSchema>;
-export type SmallBodyCloseApproach = z.infer<typeof smallBodyCloseApproachSchema>;
-export type SmallBodyProfile = z.infer<typeof smallBodyProfileSchema>;
-export type SmallBodyMatch = z.infer<typeof smallBodyMatchSchema>;
-export type SmallBodySearchResponse = z.infer<typeof smallBodySearchResponseSchema>;
 export type ApiErrorResponse = z.infer<typeof apiErrorResponseSchema>;
 
 export type ApiResponseName = keyof typeof apiResponseSchemas;

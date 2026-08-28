@@ -29,10 +29,6 @@ test("selects a Quest-focused rendering budget", () => {
   expect(profile.xrFramebufferScaleFactor).toBeLessThanOrEqual(1);
   expect(profile.xrFixedFoveation).toBeGreaterThanOrEqual(0.4);
   expect(profile.surfaceMicrodetail).toBe(true);
-  expect(profile.maxIrregularBodyTriangles).toBeLessThan(desktopProfile.maxIrregularBodyTriangles);
-  expect(profile.irregularBodyShadowMapSize).toBeLessThan(
-    desktopProfile.irregularBodyShadowMapSize,
-  );
   // A diorama draws a whole system at once, so its bodies are coarser than the one full-detail
   // world the same tier is sized for.
   expect(profile.systemBodySegments).toBeLessThan(profile.planetSegments);
@@ -52,9 +48,6 @@ test("keeps the high-detail profile on capable desktops", () => {
   expect(profile.starCount).toBe(2_400);
   expect(profile.planetSegments).toBe(96);
   expect(profile.surfaceMicrodetail).toBe(true);
-  expect(profile.maxIrregularBodyTriangles).toBe(900_000);
-  expect(profile.irregularBodyNormalMapping).toBe(true);
-  expect(profile.irregularBodyShadowMapSize).toBe(2_048);
 });
 
 test("renders at the display's native pixel density on a HiDPI desktop", () => {
@@ -120,8 +113,6 @@ test("gives Quest 2 a lighter budget than a Quest 3", () => {
   expect(questTwo.xrFixedFoveation).toBeGreaterThan(questThree.xrFixedFoveation);
   expect(questTwo.surfaceColorDetail).toBe(true);
   expect(questTwo.surfaceMicrodetail).toBe(false);
-  expect(questTwo.maxIrregularBodyTriangles).toBeLessThan(questThree.maxIrregularBodyTriangles);
-  expect(questTwo.irregularBodyNormalMapping).toBe(false);
 });
 
 test("treats an unrecognised headset as the weaker one", () => {

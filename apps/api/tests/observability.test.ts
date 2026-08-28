@@ -2,7 +2,6 @@ import { expect, test } from "vite-plus/test";
 import { createApp } from "../src/app.ts";
 import { NasaArchiveError, type PlanetRepository } from "../src/nasa-archive.ts";
 import { ApiObservability, type StructuredLogRecord } from "../src/observability.ts";
-import type { SbdbRepository } from "../src/sbdb.ts";
 
 const emptyRepository: PlanetRepository = {
   browse: async () => ({ cached: false, value: [] }),
@@ -106,33 +105,4 @@ test("classifies validation, upstream, and internal failures", async () => {
     });
     expect(JSON.stringify(telemetry.records)).not.toMatch(/secret-bearing|upstream details/);
   }
-});
-
-test("records stale upstream recovery separately from ordinary cache hits", async () => {
-  const telemetry = collect();
-  const staleSbdb: SbdbRepository = {
-    search: async () => ({
-      cached: true,
-      data: null,
-      matches: [],
-      retrievedAt: "2026-08-27T00:00:00.000Z",
-      stale: true,
-      status: "not-found",
-    }),
-  };
-
-  await createApp({
-    observability: telemetry.observability,
-    repository: emptyRepository,
-    sbdbRepository: staleSbdb,
-  }).request("/api/small-bodies?q=Eros");
-
-  expect(telemetry.records).toContainEqual(
-    expect.objectContaining({
-      cache: "stale_fallback",
-      dependency: "jpl",
-      event: "dependency.completed",
-      operation: "sbdb.search",
-    }),
-  );
 });

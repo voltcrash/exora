@@ -55,7 +55,7 @@ export const openApiDocument = {
   },
   info: {
     description:
-      "Runtime-validated astronomy data from NASA Exoplanet Archive, SIMBAD, NASA/JPL Horizons, and SBDB.",
+      "Runtime-validated astronomy data from NASA Exoplanet Archive, SIMBAD, and NASA/JPL Horizons.",
     title: "Exora API",
     version: "1.0.0",
   },
@@ -99,25 +99,6 @@ export const openApiDocument = {
           ...errorResponses(429, 500),
         },
         summary: "Check API health",
-      },
-    },
-    "/api/mission-trajectories": {
-      get: {
-        parameters: [
-          queryParameter("spk", "Allowlisted spacecraft SPK ID", { type: "string" }),
-          queryParameter("start", "UTC start date", { format: "date", type: "string" }),
-          queryParameter("stop", "UTC stop date", { format: "date", type: "string" }),
-          queryParameter("step", "Sampling interval in days", {
-            maximum: 365,
-            minimum: 1,
-            type: "integer",
-          }),
-        ],
-        responses: {
-          200: response("MissionTrajectory", "Validated spacecraft trajectory samples"),
-          ...errorResponses(400, 429, 500, 502),
-        },
-        summary: "Get a mission trajectory",
       },
     },
     "/api/openapi.json": {
@@ -164,26 +145,6 @@ export const openApiDocument = {
           ...errorResponses(400, 404, 429, 500, 502),
         },
         summary: "Get a planet by archive name",
-      },
-    },
-    "/api/small-bodies": {
-      get: {
-        parameters: [
-          queryParameter("q", "Name, designation, or SPK identifier", {
-            maxLength: 100,
-            minLength: 1,
-            type: "string",
-          }),
-          queryParameter("lookup", "Lookup interpretation", {
-            enum: ["auto", "designation", "spk"],
-            type: "string",
-          }),
-        ],
-        responses: {
-          200: response("SmallBodySearch", "Unique, ambiguous, or not-found SBDB result"),
-          ...errorResponses(400, 429, 500, 502),
-        },
-        summary: "Search JPL small bodies",
       },
     },
     "/api/stars": {

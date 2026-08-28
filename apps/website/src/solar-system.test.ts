@@ -5,7 +5,6 @@ import {
   findSolarWorld,
   SOLAR_SYSTEM_CATALOG,
   SOLAR_SYSTEM_CATALOG_GROUPS,
-  SOLAR_SYSTEM_DWARF_MOONS,
   SOLAR_SYSTEM_DWARF_PLANETS,
   SOLAR_SYSTEM_MOONS,
   SOLAR_SYSTEM_PLANETS,
@@ -91,23 +90,9 @@ describe("the local Solar System catalog", () => {
     });
   });
 
-  it("catalogs the known moons of Eris, Haumea, and Makemake with permanent SPK IDs", () => {
-    expect(SOLAR_SYSTEM_DWARF_MOONS.map(({ name }) => name)).toEqual([
-      "Dysnomia",
-      "Hiʻiaka",
-      "Namaka",
-      "S/2015 (136472) 1",
-    ]);
-    expect(
-      SOLAR_SYSTEM_DWARF_MOONS.every(
-        ({ solarSystem }) => solarSystem?.spkId && solarSystem.surfaceStatus === "unresolved",
-      ),
-    ).toBe(true);
-  });
-
   it("catalogs every principal mission-mapped moon under its primary", () => {
     expect(SOLAR_SYSTEM_MOONS).toHaveLength(21);
-    expect(SOLAR_SYSTEM_CATALOG).toHaveLength(39);
+    expect(SOLAR_SYSTEM_CATALOG).toHaveLength(35);
     expect(SOLAR_SYSTEM_CATALOG_GROUPS.map(({ label }) => label)).toEqual([
       "Sun · home star",
       "Planets · 8 worlds",
@@ -119,7 +104,6 @@ describe("the local Solar System catalog", () => {
       "Uranus system · 5 mapped moons",
       "Neptune system · 1 mapped moon",
       "Pluto system · 1 mapped moon",
-      "Dwarf-planet systems · 4 unresolved moons",
     ]);
     expect(new Set(SOLAR_SYSTEM_MOONS.map(({ solarSystem }) => solarSystem?.naifId)).size).toBe(21);
     expect(SOLAR_SYSTEM_MOONS.every(({ solarSystem }) => solarSystem?.texture)).toBe(true);

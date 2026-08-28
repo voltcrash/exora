@@ -1,11 +1,9 @@
-import type { ExoplanetProfile, SmallBodyProfile, StarProfile } from "@exora/contracts";
+import type { ExoplanetProfile, StarProfile } from "@exora/contracts";
 import { expect, test, vi } from "vite-plus/test";
 import { createApp } from "../src/app.ts";
 import { NasaArchiveError, type PlanetRepository } from "../src/nasa-archive.ts";
 import { createRateLimiter } from "../src/rate-limit.ts";
-import { SbdbError, type SbdbRepository } from "../src/sbdb.ts";
 import type { HorizonsRepository } from "../src/horizons.ts";
-import type { MissionTrajectoryRepository } from "../src/mission-trajectories.ts";
 import { SimbadArchiveError, type StarRepository } from "../src/simbad-archive.ts";
 import type { SystemAliasRepository } from "../src/nasa-system-aliases.ts";
 
@@ -130,7 +128,6 @@ test("publishes an OpenAPI 3.1 document backed by the runtime response schemas",
     paths: {
       "/api/ephemerides": { get: { responses: { 200: expect.any(Object) } } },
       "/api/planets": { get: { responses: { 200: expect.any(Object) } } },
-      "/api/small-bodies": { get: { responses: { 200: expect.any(Object) } } },
     },
   });
 });
@@ -151,83 +148,6 @@ const ephemerisRepository: HorizonsRepository = {
         velocityAuPerDay: { x: 0, y: 0.0172, z: 0 },
       },
     ],
-  }),
-};
-
-const missionTrajectoryRepository: MissionTrajectoryRepository = {
-  trajectory: async (spkId, _start, _stop, _stepDays) => ({
-    cached: true,
-    retrievedAt: "2026-08-24T12:00:00.000Z",
-    solution: "Voyager_1_ST+refit2022_m",
-    stale: false,
-    target: { command: spkId, name: "Voyager 1", spkId },
-    value: [
-      {
-        calendarTdb: "A.D. 1977-Sep-06 00:00:00.0000 TDB",
-        julianDateTdb: 2_443_392.5,
-        positionAu: { x: 1, y: 0, z: 0 },
-        velocityAuPerDay: { x: 0, y: 0.02, z: 0 },
-      },
-      {
-        calendarTdb: "A.D. 1978-Sep-06 00:00:00.0000 TDB",
-        julianDateTdb: 2_443_757.5,
-        positionAu: { x: 3, y: 2, z: 0.1 },
-        velocityAuPerDay: { x: 0.01, y: 0.01, z: 0 },
-      },
-    ],
-  }),
-};
-
-const smallBody: SmallBodyProfile = {
-  closeApproaches: [
-    {
-      body: "Earth",
-      calendarDate: "2029-Apr-13 21:46",
-      distanceAu: 0.000254,
-      distanceMaximumAu: 0.000256,
-      distanceMinimumAu: 0.000252,
-      julianDate: 2462239.407,
-      relativeVelocityKilometersPerSecond: 7.42,
-      timeUncertaintySeconds: 3.1,
-    },
-  ],
-  designation: "99942",
-  fullName: "99942 Apophis (2004 MN4)",
-  kind: "asteroid",
-  nearEarth: true,
-  orbit: {
-    conditionCode: "0",
-    dataArcDays: 7600,
-    elements: [
-      {
-        name: "a",
-        reference: null,
-        title: "semi-major axis",
-        uncertainty: "1e-10",
-        units: "au",
-        value: "0.9224",
-      },
-    ],
-    epochJulianDate: 2461000.5,
-    firstObservation: "2004-03-15",
-    lastObservation: "2026-08-01",
-    solutionDate: "2026-08-02 12:00:00",
-    solutionId: "220",
-  },
-  orbitClass: { code: "ATE", name: "Aten" },
-  physicalParameters: [],
-  potentiallyHazardous: true,
-  spkId: "2099942",
-};
-
-const sbdbRepository: SbdbRepository = {
-  search: async () => ({
-    cached: true,
-    data: smallBody,
-    matches: [],
-    retrievedAt: "2026-08-24T12:00:00.000Z",
-    stale: false,
-    status: "match",
   }),
 };
 
@@ -278,124 +198,6 @@ test("applies a smaller request budget to the upstream-expensive ephemeris route
   expect(first.status).toBe(200);
   expect(refused.status).toBe(429);
   expect(refused.headers.get("Retry-After")).toBeTruthy();
-});
-
-test("returns a bounded mission trajectory through the backend", async () => {
-  const response = await createApp({ missionTrajectoryRepository, repository }).request(
-    "/api/mission-trajectories?spk=-31&start=1977-09-06&stop=1978-09-06&step=365",
-  );
-
-  expect(response.status).toBe(200);
-  expect(response.headers.get("CDN-Cache-Control")).toContain("stale-while-revalidate");
-  expect(await response.json()).toMatchObject({
-    data: [{ calendarTdb: expect.stringContaining("TDB") }, { julianDateTdb: 2_443_757.5 }],
-    meta: {
-      cached: true,
-      center: "Sun (10)",
-      coordinateFrame: "Ecliptic J2000",
-      solution: "Voyager_1_ST+refit2022_m",
-      source: "NASA/JPL Horizons API",
-      sourceVersion: "1.2",
-      spkId: "-31",
-      stale: false,
-      stepDays: 365,
-      targetName: "Voyager 1",
-    },
-  });
-});
-
-test("rejects unsupported or unbounded mission trajectories before repository access", async () => {
-  const trajectory = vi.spyOn(missionTrajectoryRepository, "trajectory");
-  const app = createApp({ missionTrajectoryRepository, repository });
-  const unsupported = await app.request(
-    "/api/mission-trajectories?spk=-999&start=2000-01-01&stop=2001-01-01&step=30",
-  );
-  const tooMany = await app.request(
-    "/api/mission-trajectories?spk=-31&start=1977-09-06&stop=2026-01-01&step=1",
-  );
-
-  expect(unsupported.status).toBe(400);
-  expect(tooMany.status).toBe(400);
-  expect(trajectory).not.toHaveBeenCalled();
-  trajectory.mockRestore();
-});
-
-test("returns normalized JPL small-body data through the backend", async () => {
-  const response = await createApp({ repository, sbdbRepository }).request(
-    "/api/small-bodies?q=Apophis",
-  );
-
-  expect(response.status).toBe(200);
-  expect(response.headers.get("CDN-Cache-Control")).toContain("stale-while-revalidate");
-  expect(await response.json()).toMatchObject({
-    data: {
-      designation: "99942",
-      kind: "asteroid",
-      potentiallyHazardous: true,
-      spkId: "2099942",
-    },
-    matches: [],
-    meta: {
-      cached: true,
-      lookup: "auto",
-      query: "Apophis",
-      source: "NASA/JPL Small-Body Database (SBDB) API",
-      sourceVersion: "1.3",
-      status: "match",
-    },
-  });
-});
-
-test("passes designation choices through for ambiguous SBDB searches", async () => {
-  const ambiguous: SbdbRepository = {
-    search: async () => ({
-      cached: false,
-      data: null,
-      matches: [
-        { designation: "141P", name: "141P/Machholz 2" },
-        { designation: "141P-A", name: "141P/Machholz 2-A" },
-      ],
-      retrievedAt: "2026-08-24T12:00:00.000Z",
-      stale: false,
-      status: "ambiguous",
-    }),
-  };
-  const response = await createApp({ repository, sbdbRepository: ambiguous }).request(
-    "/api/small-bodies?q=141P",
-  );
-
-  expect(response.status).toBe(200);
-  expect(await response.json()).toMatchObject({
-    data: null,
-    matches: [{ designation: "141P" }, { designation: "141P-A" }],
-    meta: { status: "ambiguous" },
-  });
-});
-
-test("validates and separately rate-limits small-body searches", async () => {
-  const search = vi.spyOn(sbdbRepository, "search");
-  const validationApp = createApp({ repository, sbdbRepository });
-  const empty = await validationApp.request("/api/small-bodies?q=");
-  const invalidMode = await validationApp.request("/api/small-bodies?q=Eros&lookup=wrong");
-  const wildcard = await validationApp.request("/api/small-bodies?q=Eros*");
-  const invalidSpk = await validationApp.request("/api/small-bodies?q=Eros&lookup=spk");
-  const app = createApp({
-    repository,
-    sbdbRateLimiter: createRateLimiter({ limit: 1, windowMs: 60_000 }),
-    sbdbRepository,
-  });
-  const first = await app.request("/api/small-bodies?q=Eros");
-  const refused = await app.request("/api/small-bodies?q=Bennu");
-
-  expect(empty.status).toBe(400);
-  expect(invalidMode.status).toBe(400);
-  expect(wildcard.status).toBe(400);
-  expect(invalidSpk.status).toBe(400);
-  expect(first.status).toBe(200);
-  expect(refused.status).toBe(429);
-  expect(refused.headers.get("Retry-After")).toBeTruthy();
-  expect(search).toHaveBeenCalledOnce();
-  search.mockRestore();
 });
 
 test("returns normalized planet search results", async () => {
@@ -644,25 +446,6 @@ test("an unreachable SIMBAD archive is reported as an upstream failure", async (
   expect(await response.json()).toMatchObject({
     error: { code: "UPSTREAM_UNAVAILABLE", message: expect.stringContaining("SIMBAD") },
   });
-});
-
-test("an unreachable SBDB service is reported without leaking an upstream response", async () => {
-  const failing: SbdbRepository = {
-    search: async () => {
-      throw new SbdbError("upstream response contained an internal trace");
-    },
-  };
-
-  const response = await createApp({ repository, sbdbRepository: failing }).request(
-    "/api/small-bodies?q=Eros",
-  );
-  const payload = await response.json();
-
-  expect(response.status).toBe(502);
-  expect(payload).toMatchObject({
-    error: { code: "UPSTREAM_UNAVAILABLE", message: expect.stringContaining("JPL SBDB") },
-  });
-  expect(JSON.stringify(payload)).not.toContain("internal trace");
 });
 
 test("an unexpected failure does not leak its message to the caller", async () => {

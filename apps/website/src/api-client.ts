@@ -2,11 +2,8 @@ import {
   type ContractSchema,
   type EphemerisResponse,
   type ExoplanetProfile,
-  type MissionTrajectoryResponse,
   type PlanetResponse,
   type SchemaOutput,
-  type SmallBodyLookup,
-  type SmallBodySearchResponse,
   type StarProfile,
   type StarResponse,
 } from "@exora/contracts";
@@ -32,16 +29,10 @@ const OBJECT_LOOKUP_TIMEOUT_MS = 8_000;
 const PLANET_COLLECTION_TIMEOUT_MS = 8_000;
 const STAR_COLLECTION_TIMEOUT_MS = 10_000;
 const EPHEMERIS_TIMEOUT_MS = 20_000;
-const MISSION_TRAJECTORY_TIMEOUT_MS = 20_000;
-const SMALL_BODY_TIMEOUT_MS = 15_000;
 
 interface CollectionOptions {
   fetcher?: Fetcher;
   signal?: AbortSignal;
-}
-
-interface SmallBodySearchOptions extends CollectionOptions {
-  lookup?: SmallBodyLookup;
 }
 
 type ContractModule = typeof import("@exora/contracts");
@@ -49,10 +40,8 @@ type SchemaSelector<Schema extends ContractSchema> = (contracts: ContractModule)
 
 const responseSchema = {
   Ephemeris: (contracts: ContractModule) => contracts.ephemerisResponseSchema,
-  MissionTrajectory: (contracts: ContractModule) => contracts.missionTrajectoryResponseSchema,
   Planet: (contracts: ContractModule) => contracts.planetResponseSchema,
   PlanetSearch: (contracts: ContractModule) => contracts.planetSearchResponseSchema,
-  SmallBodySearch: (contracts: ContractModule) => contracts.smallBodySearchResponseSchema,
   Star: (contracts: ContractModule) => contracts.starResponseSchema,
   StarSearch: (contracts: ContractModule) => contracts.starSearchResponseSchema,
 } as const;
@@ -167,20 +156,6 @@ export interface RandomStarResult {
   star: StarProfile;
 }
 
-export const searchSmallBodies = async (
-  query: string,
-  { lookup = "auto", ...options }: SmallBodySearchOptions = {},
-): Promise<SmallBodySearchResponse> => {
-  const parameters = new URLSearchParams({ lookup, q: query.trim() });
-  return requestCollection(
-    `/api/small-bodies?${parameters.toString()}`,
-    options,
-    SMALL_BODY_TIMEOUT_MS,
-    "JPL small-body search",
-    responseSchema.SmallBodySearch,
-  );
-};
-
 export const loadSolarEphemeris = async (
   epoch: Date,
   naifIds: readonly number[],
@@ -205,30 +180,6 @@ export const loadSolarEphemeris = async (
     )
   ) {
     throw new Error("JPL ephemeris returned a different target set or epoch.");
-  }
-  return response;
-};
-
-export const loadMissionTrajectory = async (
-  spkId: string,
-  range: { start: string; stepDays: number; stop: string },
-  options: CollectionOptions = {},
-): Promise<MissionTrajectoryResponse> => {
-  const parameters = new URLSearchParams({
-    spk: spkId,
-    start: range.start,
-    step: String(range.stepDays),
-    stop: range.stop,
-  });
-  const response = await requestCollection(
-    `/api/mission-trajectories?${parameters.toString()}`,
-    options,
-    MISSION_TRAJECTORY_TIMEOUT_MS,
-    "JPL mission trajectory",
-    responseSchema.MissionTrajectory,
-  );
-  if (response.meta.spkId !== spkId || response.meta.stepDays !== range.stepDays) {
-    throw new Error("JPL mission trajectory returned a different target or sample interval.");
   }
   return response;
 };

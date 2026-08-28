@@ -25,10 +25,7 @@ import { togglesClearView } from "./clear-view-shortcut.ts";
 import { togglesDiscoverShortcut } from "./discover-shortcut.ts";
 import { TRAVEL_CROSS_MS, TRAVEL_REVEAL_MS, type TravelPhase } from "./travel-transition.ts";
 import { useSceneHost } from "./use-scene-host.ts";
-import type { AsteroidProfile } from "./solar-asteroids.ts";
-import type { CometProfile } from "./solar-comets.ts";
 import type { SolarRegionProfile } from "./solar-regions.ts";
-import type { SolarMissionProfile } from "./solar-missions.ts";
 
 const DiscoverScreen = lazy(() =>
   import("./components/DiscoverScreen.tsx").then((module) => ({ default: module.DiscoverScreen })),
@@ -51,40 +48,14 @@ const BlackHoleExperience = lazy(() =>
     default: module.BlackHoleExperience,
   })),
 );
-const MissionExperience = lazy(() =>
-  import("./components/MissionExperience.tsx").then((module) => ({
-    default: module.MissionExperience,
-  })),
-);
-const CometExperience = lazy(() =>
-  import("./components/CometExperience.tsx").then((module) => ({
-    default: module.CometExperience,
-  })),
-);
-const SmallBodyExperience = lazy(() =>
-  import("./components/SmallBodyExperience.tsx").then((module) => ({
-    default: module.SmallBodyExperience,
-  })),
-);
 type ActiveObject =
-  | { asteroid: AsteroidProfile; type: "asteroid" }
   | { blackHole: BlackHoleProfile; type: "black-hole" }
-  | { comet: CometProfile; type: "comet" }
-  | { mission: SolarMissionProfile; type: "mission" }
   | { recipe?: WorldRecipe; result: PlanetLoadResult; type: "planet" }
   | { result: StarLoadResult; type: "star" }
   | { result: SystemLoadResult; type: "system" }
   | { region: SolarRegionProfile; type: "region" }
   | {
-      kind:
-        | "asteroid"
-        | "black hole"
-        | "comet"
-        | "mission"
-        | "planet"
-        | "region"
-        | "star"
-        | "system";
+      kind: "black hole" | "planet" | "region" | "star" | "system";
       name: string;
       detail?: string;
       type: "missing";
@@ -117,14 +88,6 @@ const loadRequestedObject = async (): Promise<ActiveObject> => {
       ? { blackHole, type: "black-hole" }
       : { kind: "black hole", name: blackHoleName, type: "missing" };
   }
-  const missionName = parameters.get("mission");
-  if (missionName) {
-    const { findSolarMission } = await import("./solar-missions.ts");
-    const mission = findSolarMission(missionName);
-    return mission
-      ? { mission, type: "mission" }
-      : { kind: "mission", name: missionName, type: "missing" };
-  }
   const regionName = parameters.get("region");
   if (regionName) {
     const { findSolarRegion } = await import("./solar-regions.ts");
@@ -133,21 +96,6 @@ const loadRequestedObject = async (): Promise<ActiveObject> => {
       ? { region, type: "region" }
       : { kind: "region", name: regionName, type: "missing" };
   }
-  const cometName = parameters.get("comet");
-  if (cometName) {
-    const { findSolarComet } = await import("./solar-comets.ts");
-    const comet = findSolarComet(cometName);
-    return comet ? { comet, type: "comet" } : { kind: "comet", name: cometName, type: "missing" };
-  }
-  const asteroidName = parameters.get("asteroid");
-  if (asteroidName) {
-    const { findSolarAsteroid } = await import("./solar-asteroids.ts");
-    const asteroid = findSolarAsteroid(asteroidName);
-    return asteroid
-      ? { asteroid, type: "asteroid" }
-      : { kind: "asteroid", name: asteroidName, type: "missing" };
-  }
-
   const starName = parameters.get("star");
   if (starName) {
     const { findSolarStar } = await import("./solar-system.ts");
@@ -237,9 +185,6 @@ export const App = () => {
   const [activeObject, setActiveObject] = useState<ActiveObject | null>(() => {
     const parameters = new URLSearchParams(window.location.search);
     return parameters.has("blackHole") ||
-      parameters.has("asteroid") ||
-      parameters.has("comet") ||
-      parameters.has("mission") ||
       parameters.has("region") ||
       parameters.has("planet") ||
       parameters.has("star") ||
@@ -401,25 +346,11 @@ export const App = () => {
     });
   }, []);
 
-  const selectAsteroid = useCallback((asteroid: AsteroidProfile): void => {
-    window.history.pushState({}, "", `?asteroid=${encodeURIComponent(asteroid.name)}`);
-    setDiscoverOpen(false);
-    setSystemHostName(null);
-    setActiveObject({ asteroid, type: "asteroid" });
-  }, []);
-
   const selectBlackHole = useCallback((blackHole: BlackHoleProfile): void => {
     window.history.pushState({}, "", `?blackHole=${encodeURIComponent(blackHole.name)}`);
     setDiscoverOpen(false);
     setSystemHostName(null);
     setActiveObject({ blackHole, type: "black-hole" });
-  }, []);
-
-  const selectComet = useCallback((comet: CometProfile): void => {
-    window.history.pushState({}, "", `?comet=${encodeURIComponent(comet.name)}`);
-    setDiscoverOpen(false);
-    setSystemHostName(null);
-    setActiveObject({ comet, type: "comet" });
   }, []);
 
   const selectRegion = useCallback((region: SolarRegionProfile): void => {
@@ -428,28 +359,6 @@ export const App = () => {
     setSystemHostName(null);
     setActiveObject({ region, type: "region" });
   }, []);
-
-  const selectMission = useCallback((mission: SolarMissionProfile): void => {
-    window.history.pushState({}, "", `?mission=${encodeURIComponent(mission.name)}`);
-    setDiscoverOpen(false);
-    setSystemHostName(null);
-    setActiveObject({ mission, type: "mission" });
-  }, []);
-
-  const openMissionParent = useCallback(
-    (parent: SolarMissionProfile["parent"]): void => {
-      void import("./solar-system.ts").then(({ findSolarStar, findSolarWorld }) => {
-        if (parent === "Sun") {
-          const star = findSolarStar(parent);
-          if (star) selectStar(star, true);
-          return;
-        }
-        const planet = findSolarWorld(parent);
-        if (planet) selectPlanet(planet, true);
-      });
-    },
-    [selectPlanet, selectStar],
-  );
 
   /**
    * Travel to a whole host system, from a world in it, from its star, or from the console.
@@ -513,21 +422,15 @@ export const App = () => {
 
   const subject =
     activeObject && activeObject.type !== "missing"
-      ? activeObject.type === "asteroid"
-        ? activeObject.asteroid.name
-        : activeObject.type === "black-hole"
-          ? activeObject.blackHole.name
-          : activeObject.type === "comet"
-            ? activeObject.comet.name
-            : activeObject.type === "mission"
-              ? activeObject.mission.name
-              : activeObject.type === "region"
-                ? activeObject.region.name
-                : activeObject.type === "planet"
-                  ? activeObject.result.planet.name
-                  : activeObject.type === "system"
-                    ? `the ${activeObject.result.hostStar} system`
-                    : activeObject.result.star.name
+      ? activeObject.type === "black-hole"
+        ? activeObject.blackHole.name
+        : activeObject.type === "region"
+          ? activeObject.region.name
+          : activeObject.type === "planet"
+            ? activeObject.result.planet.name
+            : activeObject.type === "system"
+              ? `the ${activeObject.result.hostStar} system`
+              : activeObject.result.star.name
       : null;
 
   return (
@@ -607,34 +510,6 @@ export const App = () => {
             travelPhase={travelPhase}
           />
         </Suspense>
-      ) : activeObject.type === "asteroid" ? (
-        <Suspense fallback={null}>
-          <SmallBodyExperience
-            key={activeObject.asteroid.id}
-            asteroid={activeObject.asteroid}
-            chromeHidden={chromeHidden}
-            host={sceneHost}
-            onToggleChrome={toggleChrome}
-            onOpenDiscover={openDiscover}
-            onSelectAsteroid={selectAsteroid}
-            onSelectStar={selectStar}
-            travelPhase={travelPhase}
-          />
-        </Suspense>
-      ) : activeObject.type === "comet" ? (
-        <Suspense fallback={null}>
-          <CometExperience
-            key={activeObject.comet.id}
-            chromeHidden={chromeHidden}
-            comet={activeObject.comet}
-            host={sceneHost}
-            onToggleChrome={toggleChrome}
-            onOpenDiscover={openDiscover}
-            onSelectPlanet={selectPlanet}
-            onSelectStar={selectStar}
-            travelPhase={travelPhase}
-          />
-        </Suspense>
       ) : activeObject.type === "region" ? (
         <Suspense fallback={null}>
           <RegionExperience
@@ -645,19 +520,6 @@ export const App = () => {
             onOpenDiscover={openDiscover}
             onSelectStar={selectStar}
             region={activeObject.region}
-            travelPhase={travelPhase}
-          />
-        </Suspense>
-      ) : activeObject.type === "mission" ? (
-        <Suspense fallback={null}>
-          <MissionExperience
-            key={activeObject.mission.id}
-            chromeHidden={chromeHidden}
-            host={sceneHost}
-            mission={activeObject.mission}
-            onToggleChrome={toggleChrome}
-            onOpenParent={openMissionParent}
-            onOpenDiscover={openDiscover}
             travelPhase={travelPhase}
           />
         </Suspense>
@@ -721,10 +583,7 @@ export const App = () => {
             onClose={closeDiscover}
             onGeneratePlanet={generatePlanet}
             onGenerateStar={generateStar}
-            onSelectAsteroid={selectAsteroid}
             onSelectBlackHole={selectBlackHole}
-            onSelectComet={selectComet}
-            onSelectMission={selectMission}
             onSelectPlanet={selectPlanet}
             onSelectRegion={selectRegion}
             onSelectStar={selectStar}

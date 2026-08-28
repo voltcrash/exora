@@ -15,7 +15,6 @@
   },
   "dependencies": {
     "@babylonjs/core": "catalog:",
-    "@babylonjs/loaders": "catalog:",
     "@exora/contracts": "workspace:*",
     "@exora/worldgen": "workspace:*",
     "@vercel/analytics": "catalog:",

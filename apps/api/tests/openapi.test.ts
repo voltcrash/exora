@@ -8,12 +8,10 @@ import { createRateLimiter } from "../src/rate-limit.ts";
 const documentedStatuses = {
   "/api/ephemerides": [200, 400, 429, 500, 502],
   "/api/health": [200, 429, 500],
-  "/api/mission-trajectories": [200, 400, 429, 500, 502],
   "/api/openapi.json": [200, 429, 500],
   "/api/planets": [200, 400, 429, 500, 502],
   "/api/planets/featured": [200, 404, 429, 500, 502],
   "/api/planets/{name}": [200, 400, 404, 429, 500, 502],
-  "/api/small-bodies": [200, 400, 429, 500, 502],
   "/api/stars": [200, 400, 429, 500, 502],
   "/api/stars/featured": [200, 429, 500, 502],
   "/api/stars/{name}": [200, 400, 404, 429, 500, 502],
