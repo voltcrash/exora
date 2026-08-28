@@ -12,6 +12,12 @@
       "runtimeExecutable": "vp",
       "runtimeArgs": ["run", "@exora/api#dev"],
       "port": 8787
+    },
+    {
+      "name": "website-preview",
+      "runtimeExecutable": "vp",
+      "runtimeArgs": ["run", "website#preview"],
+      "port": 4173
     }
   ]
 }
