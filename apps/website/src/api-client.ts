@@ -19,16 +19,15 @@ type Fetcher = (input: string | URL | Request, init?: RequestInit) => Promise<Re
  *
  * Both object lookups fail soft — they resolve to `null` and the caller falls back — so the
  * budget has to cover the slowest honest answer rather than the typical one. A cold serverless
- * instance plus a cold database connection clears four seconds without either end being broken,
- * and the cost of cutting it short is silent and wrong: a shared `?planet=` link quietly lands
- * on the bundled featured world instead of the world it named.
+ * instance plus a live archive request can clear four seconds without either end being broken,
+ * and the cost of cutting it short is silent and wrong: a shared `?planet=` link quietly lands on
+ * the bundled featured world instead of the world it named.
  */
 const OBJECT_LOOKUP_TIMEOUT_MS = 8_000;
 
 /**
  * How long a list request waits. Longer than a single-object lookup, because a collection may
- * cost the API a fresh archive round trip, and longer for SIMBAD than for the planet catalog,
- * which is usually answered from PostgreSQL.
+ * cost the API a fresh archive round trip, and longer for SIMBAD than for NASA planet queries.
  */
 const PLANET_COLLECTION_TIMEOUT_MS = 8_000;
 const STAR_COLLECTION_TIMEOUT_MS = 10_000;

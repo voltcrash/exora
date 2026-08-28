@@ -3,7 +3,6 @@ import { z } from "zod";
 import { createArchiveCache, createRequestCoalescer } from "./archive-cache.ts";
 import { UpstreamError } from "./errors.ts";
 import {
-  NASA_DIALECT,
   PLANET_DISCOVERY_FILTERS,
   renderPlanetOrder,
   renderPlanetPredicate,
@@ -239,8 +238,8 @@ export class NasaPlanetRepository implements PlanetRepository {
     limit: number,
   ): Promise<RepositoryResult<ExoplanetProfile[]>> {
     const filter = PLANET_DISCOVERY_FILTERS[category];
-    const where = renderPlanetPredicate(filter.where, NASA_DIALECT);
-    const order = renderPlanetOrder(filter.order, NASA_DIALECT);
+    const where = renderPlanetPredicate(filter.where);
+    const order = renderPlanetOrder(filter.order);
     const safeLimit = Math.max(1, Math.min(Math.trunc(limit), 24));
     return this.#query(
       `select top ${safeLimit} ${NASA_COLUMNS} from pscomppars where ${where} order by ${order}`,
@@ -250,10 +249,8 @@ export class NasaPlanetRepository implements PlanetRepository {
   async findByName(name: string): Promise<RepositoryResult<ExoplanetProfile | null>> {
     const normalizedName = name.trim().slice(0, 100);
     const escapedName = escapeAdqlLiteral(normalizedName);
-    // Matched case-insensitively, like `findByHost` below and like the PostgreSQL repository
-    // behind the same interface. A shared `?planet=` link carries whatever casing the sender
-    // had, and `/api/planets/kepler-297 b` must not resolve differently depending on which
-    // repository the deployment happens to be running.
+    // Matched case-insensitively, like `findByHost` below. A shared `?planet=` link carries
+    // whatever casing the sender had, so `/api/planets/kepler-297 b` should still resolve.
     const adql = `select top 1 ${NASA_COLUMNS} from pscomppars where lower(pl_name)=lower('${escapedName}')`;
     const result = await this.#query(adql);
 
@@ -275,11 +272,6 @@ export class NasaPlanetRepository implements PlanetRepository {
     const safeLimit = Math.max(1, Math.min(Math.trunc(limit), 24));
     const adql = `select top ${safeLimit} ${NASA_COLUMNS} from pscomppars where lower(pl_name) like '%${escapedQuery}%' order by pl_name`;
 
-    return this.#query(adql);
-  }
-
-  async listAll(): Promise<RepositoryResult<ExoplanetProfile[]>> {
-    const adql = `select ${NASA_COLUMNS} from pscomppars order by pl_name`;
     return this.#query(adql);
   }
 

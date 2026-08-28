@@ -1,7 +1,6 @@
 import { apiErrorResponseSchema } from "@exora/contracts";
 import { expect, test, vi } from "vite-plus/test";
 import { createApp } from "../src/app.ts";
-import { DatabaseError } from "../src/errors.ts";
 import { NasaArchiveError, type PlanetRepository } from "../src/nasa-archive.ts";
 import { openApiDocument } from "../src/openapi.ts";
 import { createRateLimiter } from "../src/rate-limit.ts";
@@ -11,14 +10,14 @@ const documentedStatuses = {
   "/api/health": [200, 429, 500],
   "/api/mission-trajectories": [200, 400, 429, 500, 502],
   "/api/openapi.json": [200, 429, 500],
-  "/api/planets": [200, 400, 429, 500, 502, 503],
-  "/api/planets/featured": [200, 404, 429, 500, 502, 503],
-  "/api/planets/{name}": [200, 400, 404, 429, 500, 502, 503],
+  "/api/planets": [200, 400, 429, 500, 502],
+  "/api/planets/featured": [200, 404, 429, 500, 502],
+  "/api/planets/{name}": [200, 400, 404, 429, 500, 502],
   "/api/small-bodies": [200, 400, 429, 500, 502],
   "/api/stars": [200, 400, 429, 500, 502],
   "/api/stars/featured": [200, 429, 500, 502],
   "/api/stars/{name}": [200, 400, 404, 429, 500, 502],
-  "/api/stars/{name}/planets": [200, 400, 404, 429, 500, 502, 503],
+  "/api/stars/{name}/planets": [200, 400, 404, 429, 500, 502],
 } as const satisfies Record<keyof typeof openApiDocument.paths, readonly number[]>;
 
 const errorResponseNames = {
@@ -27,7 +26,6 @@ const errorResponseNames = {
   429: "RateLimited",
   500: "InternalServerError",
   502: "UpstreamUnavailable",
-  503: "DatabaseUnavailable",
 } as const;
 
 const repositoryWith = ({
@@ -112,19 +110,6 @@ test("important runtime failure paths remain represented in OpenAPI", async () =
           repository: repositoryWith({
             search: async () => {
               throw new NasaArchiveError("archive failure");
-            },
-          }),
-        }).request("/api/planets?q=earth"),
-    },
-    {
-      documentedPath: "/api/planets" as const,
-      expectedStatus: 503,
-      request: () =>
-        createApp({
-          planetDataSource: "database",
-          repository: repositoryWith({
-            search: async () => {
-              throw new DatabaseError("query failure");
             },
           }),
         }).request("/api/planets?q=earth"),

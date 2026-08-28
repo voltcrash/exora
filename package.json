@@ -13,8 +13,6 @@
     "dev:web": "vp run website#dev",
     "deploy": "vercel",
     "deploy:prod": "vercel --prod",
-    "db:migrate": "vp run @exora/api#db:migrate",
-    "db:sync": "vp run @exora/api#db:sync",
     "prepare": "vp config"
   },
   "dependencies": {

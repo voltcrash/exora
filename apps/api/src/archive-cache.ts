@@ -5,8 +5,7 @@
  * possible keys is as large as the set of possible search terms. An unbounded `Map` therefore
  * grows for the life of the process: entries are never evicted, and an expired one is only
  * displaced if that exact query is asked for again. Serverless instances are short-lived enough
- * to hide this, but the long-running `vp run @exora/api#start` server is not, and the SIMBAD
- * cache stays on the hot path even when planets are served from PostgreSQL.
+ * to hide this, but the long-running `vp run @exora/api#start` server is not.
  *
  * So entries are capped and evicted least-recently-used. The fixed-key queries — the discovery
  * categories, the featured set, the browsing field — are re-promoted on every hit, which keeps

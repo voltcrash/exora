@@ -12,7 +12,6 @@ const response = (schema: keyof typeof apiResponseSchemas, description: string) 
 
 const errorResponseDefinitions = {
   BadRequest: response("ApiError", "Request parameters are invalid"),
-  DatabaseUnavailable: response("ApiError", "The catalog database is temporarily unavailable"),
   InternalServerError: response("ApiError", "An unexpected server error occurred"),
   NotFound: response("ApiError", "The requested resource was not found"),
   RateLimited: response("ApiError", "The request rate limit was exceeded"),
@@ -28,7 +27,6 @@ const errorResponseNames = {
   429: "RateLimited",
   500: "InternalServerError",
   502: "UpstreamUnavailable",
-  503: "DatabaseUnavailable",
 } as const satisfies Record<number, keyof typeof errorResponseDefinitions>;
 
 type ErrorStatus = keyof typeof errorResponseNames;
@@ -57,7 +55,7 @@ export const openApiDocument = {
   },
   info: {
     description:
-      "Runtime-validated astronomy data from NASA Exoplanet Archive, SIMBAD, NASA/JPL Horizons, SBDB, and Exora's synchronized catalog.",
+      "Runtime-validated astronomy data from NASA Exoplanet Archive, SIMBAD, NASA/JPL Horizons, and SBDB.",
     title: "Exora API",
     version: "1.0.0",
   },
@@ -142,7 +140,7 @@ export const openApiDocument = {
         ],
         responses: {
           200: response("PlanetSearch", "Matching planet profiles"),
-          ...errorResponses(400, 429, 500, 502, 503),
+          ...errorResponses(400, 429, 500, 502),
         },
         summary: "Search or discover planets",
       },
@@ -151,7 +149,7 @@ export const openApiDocument = {
       get: {
         responses: {
           200: response("Planet", "Featured planet profile"),
-          ...errorResponses(404, 429, 500, 502, 503),
+          ...errorResponses(404, 429, 500, 502),
         },
         summary: "Get the featured planet",
       },
@@ -163,7 +161,7 @@ export const openApiDocument = {
         ],
         responses: {
           200: response("Planet", "Exact planet profile"),
-          ...errorResponses(400, 404, 429, 500, 502, 503),
+          ...errorResponses(400, 404, 429, 500, 502),
         },
         summary: "Get a planet by archive name",
       },
@@ -231,7 +229,7 @@ export const openApiDocument = {
         ],
         responses: {
           200: response("PlanetSearch", "Planets around the resolved SIMBAD host"),
-          ...errorResponses(400, 404, 429, 500, 502, 503),
+          ...errorResponses(400, 404, 429, 500, 502),
         },
         summary: "Get planets around a star",
       },

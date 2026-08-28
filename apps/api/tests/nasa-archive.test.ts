@@ -179,24 +179,6 @@ test("bounds the physical-control browsing field", async () => {
   expect(query).toContain("sy_dist is not null");
 });
 
-test("loads the complete normalized catalog for synchronization", async () => {
-  let requestedUrl = "";
-  const repository = new NasaPlanetRepository({
-    fetcher: async (input) => {
-      requestedUrl =
-        typeof input === "string" ? input : input instanceof URL ? input.href : input.url;
-      return Response.json([nasaRow]);
-    },
-  });
-
-  const result = await repository.listAll();
-  const query = new URL(requestedUrl).searchParams.get("query");
-
-  expect(result.value).toHaveLength(1);
-  expect(query).toContain("from pscomppars order by pl_name");
-  expect(query).not.toContain("select top");
-});
-
 test("resolves a planet by name whatever casing the caller used", async () => {
   const requestedQueries: string[] = [];
   const repository = new NasaPlanetRepository({
@@ -213,8 +195,7 @@ test("resolves a planet by name whatever casing the caller used", async () => {
 
   expect(exact.value?.name).toBe("HIP 65426 b");
   expect(lowercased.value?.name).toBe("HIP 65426 b");
-  // The PostgreSQL repository behind the same interface matches on `lower(name) = lower($1)`,
-  // so the archive fallback must not answer a shared link differently.
+  // Shared links preserve the sender's casing, so exact archive lookup must ignore case.
   for (const query of requestedQueries) {
     expect(query).toContain("lower(pl_name)=lower(");
   }

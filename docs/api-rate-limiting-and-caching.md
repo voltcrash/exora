@@ -4,10 +4,10 @@
 
 Exora does not currently need a durable application-level rate-limit store. The API is public,
 read-only, and unauthenticated, so there is no paid-user quota or authorization boundary that must
-be exact. Planet reads use the existing Neon catalog in production, and cacheable successful GET
-responses carry shared-CDN freshness and stale-serving policies. The remaining NASA, SIMBAD, and
-JPL adapters use bounded per-instance caches, coalesce identical misses within an instance, and
-have tighter per-route request budgets where an upstream miss is relatively expensive.
+be exact. Planet reads use the live NASA Exoplanet Archive, and cacheable successful GET responses
+carry shared-CDN freshness and stale-serving policies. The NASA, SIMBAD, and JPL adapters use
+bounded per-instance caches, coalesce identical misses within an instance, and have tighter
+per-route request budgets where an upstream miss is relatively expensive.
 
 This is a traffic-model decision, not a claim that the in-memory limits are global. There is no
 current evidence of distributed abuse, upstream quota exhaustion, or a cost/SLO problem that would
@@ -49,28 +49,23 @@ Reference: [Vercel request headers](https://vercel.com/docs/headers/request-head
 
 Only successful public data responses receive reusable cache policies. Rate-limit responses are
 `429` with `Retry-After`, the applicable remaining-budget headers, and `Cache-Control: no-store`, so
-a shared cache cannot replay one client's refusal to others. Internal catalog-refresh responses
-and errors also remain uncacheable.
+a shared cache cannot replay one client's refusal to others. Errors also remain uncacheable.
 
 An adapter cache miss is expected on a cold instance and does not indicate data loss. Identical
 concurrent misses are coalesced only within that instance. Across instances, the CDN is the shared
-cache for HTTP responses; for planet data, Neon is the durable source of truth. Adding a distributed
-archive-result cache would duplicate the CDN for repeatable GETs and would introduce invalidation,
-serialization, availability, and operating-cost concerns.
+cache for HTTP responses. Adding a distributed archive-result cache would duplicate the CDN for
+repeatable GETs and would introduce invalidation, serialization, availability, and operating-cost
+concerns.
 
 ## Escalation path
 
 If measurements demonstrate a need for globally enforceable request limits, prefer a Vercel WAF
 rate-limit rule on `/api/*` or only the expensive JPL/SIMBAD paths. It executes at ingress before
-function and upstream cost, uses Vercel's source identity, is compatible with the current deployment,
-and avoids turning Neon into a per-request counter database. Start the rule in log mode, compare its
-counts with function/upstream telemetry, then choose a fixed-window threshold and `429` action.
+function and upstream cost, uses Vercel's source identity, and is compatible with the current
+deployment. Start the rule in log mode, compare its counts with function/upstream telemetry, then
+choose a fixed-window threshold and `429` action.
 
 Reference: [Vercel WAF rate limiting](https://vercel.com/docs/vercel-firewall/vercel-waf/rate-limiting).
 
-Use Neon-backed counters only if Exora later needs an application-defined key that the WAF cannot
-enforce, such as an authenticated account quota. That design must use one atomic statement or
-transaction for increment-and-check, expire old windows, fail according to an explicit availability
-policy, and account for the latency and write amplification added to every governed request. A new
-Redis/KV service is not justified while Vercel ingress controls or the already deployed Neon database
-can satisfy the demonstrated requirement.
+A new distributed counter service is not justified while Vercel ingress controls satisfy the
+demonstrated requirement.

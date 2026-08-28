@@ -12,8 +12,6 @@ import {
 } from "@exora/contracts";
 import { Hono, type Context } from "hono";
 import { cors } from "hono/cors";
-import { isAuthorizedCatalogRefresh, type CatalogRefreshDispatcher } from "./catalog-refresh.ts";
-import { DatabaseError } from "./errors.ts";
 import {
   HORIZONS_API_VERSION,
   HORIZONS_SOURCE,
@@ -60,17 +58,11 @@ import {
 } from "./simbad-archive.ts";
 
 interface CreateAppOptions {
-  catalogRefresh?: {
-    dispatcher: CatalogRefreshDispatcher;
-    secret: string;
-  };
   horizonsRateLimiter?: RateLimiter;
   horizonsRepository?: HorizonsRepository;
   missionRateLimiter?: RateLimiter;
   missionTrajectoryRepository?: MissionTrajectoryRepository;
   observability?: ApiObservability;
-  /** Identifies whether the planet repository crosses the NASA or PostgreSQL boundary. */
-  planetDataSource?: Extract<Dependency, "database" | "nasa">;
   /** Overridable so a test can exercise the limit without issuing a hundred requests. */
   rateLimiter?: RateLimiter;
   repository?: PlanetRepository;
@@ -117,13 +109,6 @@ const renderApiError = (error: unknown, context: Context): Response => {
         "JPL SBDB is temporarily unavailable and no cached small-body record covers this search.",
       ),
       502,
-    );
-  }
-
-  if (error instanceof DatabaseError) {
-    return context.json(
-      apiError("UPSTREAM_UNAVAILABLE", "The catalog database is temporarily unavailable."),
-      503,
     );
   }
 
@@ -231,13 +216,11 @@ const starCollection = (
 };
 
 export const createApp = ({
-  catalogRefresh,
   horizonsRateLimiter = createRateLimiter({ limit: 8, windowMs: 60_000 }),
   horizonsRepository = new JplHorizonsRepository(),
   missionRateLimiter = createRateLimiter({ limit: 8, windowMs: 60_000 }),
   missionTrajectoryRepository = new JplMissionTrajectoryRepository(),
   observability = new ApiObservability(),
-  planetDataSource = "nasa",
   rateLimiter = createRateLimiter(DEFAULT_RATE_LIMIT),
   repository = new NasaPlanetRepository(),
   sbdbRateLimiter = createRateLimiter({ limit: 20, windowMs: 60_000 }),
@@ -252,8 +235,8 @@ export const createApp = ({
     return renderApiError(error, context);
   };
 
-  // This middleware is registered before every route so scheduled/internal requests and errors
-  // receive the same correlation header and completion record as the public API.
+  // This middleware is registered before every route so requests and errors receive the same
+  // correlation header and completion record.
   app.use("*", observability.middleware(handleError));
 
   const dependency = <T>(
@@ -262,21 +245,6 @@ export const createApp = ({
     operation: string,
     work: () => Promise<T>,
   ): Promise<T> => observability.dependency(context, source, operation, work);
-
-  // Vercel only schedules this short dispatch. The archive-wide work runs on a durable external
-  // worker because its upstream timeout alone is longer than this function's deployment limit.
-  app.get("/api/internal/catalog-refresh", async (context) => {
-    context.header("Cache-Control", "no-store");
-    if (
-      !catalogRefresh ||
-      !isAuthorizedCatalogRefresh(context.req.header("authorization"), catalogRefresh.secret)
-    ) {
-      return context.json({ accepted: false }, 401);
-    }
-
-    await catalogRefresh.dispatcher.dispatch();
-    return context.json({ accepted: true }, 202);
-  });
 
   app.use(
     "/api/*",
@@ -554,7 +522,7 @@ export const createApp = ({
     const browse = context.req.query("browse")?.trim() ?? "";
 
     if (browse === "physical-controls") {
-      const result = await dependency(context, planetDataSource, "planets.browse", () =>
+      const result = await dependency(context, "nasa", "planets.browse", () =>
         repository.browse(requestedLimit(context, 120)),
       );
       return planetCollection(context, result, "physical-controls", CACHE_POLICY.catalog);
@@ -564,7 +532,7 @@ export const createApp = ({
       if (hostStar.length > MAX_NAME_LENGTH) {
         return context.json(apiError("INVALID_REQUEST", "Host star name is invalid."), 400);
       }
-      const result = await dependency(context, planetDataSource, "planets.find_by_host", () =>
+      const result = await dependency(context, "nasa", "planets.find_by_host", () =>
         repository.findByHost(hostStar, requestedLimit(context, 12)),
       );
       return planetCollection(context, result, hostStar, CACHE_POLICY.catalog);
@@ -577,7 +545,7 @@ export const createApp = ({
           400,
         );
       }
-      const result = await dependency(context, planetDataSource, "planets.discover", () =>
+      const result = await dependency(context, "nasa", "planets.discover", () =>
         repository.discover(category as PlanetDiscoveryCategory, requestedLimit(context, 12)),
       );
       return planetCollection(context, result, category, CACHE_POLICY.catalog);
@@ -590,14 +558,14 @@ export const createApp = ({
       );
     }
 
-    const result = await dependency(context, planetDataSource, "planets.search", () =>
+    const result = await dependency(context, "nasa", "planets.search", () =>
       repository.search(query, requestedLimit(context, 12)),
     );
     return planetCollection(context, result, query, CACHE_POLICY.planetSearch);
   });
 
   app.get("/api/planets/featured", async (context) => {
-    const result = await dependency(context, planetDataSource, "planets.find_by_name", () =>
+    const result = await dependency(context, "nasa", "planets.find_by_name", () =>
       repository.findByName("Kepler-297 b"),
     );
 
@@ -622,7 +590,7 @@ export const createApp = ({
       return context.json(apiError("INVALID_REQUEST", "Planet name is invalid."), 400);
     }
 
-    const result = await dependency(context, planetDataSource, "planets.find_by_name", () =>
+    const result = await dependency(context, "nasa", "planets.find_by_name", () =>
       repository.findByName(name),
     );
 
@@ -726,7 +694,7 @@ export const createApp = ({
     }
     const host = hostResult.value;
 
-    const planets = await dependency(context, planetDataSource, "planets.find_by_host", () =>
+    const planets = await dependency(context, "nasa", "planets.find_by_host", () =>
       repository.findByHost(host, requestedLimit(context, 12)),
     );
     return planetCollection(context, planets, host, CACHE_POLICY.catalog);

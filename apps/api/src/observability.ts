@@ -13,7 +13,7 @@ import type { Context, Next } from "hono";
 import { routePath } from "hono/route";
 import { classifyError, classifyStatus, type ErrorClassification } from "./errors.ts";
 
-export type Dependency = "database" | "jpl" | "nasa" | "simbad";
+export type Dependency = "jpl" | "nasa" | "simbad";
 type CacheOutcome = "hit" | "miss" | "not_applicable" | "stale_fallback";
 
 export interface StructuredLogRecord {
@@ -56,7 +56,7 @@ const requestCount = meter.createCounter("exora.api.request.count", {
   unit: "{request}",
 });
 const dependencyDuration = meter.createHistogram("exora.api.dependency.duration", {
-  description: "NASA, SIMBAD, JPL, and database operation duration",
+  description: "NASA, SIMBAD, and JPL operation duration",
   unit: "ms",
 });
 const dependencyCount = meter.createCounter("exora.api.dependency.count", {
@@ -80,8 +80,7 @@ const traceFields = (span: Span): Partial<Pick<StructuredLogRecord, "span_id" | 
     : { span_id: context.spanId, trace_id: context.traceId };
 };
 
-const cacheOutcome = (dependency: Dependency, result: unknown): CacheOutcome => {
-  if (dependency === "database") return "not_applicable";
+const cacheOutcome = (result: unknown): CacheOutcome => {
   if (!result || typeof result !== "object") return "not_applicable";
   const candidate = result as DependencyResult;
   if (candidate.stale === true) return "stale_fallback";
@@ -192,7 +191,7 @@ export class ApiObservability {
         span.setAttributes(baseAttributes);
         try {
           const result = await work();
-          const cache = cacheOutcome(dependency, result);
+          const cache = cacheOutcome(result);
           const duration = durationMs(startedAt, this.#now);
           const attributes = { ...baseAttributes, "cache.outcome": cache };
           span.setAttributes(attributes);

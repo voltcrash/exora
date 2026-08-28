@@ -1,17 +1,4 @@
-/**
- * The twelve curated planet collections, defined once.
- *
- * Every category has to be expressed twice — once as ADQL against NASA's `pscomppars`, once as
- * SQL against the synchronized `exoplanets` table — because which one runs depends on whether
- * `DATABASE_URL` is set. Written out twice, the pair was free to drift: a threshold nudged in one
- * dialect left the other quietly disagreeing, and nothing in the suite compared them. That is a
- * particularly bad failure to have, because the two paths are meant to be indistinguishable to a
- * caller and the difference only shows up as a slightly different list of worlds.
- *
- * So the rules live here as data, and each repository renders them into its own dialect. The two
- * differ in column names and in null ordering, and nothing else — which is exactly the claim the
- * shared definition now makes structurally instead of by hand.
- */
+/** The twelve curated planet collections rendered as NASA Exoplanet Archive ADQL. */
 
 export type PlanetDiscoveryCategory =
   | "earth-like"
@@ -27,7 +14,7 @@ export type PlanetDiscoveryCategory =
   | "recently-confirmed"
   | "record-breakers";
 
-/** A measured quantity, named for what it is rather than for either archive's column. */
+/** A measured quantity, named for what it is rather than for NASA's column. */
 export type PlanetField =
   | "discoveryYear"
   | "distanceParsecs"
@@ -153,76 +140,41 @@ export const PLANET_DISCOVERY_CATEGORIES = new Set<PlanetDiscoveryCategory>(
   Object.keys(PLANET_DISCOVERY_FILTERS) as PlanetDiscoveryCategory[],
 );
 
-export interface PlanetQueryDialect {
-  column: Readonly<Record<PlanetField, string>>;
-  /**
-   * Whether a descending sort has to say where nulls go.
-   *
-   * PostgreSQL sorts nulls first on `DESC`, which would front the rows with nothing measured;
-   * NASA's TAP service does not accept the modifier at all. Only some categories can actually
-   * surface a null in a sort key, but emitting it uniformly is a no-op for the rest — their
-   * `where` clause has already excluded nulls from that column.
-   */
-  nullsLastOnDescending: boolean;
-}
-
-export const NASA_DIALECT: PlanetQueryDialect = {
-  column: {
-    discoveryYear: "disc_year",
-    distanceParsecs: "sy_dist",
-    equilibriumTemperature: "pl_eqt",
-    massJupiter: "pl_bmassj",
-    name: "pl_name",
-    radiusEarth: "pl_rade",
-    radiusJupiter: "pl_radj",
-  },
-  nullsLastOnDescending: false,
+const NASA_COLUMN: Readonly<Record<PlanetField, string>> = {
+  discoveryYear: "disc_year",
+  distanceParsecs: "sy_dist",
+  equilibriumTemperature: "pl_eqt",
+  massJupiter: "pl_bmassj",
+  name: "pl_name",
+  radiusEarth: "pl_rade",
+  radiusJupiter: "pl_radj",
 };
 
-export const POSTGRES_DIALECT: PlanetQueryDialect = {
-  column: {
-    discoveryYear: "discovery_year",
-    distanceParsecs: "distance_parsecs",
-    equilibriumTemperature: "equilibrium_temperature_kelvin",
-    massJupiter: "mass_jupiter",
-    name: "name",
-    radiusEarth: "radius_earth",
-    radiusJupiter: "radius_jupiter",
-  },
-  nullsLastOnDescending: true,
-};
-
-export const renderPlanetPredicate = (
-  predicate: PlanetPredicate,
-  dialect: PlanetQueryDialect,
-): string => {
+export const renderPlanetPredicate = (predicate: PlanetPredicate): string => {
   switch (predicate.kind) {
     case "between": {
-      const column = dialect.column[predicate.field];
+      const column = NASA_COLUMN[predicate.field];
       return `${column} between ${predicate.minimum} and ${predicate.maximum}`;
     }
     case "compare":
-      return `${dialect.column[predicate.field]} ${predicate.operator} ${predicate.value}`;
+      return `${NASA_COLUMN[predicate.field]} ${predicate.operator} ${predicate.value}`;
     case "present":
-      return `${dialect.column[predicate.field]} is not null`;
+      return `${NASA_COLUMN[predicate.field]} is not null`;
     case "all":
-      return predicate.of.map((term) => renderPlanetPredicate(term, dialect)).join(" and ");
+      return predicate.of.map(renderPlanetPredicate).join(" and ");
     case "any":
       // Parenthesised because an `any` is routinely one side of an enclosing `all`, where the
       // looser binding of `or` would otherwise swallow the other conditions.
-      return `(${predicate.of.map((term) => renderPlanetPredicate(term, dialect)).join(" or ")})`;
+      return `(${predicate.of.map(renderPlanetPredicate).join(" or ")})`;
   }
 };
 
-export const renderPlanetOrder = (
-  order: readonly PlanetOrderTerm[],
-  dialect: PlanetQueryDialect,
-): string =>
+export const renderPlanetOrder = (order: readonly PlanetOrderTerm[]): string =>
   order
     .map((term) => {
-      const column = dialect.column[term.field];
+      const column = NASA_COLUMN[term.field];
       if (term.kind === "nearest") return `abs(${column} - ${term.target})`;
       if (term.direction === "ascending") return column;
-      return dialect.nullsLastOnDescending ? `${column} desc nulls last` : `${column} desc`;
+      return `${column} desc`;
     })
     .join(", ");

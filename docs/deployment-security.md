@@ -50,7 +50,6 @@ applied by Vercel, not by the Vite development server.
 The public API exposes unauthenticated, read-only astronomy data, so CORS remains wildcard for
 `GET` and `OPTIONS` without credentials or caller-selected request headers. Restricting browser
 origins would not stop direct clients; rate limits and upstream caches are the relevant controls.
-The internal catalog-refresh route is registered outside that public CORS middleware.
 
 Only Vercel's ingress-owned `x-vercel-forwarded-for` value is accepted as a rate-limit identity,
 and only when the runtime is deployed on Vercel. Generic `x-forwarded-for` and `x-real-ip` values

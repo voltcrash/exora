@@ -1,4 +1,4 @@
-export type ErrorClassification = "database" | "internal" | "upstream" | "validation";
+export type ErrorClassification = "internal" | "upstream" | "validation";
 
 export class ClassifiedError extends Error {
   readonly classification: ErrorClassification;
@@ -6,13 +6,6 @@ export class ClassifiedError extends Error {
   constructor(classification: ErrorClassification, message: string, options?: ErrorOptions) {
     super(message, options);
     this.classification = classification;
-  }
-}
-
-export class DatabaseError extends ClassifiedError {
-  constructor(message: string, options?: ErrorOptions) {
-    super("database", message, options);
-    this.name = "DatabaseError";
   }
 }
 

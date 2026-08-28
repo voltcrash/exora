@@ -30,8 +30,7 @@ The system diorama is where that discipline is most visible, because a picture o
 - **Toolchain and monorepo:** Vite+ (`vp`), pnpm workspaces with a version catalog, TypeScript
 - **Web:** React 19, Vite, Babylon.js 9 (WebGL2 + WebXR)
 - **API:** Hono on Node 24
-- **Data sources:** NASA Exoplanet Archive TAP, SIMBAD TAP (CDS, Strasbourg)
-- **Catalog store:** Neon Postgres via `postgres`, with idempotent synchronization
+- **Data sources:** NASA Exoplanet Archive TAP, SIMBAD TAP (CDS, Strasbourg), and NASA/JPL APIs
 - **Immersive tooling:** IWER and `@iwer/devui` for desktop WebXR emulation
 - **Hosting:** Vercel static output plus a Vercel Function, with Analytics and Speed Insights
 
@@ -71,17 +70,6 @@ GET /api/stars/:name
 
 `vp dev` and `vp build` always invoke Vite's built-in commands. Use `vp run dev` in this repository so both applications start.
 
-### PostgreSQL catalog
-
-Copy `.env.example` to `.env`, set `DATABASE_URL`, then initialize and synchronize:
-
-```sh
-vp run db:migrate
-vp run db:sync
-```
-
-When `DATABASE_URL` is present the API serves lookups and searches from Postgres; without it, it queries NASA directly. Synchronization is an explicit job so production can schedule it independently from API startup.
-
 ### Immersive mode
 
 WebXR requires a secure context. Localhost works for desktop development, but testing from a Quest on the local network needs HTTPS or a deployed origin.
@@ -91,7 +79,7 @@ To exercise the immersive VR flow without a headset, open <http://localhost:5173
 ## Workspace
 
 ```text
-apps/api             Hono API with NASA and SIMBAD TAP adapters and the Postgres catalog
+apps/api             Hono API with NASA, SIMBAD, and JPL adapters
 apps/website         React interface and the Babylon.js scene host
 packages/contracts   Shared API, exoplanet, and star types
 packages/worldgen    Deterministic data-to-world recipe engine
@@ -103,9 +91,9 @@ packages/worldgen    Deterministic data-to-world recipe engine
 
 The website builds to static output served from Vercel's edge, and the Hono application is bundled into a single Vercel Function pinned to `sin1`. A rewrite sends every `/api/*` path to that one function, which keeps routing inside Hono rather than splitting it across per-route handlers.
 
-The function resolves its repository at startup. With `DATABASE_URL` set it reads planets from Neon Postgres — one pooled connection per instance, since Neon handles cross-instance concurrency — and otherwise falls back to querying the NASA Exoplanet Archive directly. Stars always resolve through SIMBAD, which needs no registration or key.
+The function always loads planets from the live NASA Exoplanet Archive. Stars resolve through SIMBAD, which needs no registration or key; ephemerides, mission trajectories, and small bodies resolve through NASA/JPL services.
 
-Both upstream adapters wrap their TAP queries in an in-memory cache with a request timeout, six hours for planets and twelve for stars, and every response also carries `Cache-Control` with `stale-while-revalidate` so Vercel's CDN absorbs repeated reads. Catalog synchronization runs as a separate job against the same database, so the request path never waits on an archive-wide refresh.
+The upstream adapters wrap their queries in bounded in-memory caches with request timeouts, including six hours for planets and twelve for stars. Responses also carry `Cache-Control` with `stale-while-revalidate` so Vercel's CDN absorbs repeated reads.
 
 The in-process caches and request budgets are intentionally per-instance safeguards, not global
 quotas. See [API rate limiting and caching](docs/api-rate-limiting-and-caching.md) for the trust
@@ -133,14 +121,10 @@ flowchart TB
         Fn["API Function<br/>Hono, sin1, /api/*"]
     end
 
-    subgraph Data["Data"]
-        Neon["Neon Postgres<br/>synchronized planet catalog"]
-        Sync["Catalog sync job<br/>db:migrate + db:sync"]
-    end
-
     subgraph Archives["Archives"]
         NASA["NASA Exoplanet Archive<br/>TAP"]
         SIMBAD["SIMBAD<br/>TAP, keyless"]
+        JPL["NASA/JPL<br/>Horizons + SBDB"]
     end
 
     Desktop --> Static
@@ -152,10 +136,7 @@ flowchart TB
 
     UI -->|/api/planets, /api/stars| Fn
 
-    Fn -->|when DATABASE_URL is set| Neon
-    Fn -->|fallback + featured lookups| NASA
+    Fn --> NASA
     Fn --> SIMBAD
-
-    Sync --> NASA
-    Sync --> Neon
+    Fn --> JPL
 ```

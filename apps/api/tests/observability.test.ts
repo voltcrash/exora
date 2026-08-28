@@ -1,6 +1,5 @@
 import { expect, test } from "vite-plus/test";
 import { createApp } from "../src/app.ts";
-import { DatabaseError } from "../src/errors.ts";
 import { NasaArchiveError, type PlanetRepository } from "../src/nasa-archive.ts";
 import { ApiObservability, type StructuredLogRecord } from "../src/observability.ts";
 import type { SbdbRepository } from "../src/sbdb.ts";
@@ -65,13 +64,12 @@ test("replaces an unsafe correlation ID instead of reflecting it", async () => {
   expect(telemetry.records.at(-1)).toMatchObject({ request_id: "safe-generated-id" });
 });
 
-test("classifies validation, upstream, database, and internal failures", async () => {
+test("classifies validation, upstream, and internal failures", async () => {
   const scenarios = [
     {
       expected: "validation",
       path: "/api/planets",
       repository: emptyRepository,
-      source: "nasa" as const,
     },
     {
       expected: "upstream",
@@ -82,18 +80,6 @@ test("classifies validation, upstream, database, and internal failures", async (
           throw new NasaArchiveError("upstream details that must not be logged");
         },
       },
-      source: "nasa" as const,
-    },
-    {
-      expected: "database",
-      path: "/api/planets?q=test",
-      repository: {
-        ...emptyRepository,
-        search: async () => {
-          throw new DatabaseError("postgres://user:secret@database/catalog");
-        },
-      },
-      source: "database" as const,
     },
     {
       expected: "internal",
@@ -104,7 +90,6 @@ test("classifies validation, upstream, database, and internal failures", async (
           throw new Error("unexpected secret-bearing detail");
         },
       },
-      source: "nasa" as const,
     },
   ];
 
@@ -112,7 +97,6 @@ test("classifies validation, upstream, database, and internal failures", async (
     const telemetry = collect();
     await createApp({
       observability: telemetry.observability,
-      planetDataSource: scenario.source,
       repository: scenario.repository,
     }).request(scenario.path);
 
@@ -120,9 +104,7 @@ test("classifies validation, upstream, database, and internal failures", async (
       error_type: scenario.expected,
       event: "request.completed",
     });
-    expect(JSON.stringify(telemetry.records)).not.toMatch(
-      /postgres:|secret-bearing|upstream details/,
-    );
+    expect(JSON.stringify(telemetry.records)).not.toMatch(/secret-bearing|upstream details/);
   }
 });
 
