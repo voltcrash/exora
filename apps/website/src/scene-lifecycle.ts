@@ -22,9 +22,13 @@ export const createPersistentScene = (
 ): PersistentSceneResources => {
   const engine = new Engine(
     canvas,
-    profile.tier === "desktop",
+    // Native-density Retina rendering plus MSAA can require several full-size GPU buffers before
+    // the first world is even mounted. The scene's procedural edges are already filtered by its
+    // material shaders; keeping MSAA off avoids a context-loss spiral on browsers with tighter
+    // per-tab GPU budgets.
+    false,
     {
-      antialias: profile.tier === "desktop",
+      antialias: false,
       // Variant Launch composites the iPhone camera behind the page. The WebGL context therefore
       // needs an alpha channel even though desktop and immersive VR still clear it opaquely.
       alpha: true,

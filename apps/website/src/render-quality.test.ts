@@ -50,7 +50,7 @@ test("keeps the high-detail profile on capable desktops", () => {
   expect(profile.surfaceMicrodetail).toBe(true);
 });
 
-test("renders at the display's native pixel density on a HiDPI desktop", () => {
+test("caps a HiDPI desktop at a stable initial render density", () => {
   const retina = deriveRenderQuality({
     userAgent: "Mozilla/5.0 (Macintosh; Intel Mac OS X)",
     pixelRatio: 2,
@@ -66,11 +66,12 @@ test("renders at the display's native pixel density on a HiDPI desktop", () => {
     pixelRatio: 3,
   });
 
-  // Babylon renders at cssPixels / hardwareScalingLevel, so 0.5 on a 2x panel is native.
-  expect(retina.hardwareScalingLevel).toBe(0.5);
+  // Babylon renders at cssPixels / hardwareScalingLevel. The desktop cap is 1.25x, so a 2x
+  // panel starts at 0.8 rather than allocating a native-density 2x framebuffer.
+  expect(retina.hardwareScalingLevel).toBe(0.8);
   expect(standard.hardwareScalingLevel).toBe(1);
-  // A 3x panel is capped at the tier's 2x ceiling rather than paying for full density.
-  expect(dense.hardwareScalingLevel).toBe(0.5);
+  // A 3x panel is capped at that same 1.25x ceiling rather than paying for full density.
+  expect(dense.hardwareScalingLevel).toBe(0.8);
 });
 
 test("never derives a non-finite scaling level from a bogus pixel ratio", () => {

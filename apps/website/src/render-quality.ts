@@ -199,10 +199,12 @@ export const deriveRenderQuality = ({
     surfaceColorDetail: true,
     surfaceMicrodetail: true,
     secondaryCloudDetail: true,
-    // Render at the display's native pixel density (level 0.5 on a 2x screen). The adaptive
-    // downscaler below still backs off if a heavy scene cannot hold frame rate.
-    maxRenderScale: 2,
-    hardwareScalingLevel: scalingLevelForDisplay(pixelRatio, 2),
+    // A native 2x backing store on a Retina display consumes four times the pixels of the CSS
+    // viewport before MSAA, post-processing, or scene textures are allocated. A 1.25x ceiling
+    // keeps the first world within the GPU budget of browsers that isolate each tab, while the
+    // adaptive downscaler still has room to respond to a heavier destination.
+    maxRenderScale: 1.25,
+    hardwareScalingLevel: scalingLevelForDisplay(pixelRatio, 1.25),
     maxHardwareScalingLevel: 1.65,
     xrFramebufferScaleFactor: 1,
     xrFixedFoveation: 0.35,
