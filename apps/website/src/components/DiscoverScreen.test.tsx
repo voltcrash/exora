@@ -19,6 +19,7 @@ const discoverMarkup = (initialSection: DiscoverSection = "solar"): string =>
 
 test("Discover starts directly in the Solar System catalog", () => {
   const markup = discoverMarkup();
+  const navigation = markup.slice(markup.indexOf("<nav"), markup.indexOf("</nav>"));
 
   expect(markup).toContain("Solar System");
   expect(markup).toContain("Exoplanets");
@@ -34,6 +35,9 @@ test("Discover starts directly in the Solar System catalog", () => {
   expect(markup).toContain('data-icon="black-holes"');
   expect(markup).toContain('data-icon="forge"');
   expect(markup).not.toContain("All of space. One way in.");
+  expect(navigation).toMatch(
+    /Exoplanets[\s\S]*Stars[\s\S]*Solar System[\s\S]*Black Holes[\s\S]*World Forge/,
+  );
 });
 
 test("the Solar System catalog retains regions without removed feature collections", () => {

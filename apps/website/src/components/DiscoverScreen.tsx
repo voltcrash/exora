@@ -30,12 +30,6 @@ const sections: readonly {
   source: string;
 }[] = [
   {
-    accent: "amber",
-    id: "solar",
-    label: "Solar System",
-    source: "NASA / JPL",
-  },
-  {
     accent: "cyan",
     id: "worlds",
     label: "Exoplanets",
@@ -46,6 +40,12 @@ const sections: readonly {
     id: "stars",
     label: "Stars",
     source: "SIMBAD",
+  },
+  {
+    accent: "amber",
+    id: "solar",
+    label: "Solar System",
+    source: "NASA / JPL",
   },
   {
     accent: "violet",
