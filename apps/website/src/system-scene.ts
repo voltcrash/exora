@@ -25,6 +25,8 @@
  * added to a scene it does not own.
  */
 
+import { ActionManager } from "@babylonjs/core/Actions/actionManager.js";
+import { ExecuteCodeAction } from "@babylonjs/core/Actions/directActions.js";
 import "@babylonjs/core/Culling/ray.js";
 import { PointLight } from "@babylonjs/core/Lights/pointLight.js";
 import { Color3, Color4 } from "@babylonjs/core/Maths/math.color.js";
@@ -49,7 +51,7 @@ import type { MountedWorld, SceneHost } from "./scene-host.ts";
 import { skyViewpointFrom } from "./sky-catalog.ts";
 import { propagateEphemerisVector } from "./solar-ephemeris.ts";
 import { tuneSolarWorldRecipe } from "./solar-system.ts";
-import { createStellarSurface } from "./star-surface.ts";
+import { createStellarSurface, makeStarTravelTarget } from "./star-surface.ts";
 import { createStarfield } from "./star-visuals.ts";
 import {
   deriveSystemLayout,
@@ -91,6 +93,10 @@ const ORBIT_THICKNESS = 0.011;
 export interface SystemWorldOptions {
   hostName: string;
   onFirstFrame: () => void;
+  /** Travel to the star at the centre, when a visitor clicks it. */
+  onSelectHostStar?: () => void;
+  /** Travel to one of this system's own worlds, when a visitor clicks it on its orbit. */
+  onSelectWorld?: (planet: ExoplanetProfile) => void;
   planets: readonly ExoplanetProfile[];
 }
 
@@ -253,6 +259,7 @@ const buildWorld = (
   layout: SystemLayout,
   orbit: PlacedOrbit,
   root: TransformNode,
+  onSelect?: (planet: ExoplanetProfile) => void,
 ): DrawnWorld => {
   const { planet } = orbit;
   const recipe = tuneSolarWorldRecipe(planet, deriveWorldRecipe(planet));
@@ -301,12 +308,44 @@ const buildWorld = (
   bodyMaterial.freeze();
   body.material = bodyMaterial;
 
+  if (onSelect) {
+    // What a visitor aims at is not the body. These are drawn four to five orders of magnitude
+    // larger than their orbits and are still a handful of pixels across at the distance the whole
+    // system has to fit into, so the click target is an invisible sphere several times the body's
+    // radius, centred on it and carried along by it. Fully transparent rather than hidden:
+    // Babylon's pick predicate rejects `isVisible === false`, so a hidden mesh cannot be picked.
+    const pickTarget = MeshBuilder.CreateSphere(
+      `diorama-world-target-${planet.id}`,
+      { diameter: Math.max(0.62, orbit.bodyRadiusSceneUnits * 4.4), segments: 10 },
+      scene,
+    );
+    pickTarget.parent = body;
+    pickTarget.applyFog = false;
+    pickTarget.isPickable = true;
+    const targetMaterial = new StandardMaterial(
+      `diorama-world-target-material-${planet.id}`,
+      scene,
+    );
+    targetMaterial.disableLighting = true;
+    targetMaterial.alpha = 0;
+    targetMaterial.disableDepthWrite = true;
+    targetMaterial.freeze();
+    pickTarget.material = targetMaterial;
+
+    for (const target of [body, pickTarget]) {
+      target.actionManager = new ActionManager(scene);
+      target.actionManager.registerAction(
+        new ExecuteCodeAction(ActionManager.OnPickTrigger, () => onSelect(planet)),
+      );
+    }
+  }
+
   return { body, bodyPlane, orbit };
 };
 
 export const createSystemWorld = (
   host: SceneHost,
-  { hostName, onFirstFrame, planets }: SystemWorldOptions,
+  { hostName, onFirstFrame, onSelectHostStar, onSelectWorld, planets }: SystemWorldOptions,
 ): SystemWorld => {
   const { camera, canvas, engine, profile, scene } = host;
   const layout = deriveSystemLayout(planets);
@@ -357,7 +396,7 @@ export const createSystemWorld = (
     ? createStellarSurface({
         detail: "subject",
         diameter: layout.hostRadiusSceneUnits * 2,
-        pickable: false,
+        pickable: Boolean(onSelectHostStar),
         position: SYSTEM_CENTRE,
         profile,
         recipe: starRecipe,
@@ -366,6 +405,11 @@ export const createSystemWorld = (
         spotCoverage: starRecipe.spotCoverage,
       })
     : null;
+
+  // The copy beside the diorama tells a visitor to select the star at the centre to stand at it.
+  if (stellarSurface && onSelectHostStar) {
+    makeStarTravelTarget(scene, stellarSurface, onSelectHostStar);
+  }
 
   /**
    * One light for the whole system, at the star, which is exactly where a planetary system's
@@ -380,7 +424,7 @@ export const createSystemWorld = (
   starLight.intensity = 1.45;
 
   const drawn: DrawnWorld[] = layout.orbits.map((orbit) =>
-    buildWorld(scene, profile, layout, orbit, root),
+    buildWorld(scene, profile, layout, orbit, root, onSelectWorld),
   );
 
   // Placed once at the phase they start from, so the very first frame already shows a system

@@ -75,6 +75,10 @@ export const SystemExperience = ({
   const [playbackRate, setPlaybackRate] = useState(3_600);
   const [playbackDirection, setPlaybackDirection] = useState<1 | -1>(1);
   const worldRef = useRef<SystemWorld | null>(null);
+  // The same guard `starJumpState` gives the panel button, in a form the scene can read. The
+  // diorama's own star is clicked through a handler the mount closes over once, so it would
+  // otherwise keep testing the state as it stood on the frame the world was built.
+  const starJumpRef = useRef(false);
   const ephemerisRef = useRef<EphemerisResponse | null>(null);
   const displayedAtRef = useRef(displayedAt);
   const requestSequence = useRef(0);
@@ -120,7 +124,8 @@ export const SystemExperience = ({
   };
 
   const openHostStar = async (): Promise<void> => {
-    if (starJumpState === "loading") return;
+    if (starJumpRef.current) return;
+    starJumpRef.current = true;
     setStarJumpState("loading");
     // The pull-away and the archive request go out together, so the click reads immediately
     // rather than after however long the answer takes.
@@ -129,6 +134,7 @@ export const SystemExperience = ({
     // `cancelTravel` below, or the flight would hang pulled back with no world to return to.
     const found = await onSelectHostStar(hostStar).catch(() => false);
     if (!found) host?.cancelTravel();
+    starJumpRef.current = false;
     setStarJumpState(found ? "idle" : "error");
   };
 
@@ -182,6 +188,8 @@ export const SystemExperience = ({
           createSystemWorld(host, {
             hostName: hostStar,
             planets,
+            onSelectHostStar: () => void openHostStar(),
+            onSelectWorld: (planet) => onSelectPlanet(planet, cached),
             onFirstFrame: () => {
               if (!abandoned) setSceneState("ready");
             },

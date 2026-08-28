@@ -1,3 +1,5 @@
+import { ActionManager } from "@babylonjs/core/Actions/actionManager.js";
+import { ExecuteCodeAction } from "@babylonjs/core/Actions/directActions.js";
 import { Color3 } from "@babylonjs/core/Maths/math.color.js";
 import { Vector3 } from "@babylonjs/core/Maths/math.vector.js";
 import { Effect } from "@babylonjs/core/Materials/effect.js";
@@ -502,6 +504,31 @@ export interface StellarSurface {
   update: (elapsedSeconds: number, cameraPosition: Vector3) => void;
 }
 
+/**
+ * Makes a star somewhere a visitor can click their way to.
+ *
+ * Only the surfaces built to be hit answer — the photosphere and the invisible volume around it —
+ * which is why this walks `meshes` rather than taking one: a star is several meshes and which of
+ * them is the hit surface is `createStellarSurface`'s business, not its caller's. Babylon fires
+ * `OnPickTrigger` on release over the same mesh the press landed on, and suppresses it once the
+ * pointer has travelled more than its drag threshold, so the orbit drag that shares this canvas
+ * never ends in a jump.
+ *
+ * The action managers register on the scene, which is how `world-scope.ts` finds them again when
+ * the world is taken back out.
+ */
+export const makeStarTravelTarget = (
+  scene: Scene,
+  surface: StellarSurface,
+  travel: () => void,
+): void => {
+  for (const target of surface.meshes) {
+    if (!target.isPickable) continue;
+    target.actionManager = new ActionManager(scene);
+    target.actionManager.registerAction(new ExecuteCodeAction(ActionManager.OnPickTrigger, travel));
+  }
+};
+
 export const createStellarSurface = ({
   detail,
   diameter,
@@ -610,7 +637,11 @@ export const createStellarSurface = ({
     );
     if (parent) mesh.parent = parent;
     mesh.position.copyFrom(position);
-    mesh.isPickable = pickable;
+    // Never a hit surface, however clickable the star is. This shell stands 2.6 stellar radii off
+    // and is drawn on its far side, so a camera that ends up inside it — which the diorama's does
+    // on any host large enough — would have it under the cursor everywhere on screen, and every
+    // click on empty sky would become a jump to the star. The pick target below is the hit volume.
+    mesh.isPickable = false;
     mesh.applyFog = false;
     // A group later than the star's own, matching the planet atmosphere shell. Sharing the star's
     // group the transparent shell sorts against the starfield and blanks it out, leaving a black
@@ -692,6 +723,10 @@ export const createStellarSurface = ({
     if (parent) pickTarget.parent = parent;
     pickTarget.position.copyFrom(position);
     pickTarget.applyFog = false;
+    // Said rather than assumed. The shared scene runs at `ScenePerformancePriority.Intermediate`,
+    // and Babylon builds every mesh under that priority unpickable — so a hit volume that leaves
+    // this to the default is a hit volume that has never once been hit.
+    pickTarget.isPickable = true;
     pickTarget.renderingGroupId = renderingGroupId;
     const pickMaterial = new StandardMaterial("star-pick-target-material", scene);
     pickMaterial.disableLighting = true;
@@ -715,7 +750,10 @@ export const createStellarSurface = ({
     spikes: isSubject ? 0.28 : 1,
     spread: isSubject ? 3.2 : 5.5,
   });
-  glare.mesh.isPickable = pickable;
+  // Not the hit surface either, for the reason the pick target exists: a billboard built from one
+  // degenerate point has no triangles for a ray to meet, so marking it pickable would only look
+  // like it did something.
+  glare.mesh.isPickable = false;
 
   const meshes: AbstractMesh[] = [photosphere, glare.mesh];
   if (corona) meshes.push(corona.mesh);

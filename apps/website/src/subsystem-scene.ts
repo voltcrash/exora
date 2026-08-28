@@ -1,3 +1,5 @@
+import { ActionManager } from "@babylonjs/core/Actions/actionManager.js";
+import { ExecuteCodeAction } from "@babylonjs/core/Actions/directActions.js";
 import { DirectionalLight } from "@babylonjs/core/Lights/directionalLight.js";
 import { HemisphericLight } from "@babylonjs/core/Lights/hemisphericLight.js";
 import { Color3, Color4 } from "@babylonjs/core/Maths/math.color.js";
@@ -20,6 +22,8 @@ import { createStarfield } from "./star-visuals.ts";
 
 export interface SubsystemWorldOptions {
   onFirstFrame: () => void;
+  /** Travel to a moon, when a visitor clicks it on its track. Named, since only some are worlds. */
+  onSelectMoon?: (name: string) => void;
   planet: ExoplanetProfile;
   subsystem: PlanetarySubsystem;
 }
@@ -116,7 +120,7 @@ const systemColor = (name: string): Color3 =>
 
 export const createSubsystemWorld = (
   host: SceneHost,
-  { onFirstFrame, planet, subsystem }: SubsystemWorldOptions,
+  { onFirstFrame, onSelectMoon, planet, subsystem }: SubsystemWorldOptions,
 ): MountedWorld => {
   const { camera, canvas, engine, profile, scene } = host;
   scene.clearColor = new Color4(0.0005, 0.0012, 0.0035, 1);
@@ -239,6 +243,16 @@ export const createSubsystemWorld = (
     }
     body.material = moonMaterial;
     body.parent = orbitalRoot;
+    if (onSelectMoon) {
+      // Explicit for the reason the star's hit volume is: at this scene's performance priority
+      // Babylon creates every mesh unpickable, so a body that does not claim to be a target is
+      // one a click passes straight through.
+      body.isPickable = true;
+      body.actionManager = new ActionManager(scene);
+      body.actionManager.registerAction(
+        new ExecuteCodeAction(ActionManager.OnPickTrigger, () => onSelectMoon(descriptor.name)),
+      );
+    }
     meshes.push(body);
     materials.push(moonMaterial);
     nodes.push(orbitalRoot);

@@ -8,7 +8,7 @@ import { Vector3 } from "@babylonjs/core/Maths/math.vector.js";
 import type { AbstractMesh } from "@babylonjs/core/Meshes/abstractMesh.js";
 import { MeshBuilder } from "@babylonjs/core/Meshes/meshBuilder.js";
 import { TransformNode } from "@babylonjs/core/Meshes/transformNode.js";
-import { Scene } from "@babylonjs/core/scene.js";
+import { Scene, ScenePerformancePriority } from "@babylonjs/core/scene.js";
 import type { ExoplanetProfile, StarProfile } from "@exora/contracts";
 import { deriveWorldRecipe } from "@exora/worldgen";
 import { afterEach, beforeEach, expect, test, vi } from "vite-plus/test";
@@ -160,6 +160,12 @@ const createHarness = (
     textureSize: 256,
   });
   const scene = new Scene(engine);
+  // The same priority the page's one persistent scene runs at, set here for the same reason it
+  // matters there: under it Babylon creates every mesh unpickable and every mesh always-active, so
+  // a scene left on the default would let a world claim hit surfaces it would not have in a
+  // browser. `createPersistentScene` puts the colour clear back afterwards, and so does this.
+  scene.performancePriority = ScenePerformancePriority.Intermediate;
+  scene.autoClear = true;
   const camera = new ArcRotateCamera(
     "renderer-test-camera",
     -Math.PI / 2,
@@ -675,8 +681,160 @@ test("the system diorama renders one headless frame and releases its scene conte
   expect(() => scene.render()).not.toThrow();
   expect(firstFrame).toHaveBeenCalledOnce();
 
-  // Worlds are view-only in VR; no enlarged destination-selection targets are mounted.
+  // A diorama built without anywhere to send a visitor draws no hit volumes it could not honour.
   expect(scene.getMeshByName("diorama-world-target-system-inner")).toBeNull();
+  expect(scene.getMeshByName("star-pick-target")).toBeNull();
+
+  world.dispose();
+  scope.dispose();
+  expect(sceneCounts(scene)).toEqual(before);
+  engine.dispose();
+}, 30_000);
+
+/**
+ * Clicking what is drawn is how a visitor leaves any of these scenes, and it is wired through
+ * Babylon action managers rather than through anything Exora owns — so it is invisible to every
+ * other test here, and was once removed wholesale by a change that only meant to take out the
+ * in-headset console. These assert the two halves separately: that the hit surfaces exist and are
+ * pickable, and that a pick on one of them travels.
+ */
+test("the diorama sends a visitor to the world or the star they click", async () => {
+  const { engine, host, scene } = createHarness();
+  const before = sceneCounts(scene);
+  const scope = openWorldScope(scene);
+  const visitWorld = vi.fn();
+  const visitStar = vi.fn();
+  const world = createSystemWorld(host, {
+    hostName: "Renderer Prime",
+    onFirstFrame: () => undefined,
+    onSelectHostStar: visitStar,
+    onSelectWorld: visitWorld,
+    planets: systemPlanets,
+  });
+  scope.seal();
+  await settleSky();
+
+  // A body four orders of magnitude smaller than its own orbit is a few pixels of cursor target,
+  // so the volume around it is what a visitor actually hits — and it is invisible, not hidden,
+  // because Babylon will not pick a mesh whose `isVisible` is false.
+  const target = scene.getMeshByName("diorama-world-target-system-inner");
+  expect(target?.isPickable).toBe(true);
+  expect(target?.isVisible).toBe(true);
+  expect(target?.material?.alpha).toBe(0);
+
+  const body = scene.getMeshByName("diorama-world-system-inner");
+  expect(body?.isPickable).toBe(true);
+  body?.actionManager?.processTrigger(ActionManager.OnPickTrigger);
+  target?.actionManager?.processTrigger(ActionManager.OnPickTrigger);
+  expect(visitWorld).toHaveBeenCalledTimes(2);
+  expect(visitWorld.mock.calls.every(([picked]) => picked.name === "System Inner b")).toBe(true);
+
+  // The star answers on its disc and on the volume around it. Its corona must not: that shell
+  // stands off 2.6 stellar radii and is drawn on its far side, so a camera inside it would have
+  // it under the cursor everywhere, and every click on empty sky would become a jump to the star.
+  const photosphere = scene.getMeshByName("star-photosphere");
+  const starTarget = scene.getMeshByName("star-pick-target");
+  expect(photosphere?.isPickable).toBe(true);
+  expect(starTarget?.isPickable).toBe(true);
+  expect(scene.getMeshByName("star-corona")?.isPickable).toBe(false);
+  expect(scene.getMeshByName("star-corona")?.actionManager).toBeFalsy();
+
+  photosphere?.actionManager?.processTrigger(ActionManager.OnPickTrigger);
+  starTarget?.actionManager?.processTrigger(ActionManager.OnPickTrigger);
+  expect(visitStar).toHaveBeenCalledTimes(2);
+
+  world.dispose();
+  scope.dispose();
+  // Action managers register on the scene rather than in the node graph, so this is also the
+  // assertion that the world scope takes them back out with everything else.
+  expect(sceneCounts(scene)).toEqual(before);
+  engine.dispose();
+}, 30_000);
+
+test("a world sends a visitor to the star hanging in its sky", async () => {
+  vi.stubGlobal("window", new EventTarget());
+  const { engine, host, scene } = createHarness();
+  const before = sceneCounts(scene);
+  const scope = openWorldScope(scene);
+  const planet = planets[0]!;
+  const visitStar = vi.fn();
+  const world = createPlanetWorld(host, {
+    onFirstFrame: vi.fn(),
+    onSelectHostStar: visitStar,
+    onViewModeChange: () => undefined,
+    planet,
+    recipe: deriveWorldRecipe(planet),
+  });
+  scope.seal();
+  await settleSky();
+
+  // One star in the orbital sky and one over the terrain, each with its own hit volume, and both
+  // reached the same way — a visitor who walked down to the ground can still leave for the star.
+  const targets = scene.meshes.filter((mesh) => mesh.name === "star-pick-target");
+  expect(targets).toHaveLength(2);
+  for (const target of targets) {
+    expect(target.isPickable).toBe(true);
+    target.actionManager?.processTrigger(ActionManager.OnPickTrigger);
+  }
+  expect(visitStar).toHaveBeenCalledTimes(2);
+
+  world.dispose();
+  scope.dispose();
+  expect(sceneCounts(scene)).toEqual(before);
+  engine.dispose();
+}, 30_000);
+
+test("a world built with no host star to reach draws nothing that looks clickable", async () => {
+  vi.stubGlobal("window", new EventTarget());
+  const { engine, host, scene } = createHarness();
+  const scope = openWorldScope(scene);
+  const planet = planets[0]!;
+  const world = createPlanetWorld(host, {
+    onFirstFrame: vi.fn(),
+    onViewModeChange: () => undefined,
+    planet,
+    recipe: deriveWorldRecipe(planet),
+  });
+  scope.seal();
+  await settleSky();
+
+  // The World Forge route: no archive behind the world, so no star to resolve and no hit volume.
+  expect(scene.meshes.filter((mesh) => mesh.name === "star-pick-target")).toHaveLength(0);
+  expect(scene.getMeshByName("star-photosphere")?.isPickable).toBe(false);
+
+  world.dispose();
+  scope.dispose();
+  engine.dispose();
+}, 30_000);
+
+test("a subsystem sends a visitor to the moon they click, by name", async () => {
+  const { engine, host, scene } = createHarness();
+  const before = sceneCounts(scene);
+  const scope = openWorldScope(scene);
+  const subsystem = findPlanetarySubsystem("Jupiter");
+  if (!subsystem) throw new Error("Expected Jupiter subsystem fixture.");
+  const visitMoon = vi.fn();
+  const world = createSubsystemWorld(host, {
+    onFirstFrame: vi.fn(),
+    onSelectMoon: visitMoon,
+    planet: JUPITER,
+    subsystem,
+  });
+  scope.seal();
+  await settleSky();
+
+  const io = scene.getMeshByName("Io-mapped-mission-mosaic");
+  // A moon that does not claim to be a target is one a click passes straight through, and at this
+  // scene's performance priority Babylon hands out meshes that make no such claim.
+  expect(io?.isPickable).toBe(true);
+  io?.actionManager?.processTrigger(ActionManager.OnPickTrigger);
+  expect(visitMoon).toHaveBeenCalledWith("Io");
+
+  // And each carries its own name, not one shared handler standing in for every moon.
+  const metis = scene.getMeshByName("Metis-unresolved-neutral-silhouette");
+  expect(metis?.isPickable).toBe(true);
+  metis?.actionManager?.processTrigger(ActionManager.OnPickTrigger);
+  expect(visitMoon).toHaveBeenLastCalledWith("Metis");
 
   world.dispose();
   scope.dispose();

@@ -24,7 +24,7 @@ import { createSurfaceScatter } from "./surface-scatter.ts";
 import { type SurfaceVista, createSurfaceVista } from "./surface-vista.ts";
 import type { MountedWorld, SceneHost } from "./scene-host.ts";
 import { skyViewpointFrom } from "./sky-catalog.ts";
-import { createStellarSurface, type StellarSurface } from "./star-surface.ts";
+import { createStellarSurface, makeStarTravelTarget, type StellarSurface } from "./star-surface.ts";
 import { createStarfield } from "./star-visuals.ts";
 import { markAsVirtualBackground } from "./world-presentation.ts";
 import {
@@ -1179,6 +1179,12 @@ export type ViewMode = "orbit" | "subsystem" | "surface" | "transition";
 interface PlanetWorldOptions {
   onFirstFrame: () => void;
   onViewModeChange: (mode: ViewMode) => void;
+  /**
+   * Travel to the star this world orbits, when a visitor clicks it in the sky.
+   *
+   * Left out by a World Forge world, which has no archive behind it and so no star to resolve.
+   */
+  onSelectHostStar?: () => void;
   planet: ExoplanetProfile;
   recipe: WorldRecipe;
 }
@@ -1201,12 +1207,13 @@ const createHostStar = (
   recipe: WorldRecipe,
   profile: RenderQualityProfile,
   parent: TransformNode,
+  onSelectHostStar?: () => void,
 ): StellarSurface => {
   const surface = createStellarSurface({
     detail: "distant",
     diameter: recipe.star.radiusSceneUnits * 2,
     parent,
-    pickable: false,
+    pickable: Boolean(onSelectHostStar),
     position: PLANET_POSITION.add(HOST_STAR_OFFSET),
     profile,
     recipe: recipe.star,
@@ -1214,6 +1221,8 @@ const createHostStar = (
     seed: recipe.seed,
     spotCoverage: recipe.star.spotCoverage,
   });
+
+  if (onSelectHostStar) makeStarTravelTarget(scene, surface, onSelectHostStar);
 
   return surface;
 };
@@ -1877,6 +1886,7 @@ const createSurfaceEnvironment = (
   recipe: WorldRecipe,
   geology: SurfaceGeology | null,
   profile: RenderQualityProfile,
+  onSelectHostStar?: () => void,
 ): {
   cloudLayers: Mesh[];
   /** World-space ground height under any point a visitor can reach. */
@@ -2000,7 +2010,7 @@ const createSurfaceEnvironment = (
     diameter:
       SURFACE_STAR_DISTANCE * 2 * surfaceStarAngularRadius(recipe.star.apparentRadiusRadians),
     parent: skyAnchor,
-    pickable: false,
+    pickable: Boolean(onSelectHostStar),
     position: SURFACE_STAR_DIRECTION.scale(SURFACE_STAR_DISTANCE),
     profile,
     recipe: recipe.star,
@@ -2022,6 +2032,11 @@ const createSurfaceEnvironment = (
     }
     meshes.splice(0, meshes.length, ...meshes.filter((mesh) => !surfaceStar.meshes.includes(mesh)));
   }
+
+  // The same route out as the orbital view offers, from down here. A star disabled just above is
+  // left alone: a disabled mesh is not picked, so a world whose air hides its sun has nothing in
+  // the sky to click, which is the honest answer.
+  if (onSelectHostStar) makeStarTravelTarget(scene, surfaceStar, onSelectHostStar);
 
   for (const mesh of meshes) {
     mesh.isVisible = false;
@@ -2062,7 +2077,13 @@ const setEnvironmentEnabled = (
  */
 export const createPlanetWorld = (
   host: SceneHost,
-  { onFirstFrame, onViewModeChange, planet: planetProfile, recipe }: PlanetWorldOptions,
+  {
+    onFirstFrame,
+    onSelectHostStar,
+    onViewModeChange,
+    planet: planetProfile,
+    recipe,
+  }: PlanetWorldOptions,
 ): MountedWorld => {
   const { camera, canvas, engine, profile, scene } = host;
 
@@ -2110,7 +2131,7 @@ export const createPlanetWorld = (
     ringSystem,
     shader,
   } = createPlanet(scene, recipe, profile, planetProfile);
-  const hostStar = createHostStar(scene, recipe, profile, orbitalRoot);
+  const hostStar = createHostStar(scene, recipe, profile, orbitalRoot, onSelectHostStar);
   orbitalMeshes.push(...hostStar.meshes);
   // The deep-space starfield belongs to the orbital view only. Down on the surface the sky shader
   // owns what the sky contains, and it has to: stars there are seen through an atmosphere that
@@ -2131,7 +2152,13 @@ export const createPlanetWorld = (
           }
         : null,
     ) ?? cloudDeckGeology(recipe);
-  const surfaceEnvironment = createSurfaceEnvironment(scene, recipe, surfaceGeology, profile);
+  const surfaceEnvironment = createSurfaceEnvironment(
+    scene,
+    recipe,
+    surfaceGeology,
+    profile,
+    onSelectHostStar,
+  );
 
   let elapsedSeconds = 0;
   const displayRotationSpeed = planetProfile.solarSystem?.rotationPeriodHours
