@@ -695,19 +695,23 @@ export const createSurfaceVista = (
   // is genuinely off screen rather than culling on a bounding sphere that swallows the camera.
   mesh.alwaysSelectAsActiveMesh = true;
 
-  const detail = geology.detail;
-  const textures = getSurfaceDetailTextures(
-    scene,
-    detail,
-    profile.surfaceMicrodetail,
-    profile.anisotropicFiltering,
-  );
-
   // Two fractal fields per fragment over ground that fills most of the frame is the vista's
   // dominant fill cost, and in a headset it is paid twice over. The macro and grain fields only
   // shape colour, so an octave less is invisible where an unsteady frame rate is not.
   const noiseOctaves = profile.tier === "desktop" ? profile.fbmOctaves - 1 : 2;
   const isCloud = geology.medium === "cloud";
+  const detail = geology.detail;
+  // A cloud deck compiles without either rocky-detail branch below. Constructing textures anyway
+  // used to download and transcode close to a megabyte of mineral maps during the featured ice
+  // giant's startup, even though the material could never sample them.
+  const textures = isCloud
+    ? null
+    : getSurfaceDetailTextures(
+        scene,
+        detail,
+        profile.surfaceMicrodetail,
+        profile.anisotropicFiltering,
+      );
   const defines = [`#define FBM_OCTAVES ${Math.max(2, noiseOctaves)}`];
   // A cloud deck has no rock in it, so the mineral maps have nothing to say about it — and every
   // one of them read as stone laid over the sky.
@@ -847,10 +851,12 @@ export const createSurfaceVista = (
   material.setFloat("coarseDetailScale", 0.072);
   material.setFloat("chemistryScale", 0.026);
   material.setFloat("chemistryStrength", detail.chemistryStrength);
-  material.setTexture("chemistryColorMap", textures.chemistry);
-  material.setTexture("primaryNormalMap", textures.primary.normal);
-  material.setTexture("primaryRoughnessMap", textures.primary.roughness);
-  material.setTexture("secondaryNormalMap", textures.secondary.normal);
+  if (textures) {
+    material.setTexture("chemistryColorMap", textures.chemistry);
+    material.setTexture("primaryNormalMap", textures.primary.normal);
+    material.setTexture("primaryRoughnessMap", textures.primary.roughness);
+    material.setTexture("secondaryNormalMap", textures.secondary.normal);
+  }
   material.setVector2(
     "windAxis",
     new Vector2(Math.cos(geology.windDirection), Math.sin(geology.windDirection)),

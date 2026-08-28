@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useState } from "react";
 import type { RendererStatus } from "./renderer-recovery.ts";
+import { initialSceneAssetForSearch, type InitialSceneAsset } from "./route-assets.ts";
 import type { SceneHost } from "./scene-host.ts";
 
 export type SceneHostStatus = "initializing" | RendererStatus;
@@ -10,26 +11,45 @@ export interface SceneHostController {
   status: SceneHostStatus;
 }
 
-const RENDERER_START_DELAY_MS = 1_000;
-
 /**
  * Gives the first React paint a chance to reach the screen before the Babylon graph is evaluated.
  *
  * The renderer is intentionally dynamic, but a passive effect can still run before the browser's
- * next paint when the canvas ref causes a follow-up render. Waiting one frame and then a short task
- * delay makes the boundary explicit: the loading UI is visible immediately, while the expensive
- * engine import starts after that first useful frame.
+ * next paint when the canvas ref causes a follow-up render. A zero-delay task queued from the next
+ * animation frame crosses that paint boundary without adding a human-visible startup delay.
  */
 const afterFirstPaint = (callback: () => void): (() => void) => {
   let timeoutId: number | null = null;
   const frameId = window.requestAnimationFrame(() => {
-    timeoutId = window.setTimeout(callback, RENDERER_START_DELAY_MS);
+    timeoutId = window.setTimeout(callback, 0);
   });
 
   return () => {
     window.cancelAnimationFrame(frameId);
     if (timeoutId !== null) window.clearTimeout(timeoutId);
   };
+};
+
+/** Starts fetching the destination renderer while the shared Babylon host is being evaluated. */
+const preloadInitialScene = (asset: InitialSceneAsset): Promise<unknown> => {
+  switch (asset) {
+    case "asteroid":
+      return import("./small-body-scene.ts");
+    case "black-hole":
+      return import("./black-hole-scene.ts");
+    case "comet":
+      return import("./comet-scene.ts");
+    case "mission":
+      return import("./mission-scene.ts");
+    case "region":
+      return import("./solar-region-scene.ts");
+    case "star":
+      return import("./star-scene.ts");
+    case "system":
+      return import("./system-scene.ts");
+    case "planet":
+      return import("./planet-scene.ts");
+  }
 };
 
 /**
@@ -58,6 +78,12 @@ export const useSceneHost = (canvas: HTMLCanvasElement | null): SceneHostControl
     setStatus("initializing");
     const cancelStartup = afterFirstPaint(() => {
       if (cancelled) return;
+      // The first destination used to wait for this host to finish evaluating before its own
+      // renderer request even began. Both graphs are independent until mount, so fetch them in
+      // parallel and let the destination find its module warm when the host becomes available.
+      void preloadInitialScene(initialSceneAssetForSearch(window.location.search)).catch(
+        () => undefined,
+      );
       // Started alongside the renderer, not with the first world that wants it. The star catalogue
       // is one memoized download for the life of the page, and a destination builds its sky on the
       // microtask that resolves it — so getting the request out now is what keeps the very first
