@@ -198,6 +198,21 @@ export default defineConfig(({ mode }) => {
         // here would hoist Babylon into the entry chunk and add roughly 1.7 MB to first paint.
         output: {
           chunkFileNames: chunkFileName,
+          /**
+           * Runs module bodies in source order even when a cycle spans two chunks.
+           *
+           * `maxSize` below cuts the Babylon group into pieces at size boundaries, and Babylon's
+           * imports are densely circular, so a cut lands mid-cycle. The chunk holding `Matrix`
+           * then imports the chunk holding `PerformanceConfigurator` while that chunk is already
+           * partway through importing it back, and `Matrix._IdentityReadOnly = Matrix.Identity()`
+           * runs at module scope against a binding that has not been initialized yet — the whole
+           * renderer dies on `Cannot read properties of undefined`.
+           *
+           * Which module lands on which side of a cut shifts whenever the module set changes, so
+           * this is not a Babylon bug to route around: any split of a cyclic graph can reproduce
+           * it. Wrapping module bodies restores the evaluation order the source guarantees.
+           */
+          strictExecutionOrder: true,
           // Removing a lazy destination can reduce the number of natural graph boundaries and
           // make a shared vendor chunk grow even though the application itself got smaller.
           // Preserve those boundaries automatically while keeping every emitted file below the
