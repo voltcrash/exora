@@ -22,13 +22,11 @@ const readBundledAsset = async (): Promise<ArrayBuffer> => {
 interface SyntheticStar {
   colourIndex: number;
   declinationDegrees: number;
-  /** Parsecs, or 0 for a star with no usable parallax. */
   distanceParsecs: number;
   rightAscensionDegrees: number;
   visualMagnitude: number;
 }
 
-/** Writes the same layout `scripts/build-star-catalog.ts` produces, for a handful of stars. */
 const packSynthetic = (stars: readonly SyntheticStar[], magnitudeLimit = 6.5): ArrayBuffer => {
   const count = stars.length;
   const buffer = new ArrayBuffer(16 + count * 16);
@@ -84,13 +82,10 @@ test("the bundled asset parses and holds the naked-eye sky", async () => {
   const catalog = parseSkyCatalog(await readBundledAsset());
 
   expect(catalog.magnitudeLimit).toBe(6.5);
-  // Hipparcos is complete well past this cut, so the count is a property of the sky rather than
-  // of the build: roughly nine thousand stars are visible to the unaided eye from Earth.
   expect(catalog.count).toBeGreaterThan(8_000);
   expect(catalog.count).toBeLessThan(10_000);
   expect(catalog.unitDirections).toHaveLength(catalog.count * 3);
 
-  // Written brightest first, and the brightest star in the sky is Sirius at V = -1.44.
   expect(valueAt(catalog.visualMagnitude, 0) / 1_000).toBeCloseTo(-1.44, 3);
   expect(valueAt(catalog.distanceParsecs, 0)).toBeCloseTo(2.637, 2);
   for (let index = 1; index < catalog.count; index += 1) {
@@ -111,8 +106,6 @@ test("every catalogued direction is a unit vector and nothing exceeds the faint 
     expect(valueAt(catalog.visualMagnitude, index) / 1_000).toBeLessThanOrEqual(
       catalog.magnitudeLimit,
     );
-    // Zero is the marker for a star with no usable parallax. A negative or tiny distance would
-    // mean the build invented one.
     const distance = valueAt(catalog.distanceParsecs, index);
     expect(distance === 0 || distance > 1).toBe(true);
   }
@@ -186,7 +179,6 @@ test("a viewpoint needs all three measurements, and refuses to be invented", () 
   expect(
     skyViewpointFrom({ declinationDegrees: 1, distanceParsecs: 7.68, rightAscensionDegrees: null }),
   ).toBeNull();
-  // A distance of zero is the Sun's own position, not a place a catalogue object can be.
   expect(
     skyViewpointFrom({ declinationDegrees: 1, distanceParsecs: 0, rightAscensionDegrees: 1 }),
   ).toBeNull();
@@ -200,19 +192,14 @@ test("a viewpoint needs all three measurements, and refuses to be invented", () 
 });
 
 test("colour comes from the catalogued colour index, through a black-body temperature", () => {
-  // The Sun's B-V is 0.656 and its effective temperature is 5,772 K; Ballesteros' relation is
-  // what turns one into the other, and it lands within a hundred kelvin of the real value.
   expect(colourIndexToTemperatureKelvin(0.656)).toBeGreaterThan(5_650);
   expect(colourIndexToTemperatureKelvin(0.656)).toBeLessThan(5_900);
-  // Redder is cooler, and monotonically so across the whole catalogued range.
   expect(colourIndexToTemperatureKelvin(1.6)).toBeLessThan(colourIndexToTemperatureKelvin(0.656));
   expect(colourIndexToTemperatureKelvin(0.0)).toBeGreaterThan(
     colourIndexToTemperatureKelvin(0.656),
   );
 
   const catalog = syntheticCatalog([
-    // A cool red giant and a hot blue star, in opposite directions so neither can be confused
-    // with the other by position.
     {
       colourIndex: 1.85,
       declinationDegrees: 0,
@@ -262,7 +249,6 @@ test("the north celestial pole is scene up, and the sky is not mirrored", () => 
       visualMagnitude: 1,
     },
   ]);
-  // All three have no parallax, so they keep their catalogued directions whatever the viewpoint.
   const { positions } = projectSky(
     catalog,
     { declinationDegrees: 12, distanceParsecs: 400, rightAscensionDegrees: 200 },
@@ -279,9 +265,6 @@ test("the north celestial pole is scene up, and the sky is not mirrored", () => 
   expect(sixHours.z).toBeCloseTo(90, 3);
   expect(pole.y).toBeCloseTo(90, 3);
 
-  // The equatorial frame is right-handed and a Babylon scene is left-handed, so the mapping
-  // between them has to reverse orientation — otherwise every constellation renders mirrored.
-  // The determinant of the three mapped basis vectors is what says whether it does.
   const determinant =
     equinox.x * (sixHours.y * pole.z - sixHours.z * pole.y) -
     equinox.y * (sixHours.x * pole.z - sixHours.z * pole.x) +
@@ -305,14 +288,10 @@ test("distance is what moves a star, so the near ones swing and the far ones do 
     starLimit: 10,
   });
 
-  // The viewer stands 10 pc up the polar axis. The near star is 10 pc out along the equinox axis,
-  // so from there it sits 45 degrees below the equator: an enormous shift for a star Earth sees
-  // exactly on the equator.
   const nearDirection = sceneVector(positions, 0);
   expect(nearDirection.x).toBeCloseTo(Math.SQRT1_2, 4);
   expect(nearDirection.y).toBeCloseTo(-Math.SQRT1_2, 4);
 
-  // The far one has barely stirred: 10 pc of baseline against 900 pc of distance.
   const farDirection = sceneVector(positions, 1);
   expect(farDirection.x).toBeGreaterThan(0.99);
   expect(Math.abs(farDirection.y)).toBeLessThan(0.02);
@@ -320,8 +299,6 @@ test("distance is what moves a star, so the near ones swing and the far ones do 
 
 test("apparent magnitude is recomputed, and stars that fall below the cut are dropped", () => {
   const catalog = syntheticCatalog([
-    // Earth sees this one at the very edge of naked-eye visibility from 10 pc. Move 90 pc further
-    // away and it is five magnitudes fainter, which is well past the limit.
     {
       colourIndex: 0.5,
       declinationDegrees: 0,
@@ -329,7 +306,6 @@ test("apparent magnitude is recomputed, and stars that fall below the cut are dr
       rightAscensionDegrees: 0,
       visualMagnitude: 6.4,
     },
-    // This one is faint from Earth at 100 pc and blazing from 10 pc away.
     {
       colourIndex: 0.5,
       declinationDegrees: 0,
@@ -339,8 +315,6 @@ test("apparent magnitude is recomputed, and stars that fall below the cut are dr
     },
   ]);
 
-  // Standing 100 pc along the equinox axis: 90 pc past the first star, 0 pc from... no — the
-  // second star lies in the opposite direction, so the viewer ends up 200 pc from it.
   const receding = projectSky(
     catalog,
     { declinationDegrees: 0, distanceParsecs: 100, rightAscensionDegrees: 0 },
@@ -348,15 +322,12 @@ test("apparent magnitude is recomputed, and stars that fall below the cut are dr
   );
   expect(receding.drawn).toBe(0);
 
-  // From 90 pc along the opposite direction the second star is only 10 pc away: five magnitudes
-  // brighter than the 100 pc Earth sees it from, so 1.4 rather than 6.4.
   const approaching = projectSky(
     catalog,
     { declinationDegrees: 0, distanceParsecs: 90, rightAscensionDegrees: 180 },
     { shellRadius: 90, starLimit: 10 },
   );
   expect(approaching.drawn).toBe(1);
-  // Brighter stars are drawn brighter, and 1.4 is bright enough to be well up the scale.
   expect(approaching.colors[0]).toBeGreaterThan(0.6);
 });
 
@@ -383,12 +354,9 @@ test("a star with no usable parallax keeps its direction and its catalogued magn
 
   expect(close.drawn).toBe(2);
   expect(distant.drawn).toBe(1);
-  // Same direction and same brightness from both viewpoints, because moving it would need a
-  // distance nobody has measured.
   expect(sceneVector(close.positions, 0)).toEqual(sceneVector(distant.positions, 0));
   expect(valueAt(close.colors, 0)).toBeCloseTo(valueAt(distant.colors, 0), 6);
 
-  // Its measured neighbour is reprojected nearby and falls below the visibility cut far away.
   expect(sceneVector(close.positions, 1)).not.toEqual(sceneVector(close.positions, 0));
 });
 
@@ -402,9 +370,6 @@ test("the star the scene is already drawing is not drawn again as a background p
   };
   const neighbour = { ...subject, distanceParsecs: 9.2, visualMagnitude: 3 };
 
-  // Standing at the subject, reached through a different catalogue that puts it a few thousandths
-  // of a parsec away. Without the cut it would be a second, magnitude -25 copy of the star the
-  // scene renders in front of the visitor — and the direction to it would be a division by zero.
   const { drawn, positions } = projectSky(
     syntheticCatalog([subject, neighbour]),
     { declinationDegrees: 38.78, distanceParsecs: 7.682, rightAscensionDegrees: 279.23 },
@@ -430,13 +395,10 @@ test("the device budget keeps the brightest stars the viewpoint can actually see
   expect(budgeted.drawn).toBe(2);
   expect(budgeted.positions).toHaveLength(6);
   expect(budgeted.colors).toHaveLength(8);
-  // Magnitudes 1.2 and 3.4, at right ascensions 0 and 80 degrees.
   expect(sceneVector(budgeted.positions, 0).x).toBeCloseTo(1, 4);
   expect(sceneVector(budgeted.positions, 1).z).toBeCloseTo(Math.sin((80 * Math.PI) / 180), 4);
-  // Brightest first, so the budgeted sky is the part of it a person would notice.
   expect(valueAt(budgeted.colors, 0)).toBeGreaterThan(valueAt(budgeted.colors, 4));
 
-  // A budget larger than the visible sky draws the visible sky, not the budget.
   expect(projectSky(catalog, viewpoint, { shellRadius: 1, starLimit: 500 }).drawn).toBe(4);
 });
 
@@ -458,8 +420,6 @@ test("every drawn point sits on the shell the caller asked for", async () => {
 test("a parsec and a half from Earth already rearranges the sky", async () => {
   const catalog = parseSkyCatalog(await readBundledAsset());
   const options = { shellRadius: 1, starLimit: catalog.count };
-  // As close to the Sun's own position as a catalogue object gets, so this is very nearly the
-  // sky from Earth; and Alpha Centauri, 1.3 pc away, is the nearest place anyone could stand.
   const nearlyEarth = projectSky(
     catalog,
     { declinationDegrees: 0, distanceParsecs: 1e-6, rightAscensionDegrees: 0 },
@@ -471,8 +431,6 @@ test("a parsec and a half from Earth already rearranges the sky", async () => {
     options,
   );
 
-  // Sirius is the first row of the catalogue and is 2.6 pc from the Sun, so a 1.3 pc baseline
-  // swings it through tens of degrees — the parallax that makes going somewhere worth it.
   const fromEarth = sceneVector(nearlyEarth.positions, 0);
   const fromAlphaCentauri = sceneVector(alphaCentauri.positions, 0);
   const dot =
@@ -481,6 +439,5 @@ test("a parsec and a half from Earth already rearranges the sky", async () => {
     fromEarth.z * fromAlphaCentauri.z;
   expect((Math.acos(Math.min(1, dot)) * 180) / Math.PI).toBeGreaterThan(20);
 
-  // Alpha Centauri itself is the place being stood on, so it leaves the background sky.
   expect(alphaCentauri.drawn).toBeLessThan(nearlyEarth.drawn);
 });

@@ -1,19 +1,9 @@
 import { defineConfig } from "vite-plus";
 
-/**
- * Third-party bundles served verbatim.
- *
- * Babylon's KTX2 decoder and Basis transcoder are vendored minified, and they have to stay byte
- * for byte what upstream published: formatting them rewrites an artifact this repository did not
- * author and inflates it by half, and linting them reports on code nobody here can fix.
- */
+// Preserve vendored KTX2 artifacts byte-for-byte.
 const VENDORED_PATTERNS = ["apps/website/public/ktx2/**"];
 
 export default defineConfig({
-  // The root command is the fast, non-browser test entry point across every workspace. Browser
-  // journeys need the website's Playwright-backed `browser` project; if the default root glob
-  // discovers them, Vitest tries to import `vite-plus/test/browser/context` in its forks pool and
-  // fails before collecting a test. Keep those files exclusively behind `website#test:browser`.
   test: {
     include: [
       "apps/*/src/**/*.test.{ts,tsx}",
@@ -22,6 +12,7 @@ export default defineConfig({
       "packages/*/tests/**/*.test.{ts,tsx}",
       "scripts/**/*.test.mjs",
     ],
+    // Browser tests require the website's Playwright project.
     exclude: ["apps/*/src/**/*.browser.test.{ts,tsx}"],
   },
   staged: {

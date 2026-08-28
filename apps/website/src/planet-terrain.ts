@@ -1,13 +1,5 @@
 import type { RockyTerrainDetail } from "@exora/worldgen";
 
-/**
- * Pure, framework-free procedural terrain math for rocky planets.
- *
- * Every function here is a deterministic function of its numeric inputs (position + seed), with
- * no RNG state and no Babylon dependency, so a mesh builder in planet-scene.ts can call these
- * once per vertex (CPU-side, object-space) and get the same shape on every rebuild.
- */
-
 interface Vector3Like {
   x: number;
   y: number;
@@ -25,8 +17,6 @@ const smoothstep = (edge0: number, edge1: number, value: number): number => {
 
 const lerp = (a: number, b: number, t: number): number => a + (b - a) * t;
 
-/** Deterministic 32-bit hash of three integers plus a seed, used to build a seeded gradient
- * table lookup without materializing a permutation array (keeps this allocation-free per call). */
 const hash3i = (xi: number, yi: number, zi: number, seed: number): number => {
   let h = (xi * 374_761_393 + yi * 668_265_263 + zi * 2_147_483_647 + seed * 3_266_489_917) | 0;
   h = Math.imul(h ^ (h >>> 13), 1_274_126_177);
@@ -64,8 +54,6 @@ const gradientDot = (
 
 const fade = (t: number): number => t * t * t * (t * (t * 6 - 15) + 10);
 
-/** Ken Perlin's "improved noise" (public domain), reseeded per call site via a hashed lattice
- * instead of a shared permutation table so multiple independent noise fields never correlate. */
 export const gradientNoise3 = (x: number, y: number, z: number, seed: number): number => {
   const x0 = Math.floor(x);
   const y0 = Math.floor(y);
@@ -93,7 +81,6 @@ export const gradientNoise3 = (x: number, y: number, z: number, seed: number): n
   const nxy0 = lerp(nx00, nx10, v);
   const nxy1 = lerp(nx01, nx11, v);
 
-  // Improved-noise gradients have max magnitude sqrt(2)/2 in this construction; rescale to ~[-1, 1].
   return lerp(nxy0, nxy1, w) * 1.4;
 };
 
@@ -103,7 +90,6 @@ interface FbmOptions {
   octaves: number;
 }
 
-/** Fractal Brownian motion: layered gradient noise, normalized to roughly [-1, 1]. */
 export const fbm3 = (
   x: number,
   y: number,
@@ -129,8 +115,6 @@ export const fbm3 = (
   return normalization > 0 ? sum / normalization : 0;
 };
 
-/** Ridged multifractal: folds noise around zero so ridgelines read as mountain crests rather
- * than random bumps, with each octave weighted by the previous octave's sharpness. */
 export const ridged3 = (
   x: number,
   y: number,
@@ -161,8 +145,6 @@ export const ridged3 = (
   return normalization > 0 ? (sum / normalization) * 2 - 1 : 0;
 };
 
-/** Cellular (Worley) F1 distance field, sampled from one jittered point per lattice cell across
- * the 3x3x3 neighborhood — cheap enough to run per-vertex without a spatial index. */
 export const worley3 = (x: number, y: number, z: number, seed: number): number => {
   const xi = Math.floor(x);
   const yi = Math.floor(y);
@@ -191,8 +173,6 @@ export const worley3 = (x: number, y: number, z: number, seed: number): number =
   return clamp01(closest);
 };
 
-/** Offsets a sample point by two independent low-frequency noise fields, breaking up the
- * axis-aligned regularity that a single noise octave would otherwise stamp onto continents. */
 export const domainWarp3 = (
   x: number,
   y: number,
@@ -218,8 +198,6 @@ interface Crater {
   rimHeight: number;
 }
 
-/** Deterministic mulberry32-style PRNG, matching the style already used in @exora/worldgen so
- * crater placement stays reproducible across runs without depending on that package's internals. */
 const createSeededRandom = (seed: number): (() => number) => {
   let state = seed >>> 0;
   return () => {
@@ -231,11 +209,6 @@ const createSeededRandom = (seed: number): (() => number) => {
   };
 };
 
-/**
- * Builds a deterministic crater field for a planet. Placement uses uniform-sphere sampling
- * (cosTheta in [-1, 1], phi in [0, 2*pi)) rather than lat/long grid sampling, so craters do not
- * cluster or thin out near the poles the way a naive latitude/longitude walk would.
- */
 export const buildCraterField = (seed: number, density: number, scale: number): Crater[] => {
   const random = createSeededRandom((seed ^ 0x9e3779b9) >>> 0);
   const count = Math.round(lerp(4, 46, clamp01(density)));
@@ -250,7 +223,6 @@ export const buildCraterField = (seed: number, density: number, scale: number): 
       y: cosTheta,
       z: sinTheta * Math.sin(phi),
     };
-    // Power-law size distribution: many small craters, a few large ones, echoing real impact counts.
     const sizeRoll = random();
     const radius = lerp(0.035, 0.32, sizeRoll * sizeRoll) * lerp(0.6, 1.6, clamp01(scale));
     const depth = lerp(0.25, 1, 1 - sizeRoll) * lerp(0.4, 1.1, clamp01(scale));
@@ -266,8 +238,6 @@ export const buildCraterField = (seed: number, density: number, scale: number): 
   return craters;
 };
 
-/** Evaluates crater depression/rim/central-peak displacement at a unit direction, summing the
- * contribution of every crater whose radius reaches that point. */
 const evaluateCraters = (direction: Vector3Like, craters: readonly Crater[]): number => {
   let displacement = 0;
 
@@ -303,22 +273,9 @@ const evaluateCraters = (direction: Vector3Like, craters: readonly Crater[]): nu
 };
 
 export interface TerrainSample {
-  /** Normalized elevation, roughly in [-1, 1], before the caller applies display exaggeration. */
   height: number;
 }
 
-/**
- * Multi-scale procedural terrain height for a rocky world, evaluated in object space on the unit
- * sphere so it is seam-free (no UV dependency) and identical on every rebuild for a given seed.
- *
- * Four independent scales are combined rather than a single Perlin displacement:
- *  - macro:    domain-warped, threshold-shaped continents/ocean basins
- *  - regional: ridged multifractal mountain systems, masked to land
- *  - local:    higher-frequency ridged detail for ridges/valleys within a range
- *  - small:    low-amplitude fbm roughness
- * Craters are then carved/raised on top, and the whole field is not clamped so exaggeration stays
- * linear in the caller.
- */
 export const sampleTerrainHeight = (
   direction: Vector3Like,
   terrain: RockyTerrainDetail,

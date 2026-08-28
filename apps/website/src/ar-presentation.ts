@@ -12,7 +12,6 @@ import type { WebXRSessionManager } from "@babylonjs/core/XR/webXRSessionManager
 import { VIRTUAL_BACKGROUND_LAYER_MASK, type WorldPresentation } from "./world-presentation.ts";
 
 export interface ArPresentation {
-  /** Connects hit testing and manipulation to the currently mounted, already-built world. */
   begin: (
     hitTest: WebXRHitTest,
     sessionManager: WebXRSessionManager,
@@ -20,10 +19,8 @@ export interface ArPresentation {
     setSpaceBackground: (enabled: boolean) => void,
   ) => void;
   dispose: () => void;
-  /** Restores the flat/VR presentation after AR ends or fails to enter. */
   end: () => void;
   overlay: HTMLElement;
-  /** Changes destination without changing the AR session or rebuilding presentation logic. */
   setWorld: (world: WorldPresentation | null) => void;
 }
 
@@ -47,13 +44,6 @@ const gestureDistance = (points: readonly ScreenPoint[]): number | null => {
   return Math.hypot(second.x - first.x, second.y - first.y);
 };
 
-/**
- * Owns AR-only input and guidance around the ordinary Babylon world.
- *
- * The controller adds a physical-surface reticle, then hands placement and manipulation to the
- * transform wrapper captured by `world-presentation.ts`. It never creates a planet, star or black
- * hole; switching presentation mode therefore cannot diverge from the desktop/VR shaders.
- */
 export const createArPresentation = (scene: Scene): ArPresentation => {
   const overlay = document.createElement("div");
   overlay.id = "ar-overlay";
@@ -88,10 +78,6 @@ export const createArPresentation = (scene: Scene): ArPresentation => {
   reticle.isPickable = false;
   reticle.setEnabled(false);
 
-  // Space View must live in the same XR framebuffer as the world. A black DOM/canvas backing is
-  // composited above Variant's WebXR layer on iPhone and therefore hides the planet along with the
-  // camera. This inward-facing, camera-relative shell instead contributes opaque black fragments
-  // behind the world while leaving its foreground and virtual starfield visible.
   const spaceBackdropMaterial = new StandardMaterial("ar-space-backdrop-material", scene);
   spaceBackdropMaterial.disableLighting = true;
   spaceBackdropMaterial.diffuseColor = Color3.Black();
@@ -135,8 +121,6 @@ export const createArPresentation = (scene: Scene): ArPresentation => {
 
   const setSpaceBackground = (enabled: boolean): void => {
     spaceBackground = enabled;
-    // Babylon deliberately leaves an immersive-AR framebuffer uncleared so the platform can
-    // provide a truly transparent camera composite. Space is geometry, not a different clear.
     scene.clearColor.a = 0;
     spaceBackdrop.setEnabled(enabled);
     document.documentElement.dataset.arBackground = enabled ? "space" : "camera";
@@ -321,10 +305,6 @@ export const createArPresentation = (scene: Scene): ArPresentation => {
       document.documentElement.dataset.presentationMode = "ar";
       document.body.dataset.presentationMode = "ar";
 
-      // Screen taps in a handheld WebXR session are XR `select` events, not necessarily DOM
-      // pointer events on Babylon's canvas. Variant exposes the standard event, so bind it as
-      // soon as requestSession succeeds; the pointer observer below remains useful for runtimes
-      // which also mirror screen input onto the canvas.
       sessionInitObserver = sessionManager.onXRSessionInit.add((session) => {
         xrSession?.removeEventListener("select", onXrSelect);
         xrSession = session;
@@ -332,9 +312,6 @@ export const createArPresentation = (scene: Scene): ArPresentation => {
       });
 
       hitObserver = hitTest.onHitTestResultObservable.add((results) => {
-        // A transient hit-test ray follows the finger that generated it. It must not replace the
-        // stable viewer-centred reticle (the large ring seen while touching the iPhone screen).
-        // The subsequent `select` places at the latest permanent surface pose.
         const result = results.find((candidate) => !candidate.isTransient);
         if (!result && results.some((candidate) => candidate.isTransient)) return;
         if (!result) {

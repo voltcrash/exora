@@ -1,56 +1,18 @@
-/**
- * Turns the published HYG star database into the compact binary the renderer reads.
- *
- * The sky Exora draws around a destination is the real one, so the star positions behind it have
- * to come from a catalogue rather than from a noise function. HYG is that catalogue: a merge of
- * Hipparcos, the Yale Bright Star Catalog and Gliese, published as one CSV with a distance for
- * every star whose parallax is good enough to invert.
- *
- * The published file is 34 MB of CSV covering 119,614 stars, almost all of them far below the
- * naked-eye limit. What the renderer needs is five numbers each for the ~8,900 stars a person
- * could actually see, so this script does the filtering once, here, and commits the result. The
- * browser then downloads 139 KB of typed arrays it can map straight onto a vertex buffer instead
- * of parsing a JSON document several times that size.
- *
- * Nothing is computed or invented on the way through: every value written is a column HYG
- * publishes, and a star missing any one of them is dropped rather than filled in.
- *
- *   node scripts/build-star-catalog.ts [--source <hyg_v44.csv[.gz]>]
- *
- * Run it through `vp run website#star-catalog`. With no `--source` it downloads the pinned
- * release; the digest below is checked either way, so a changed upstream file fails loudly
- * instead of silently rewriting the sky.
- */
-
 import { createHash } from "node:crypto";
 import { readFile, writeFile } from "node:fs/promises";
 import { argv } from "node:process";
 import { gunzipSync } from "node:zlib";
 
-/**
- * HYG v4.4, the current release, fetched through Codeberg's LFS media endpoint — the plain `raw`
- * URL answers with the LFS pointer file rather than the catalogue.
- */
 const SOURCE_URL =
   "https://codeberg.org/astronexus/hyg/media/branch/main/data/hyg/CURRENT/hyg_v44.csv.gz";
 const SOURCE_SHA256 = "00b349893b9a53106dd488d8371e8d2fa586043e500bb3cdb8bff3931682197d";
 
-/**
- * The naked-eye limit under a dark sky, and the same cut the renderer applies again once it has
- * recomputed each magnitude for the viewer's own distance.
- */
 const MAGNITUDE_LIMIT = 6.5;
 
-/**
- * HYG's marker for a star whose parallax is missing, negative, or too small to inverting into a
- * distance: `dist` is set to 100000 pc rather than left blank. Those stars keep their direction
- * and lose their distance — see `NO_PARALLAX_DISTANCE` in `sky-catalog.ts`.
- */
 const HYG_UNKNOWN_DISTANCE_PARSECS = 100_000;
 
 const OUTPUT_URL = new URL("../public/sky/hyg-v44-vmag65.bin", import.meta.url);
 
-/** `EXSK`, little-endian, so a truncated or mistyped asset is rejected before it is read. */
 const MAGIC = 0x4b_53_58_45;
 const FORMAT_VERSION = 1;
 const HEADER_BYTES = 16;
@@ -58,19 +20,11 @@ const HEADER_BYTES = 16;
 interface CatalogueStar {
   colourIndex: number;
   declinationRadians: number;
-  /** Parsecs, or 0 for a star HYG could not place — see `HYG_UNKNOWN_DISTANCE_PARSECS`. */
   distanceParsecs: number;
   rightAscensionRadians: number;
   visualMagnitude: number;
 }
 
-/**
- * A CSV reader that understands quoting, because HYG uses it.
- *
- * Splitting on commas is enough for most of the file and wrong for the rest: `spect` carries
- * values like `"F5V:+..."` and the name columns are quoted throughout, so a naive split shifts
- * every later column on those rows and would quietly read a spectral type as a magnitude.
- */
 const parseCsvLine = (line: string): string[] => {
   const fields: string[] = [];
   let field = "";
@@ -125,8 +79,6 @@ const selectStars = (csv: string): { counts: SelectionCounts; stars: CatalogueSt
   };
 
   const identifierColumn = columnOf("id");
-  // The radian columns rather than `ra`/`dec`: HYG publishes both, and these are the ones it
-  // states to full precision, so reading them avoids re-deriving a number the file already has.
   const rightAscensionColumn = columnOf("rarad");
   const declinationColumn = columnOf("decrad");
   const distanceColumn = columnOf("dist");
@@ -148,10 +100,6 @@ const selectStars = (csv: string): { counts: SelectionCounts; stars: CatalogueSt
 
     const fields = parseCsvLine(text);
 
-    // Row zero is the Sun, which HYG carries at distance zero with a right ascension and
-    // declination of zero because it has no direction to record. It is the origin of the
-    // coordinate frame, not a star in anybody's sky, and at magnitude -26.7 it would otherwise
-    // sail through the cut below and be drawn on the infinity shell at the vernal equinox.
     if (fields[identifierColumn] === "0") continue;
 
     const visualMagnitude = numberOrNull(fields[magnitudeColumn]);
@@ -161,8 +109,6 @@ const selectStars = (csv: string): { counts: SelectionCounts; stars: CatalogueSt
     const declinationRadians = numberOrNull(fields[declinationColumn]);
     if (rightAscensionRadians === null || declinationRadians === null) continue;
 
-    // A star with no colour index has no colour this renderer is entitled to draw. Painting it
-    // white would be indistinguishable from a real A0 star, so it leaves the catalogue instead.
     const colourIndex = numberOrNull(fields[colourIndexColumn]);
     if (colourIndex === null) {
       counts.droppedNoColourIndex += 1;
@@ -186,8 +132,6 @@ const selectStars = (csv: string): { counts: SelectionCounts; stars: CatalogueSt
     counts.selected += 1;
   }
 
-  // Brightest first. The order is free — nothing downstream depends on it — and it costs about
-  // 10 KB off the compressed asset, because a monotonic magnitude column is nearly all runs.
   stars.sort(
     (left, right) =>
       left.visualMagnitude - right.visualMagnitude ||
@@ -197,17 +141,6 @@ const selectStars = (csv: string): { counts: SelectionCounts; stars: CatalogueSt
   return { counts, stars };
 };
 
-/**
- * Packs the selection as a header followed by five parallel arrays.
- *
- * Struct-of-arrays rather than interleaved records, so the browser can wrap each column in one
- * typed-array view over the downloaded buffer with no copying and no per-star object.
- *
- * Magnitude and colour index are the two columns HYG states to three decimals, so they ship as
- * thousandths in an `Int16Array` — exact for every value in the file, at half the width of a
- * float. Right ascension, declination and distance keep full `Float32Array` precision: at 8,880
- * stars the four extra bytes each are worth more than the argument about how few of them matter.
- */
 const packCatalogue = (stars: readonly CatalogueStar[]): Uint8Array => {
   const count = stars.length;
   const bytes = new Uint8Array(HEADER_BYTES + count * 16);
@@ -259,8 +192,6 @@ const main = async (): Promise<void> => {
   const gzipped = source[0] === 0x1f && source[1] === 0x8b;
 
   if (digest !== SOURCE_SHA256) {
-    // Deliberately fatal. A different upstream file is a different sky, and the provenance
-    // recorded in THIRD_PARTY_ASSETS.md names this exact release.
     throw new Error(
       `HYG source digest ${digest} does not match the pinned ${SOURCE_SHA256}. ` +
         "If the upstream release really did change, update SOURCE_URL, SOURCE_SHA256 and " +

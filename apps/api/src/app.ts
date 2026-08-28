@@ -43,12 +43,10 @@ import {
 interface CreateAppOptions {
   horizonsRateLimiter?: RateLimiter;
   horizonsRepository?: HorizonsRepository;
-  /** Overridable so a test can exercise the limit without issuing a hundred requests. */
   rateLimiter?: RateLimiter;
   repository?: PlanetRepository;
   starRepository?: StarRepository;
   systemAliasRepository?: SystemAliasRepository;
-  /** Trust Vercel's deployment-provided client address. Leave false outside Vercel. */
   trustVercelProxy?: boolean;
 }
 
@@ -86,41 +84,30 @@ const renderApiError = (error: unknown, context: Context): Response => {
   );
 };
 
-/** The longest a name either archive could plausibly carry; longer is a malformed request. */
 const MAX_NAME_LENGTH = 100;
 
-/**
- * How long each kind of answer may be reused, and how long a stale one may stand in while it
- * refreshes behind the request. Curated collections and single objects move on the archives'
- * schedule rather than ours, so they are held far longer than a free-text search.
- */
 interface CachePolicy {
   browser: string;
   cdn: string;
 }
 
 const CACHE_POLICY = {
-  /** Curated collections, host-system lookups, and single objects. */
   catalog: {
     browser: "public, max-age=60",
     cdn: "public, max-age=900, stale-while-revalidate=21600, stale-if-error=86400",
   },
-  /** Ephemerides that can change as upstream solutions are updated. */
   liveLookup: {
     browser: "public, max-age=60",
     cdn: "public, max-age=300, stale-while-revalidate=86400, stale-if-error=86400",
   },
-  /** Free-text planet search: the most likely thing to be retried with a different spelling. */
   planetSearch: {
     browser: "public, max-age=0, must-revalidate",
     cdn: "public, max-age=300, stale-while-revalidate=3600, stale-if-error=21600",
   },
-  /** SIMBAD's curated star collections. */
   starDiscovery: {
     browser: "public, max-age=120",
     cdn: "public, max-age=1800, stale-while-revalidate=43200, stale-if-error=86400",
   },
-  /** The fixed featured set, which only changes when this file does. */
   starFeatured: {
     browser: "public, max-age=300",
     cdn: "public, max-age=3600, stale-while-revalidate=43200, stale-if-error=86400",
@@ -132,12 +119,6 @@ const setCachePolicy = (context: Context, policy: CachePolicy): void => {
   context.header("CDN-Cache-Control", policy.cdn);
 };
 
-/**
- * The page size the caller asked for, or `fallback` when they did not ask for a usable one.
- *
- * Deliberately not a validation step: every repository clamps to its own bounds, so a number out
- * of range is narrowed rather than refused, and only an unparseable one falls back.
- */
 const requestedLimit = (context: Context, fallback: number): number => {
   const parsed = Number.parseInt(context.req.query("limit") ?? "", 10);
   return Number.isFinite(parsed) ? parsed : fallback;
@@ -199,11 +180,8 @@ export const createApp = ({
 
   app.use(
     "/api/*",
+    // Public read-only data; abuse control is handled by the request budget below.
     cors({
-      // Deliberately open. The responses are public, read-only, unauthenticated astronomy data
-      // with no cookies or credentials attached, and the browser's origin check would not slow
-      // down the abuse this API actually has to worry about — a script calling it server-side
-      // never sends an Origin at all. The request budget below is what bounds that.
       allowHeaders: [],
       allowMethods: ["GET", "OPTIONS"],
       credentials: false,

@@ -5,11 +5,6 @@ import { measuredSurfaceAppearance } from "./surface-geology.ts";
 
 export { SOLAR_SYSTEM_MOON_GROUPS, SOLAR_SYSTEM_MOONS } from "./solar-moons.ts";
 
-/**
- * Our home system is small, known and useful offline, so it is an authored catalog rather than
- * an exoplanet-shaped request to a service that deliberately excludes it. Physical identifiers
- * and values follow NASA/JPL Solar System Dynamics; visual map provenance lives with each body.
- */
 export const SUN: StarProfile = {
   catalogName: "NAIF 10",
   customization: {
@@ -138,8 +133,6 @@ const planet = ({
     massEarth,
     massJupiter: massJupiter ?? null,
     orbitalEccentricity: eccentricity,
-    // Solar-System inclinations use the ecliptic, not an observer's sky plane. The measured
-    // value is preserved in `solarSystem` and translated only by the system layout.
     orbitalInclinationDegrees: null,
     orbitalPeriodDays,
     radiusEarth,
@@ -637,11 +630,6 @@ const classifications: Readonly<Record<number, string>> = {
   999: "Kuiper Belt dwarf planet",
 };
 
-/**
- * Catalog exoplanets are intentionally inferred; known planets are not. Keep the shared geometry
- * and shaders, but replace the random axial tilt and ring lottery with measured, recognisable
- * properties before either the close-up renderer or the system diorama sees the recipe.
- */
 export const tuneSolarWorldRecipe = (
   profile: ExoplanetProfile,
   recipe: WorldRecipe,
@@ -689,10 +677,6 @@ export const tuneSolarWorldRecipe = (
               : identity.naifId === 499
                 ? 0.04
                 : 0;
-    // A known body's surface colours are established by mission imagery, so they are stated
-    // rather than inferred from equilibrium temperature and bulk density. Left to the inference,
-    // Mars came out blue: at 210 K it landed inside an ice threshold calibrated for worlds a
-    // hundred kelvin colder, and the vista painted the reddest planet in the sky as glacier.
     const appearance = unresolved ? null : measuredSurfaceAppearance(identity.naifId);
     return {
       ...base,
@@ -761,14 +745,6 @@ export const tuneSolarWorldRecipe = (
 
   if (base.renderer === "gas-giant") {
     const saturn = identity.naifId === 699;
-    /**
-     * Band colours, stated rather than drawn.
-     *
-     * A known giant's orbital view is a mission mosaic, so nothing ever checked the palette the
-     * inference gave it — and the inference picks between plausible families at random, which
-     * left Jupiter's own cloud deck rendering in neutral grey. From above that never showed;
-     * standing on it, the colour is the whole subject.
-     */
     const cloudBands = saturn
       ? {
           deepColor: [0.16, 0.14, 0.1] as Rgb,
@@ -794,7 +770,6 @@ export const tuneSolarWorldRecipe = (
     };
   }
 
-  // Uranus is a nearly featureless pale cyan; Neptune a deep blue with bright methane cloud.
   const uranus = identity.naifId === 799;
   return {
     ...base,

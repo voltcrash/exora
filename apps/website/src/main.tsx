@@ -37,9 +37,6 @@ const render = (): void => {
   scheduleWebFontLoad();
 };
 
-// The emulator is a development feature, but when enabled it has to own navigator.xr before
-// Babylon probes for a headset. Keep its request parsing and installation path out of production's
-// eager application chunk while preserving that ordering in emulator-enabled builds.
 if (import.meta.env.DEV || import.meta.env.VITE_XR_EMULATOR === "1") {
   void import("./xr-emulator.ts").then(({ installXrEmulator, isXrEmulatorRequested }) => {
     if (isXrEmulatorRequested()) void installXrEmulator().then(render);

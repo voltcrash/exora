@@ -61,7 +61,6 @@ const sections: readonly {
   },
 ] as const;
 
-/** Distinct silhouettes keep the compact mobile navigation legible without relying on colour. */
 const DiscoverIcon = ({ section }: { section: DiscoverSection }) => (
   <svg className="discover-nav-icon" data-icon={section} viewBox="0 0 32 32" aria-hidden="true">
     {section === "solar" ? (

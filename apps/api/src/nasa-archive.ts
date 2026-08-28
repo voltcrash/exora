@@ -20,14 +20,9 @@ const NASA_COLUMNS = [
   "pl_eqt",
   "pl_orbper",
   "pl_orbsmax",
-  // The orbit's shape and tilt, which is what turns a list of sibling worlds into a system that
-  // can be drawn. Both are frequently null — a transit solution usually fixes neither — and stay
-  // that way rather than being filled in with a circle in a shared plane.
   "pl_orbeccen",
   "pl_orbincl",
   "sy_dist",
-  // The host system's place on the sky. With `sy_dist` this fixes where in the galaxy the system
-  // actually is, which is what the renderer needs to draw the real sky as seen from it.
   "ra",
   "dec",
   "disc_year",
@@ -249,8 +244,6 @@ export class NasaPlanetRepository implements PlanetRepository {
   async findByName(name: string): Promise<RepositoryResult<ExoplanetProfile | null>> {
     const normalizedName = name.trim().slice(0, 100);
     const escapedName = escapeAdqlLiteral(normalizedName);
-    // Matched case-insensitively, like `findByHost` below. A shared `?planet=` link carries
-    // whatever casing the sender had, so `/api/planets/kepler-297 b` should still resolve.
     const adql = `select top 1 ${NASA_COLUMNS} from pscomppars where lower(pl_name)=lower('${escapedName}')`;
     const result = await this.#query(adql);
 

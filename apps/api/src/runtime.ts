@@ -7,7 +7,5 @@ export const app = createApp({
   horizonsRepository: new JplHorizonsRepository(),
   repository: new NasaPlanetRepository(),
   starRepository: new SimbadStarRepository(),
-  // Only Vercel's ingress-owned forwarding header is trusted. Direct/local requests have no
-  // equivalent trusted proxy boundary and remain grouped in the conservative fallback bucket.
   trustVercelProxy: Boolean(process.env.VERCEL),
 });

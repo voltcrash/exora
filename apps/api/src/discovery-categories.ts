@@ -1,5 +1,3 @@
-/** The twelve curated planet collections rendered as NASA Exoplanet Archive ADQL. */
-
 export type PlanetDiscoveryCategory =
   | "earth-like"
   | "lava-worlds"
@@ -14,7 +12,6 @@ export type PlanetDiscoveryCategory =
   | "recently-confirmed"
   | "record-breakers";
 
-/** A measured quantity, named for what it is rather than for NASA's column. */
 export type PlanetField =
   | "discoveryYear"
   | "distanceParsecs"
@@ -33,7 +30,6 @@ export type PlanetPredicate =
 
 export type PlanetOrderTerm =
   | { direction: "ascending" | "descending"; field: PlanetField; kind: "column" }
-  /** Orders by `abs(field - target)`: closest to a reference value first. */
   | { field: PlanetField; kind: "nearest"; target: number };
 
 export interface PlanetDiscoveryFilter {
@@ -74,10 +70,8 @@ const nearest = (field: PlanetField, target: number): PlanetOrderTerm => ({
   target,
 });
 
-/** A giant by either measure: some rows carry a radius, some only a mass. */
 const IS_GIANT = any(compare("radiusJupiter", ">=", 0.45), compare("massJupiter", ">=", 0.08));
 
-/** Earth's scale and a temperate equilibrium, the reference both "earth-like" orders point at. */
 const EARTH_LIKE_ORDER: readonly PlanetOrderTerm[] = [
   nearest("radiusEarth", 1),
   nearest("equilibriumTemperature", 255),
@@ -163,8 +157,6 @@ export const renderPlanetPredicate = (predicate: PlanetPredicate): string => {
     case "all":
       return predicate.of.map(renderPlanetPredicate).join(" and ");
     case "any":
-      // Parenthesised because an `any` is routinely one side of an enclosing `all`, where the
-      // looser binding of `or` would otherwise swallow the other conditions.
       return `(${predicate.of.map(renderPlanetPredicate).join(" or ")})`;
   }
 };

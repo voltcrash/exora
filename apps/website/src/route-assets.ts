@@ -2,7 +2,6 @@ import type { RenderQualityTier } from "./render-quality.ts";
 
 export type InitialSceneAsset = "black-hole" | "planet" | "region" | "star" | "system";
 
-/** Selects the renderer module needed by the URL before the scene host has finished booting. */
 export const initialSceneAssetForSearch = (search: string): InitialSceneAsset => {
   const parameters = new URLSearchParams(search);
   if (parameters.has("blackHole")) return "black-hole";
@@ -12,13 +11,6 @@ export const initialSceneAssetForSearch = (search: string): InitialSceneAsset =>
   return "planet";
 };
 
-/**
- * Mission mosaics whose desktop source is larger than 900 kB.
- *
- * The constrained copies retain the full equirectangular coverage at 1024×512, which exceeds the
- * on-screen texel density of these tiers while avoiding a megabyte-scale route request. Smaller
- * source maps stay untouched so a second asset is not shipped without a meaningful saving.
- */
 const CONSTRAINED_SOLAR_MOSAICS = new Set([
   "/textures/solar-system/callisto.jpg",
   "/textures/solar-system/dione.jpg",

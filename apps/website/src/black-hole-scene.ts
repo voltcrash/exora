@@ -48,15 +48,6 @@ interface BlackHoleWorldOptions {
   onFirstFrame: () => void;
 }
 
-/**
- * Builds a disclosed visual model of a black-hole environment.
- *
- * The shadow, orbiting luminous bands, photon-ring reference and optional jets are separate scene
- * layers. Their scale is intentionally readable rather than an angular-size reconstruction; the
- * mass-derived number stays in telemetry, while the scene shows the gravitational signatures an
- * observer would use to recognize this class of object. No telescope pixels are repurposed as a
- * literal nearby view.
- */
 export const createBlackHoleWorld = (
   host: SceneHost,
   { blackHole, onFirstFrame }: BlackHoleWorldOptions,

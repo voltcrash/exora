@@ -34,11 +34,6 @@ const moon = (name: string) => {
   return found;
 };
 
-/**
- * The bug this guards: Mars's equilibrium temperature is 210 K, which the old ice threshold
- * (anything under 250 K) read as a glaciated world, so the surface vista painted the reddest
- * planet in the sky blue-white and gave it an ocean.
- */
 test("Mars reads as red rock, not ice, and carries no standing liquid", () => {
   const { geology, recipe } = geologyFor(MARS);
 
@@ -47,7 +42,6 @@ test("Mars reads as red rock, not ice, and carries no standing liquid", () => {
   expect(recipe.surface.waterLevel).toBe(0);
   expect(geology.liquidLevel).toBeNull();
 
-  // Every stop on the ramp is warmer than it is cool: red above green above blue, throughout.
   for (const [red, green, blue] of geology.ramp) {
     expect(red).toBeGreaterThan(green);
     expect(green).toBeGreaterThan(blue);
@@ -67,8 +61,6 @@ test("Mars's provinces are the landforms Mars actually has", () => {
   expect(geology.windStreaks).toBeGreaterThan(0.5);
 });
 
-/** Resurfacing history is the single most distinctive fact about several of these surfaces, and
- * it shows up as a crater count. A renderer that sprinkles the same craters everywhere erases it. */
 test("crater density follows each body's measured resurfacing history", () => {
   const io = geologyFor(moon("Io")).geology;
   const europa = geologyFor(moon("Europa")).geology;
@@ -77,22 +69,14 @@ test("crater density follows each body's measured resurfacing history", () => {
   const mercury = geologyFor(MERCURY).geology;
   const earth = geologyFor(EARTH).geology;
 
-  // Io is repaved by its own volcanism faster than impacts can mark it: not one crater is known.
   expect(io.craterDensity).toBe(0);
   expect(europa.craterDensity).toBeLessThan(0.1);
   expect(venus.craterDensity).toBeLessThan(0.1);
   expect(earth.craterDensity).toBeLessThan(0.05);
-  // Callisto is the other extreme: the most heavily cratered surface in the Solar System.
   expect(callisto.craterDensity).toBe(1);
   expect(mercury.craterDensity).toBeGreaterThan(0.9);
 });
 
-/**
- * Europa is the smoothest solid surface known, and the vista has to show that — but the figure
- * being compared is the scale of a landscape someone is standing in, not the body's global
- * relief. Globally Europa is thirty times flatter than Mars; stood on, its double ridges are real
- * topography, and the ground still has to read as markedly flatter rather than as featureless.
- */
 test("Europa's ground stays markedly flatter than a rocky planet's, as measured", () => {
   const europa = geologyFor(moon("Europa")).geology;
   const mars = geologyFor(MARS).geology;
@@ -122,8 +106,6 @@ test("every measured body's province weights are normalized", () => {
   }
 });
 
-/** A body no mission has resolved gets a deliberately featureless plain rather than an invented
- * landscape — the same rule the orbital view already follows for the same objects. */
 test("unresolved bodies get no invented landforms", () => {
   const geology = deriveSurfaceGeology(deriveWorldRecipe(MARS), {
     naifId: 20_136_199,
@@ -167,11 +149,6 @@ test("a giant has no ground to stand on and so has no geology", () => {
   expect(deriveSurfaceGeology(gasGiant, null)).toBeNull();
 });
 
-/**
- * A giant has no ground, and the excursion has never pretended otherwise — what a visitor stands
- * on is the top of the convecting cloud layer whose bands the orbital view shows from above. It
- * shares the vista's geometry and light and none of its geology.
- */
 test("a giant's excursion stands on cloud, with no rock in it anywhere", () => {
   const jupiter = SOLAR_SYSTEM_WORLDS.find((world) => world.name === "Jupiter");
   if (!jupiter) throw new Error("Expected a Jupiter profile.");
@@ -185,7 +162,6 @@ test("a giant's excursion stands on cloud, with no rock in it anywhere", () => {
   expect(geology.strataStrength).toBe(0);
   expect(geology.liquidLevel).toBeNull();
   expect(geology.detail.chemistryStrength).toBe(0);
-  // Jupiter's own bands, not whichever family the inference happened to draw for it.
   const [red, green, blue] = geology.ramp[4];
   expect(red).toBeGreaterThan(blue * 1.2);
   expect(green).toBeGreaterThan(blue);

@@ -38,8 +38,6 @@ test("AR wraps and fits the existing foreground while ignoring its virtual sky",
   presentation.place(new Vector3(1, 0, 3));
   scene.render();
 
-  // A two-unit foreground becomes a 68 cm tabletop object. The kilometre-wide virtual sky does
-  // not participate in fitting, and the original lower edge (y=1) lands on the physical plane.
   expect(presentation.proxy.scaling.x).toBeCloseTo(0.34);
   expect(presentation.proxy.position.asArray()).toEqual([1, -0.34, 3]);
   const placedAtmosphere = atmosphere.getAbsolutePosition();

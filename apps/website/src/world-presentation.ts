@@ -8,14 +8,12 @@ import { TransformNode } from "@babylonjs/core/Meshes/transformNode.js";
 import { VertexData } from "@babylonjs/core/Meshes/mesh.vertexData.js";
 import type { Scene } from "@babylonjs/core/scene.js";
 
-/** A bit the desktop/VR cameras see and the AR camera deliberately omits. */
 export const VIRTUAL_BACKGROUND_LAYER_MASK = 0x0800_0000;
 
 const AR_DISPLAY_DIAMETER_METERS = 0.68;
 const MIN_AR_SCALE_FACTOR = 0.25;
 const MAX_AR_SCALE_FACTOR = 4;
 
-/** Marks camera-filling geometry that must give way to passthrough in AR. */
 export const markAsVirtualBackground = <MeshType extends AbstractMesh>(
   mesh: MeshType,
 ): MeshType => {
@@ -30,20 +28,14 @@ export interface WorldPresentationContents {
 }
 
 export interface WorldPresentation {
-  /** Makes the existing world a tabletop-scale, manipulable AR object, initially hidden. */
   beginAr: () => void;
-  /** Captures the world nodes after its one ordinary scene build. */
   capture: (contents: WorldPresentationContents) => void;
   dispose: () => void;
-  /** Restores the exact identity transform used by desktop and immersive VR. */
   endAr: () => void;
   isPlaced: () => boolean;
-  /** Moves a placed world in XR metres without changing its surface height. */
   moveBy: (delta: Vector3) => void;
-  /** Places the bottom of the captured world on the hit-tested physical surface. */
   place: (position: Vector3) => void;
   proxy: Mesh;
-  /** Applies a relative scale change while preserving the world's contact with its surface. */
   scaleBy: (factor: number) => void;
 }
 
@@ -79,12 +71,6 @@ const finiteBounds = (meshes: readonly AbstractMesh[]): { maximum: Vector3; mini
   return { maximum, minimum };
 };
 
-/**
- * Adds a transform-only presentation wrapper around a world's existing nodes.
- *
- * Identity transforms leave desktop and VR byte-for-byte on the scene builders' original path.
- * AR alone scales and moves this wrapper; none of the procedural geometry or shaders are rebuilt.
- */
 export const createWorldPresentation = (scene: Scene): WorldPresentation => {
   const proxy = new Mesh("world-presentation-proxy", scene);
   const contentsRoot = new TransformNode("world-presentation-contents", scene);
@@ -156,9 +142,6 @@ export const createWorldPresentation = (scene: Scene): WorldPresentation => {
       proxyGeometry.applyToMesh(proxy, true);
 
       for (const mesh of meshes) {
-        // A virtual sky follows the tracked camera in both VR and optional AR Space View. It is
-        // deliberately outside the tabletop proxy so placing/scaling a planet cannot shrink its
-        // stars into a small ball around the object.
         if (mesh !== proxy && mesh.layerMask !== VIRTUAL_BACKGROUND_LAYER_MASK && !mesh.parent) {
           mesh.parent = contentsRoot;
         }
@@ -176,10 +159,6 @@ export const createWorldPresentation = (scene: Scene): WorldPresentation => {
       scene.onBeforeRenderObservable.remove(scaleObserver);
     },
     beginAr: () => {
-      // A frozen matrix deliberately ignores parent-transform changes. The orbital atmosphere
-      // uses one on desktop, which otherwise leaves that shell at its original scene-scale pose
-      // while AR shrinks and places the planet underneath it. Let every captured mesh follow the
-      // presentation proxy for AR; `endAr` restores the original optimization.
       for (const mesh of frozenMeshes) mesh.unfreezeWorldMatrix();
       placed = false;
       proxy.position.setAll(0);

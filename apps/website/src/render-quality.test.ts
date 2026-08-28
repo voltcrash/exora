@@ -22,15 +22,11 @@ test("selects a Quest-focused rendering budget", () => {
   });
 
   expect(profile.tier).toBe("quest");
-  // Compared against the desktop budget rather than a literal, so retuning the absolute counts
-  // does not break a test whose point is the relationship between the tiers.
   expect(profile.starCount).toBeLessThan(desktopProfile.starCount);
   expect(profile.planetSegments).toBeLessThan(96);
   expect(profile.xrFramebufferScaleFactor).toBeLessThanOrEqual(1);
   expect(profile.xrFixedFoveation).toBeGreaterThanOrEqual(0.4);
   expect(profile.surfaceMicrodetail).toBe(true);
-  // A diorama draws a whole system at once, so its bodies are coarser than the one full-detail
-  // world the same tier is sized for.
   expect(profile.systemBodySegments).toBeLessThan(profile.planetSegments);
   expect(profile.systemBodySegments).toBeLessThan(desktopProfile.systemBodySegments);
   expect(profile.systemOrbitSegments).toBeLessThan(desktopProfile.systemOrbitSegments);
@@ -66,11 +62,8 @@ test("caps a HiDPI desktop at a stable initial render density", () => {
     pixelRatio: 3,
   });
 
-  // Babylon renders at cssPixels / hardwareScalingLevel. The desktop cap is 1.25x, so a 2x
-  // panel starts at 0.8 rather than allocating a native-density 2x framebuffer.
   expect(retina.hardwareScalingLevel).toBe(0.8);
   expect(standard.hardwareScalingLevel).toBe(1);
-  // A 3x panel is capped at that same 1.25x ceiling rather than paying for full density.
   expect(dense.hardwareScalingLevel).toBe(0.8);
 });
 

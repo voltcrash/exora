@@ -6,14 +6,6 @@ import { PlanetExperience } from "./PlanetExperience.tsx";
 import { StarExperience } from "./StarExperience.tsx";
 import { MissionControl } from "./MissionControl.tsx";
 
-/**
- * Discover sheds its text on narrow phones and keeps only a decorative telescope mark. The name
- * therefore has to come from an attribute the media query cannot reach. The same is true of the
- * immersive entry beside it on the deck, which loses its copy at the same width.
- *
- * `renderToStaticMarkup` is enough: no effect runs, no scene mounts, and the control deck is the
- * part of the tree that renders from props alone.
- */
 const sirius: StarProfile = {
   catalogName: "* alf CMa",
   id: "alf-cma",
@@ -67,7 +59,6 @@ const starMarkup = (): string =>
     />,
   );
 
-/** Every button on the top navigation deck, in the order the markup places them. */
 const deckButtons = (markup: string): string[] => {
   const start = markup.indexOf('class="control-deck"');
   expect(start).toBeGreaterThan(-1);
@@ -75,15 +66,12 @@ const deckButtons = (markup: string): string[] => {
   return [...deck.matchAll(/<button[^>]*>/g)].map(([tag]) => tag);
 };
 
-/** The name each of those buttons answers to, preserving the navigation and keyboard order. */
 const deckNames = (markup: string): string[] =>
   deckButtons(markup).map((button) => /aria-label="([^"]+)"/.exec(button)?.[1] ?? "");
 
 test("the world view gathers every control onto one named deck", () => {
   const markup = planetMarkup();
 
-  // Discover, clear view and the immersive entry: navigation first, presentation second and the
-  // optional headset mode last, matching both the visible and keyboard order.
   expect(deckNames(markup)).toEqual(["Open Discover", "Hide the interface", "XR: NOT AVAILABLE"]);
   expect(markup).toContain('<kbd class="shortcut-icon" aria-label="Backspace or Delete">⌫</kbd>');
   expect(markup).toContain('<kbd class="shortcut-icon" aria-label="Tab">⇥</kbd>');
@@ -91,7 +79,6 @@ test("the world view gathers every control onto one named deck", () => {
   expect(markup).toContain('class="clear-view-icon"');
   expect(markup).toContain("<small>XR</small><strong>NOT AVAILABLE</strong>");
 
-  // Nothing is left in the top bar but the way home.
   const header = markup.slice(markup.indexOf("<header"), markup.indexOf("</header>"));
   expect([...header.matchAll(/<button[^>]*>/g)]).toHaveLength(0);
 });

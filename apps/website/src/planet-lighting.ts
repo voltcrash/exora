@@ -6,7 +6,6 @@ import type { Rgb, WorldRecipe } from "@exora/worldgen";
 
 const toColor3 = ([red, green, blue]: Rgb): Color3 => new Color3(red, green, blue);
 
-/** Creates the world-owned key light while the host keeps ownership of the shared scene. */
 export const createPlanetKeyLight = (
   scene: Scene,
   direction: Vector3,

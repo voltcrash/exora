@@ -32,8 +32,6 @@ test("an ascending sort needs no modifier", () => {
 });
 
 test("a disjunction is parenthesised so an enclosing conjunction cannot swallow it", () => {
-  // `extreme-weather` is a temperature bound AND a giant-by-either-measure test; without the
-  // parentheses `or` binds loosest and the temperature bound would apply to only one branch.
   const where = renderPlanetPredicate(PLANET_DISCOVERY_FILTERS["extreme-weather"].where);
 
   expect(where).toBe("pl_eqt >= 1200 and (pl_radj >= 0.45 or pl_bmassj >= 0.08)");

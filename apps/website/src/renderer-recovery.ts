@@ -6,7 +6,6 @@ export type RendererEvent =
   | "frame-rendered"
   | "render-failed";
 
-/** Keeps the context lifecycle deterministic and independently testable from WebGL. */
 export const transitionRendererStatus = (
   current: RendererStatus,
   event: RendererEvent,

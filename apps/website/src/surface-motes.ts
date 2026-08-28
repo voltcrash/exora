@@ -10,20 +10,6 @@ import type { Scene } from "@babylonjs/core/scene.js";
 import type { RenderQualityProfile } from "./render-quality.ts";
 import type { SurfaceGeology } from "./surface-geology.ts";
 
-/**
- * What is in the air between the viewer and everything else.
- *
- * A vista with perfectly clear air between the eye and the ground reads as a diorama under glass,
- * however good the ground is — there is nothing at arm's length for the eye to focus on, and in a
- * headset that absence is the loudest thing in the scene. So: dust on a windy world, snow on an
- * icy one, embers over molten ground, and on an airless one nothing at all, because there is
- * nothing to hold anything up.
- *
- * The whole field is one draw call and never touched by the CPU after it is built. Particles ride
- * a box pinned to the viewer and wrap around inside it in the vertex shader, so a visitor walks
- * through weather that has no beginning and no end rather than through a fixed cloud of specks.
- */
-
 const MOTE_VERTEX_SHADER = `
 precision highp float;
 
@@ -44,25 +30,16 @@ varying float vPhase;
 varying float vForward;
 
 void main(void) {
-  // Wrapped around a box that follows the eye: a particle leaving one face re-enters the opposite
-  // one, so a field of a couple of thousand covers a walk of any length.
   vec3 drifted = position + drift * time;
-  // Centred a little above the eye rather than on it, because what is airborne is mostly between
-  // the eye and the ground rather than evenly split above and below it.
   vec3 anchor = viewer + boxCenter;
   vec3 relative = mod(drifted - anchor + boxSize * 0.5, boxSize) - boxSize * 0.5;
   vec3 world = anchor + relative;
   vec4 clip = viewProjection * vec4(world, 1.0);
 
   float distance = length(world - viewer);
-  // Gone at the far wall of the box, and gone again right at the eye — a mote in front of the
-  // cornea is a smear, not a mote.
   vFade = (1.0 - smoothstep(boxSize.x * 0.22, boxSize.x * 0.5, distance))
     * smoothstep(0.5, 2.6, distance);
   vPhase = uv.y;
-  // A grain in the air is only really visible when it is between the eye and the light: what
-  // reaches the eye is sunlight scattered forward through it, which is why dust and snow show up
-  // as a haze around the sun and as nothing at all with the sun behind you.
   vForward = pow(max(dot(normalize(world - viewer), sunDirection), 0.0), 3.0);
   gl_PointSize = clamp(pointScale * uv.x * (0.65 + vForward * 0.5) / max(clip.w, 0.001), 1.0, 14.0);
   gl_Position = clip;
@@ -86,9 +63,7 @@ void main(void) {
   vec2 offset = gl_PointCoord - 0.5;
   float radius = dot(offset, offset) * 4.0;
   if (radius > 1.0) discard;
-  // Soft-edged rather than a square: a hard-edged speck reads as a dead pixel.
   float shape = (1.0 - radius) * (1.0 - radius);
-  // Every grain is a different facet catching the light at a different moment.
   float flicker = 1.0 - twinkle * (0.5 + 0.5 * sin(time * 3.1 + vPhase * 62.8));
   float alpha = shape * vFade * opacity * flicker * (0.4 + vForward * 1.5);
   if (alpha <= 0.004) discard;
@@ -102,9 +77,7 @@ const MOTE_BUDGET: Readonly<Record<RenderQualityProfile["tier"], number>> = {
   quest: 800,
 };
 
-/** How wide a volume the motes fill around the viewer, in scene units. */
 const BOX = new Vector3(72, 26, 72);
-/** Where that volume sits relative to the eye. */
 const BOX_CENTER = new Vector3(0, 5.5, 0);
 
 const createSeededRandom = (seed: number): (() => number) => {
@@ -124,7 +97,6 @@ export interface SurfaceMotesOptions {
   profile: RenderQualityProfile;
   skyHorizonColor: Color3;
   sunColor: Color3;
-  /** Unit vector from the ground toward the host star. */
   sunDirection: Vector3;
 }
 
@@ -134,13 +106,11 @@ export interface SurfaceMotes {
   update: (elapsedSeconds: number, cameraPosition: Vector3) => void;
 }
 
-/** What this world has in its air, if anything. */
 const moteKind = (
   geology: SurfaceGeology,
 ): { drift: Vector3; opacity: number; size: number; tint: Color3; twinkle: number } | null => {
   const wind = new Vector3(Math.cos(geology.windDirection), 0, Math.sin(geology.windDirection));
 
-  // Sparks off molten ground, rising on their own heat.
   if (geology.lavaGlow > 0.15) {
     return {
       drift: new Vector3(wind.x * 1.1, 2.4, wind.z * 1.1),
@@ -151,10 +121,8 @@ const moteKind = (
     };
   }
 
-  // Nothing stays airborne without air.
   if (geology.hazeDensity < 0.06) return null;
 
-  // Ice crystals falling out of a cold sky, sliding sideways as they go.
   if (geology.frostCoverage > 0.45) {
     return {
       drift: new Vector3(wind.x * 1.6, -1.15, wind.z * 1.6),
@@ -165,7 +133,6 @@ const moteKind = (
     };
   }
 
-  // Dust, carried by whatever wind this world has.
   if (geology.windStreaks > 0.18) {
     return {
       drift: new Vector3(wind.x * 4.6, -0.18, wind.z * 4.6),
@@ -203,7 +170,6 @@ export const createSurfaceMotes = (
     positions[index * 3] = (random() - 0.5) * BOX.x;
     positions[index * 3 + 1] = (random() - 0.5) * BOX.y;
     positions[index * 3 + 2] = (random() - 0.5) * BOX.z;
-    // Grain sizes follow a power law like everything else loose on a world.
     attributes[index * 2] = 0.35 + random() ** 2.6 * 1.9;
     attributes[index * 2 + 1] = random();
     indices.push(index);
@@ -216,8 +182,6 @@ export const createSurfaceMotes = (
   mesh.isUnIndexed = true;
   mesh.parent = parent;
   mesh.isPickable = false;
-  // The mesh's own bounds say nothing about where its particles end up, since they are placed
-  // around the viewer in the vertex shader.
   mesh.alwaysSelectAsActiveMesh = true;
 
   const material = new ShaderMaterial(
@@ -248,7 +212,6 @@ export const createSurfaceMotes = (
   material.setVector3("boxCenter", BOX_CENTER);
   material.setFloat("time", 0);
   material.setFloat("pointScale", kind.size);
-  // Lit by the sun it is floating in, tinted toward the sky it is floating under.
   material.setColor3(
     "tint",
     Color3.Lerp(

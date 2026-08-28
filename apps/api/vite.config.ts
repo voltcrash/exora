@@ -13,9 +13,7 @@ export default defineConfig({
   pack: {
     entry: ["src/index.ts", "src/vercel.ts"],
     deps: {
-      // Vercel traces the generated entry point, not the original monorepo. If a workspace
-      // dependency remains external, the function contains a symlink to source that is absent
-      // from /var/task and every API route fails during module loading.
+      // Vercel cannot follow workspace source symlinks from the generated function.
       alwaysBundle: [/^hono(?:\/.*)?$/, "@exora/contracts"],
       onlyBundle: ["hono"],
     },

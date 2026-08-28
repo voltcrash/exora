@@ -66,14 +66,12 @@ test("the measured extremes land on the ends of the radial band", () => {
 });
 
 test("a compact system is drawn inside the band rather than stretched across it", () => {
-  // Four worlds inside a tenth of a decade. Filling the band would claim they are spread out.
   const mapping = deriveDistanceMapping([0.02, 0.021, 0.022, 0.023]);
 
   expect(mapping.widened).toBe(true);
   expect(mapping.decades).toBe(MIN_MAPPED_DECADES);
   expect(mapDistance(mapping, 0.02)).toBeGreaterThan(DIORAMA_INNER_SCENE_UNITS);
   expect(mapDistance(mapping, 0.023)).toBeLessThan(DIORAMA_OUTER_SCENE_UNITS);
-  // Still centred, so the diorama reads as a tight cluster in the middle of the room.
   const centre = (DIORAMA_INNER_SCENE_UNITS + DIORAMA_OUTER_SCENE_UNITS) / 2;
   expect((mapDistance(mapping, 0.02) + mapDistance(mapping, 0.023)) / 2).toBeCloseTo(centre, 6);
 });
@@ -90,8 +88,6 @@ test("the mapping rises with distance and never draws through the star", () => {
   const mapping = deriveDistanceMapping([0.05, 1.2]);
 
   expect(mapDistance(mapping, 0.5)).toBeGreaterThan(mapDistance(mapping, 0.2));
-  // A very eccentric perihelion maps arbitrarily far below the band; it is held at the floor
-  // rather than passing through the centre.
   expect(mapDistance(mapping, 1e-6)).toBe(DIORAMA_FLOOR_SCENE_UNITS);
   expect(mapDistance(mapping, 0)).toBe(DIORAMA_FLOOR_SCENE_UNITS);
 });
@@ -101,7 +97,6 @@ test("the floor is held clear of the host star's own disc, however large it is d
     world("Giant host b", { hostRadiusSolar: 900, orbitalEccentricity: 0.9, semiMajorAxisAu: 3 }),
   ]);
 
-  // The default floor would sit inside a star this size, so the mapping's own floor moves out.
   expect(giant.mapping.floorSceneUnits).toBeGreaterThan(giant.hostRadiusSceneUnits);
   expect(mapDistance(giant.mapping, 1e-9)).toBeGreaterThan(giant.hostRadiusSceneUnits);
 });
@@ -144,7 +139,6 @@ test("a missing shape or plane is drawn as a circle in the shared plane and says
     eccentricitySource: "assumed",
     inclinationSource: "assumed",
   });
-  // The distinction the contract exists to keep: a drawn zero is not a measured zero.
   expect(elements && orbitTiltRadians(elements.inclinationDegrees)).toBe(0);
   expect(elements && elementProvenance(elements)).toContain("SHAPE ASSUMED CIRCULAR");
   expect(elements && elementProvenance(elements)).toContain("PLANE ASSUMED SHARED");
@@ -183,7 +177,6 @@ test("an untimed orbit borrows a period from its size, or admits it has none", (
 
 test("a world the archive places nowhere is not placed anywhere", () => {
   expect(deriveOrbitElements(world("Nowhere b", { hostMassSolar: null }))).toBe(null);
-  // A period alone is not enough: without a host mass there is no third law to apply.
   expect(
     deriveOrbitElements(world("Nowhere c", { hostMassSolar: null, orbitalPeriodDays: 12 })),
   ).toBe(null);
@@ -199,7 +192,6 @@ test("a circular orbit sweeps at a constant radius and an eccentric one does not
   expect(trueAnomalyFromEccentric(eccentricAnomaly(1.1, 0), 0)).toBeCloseTo(1.1, 9);
   expect(orbitRadiusAu(1, 0, 2.4)).toBeCloseTo(1, 9);
 
-  // Perihelion at a(1 - e), aphelion at a(1 + e): the two numbers eccentricity is there to give.
   expect(orbitRadiusAu(1, 0.4, 0)).toBeCloseTo(0.6, 9);
   expect(orbitRadiusAu(1, 0.4, Math.PI)).toBeCloseTo(1.4, 9);
 });
@@ -213,7 +205,6 @@ test("Kepler's equation is solved to the true anomaly at both ends of the ellips
     expect(
       Math.abs(trueAnomalyFromEccentric(eccentricAnomaly(Math.PI, eccentricity), eccentricity)),
     ).toBeCloseTo(Math.PI, 6);
-    // The solution has to satisfy the equation it came from, not merely converge to something.
     const anomaly = eccentricAnomaly(2.2, eccentricity);
     expect(anomaly - eccentricity * Math.sin(anomaly)).toBeCloseTo(2.2, 9);
   }
@@ -263,7 +254,6 @@ test("a system is laid out innermost first, keeping the worlds it cannot place",
     "Outer d",
   ]);
   expect(layout.unplaced.map(({ name }) => name)).toEqual(["Nowhere e"]);
-  // The innermost world is what the clock is pinned to, so every system is watchable.
   expect(layout.daysPerSecond).toBeCloseTo(4 / INNERMOST_ORBIT_SECONDS, 9);
 });
 
@@ -283,7 +273,6 @@ test("bodies keep their size ordering while the range is compressed", () => {
 
   expect(jupiter).toBeGreaterThan(earth);
   expect(star).toBeGreaterThan(jupiter);
-  // Compressed rather than linear: a hundred-fold radius is not drawn a hundred times larger.
   expect(star / earth).toBeLessThan(20);
 });
 
@@ -319,6 +308,5 @@ test("the readouts state the compressions rather than leaving the layout to look
 
   expect(orbitMappingLabel(layout)).toBe("LOG · 0.050–1.20 AU → 3.0–13.0 m");
   expect(timeScaleLabel(layout)).toBe("1 s = 0.444 d");
-  // Bodies are drawn hundreds of times larger than the orbits around them, and the number says so.
   expect(bodyExaggeration(layout.mapping)).toBeGreaterThan(100);
 });

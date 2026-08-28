@@ -51,12 +51,7 @@ export const PlanetExperience = ({
   const [findSolarWorld, setFindSolarWorld] = useState<
     ((name: string) => ExoplanetProfile | null) | null
   >(null);
-  // The same guard `hostJumpState` gives the panel button, in a form the scene can read. The star
-  // in the sky is clicked through a handler the mount closes over once, so it would otherwise keep
-  // testing the state as it stood on the frame the world was built.
   const hostJumpRef = useRef(false);
-  // The moon list arrives after the subsystem is mounted, so the scene's handler reads the lookup
-  // through a ref rather than closing over whichever value it had at build time.
   const findSolarWorldRef = useRef<((name: string) => ExoplanetProfile | null) | null>(null);
   findSolarWorldRef.current = findSolarWorld;
   const planet = result.planet;
@@ -70,9 +65,6 @@ export const PlanetExperience = ({
     [planet, recipeOverride],
   );
 
-  // The authored moon catalog is substantial and only nine Solar System destinations can use it.
-  // Keep it out of the landing route's eager bundle; a world is already coherent while this small
-  // optional layer arrives, and the switch appears as soon as its data is ready.
   useEffect(() => {
     let active = true;
     if (!solar) {
@@ -94,9 +86,6 @@ export const PlanetExperience = ({
     };
   }, [planet.name, solar]);
 
-  // Whether the page is between destinations, and whether this view's own panels belong to the
-  // world being left. The flight replaces the loading card entirely: while one is in the air the
-  // card must never appear, or it would cover the very thing it used to stand in for.
   const travelling = travelPhase === "departing" || travelPhase === "crossing";
   const settled = sceneState !== "loading" || travelPhase !== "idle";
 
@@ -104,11 +93,7 @@ export const PlanetExperience = ({
     if (result.mode === "custom" || hostJumpRef.current) return;
     hostJumpRef.current = true;
     setHostJumpState("loading");
-    // The camera starts pulling away while the archive is still being asked, so the click reads
-    // as having done something long before the answer decides where it is going.
     host?.beginTravel();
-    // A lookup that fails outright is a destination that is not there: it has to reach the
-    // `cancelTravel` below, or the flight would hang pulled back with no world to return to.
     const found = await onSelectHostStar(planet.hostStar).catch(() => false);
     hostJumpRef.current = false;
     if (!found) {
@@ -117,7 +102,6 @@ export const PlanetExperience = ({
     }
   };
 
-  /** The counterpart of travelling in to the host star: pull back to the whole system. */
   const openHostSystem = async (): Promise<void> => {
     if (result.mode === "custom" || systemJumpState === "loading") return;
     setSystemJumpState("loading");
@@ -127,10 +111,6 @@ export const PlanetExperience = ({
     setSystemJumpState(found ? "idle" : "error");
   };
 
-  // Both routes out of this world are named by the world itself, so they are asked for now
-  // rather than when the visitor clicks — a flight that has to wait for an archive is a flight
-  // that stops in mid-air. Nothing here waits on the answer; it is only put where the jump will
-  // find it. Custom worlds have no archive behind them and nothing to ask about.
   useEffect(() => {
     if (result.mode !== "custom") warmDestinations(planet.hostStar);
   }, [planet.hostStar, result.mode]);
@@ -146,9 +126,6 @@ export const PlanetExperience = ({
     return () => window.clearInterval(fpsTimer);
   }, [host]);
 
-  // The world is handed to the shared renderer, which disposes the previous one as it takes
-  // this one. Nothing is torn down when this view unmounts: a running immersive session is
-  // living on that renderer, and the destination replacing this view is what releases it.
   useEffect(() => {
     if (!host) return;
 
@@ -163,7 +140,6 @@ export const PlanetExperience = ({
               onFirstFrame: () => {
                 if (!abandoned) setSceneState("ready");
               },
-              // Only the moons Exora has a world for are destinations; the rest stay scenery.
               onSelectMoon: (name) => {
                 const destination = findSolarWorldRef.current?.(name);
                 if (destination) onSelectPlanet(destination, true);
@@ -179,8 +155,6 @@ export const PlanetExperience = ({
               planet,
               recipe,
               onViewModeChange: setViewMode,
-              // A World Forge world has no archive behind it, so its sun is scenery rather than
-              // somewhere to go, and is built unclickable rather than clickable and inert.
               ...(result.mode === "custom" ? {} : { onSelectHostStar: () => void openHostStar() }),
               onFirstFrame: () => {
                 if (!abandoned) setSceneState("ready");
@@ -250,8 +224,6 @@ export const PlanetExperience = ({
   return (
     <div
       className={`experience-shell view-${viewMode} ${subsystemActive ? "subsystem-experience" : ""} ${settled ? "scene-ready" : ""} ${sceneState === "error" ? "scene-error" : ""} ${travelling ? "travelling" : ""} ${chromeHidden ? "chrome-hidden" : ""}`}
-      // The dark over a descent is one timeline with the camera flying it, so the stylesheet is
-      // told how long that is rather than keeping its own copy of the number.
       style={{ "--surface-transition": `${SURFACE_TRANSITION_MS}ms` } as CSSProperties}
     >
       <div className="space-haze" aria-hidden="true" />
@@ -700,10 +672,6 @@ export const PlanetExperience = ({
                   ? "SCALE SYSTEM"
                   : "ZOOM / APPROACH",
           },
-          // Advertised only where the thing to click is unmistakably on screen and certain to be
-          // there. The star is in the sky of the surface view too, but a world with air thick
-          // enough hides its sun entirely, and a legend has to be true of every world it appears
-          // over. A World Forge world has no star to resolve at all.
           ...(viewMode === "subsystem"
             ? [{ key: "CLICK", meaning: "VISIT MOON" }]
             : viewMode === "orbit" && result.mode !== "custom"

@@ -5,12 +5,10 @@ export interface RegisteredSceneHost<Canvas> {
 
 export interface SceneHostRegistry<Canvas, Host extends RegisteredSceneHost<Canvas>> {
   acquire: (canvas: Canvas) => Host;
-  /** Forgets a host that disposed itself outside the registry. */
   forget: (host: Host) => void;
   recreate: (canvas: Canvas) => Promise<Host>;
 }
 
-/** Keeps ordinary mounts on one renderer while allowing explicit recovery to replace it safely. */
 export const createSceneHostRegistry = <Canvas, Host extends RegisteredSceneHost<Canvas>>(
   create: (canvas: Canvas) => Host,
 ): SceneHostRegistry<Canvas, Host> => {
@@ -40,8 +38,6 @@ export const createSceneHostRegistry = <Canvas, Host extends RegisteredSceneHost
         current = replacement;
         return replacement;
       });
-      // A rapid second retry must wait for the first replacement to finish, even if creating it
-      // failed. Otherwise two engines can once again ask the same canvas for a context together.
       recreation = operation.then(
         () => undefined,
         () => undefined,

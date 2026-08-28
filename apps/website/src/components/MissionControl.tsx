@@ -13,7 +13,6 @@ const xrAvailabilityCopy: Record<XrStatus, "AR AVAILABLE" | "NOT AVAILABLE" | "V
 
 const readyStatuses = new Set<XrStatus>(["ready-ar", "ready-ar-launch", "ready-vr"]);
 
-/** A shared wraparound spatial visor, drawn in the same instrument-line style as the deck. */
 const ImmersiveModeIcon = () => (
   <svg className="immersive-mode-icon" viewBox="0 0 32 28" aria-hidden="true">
     <path d="M4.5 10.5C5.2 7 8.3 5 12.5 5h7c4.2 0 7.3 2 8 5.5l.7 5.4c.4 3.1-1.5 5.1-4.4 5.1h-3.1c-2.1 0-2.8-2.8-4.7-2.8S13.4 21 11.3 21H8.2c-2.9 0-4.8-2-4.4-5.1l.7-5.4Z" />
@@ -22,7 +21,6 @@ const ImmersiveModeIcon = () => (
   </svg>
 );
 
-/** One key, and what it does to the scene under the deck. */
 export interface ControlHint {
   key: string;
   meaning: string;
@@ -30,29 +28,13 @@ export interface ControlHint {
 
 interface MissionControlProps {
   chromeHidden: boolean;
-  /** The legend for this view: every gesture the scene answers to, in reading order. */
   hints: ControlHint[];
   onToggleChrome: () => void;
   onOpenDiscover: () => void;
-  /** Whether the world under the deck failed to build. */
   sceneFailed: boolean;
-  /** Left out by the views with no immersive scene to enter. */
   xr?: { host: SceneHost | null; status: XrStatus } | undefined;
 }
 
-/**
- * MISSION CONTROL — the navigation deck at the top right, and the instruction line at the bottom.
- *
- * Discover, the gesture legend, the frame counter, the clear-view switch and the immersive entry
- * each used to hold a different corner of the screen. Gathering them cost nothing but showed what
- * each one was: three of them are controls and two of them are reading matter, and a tray of five
- * cells made no distinction between pressing something and being told something.
- *
- * So the deck is now the three controls alone — Discover, clear view, the immersive entry — in
- * the same order a visitor moves from navigation to presentation to the optional headset mode.
- * The frame counter went to the archive panel's signal bars; the legend, and the alert that
- * replaces it, sit outside the deck as copy rather than as cells that look pressable and are not.
- */
 export const MissionControl = ({
   chromeHidden,
   hints,
@@ -62,11 +44,6 @@ export const MissionControl = ({
   xr,
 }: MissionControlProps) => (
   <footer className="mission-control">
-    {/*
-     * A renderer that could not build the world has no gestures to advertise, so the alert takes
-     * the legend's line rather than a place of its own. The deck below is untouched by either —
-     * travelling somewhere else is the way out of a world that would not assemble.
-     */}
     {sceneFailed ? (
       <p className="scene-alert" role="status">
         RENDERER UNAVAILABLE
@@ -108,7 +85,6 @@ export const MissionControl = ({
         </button>
       </div>
 
-      {/* Rendered only where there is a scene to enter: an absent group leaves no empty slot. */}
       {xr ? (
         <div className="deck-group deck-actions">
           <button

@@ -11,26 +11,18 @@ export interface PersistentSceneResources {
   camera: ArcRotateCamera;
   engine: Engine;
   scene: Scene;
-  /** Releases the page-lifetime resources. Worlds are removed separately before this is called. */
   dispose: () => void;
 }
 
-/** Creates the one Babylon engine, scene, and desktop camera that every destination shares. */
 export const createPersistentScene = (
   canvas: HTMLCanvasElement,
   profile: RenderQualityProfile,
 ): PersistentSceneResources => {
   const engine = new Engine(
     canvas,
-    // Native-density Retina rendering plus MSAA can require several full-size GPU buffers before
-    // the first world is even mounted. The scene's procedural edges are already filtered by its
-    // material shaders; keeping MSAA off avoids a context-loss spiral on browsers with tighter
-    // per-tab GPU budgets.
     false,
     {
       antialias: false,
-      // Variant Launch composites the iPhone camera behind the page. The WebGL context therefore
-      // needs an alpha channel even though desktop and immersive VR still clear it opaquely.
       alpha: true,
       doNotHandleContextLost: false,
       preserveDrawingBuffer: false,
@@ -43,8 +35,6 @@ export const createPersistentScene = (
   const scene = new Scene(engine);
   scene.clearColor = DEFAULT_CLEAR_COLOR.clone();
   scene.performancePriority = ScenePerformancePriority.Intermediate;
-  // The intermediate priority also turns off the colour clear, which leaves each eye smearing
-  // the previous frame in an immersive session. Nothing here paints every pixel, so clear.
   scene.autoClear = true;
   scene.skipPointerMovePicking = true;
 
@@ -71,7 +61,6 @@ export const createPersistentScene = (
   };
 };
 
-/** Undoes scene-level settings a world may change without touching host-owned resources. */
 export const resetPersistentScene = (scene: Scene, camera: ArcRotateCamera): void => {
   camera.detachControl();
   scene.clearColor = DEFAULT_CLEAR_COLOR.clone();

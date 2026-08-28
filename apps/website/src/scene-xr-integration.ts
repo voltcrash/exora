@@ -36,7 +36,6 @@ const statusFor = (destination: ImmersiveDestination): XrStatus => {
   return destination.launchUrl ? "ready-ar-launch" : "ready-ar";
 };
 
-/** Owns XR capability discovery and the user-visible status around the persistent session. */
 export const createXrIntegration = ({
   getLaunchUrl,
   onLaunchReady,

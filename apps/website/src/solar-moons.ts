@@ -22,7 +22,6 @@ interface MoonParameters {
   retrograde?: boolean;
   sourceSlug: string;
   summary: string;
-  /** Page the shipped mosaic was retrieved from, when it is not NASA's 3D Resources mirror. */
   textureSourceUrl?: string;
 }
 
@@ -66,8 +65,6 @@ const moon = ({
     massJupiter: null,
     orbitalEccentricity: null,
     orbitalInclinationDegrees: null,
-    // The renderer needs the body's distance from the Sun to light it correctly. Its measured
-    // local orbit remains alongside the JPL identity below and is what the interface displays.
     orbitalPeriodDays: parentOrbitalPeriodDays,
     radiusEarth: radiusKilometers / EARTH_MEAN_RADIUS_KM,
     radiusJupiter: null,

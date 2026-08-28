@@ -23,8 +23,6 @@ test("a tab on the main screen toggles the interface", () => {
   expect(togglesClearView(tab())).toBe(true);
   expect(togglesClearView(tab({ target: element("BODY") }))).toBe(true);
   expect(togglesClearView(tab({ target: element("CANVAS") }))).toBe(true);
-  // The button that hides the interface is itself hidden by the press, so the press that brings
-  // the interface back arrives with the button no longer there to have focus.
   expect(togglesClearView(tab({ target: element("BUTTON") }))).toBe(true);
 });
 
@@ -35,8 +33,6 @@ test("no other key toggles the interface", () => {
 });
 
 test("a tab anywhere but the main screen is left to the browser", () => {
-  // A dialog traps focus for its own controls, and a recovery screen is one button asking to be
-  // reached — neither is somewhere hiding the interface behind them would mean anything.
   expect(togglesClearView(tab({ onMainScreen: false }))).toBe(false);
 });
 

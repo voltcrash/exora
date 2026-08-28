@@ -11,13 +11,6 @@ export interface SceneHostController {
   status: SceneHostStatus;
 }
 
-/**
- * Gives the first React paint a chance to reach the screen before the Babylon graph is evaluated.
- *
- * The renderer is intentionally dynamic, but a passive effect can still run before the browser's
- * next paint when the canvas ref causes a follow-up render. A zero-delay task queued from the next
- * animation frame crosses that paint boundary without adding a human-visible startup delay.
- */
 const afterFirstPaint = (callback: () => void): (() => void) => {
   let timeoutId: number | null = null;
   const frameId = window.requestAnimationFrame(() => {
@@ -30,7 +23,6 @@ const afterFirstPaint = (callback: () => void): (() => void) => {
   };
 };
 
-/** Starts fetching the destination renderer while the shared Babylon host is being evaluated. */
 const preloadInitialScene = (asset: InitialSceneAsset): Promise<unknown> => {
   switch (asset) {
     case "black-hole":
@@ -46,14 +38,6 @@ const preloadInitialScene = (asset: InitialSceneAsset): Promise<unknown> => {
   }
 };
 
-/**
- * The shared renderer, resolved once the Babylon bundle has loaded.
- *
- * The host is deliberately owned above the planet and star views rather than inside them: it
- * holds the WebGL context an immersive session is bound to, so it has to survive React swapping
- * one view for the other. A restart deliberately replaces that host, causing the active view to
- * remount its world on a fresh engine without losing the selected destination in React or the URL.
- */
 export const useSceneHost = (canvas: HTMLCanvasElement | null): SceneHostController => {
   const [host, setHost] = useState<SceneHost | null>(null);
   const [status, setStatus] = useState<SceneHostStatus>("initializing");
@@ -72,16 +56,9 @@ export const useSceneHost = (canvas: HTMLCanvasElement | null): SceneHostControl
     setStatus("initializing");
     const cancelStartup = afterFirstPaint(() => {
       if (cancelled) return;
-      // The first destination used to wait for this host to finish evaluating before its own
-      // renderer request even began. Both graphs are independent until mount, so fetch them in
-      // parallel and let the destination find its module warm when the host becomes available.
       void preloadInitialScene(initialSceneAssetForSearch(window.location.search)).catch(
         () => undefined,
       );
-      // Started alongside the renderer, not with the first world that wants it. The star catalogue
-      // is one memoized download for the life of the page, and a destination builds its sky on the
-      // microtask that resolves it — so getting the request out now is what keeps the very first
-      // arrival from rendering a frame or two of empty space before its stars appear.
       void import("./sky-catalog.ts").then(({ loadSkyCatalog }) => loadSkyCatalog());
       void import("./scene-host.ts")
         .then(async ({ acquireSceneHost, recreateSceneHost }) => {

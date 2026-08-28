@@ -94,7 +94,6 @@ const bindProceduralSurface = (
   }
 };
 
-/** Binds either measured mosaics or cached procedural detail to the already-created material. */
 export const bindPlanetSurfaceAssets = (
   scene: Scene,
   shader: ShaderMaterial,

@@ -91,7 +91,6 @@ test("AR makes the page transparent and places from the XR select event", () => 
       rotationQuaternion: Quaternion.Identity(),
     } as IWebXRHitResult,
   ]);
-  // A touchscreen transient ray must not pull the reticle/placement pose towards the finger.
   hitResults.notifyObservers([
     {
       isTransient: true,

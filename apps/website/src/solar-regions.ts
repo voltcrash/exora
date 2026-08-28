@@ -357,11 +357,6 @@ const compressedRadius = (region: SolarRegionProfile, distanceAu: number): numbe
   return 4 + ((distanceAu - region.distanceAu.inner) / span) * 8;
 };
 
-/**
- * Builds a repeatable population sample for the regional views. It intentionally has no object
- * identifiers: these points communicate aggregate structure and must never masquerade as an
- * asteroid/comet catalogue or an ephemeris solution.
- */
 export const sampleRegionParticles = (
   region: SolarRegionProfile,
   requestedCount: number,
@@ -378,8 +373,6 @@ export const sampleRegionParticles = (
     let verticalSpread = 0.04;
 
     if (region.id === "region-main-asteroid-belt") {
-      // Principal resonances are represented only as depleted statistical bands. This does not
-      // assign an orbit to any point; it keeps the aggregate view from becoming a uniform torus.
       const nearestGap = [2.5, 2.82, 2.95].find((gap) => Math.abs(distance - gap) < 0.035);
       if (nearestGap !== undefined && random() < 0.82) {
         distance += distance < nearestGap ? -0.055 : 0.055;

@@ -10,7 +10,6 @@ export interface RenderLifecycle {
   readonly isRunning: boolean;
   readonly suspensionCount: number;
   dispose: () => void;
-  /** Marks a world-build failure that occurred outside the frame callback. */
   fail: () => void;
   onStatus: (listener: (status: RendererStatus) => void) => () => void;
   renderFrame: () => void;
@@ -26,7 +25,6 @@ export interface RenderLifecycleOptions {
   scene: Scene;
 }
 
-/** Owns frame production and recovery signalling for one page-lifetime engine. */
 export const createRenderLifecycle = ({
   engine,
   isInXr,
@@ -48,9 +46,6 @@ export const createRenderLifecycle = ({
 
   const renderFrame = (): void => {
     if (disposed) return;
-    // Browsers can deliver one callback that was already queued when WebGL reports a lost
-    // context. Rendering that callback throws from the unavailable context and used to turn a
-    // recoverable interruption into the permanent recovery screen.
     if (status === "context-lost") return;
     try {
       scene.render();
@@ -58,7 +53,6 @@ export const createRenderLifecycle = ({
     } catch (error) {
       console.error("[renderer] frame failed", error);
       dispatch("render-failed");
-      // A failed renderer must not leave another callback registered behind this one.
       engine.stopRenderLoop();
       looping = false;
     }
@@ -67,8 +61,6 @@ export const createRenderLifecycle = ({
   const start = (): void => {
     if (looping || disposed) return;
     looping = true;
-    // Babylon's frame-time average knows nothing about pauses. Resetting prevents the first frame
-    // back from looking like one enormous frame to both the FPS display and quality adaptation.
     engine.performanceMonitor.reset();
     engine.runRenderLoop(renderFrame);
   };
@@ -94,15 +86,12 @@ export const createRenderLifecycle = ({
 
   const resize = (): void => {
     engine.resize();
-    // A parked canvas gets a fresh empty drawing buffer after resize, so fill that one buffer.
     if (!looping && !disposed) renderFrame();
   };
 
   engine.onContextLostObservable.add(() => {
     if (disposed) return;
     dispatch("context-lost");
-    // Do not give a lost context another frame to fail on. Babylon will notify restoration when
-    // the browser has re-established the underlying WebGL resources.
     stop();
   });
   engine.onContextRestoredObservable.add(() => {

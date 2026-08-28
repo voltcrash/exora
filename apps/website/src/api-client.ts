@@ -11,21 +11,8 @@ import { requestDeadline } from "./request-deadline.ts";
 
 type Fetcher = (input: string | URL | Request, init?: RequestInit) => Promise<Response>;
 
-/**
- * How long a single-object lookup waits before giving up.
- *
- * Both object lookups fail soft — they resolve to `null` and the caller falls back — so the
- * budget has to cover the slowest honest answer rather than the typical one. A cold serverless
- * instance plus a live archive request can clear four seconds without either end being broken,
- * and the cost of cutting it short is silent and wrong: a shared `?planet=` link quietly lands on
- * the bundled featured world instead of the world it named.
- */
 const OBJECT_LOOKUP_TIMEOUT_MS = 8_000;
 
-/**
- * How long a list request waits. Longer than a single-object lookup, because a collection may
- * cost the API a fresh archive round trip, and longer for SIMBAD than for NASA planet queries.
- */
 const PLANET_COLLECTION_TIMEOUT_MS = 8_000;
 const STAR_COLLECTION_TIMEOUT_MS = 10_000;
 const EPHEMERIS_TIMEOUT_MS = 20_000;
@@ -50,21 +37,10 @@ const parseApiPayload = async <Schema extends ContractSchema>(
   selectSchema: SchemaSelector<Schema>,
   value: unknown,
 ): Promise<SchemaOutput<Schema>> => {
-  // Contracts are loaded only when the first API response arrives. Zod and the full schema graph
-  // stay out of Exora's latency-sensitive renderer chunk while every network payload still passes
-  // through the same runtime contract used by the server.
   const contracts = await import("@exora/contracts");
   return selectSchema(contracts).parse(value);
 };
 
-/**
- * Fetches and validates one list endpoint.
- *
- * Unlike the single-object lookups above, a failure here is raised rather than swallowed: there
- * is no sensible stand-in for "the collection you asked for", so the caller shows the error.
- * `subject` names the request in that message, which is the only thing that varied between the
- * four copies of this that used to exist.
- */
 const requestCollection = async <Schema extends ContractSchema>(
   path: string,
   { fetcher = fetch, signal }: CollectionOptions,
@@ -98,16 +74,20 @@ const requestPlanetCollection = (
     PLANET_COLLECTION_TIMEOUT_MS,
     subject,
     responseSchema.PlanetSearch,
-  ) //
-    .then(({ data, meta }) => ({ cached: meta.cached, planets: data, query: meta.query }));
+  ).then(({ data, meta }) => ({ cached: meta.cached, planets: data, query: meta.query }));
 
 const requestStarCollection = (
   path: string,
   options: CollectionOptions,
   subject: string,
 ): Promise<StarSearchResult> =>
-  requestCollection(path, options, STAR_COLLECTION_TIMEOUT_MS, subject, responseSchema.StarSearch) //
-    .then(({ data, meta }) => ({ cached: meta.cached, query: meta.query, stars: data }));
+  requestCollection(
+    path,
+    options,
+    STAR_COLLECTION_TIMEOUT_MS,
+    subject,
+    responseSchema.StarSearch,
+  ).then(({ data, meta }) => ({ cached: meta.cached, query: meta.query, stars: data }));
 
 export interface PlanetLoadResult {
   cached: boolean;
@@ -133,13 +113,6 @@ export interface StarSearchResult {
   stars: StarProfile[];
 }
 
-/**
- * A whole host system: its name, and every confirmed world the archive links to it.
- *
- * Deliberately not a star lookup. Each planet row already carries its host's temperature, radius,
- * mass and luminosity, which is what the diorama draws the star from, so a system resolves out of
- * one planet query and stays reachable for the many hosts SIMBAD cannot name.
- */
 export interface SystemLoadResult {
   cached: boolean;
   hostStar: string;

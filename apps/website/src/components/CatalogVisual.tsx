@@ -57,8 +57,6 @@ export const StarCatalogVisual = ({ star }: { star: StarProfile }) => {
     "--star-size": `${Math.min(124, Math.max(68, size))}px`,
   };
 
-  // No glint. A glint is a specular highlight — light from somewhere else bouncing off a surface —
-  // which is precisely the wrong thing to say about the object that IS the light source.
   return (
     <span className="catalog-visual star-catalog-visual" style={style} aria-hidden="true">
       <span className="catalog-star-rays" />

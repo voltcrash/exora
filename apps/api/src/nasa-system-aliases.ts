@@ -31,10 +31,6 @@ const cleanIdentifier = (identifier: string): string =>
     .replace(/^\*\s+/, "")
     .trim();
 
-/**
- * SIMBAD identifiers ordered by how reliably NASA says its aliases service recognizes them.
- * The canonical SIMBAD display name remains first; catalog identifiers are fallbacks only.
- */
 export const nasaAliasCandidates = (star: StarProfile): readonly string[] => {
   const aliases = star.aliases ?? [];
   const reliableAliases = aliases.filter((alias) =>
@@ -51,7 +47,6 @@ export const nasaAliasCandidates = (star: StarProfile): readonly string[] => {
   ].slice(0, 16);
 };
 
-/** Resolves a SIMBAD star to NASA's authoritative default host-system name. */
 export class NasaSystemAliasRepository implements SystemAliasRepository {
   readonly #cache = createArchiveCache<string | null>();
   readonly #cacheTtlMs: number;

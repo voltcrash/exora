@@ -279,8 +279,6 @@ const formatBayerDesignation = (identifier: string): string | null => {
 };
 
 const displayName = (matchedId: string, mainId: string, aliases: string | null): string => {
-  // `matchedId` is the spelling used to find the object, not its identity. Prefer SIMBAD's main
-  // proper name so the same object cannot change title depending on the route taken.
   const mainProperName = mainId.replace(/^NAME\s+/i, "").trim();
   if (/^NAME\s+/i.test(mainId) && mainProperName) return mainProperName;
 
@@ -310,8 +308,6 @@ const parseAliases = (aliases: string | null): readonly string[] =>
 
 const ASTRONOMICAL_UNIT_KILOMETERS = 149_597_870.7;
 
-/** SIMBAD diameter measurements are either linear kilometres or angular milliarcseconds. An
- * angular diameter divided by the parallax gives the physical diameter in astronomical units. */
 const diameterKilometers = (
   diameter: number | null,
   unit: string | null,

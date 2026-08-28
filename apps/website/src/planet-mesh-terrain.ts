@@ -5,10 +5,8 @@ import type { FloatArray } from "@babylonjs/core/types.js";
 import type { RockyWorldRecipe } from "@exora/worldgen";
 import { buildCraterField, sampleTerrainHeight } from "./planet-terrain.ts";
 
-/** Artistic terrain exaggeration in scene units, independent of the catalogued physical radius. */
 const TERRAIN_DISPLAY_EXAGGERATION = 0.5;
 
-/** Restores smooth normals across Babylon's unshared icosphere triangle corners. */
 export const weldTerrainNormals = (positions: FloatArray, normals: Float32Array): void => {
   const vertexCount = normals.length / 3;
   const representatives = new Map<string, number>();
@@ -43,7 +41,6 @@ export const weldTerrainNormals = (positions: FloatArray, normals: Float32Array)
   }
 };
 
-/** Applies the recipe's procedural relief to an orbital rocky-world icosphere. */
 export const displaceRockyPlanet = (planet: Mesh, recipe: RockyWorldRecipe): void => {
   const positions = planet.getVerticesData(VertexBuffer.PositionKind);
   const indices = planet.getIndices();

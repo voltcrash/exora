@@ -1,20 +1,3 @@
-/**
- * The renderer that outlives every world.
- *
- * A WebXR session belongs to the WebGL context it was opened against. Exora used to give each
- * destination its own Babylon engine, so travelling from a world to its host star disposed the
- * context the session was running on: the headset dropped back to the panel, the next scene
- * booted, and the wearer had to be pulled back into VR through a second permission-free but very
- * visible re-entry. Two black transitions and a compositor hand-off for what should be a step
- * across a room.
- *
- * So the engine, the scene, the desktop camera and the immersive session all live here, for as
- * long as the page does, and a destination is just the *contents* of that one scene. Travelling
- * swaps the contents. The session never notices.
- *
- * What the host owns, no world may dispose; what a world adds, `world-scope.ts` takes back out.
- */
-
 import { ArcRotateCamera } from "@babylonjs/core/Cameras/arcRotateCamera.js";
 import "@babylonjs/core/Culling/ray.js";
 import { Ray } from "@babylonjs/core/Culling/ray.js";
@@ -67,34 +50,14 @@ import type * as XrRuntime from "./xr-runtime.ts";
 
 export type { XrStatus } from "./scene-xr-integration.ts";
 
-/** Locomotion speed inside a session, shared by every destination so travel never changes feel. */
+// One host owns the WebGL context across every destination and WebXR session.
 const XR_MOVE_SPEED = 2.2;
-/** How long the in-headset fade takes in each direction. */
 const VEIL_FADE_SECONDS = 0.22;
 
-/** A destination occupying the shared scene. */
 export interface MountedWorld {
-  /**
-   * The farthest the camera may be pulled back before this world stops holding up, if it has a
-   * limit at all.
-   *
-   * A jump begins by flying away from what is being left, and how far that can go is the world's
-   * own business. An orbital view has nothing behind it but a sky that follows the camera, so it
-   * can be left from any distance; a surface vista is a finite patch of ground under a dome, and
-   * pulling back past its edge would show the visitor where the world stops. Answering nothing
-   * lets the flight simply scale the distance the visitor was already watching from.
-   */
   farthestView?: () => number | undefined;
-  /** Releases anything the world holds outside the scene: listeners, observers, effect layers. */
   dispose: () => void;
-  /**
-   * Puts the immersive rig where this world expects a visitor to stand.
-   *
-   * `initial` marks the very first pose of a session, before Babylon has added the wearer's real
-   * height to the rig; every later call happens mid-session, where the height is already there.
-   */
   focusXrRig: (initial: boolean) => void;
-  /** Restores the desktop camera so leaving the headset lands on the view the wearer left in. */
   restoreDesktopView: () => void;
 }
 
@@ -105,17 +68,7 @@ export interface SceneHost {
   readonly profile: RenderQualityProfile;
   readonly qualityTier: RenderQualityTier;
   readonly scene: Scene;
-  /**
-   * Starts flying away from the world on screen, before the destination is even known.
-   *
-   * A jump that has to ask an archive for its destination first would otherwise sit perfectly
-   * still until the answer came back, and then move — so the click reads as having done nothing.
-   * Calling this the moment the visitor asks puts the flight and the request in the air together;
-   * `mountWorld` picks the flight up wherever it has got to. Harmless to call twice, and does
-   * nothing inside an immersive session, where the in-headset veil covers the jump instead.
-   */
   beginTravel: () => void;
-  /** Flies back to the view a jump left from, for a destination that turned out not to exist. */
   cancelTravel: () => void;
   dispose: () => Promise<void>;
   enterImmersive: () => Promise<void>;
@@ -123,48 +76,13 @@ export interface SceneHost {
   isArSupported: () => boolean;
   isInXr: () => boolean;
   isVrSupported: () => boolean;
-  /**
-   * Subscribes to where a jump has got to, called immediately with the current phase.
-   *
-   * The page above the canvas has its own half of the flight to play — panels belonging to the
-   * world being left have to go with it, and the dark that hides the swap is a DOM layer — so the
-   * renderer says where it is rather than reaching up into the interface itself.
-   */
   onTravelPhase: (listener: (phase: TravelPhase) => void) => () => void;
-  /**
-   * Replaces the world in the shared scene, without touching a running session.
-   *
-   * Resolves with the mounted world, or with null when a later travel request overtook this one
-   * while the screen was fading — in that case nothing was built and nothing needs releasing.
-   */
   mountWorld: <World extends MountedWorld>(
     build: () => Promise<World> | World,
   ) => Promise<World | null>;
-  /** Subscribes to immersive status, called immediately with the current one. */
   onXrStatus: (listener: (status: XrStatus) => void) => () => void;
-  /** Subscribes to WebGL availability and recovery, called immediately with the current state. */
   onRendererStatus: (listener: (status: RendererStatus) => void) => () => void;
-  /**
-   * Whether the visitor has asked for less movement.
-   *
-   * Read here rather than in each scene, because a jump between destinations and a descent
-   * within one are the same promise to that visitor, and answering it differently in two places
-   * is how one of them ends up still flying.
-   */
   prefersReducedMotion: () => boolean;
-  /**
-   * Parks the render loop while something else owns the screen, returning the release.
-   *
-   * A modal dialog covers the scene with a blurred, three-quarters-opaque scrim, and the frames
-   * still being drawn underneath it are paid for twice: once by the GPU rendering a full-detail
-   * planet at the display's native density, and again by the compositor, which has to re-run the
-   * `backdrop-filter` blur over the whole viewport every time the canvas changes. Neither buys
-   * anything a reader can see. Stopping the loop makes the canvas static, which lets the browser
-   * cache the blurred backdrop instead of rebuilding it per frame, so the saving is both halves.
-   *
-   * Calls nest: the loop restarts once the last holder releases. Never applies inside an
-   * immersive session, where the loop belongs to the headset's frame callback rather than to us.
-   */
   suspendRendering: () => () => void;
   xrCamera: () => WebXRCamera | null;
 }
@@ -185,14 +103,6 @@ const createSceneHost = (canvas: HTMLCanvasElement): SceneHost => {
 
   let isInXr = false;
 
-  /**
-   * The black shell the wearer is inside during a jump.
-   *
-   * Building a world is thousands of lines of synchronous geometry and shader work, which stalls
-   * the session's frame loop for as long as it runs. Fading to black first means the frame the
-   * compositor holds through the stall is a black one, so the stall reads as a blink rather than
-   * a freeze — and the new world arrives faded in rather than cutting in around the wearer.
-   */
   const veilMaterial = new StandardMaterial("travelVeilMaterial", scene);
   veilMaterial.disableLighting = true;
   veilMaterial.diffuseColor = Color3.Black();
@@ -209,24 +119,14 @@ const createSceneHost = (canvas: HTMLCanvasElement): SceneHost => {
   veil.isPickable = false;
   veil.applyFog = false;
   veil.alwaysSelectAsActiveMesh = true;
-  // Above the world's scenery, so a jump hides the view the wearer travelled from.
   veil.renderingGroupId = 3;
   veil.setEnabled(false);
 
-  // AR presentation is host-owned just like the XR rig. Its reticle and DOM overlay therefore
-  // survive destination changes, while each world's transform wrapper is exchanged below.
   const arPresentation = createArPresentation(scene);
 
   let veilAlpha = 0;
   let veilTarget = 0;
   let settleVeil: (() => void) | null = null;
-  /**
-   * Set when a newly mounted world still has to be handed the immersive rig.
-   *
-   * Positioning the rig reads the wearer's real height, which Babylon answers from the live
-   * XRFrame — and an XRFrame may only be touched inside the callback that produced it. Travel is
-   * driven from a promise continuation, so the move waits for the next frame instead.
-   */
   let rigAwaitingWorld = false;
 
   const resolveVeil = (): void => {
@@ -235,7 +135,6 @@ const createSceneHost = (canvas: HTMLCanvasElement): SceneHost => {
     settle?.();
   };
 
-  /** Drives the veil to `target`, resolving once it is there (or immediately, outside a session). */
   const fadeVeil = async (target: number): Promise<void> => {
     if (!isInXr) {
       veilTarget = 0;
@@ -271,12 +170,6 @@ const createSceneHost = (canvas: HTMLCanvasElement): SceneHost => {
     xrSystem: () => navigator.xr,
   });
 
-  /**
-   * Trades peripheral sharpness for frame rate while the headset is on.
-   *
-   * Canvas resolution is fixed for the lifetime of a session, so foveation is the only lever
-   * left; a Quest 2 that starts missing 72 Hz recovers by blurring further from the eye.
-   */
   const adaptSessionFoveation = (fps: number): void => {
     const sessionManager = xr?.baseExperience.sessionManager;
     if (!sessionManager?.isFixedFoveationSupported) return;
@@ -301,8 +194,6 @@ const createSceneHost = (canvas: HTMLCanvasElement): SceneHost => {
   scene.onBeforeRenderObservable.add(() => {
     const deltaSeconds = Math.min(engine.getDeltaTime() / 1_000, 0.05);
 
-    // Inside an XR session this observer runs within the frame callback, which is the only place
-    // the rig's pose may be read. The veil is still opaque here, so the move is never seen.
     if (rigAwaitingWorld && isInXr && activeImmersiveMode === "vr") {
       rigAwaitingWorld = false;
       worldMount.current?.focusXrRig(false);
@@ -344,7 +235,6 @@ const createSceneHost = (canvas: HTMLCanvasElement): SceneHost => {
     scene,
   });
 
-  /** Undoes the scene-level settings a world is allowed to change, before the next one lands. */
   const resetSceneDefaults = (): void => resetPersistentScene(scene, camera);
 
   const worldMount = createSceneMountSlot<MountedWorld>(scene, {
@@ -360,11 +250,8 @@ const createSceneHost = (canvas: HTMLCanvasElement): SceneHost => {
     for (const listener of travelListeners) listener(next);
   };
 
-  /** The view a jump left from, kept so one that finds nothing to travel to can be flown back. */
   let travelOrigin: { lower: number | null; radius: number; upper: number | null } | null = null;
-  /** The outbound flight in progress, shared by whoever started it and whoever lands on it. */
   let departure: Promise<boolean> | null = null;
-  /** Set once a mount has taken the outbound flight over, so it stops drifting and crosses. */
   let departureClaimed = false;
   let glideFrame = 0;
   let glideDeadline = 0;
@@ -373,39 +260,16 @@ const createSceneHost = (canvas: HTMLCanvasElement): SceneHost => {
   const prefersReducedMotion = (): boolean =>
     window.matchMedia?.("(prefers-reduced-motion: reduce)").matches === true;
 
-  /**
-   * How far out a flight to or from the world on screen reaches.
-   *
-   * A visitor who has asked for less movement gets no flight at all: the distance collapses to
-   * the one they are already watching from, and a jump becomes the dark fading across the swap
-   * and nothing else. That part stays, because it is covering a stalled frame loop rather than
-   * decorating one — it is the honest picture of what the page is doing.
-   */
   const flightRadius = (resting: number): number =>
     prefersReducedMotion()
       ? resting
       : departureRadius(resting, worldMount.current?.farthestView?.());
 
-  /**
-   * Makes room for a flight that leaves the distances the current view was built around.
-   *
-   * The camera clamps its own radius to those limits on every frame it updates, so the room has
-   * to be re-made each step rather than once: the world being left is entitled to reset its own
-   * limits underneath the flight, and does exactly that when a surface approach lands mid-jump.
-   */
   const widenCameraReach = (from: number, to: number): void => {
     camera.lowerRadiusLimit = Math.min(camera.lowerRadiusLimit ?? from, from, to);
     camera.upperRadiusLimit = Math.max(camera.upperRadiusLimit ?? to, from, to);
   };
 
-  /**
-   * Ends the flight in progress, saying whether it got where it was going.
-   *
-   * A flight that was cut short — overtaken by the next jump, or by the host being disposed —
-   * still has to resolve, or whatever is awaiting it waits for ever. It must not *land*, though:
-   * landing puts the camera's limits back and hands control to the visitor, and doing that
-   * underneath the flight that replaced it would clamp it mid-air and let the wheel fight it.
-   */
   const endGlide = (snapTo: number | null, landed: boolean): void => {
     if (glideFrame) window.cancelAnimationFrame(glideFrame);
     if (glideDeadline) window.clearTimeout(glideDeadline);
@@ -417,14 +281,6 @@ const createSceneHost = (canvas: HTMLCanvasElement): SceneHost => {
     land?.(landed);
   };
 
-  /**
-   * Flies the shared camera to a distance, resolving once it is there.
-   *
-   * Driven from `requestAnimationFrame` rather than from the scene's own frame observer, because
-   * a jump can begin while a dialog has the render loop parked — and a flight waiting on frames
-   * nobody is drawing would leave the destination behind it never built at all. The timer is the
-   * same guarantee for a tab that gets backgrounded mid-flight, where frames stop entirely.
-   */
   const glideCamera = (
     to: number,
     durationMs: number,
@@ -438,8 +294,6 @@ const createSceneHost = (canvas: HTMLCanvasElement): SceneHost => {
       return Promise.resolve(true);
     }
 
-    // Nothing else may drive the camera while the flight has it: a wheel notch part-way through
-    // would otherwise fight the flight for the same value, frame by frame.
     camera.detachControl();
     const startedAt = performance.now();
     return new Promise<boolean>((resolve) => {
@@ -470,9 +324,6 @@ const createSceneHost = (canvas: HTMLCanvasElement): SceneHost => {
     setTravelPhase("departing");
     const far = flightRadius(camera.radius);
     departure = glideCamera(far, TRAVEL_DEPART_MS, easeAway).then((landed) => {
-      // Nothing has come to claim the flight, so an archive is still being asked where this jump
-      // is going. It carries on drifting at the speed it had rather than stopping dead in the
-      // middle of the sky, which is what reads as the page having hung rather than as travel.
       if (landed && !departureClaimed && !disposed) {
         void glideCamera(far * TRAVEL_COAST_SCALE, TRAVEL_COAST_MS, easeDrift);
       }
@@ -482,8 +333,6 @@ const createSceneHost = (canvas: HTMLCanvasElement): SceneHost => {
 
   const cancelTravel = (): void => {
     const origin = travelOrigin;
-    // Once the screen has gone dark there is nothing left to fly back to: the world that was
-    // being left is already being taken apart behind it.
     if (!origin || travelPhase !== "departing") return;
     departure = null;
     travelOrigin = null;
@@ -497,7 +346,6 @@ const createSceneHost = (canvas: HTMLCanvasElement): SceneHost => {
     });
   };
 
-  /** The outbound half of a jump: finish pulling away, then darken over the swap itself. */
   const departFromWorld = async (): Promise<void> => {
     if (isInXr) return;
     if (!departure) beginTravel();
@@ -507,15 +355,6 @@ const createSceneHost = (canvas: HTMLCanvasElement): SceneHost => {
     await new Promise<void>((resolve) => window.setTimeout(resolve, TRAVEL_CROSS_MS));
   };
 
-  /**
-   * The inbound half: the destination is already close, and the camera settles back onto it.
-   *
-   * Started on the destination's first drawn frame rather than the instant it was built. The
-   * build stalls the frame loop, and behind that stall sits the shader compilation for
-   * everything it just made — together long enough that a flight timed from the end of the build
-   * would spend its first third frozen and then jump to wherever the clock had got to. Waiting
-   * for the frame costs the jump nothing, because the dark is over that whole stall anyway.
-   */
   const arriveAtWorld = (mounted: number): void => {
     departure = null;
     departureClaimed = false;
@@ -525,7 +364,6 @@ const createSceneHost = (canvas: HTMLCanvasElement): SceneHost => {
       return;
     }
 
-    // Whatever the world put the camera at as it was built is where this flight is going.
     const resting = camera.radius;
     const lower = camera.lowerRadiusLimit;
     const upper = camera.upperRadiusLimit;
@@ -534,15 +372,9 @@ const createSceneHost = (canvas: HTMLCanvasElement): SceneHost => {
     camera.radius = near;
 
     const settle = (): void => {
-      // The first world of a session arrives out of `idle` rather than out of the dark, so what
-      // is checked is that this is still the world the scene holds — not which phase it came from.
       if (disposed || mounted !== mountToken) return;
-      // The dark lifts here rather than when the build returned: everything the visitor is about
-      // to see starts together, on a frame that has actually been drawn.
       setTravelPhase("arriving");
       void glideCamera(resting, TRAVEL_ARRIVE_MS, easeSettle).then((landed) => {
-        // A flight overtaken by the next jump, or one whose host was disposed out from under it,
-        // has nothing to hand back: the limits and the controls belong to whatever replaced it.
         if (!landed || disposed) return;
         camera.lowerRadiusLimit = lower;
         camera.upperRadiusLimit = upper;
@@ -551,8 +383,6 @@ const createSceneHost = (canvas: HTMLCanvasElement): SceneHost => {
       });
     };
 
-    // Whichever comes first: the frame, or a deadline for the case where no frame is coming
-    // because a dialog has the loop parked and nothing is being drawn at all.
     let started = false;
     const startOnce = (): void => {
       if (started) return;
@@ -569,8 +399,6 @@ const createSceneHost = (canvas: HTMLCanvasElement): SceneHost => {
     build: () => Promise<World> | World,
   ): Promise<World | null> => {
     const token = (mountToken += 1);
-    // The outgoing world keeps rendering through the flight, so the jump never shows an empty
-    // sky: it is watched receding, and only the swap itself happens behind the dark.
     if (worldMount.current) {
       await fadeVeil(1);
       await departFromWorld();
@@ -582,9 +410,6 @@ const createSceneHost = (canvas: HTMLCanvasElement): SceneHost => {
       world = await worldMount.replace(build, () => token === mountToken && !disposed);
     } catch (error) {
       void fadeVeil(0);
-      // There is no destination to fly in to, so the flight is abandoned rather than landed:
-      // the recovery screen that answers this has to be visible, not behind a jump that never
-      // ends.
       endGlide(null, false);
       departure = null;
       travelOrigin = null;
@@ -598,16 +423,7 @@ const createSceneHost = (canvas: HTMLCanvasElement): SceneHost => {
     rigAwaitingWorld = isInXr && activeImmersiveMode === "vr";
     void fadeVeil(0);
     arriveAtWorld(token);
-    // A destination can be chosen from a dialog that is still open over the canvas — the
-    // catalog closes and the world mounts in the same commit, and nothing says which lands
-    // first. One frame here means the scrim is never left blurring the world the visitor just
-    // left.
     if (!renderLifecycle.isRunning) renderLifecycle.renderFrame();
-    // Building a world stalls the frame loop, and the rolling average knows nothing about why:
-    // left alone it reports the stall as a run of enormous frames for seconds afterwards, which
-    // shows up as a heads-up display insisting on single digits and — worse — as the quality
-    // adapter deciding the machine cannot keep up and dropping the render scale, which
-    // reallocates the framebuffer and hitches the arrival it was supposed to be helping.
     engine.performanceMonitor.reset();
     qualitySampleSeconds = 0;
     return world;
@@ -620,18 +436,13 @@ const createSceneHost = (canvas: HTMLCanvasElement): SceneHost => {
       const createdXr = await runtime.WebXRDefaultExperience.CreateAsync(scene, {
         disableDefaultUI: true,
         disableNearInteraction: true,
-        // A/X only activates the planet's terrain action below. Triggers and grips are deliberately
-        // free for the session and desktop-menu shortcuts, so Babylon must not bind selection.
         disablePointerSelection: true,
         disableTeleportation: true,
-        // The rigged hand mesh is a remote glTF and no loader is bundled, so joint spheres are used.
         handSupportOptions: { handMeshes: { disableDefaultMeshes: true } },
         inputOptions: { doNotLoadControllerMeshes: true },
         optionalFeatures: ["hand-tracking"],
         outputCanvasOptions: {
           canvasOptions: {
-            // Quest 2's compositor is unreliable with an explicitly opaque WebGL layer. Babylon's
-            // compatible default is alpha-enabled; the scene still clears to opaque black each frame.
             alpha: true,
             antialias: false,
             depth: true,
@@ -728,9 +539,6 @@ const createSceneHost = (canvas: HTMLCanvasElement): SceneHost => {
       };
       for (const controller of createdXr.input.controllers) bindXrController(controller);
       createdXr.input.onControllerAddedObservable.add(bindXrController);
-      // The rig lands wherever the headset happens to face, so the view has to be aimed at the
-      // subject; otherwise a VR session opens on empty starfield and looks broken. AR must leave
-      // the tracked camera at the physical device pose, so its world moves instead of the rig.
       createdXr.baseExperience.onInitialXRPoseSetObservable.add(() => {
         if (activeImmersiveMode === "vr") worldMount.current?.focusXrRig(true);
       });
@@ -740,8 +548,6 @@ const createSceneHost = (canvas: HTMLCanvasElement): SceneHost => {
         if (state === runtime.WebXRState.ENTERING_XR) xrIntegration.markEntering();
         if (state === runtime.WebXRState.IN_XR) {
           isInXr = true;
-          // Inside a session the loop is the headset's frame callback, and a wearer cannot see
-          // the flat dialog that parked it. Whatever suspensions are outstanding, run.
           renderLifecycle.start();
           sessionFoveation = profile.xrFixedFoveation;
           if (createdXr.baseExperience.sessionManager.isFixedFoveationSupported) {
@@ -826,8 +632,6 @@ const createSceneHost = (canvas: HTMLCanvasElement): SceneHost => {
 
       activeImmersiveMode = destination.mode;
       if (destination.mode === "vr") {
-        // This is the original Quest path: same session mode, reference space, render target and
-        // optional hand feature set. Capability selection above only decides to arrive here.
         await readyXr.baseExperience.enterXRAsync(
           "immersive-vr",
           "local-floor",
@@ -841,8 +645,6 @@ const createSceneHost = (canvas: HTMLCanvasElement): SceneHost => {
         const hitTest = features.enableFeature(
           runtime.WebXRFeatureName.HIT_TEST,
           "latest",
-          // Placement uses the stable viewer-centred ray. A transient touchscreen ray follows
-          // the finger and made the reticle swell/move under a tap in Variant's iPhone viewer.
           { enableTransientHitTest: false },
           true,
           true,
@@ -867,9 +669,6 @@ const createSceneHost = (canvas: HTMLCanvasElement): SceneHost => {
               : xrCameraLayerMask & ~VIRTUAL_BACKGROUND_LAYER_MASK;
           },
         );
-        // Variant Launch and native mobile WebXR both implement the standard AR session. Hit
-        // testing is required; DOM overlay is optional so a device can still place/manipulate the
-        // scene through Babylon pointer events if it cannot render the instruction strip.
         await readyXr.baseExperience.enterXRAsync("immersive-ar", "local", readyXr.renderTarget);
       } catch (error) {
         arPresentation.end();
@@ -884,13 +683,7 @@ const createSceneHost = (canvas: HTMLCanvasElement): SceneHost => {
     dispose: async () => {
       if (disposed) return;
       disposed = true;
-      // Test remounts and client-side renderer recovery can present the same canvas node again.
-      // Never let the module singleton hand that caller this already-disposed host.
       sceneHostRegistry.forget(sceneHost);
-      // Both subscriber sets are released, not just one. A disposed host answers nothing, and
-      // `recreateSceneHost` builds its replacement while React still holds the old subscriptions
-      // until its effects re-run — so anything still reachable from here is a listener that has
-      // already stopped being told the truth.
       travelListeners.clear();
       endGlide(null, false);
       xrIntegration.dispose();
@@ -899,11 +692,6 @@ const createSceneHost = (canvas: HTMLCanvasElement): SceneHost => {
       arPresentation.dispose();
       xr?.dispose();
       xr = null;
-      // An OBJ/GLB import cannot be cancelled once Babylon has handed it to a loader. Keep the
-      // shared scene alive until that build leaves its serialized scope; disposing it underneath
-      // the loader turns a routine React unmount into a late `clearColor`/mesh write on null
-      // internals. Recovery also awaits this promise before asking the same canvas for another
-      // WebGL context, so the retiring engine cannot tear its replacement down afterward.
       await worldDisposed;
       resources.dispose();
     },
@@ -913,18 +701,10 @@ const createSceneHost = (canvas: HTMLCanvasElement): SceneHost => {
 
 const sceneHostRegistry = createSceneHostRegistry(createSceneHost);
 
-/**
- * The one renderer for the page.
- *
- * The React tree swaps a planet view for a star view by unmounting one component and mounting
- * another, but the canvas and everything attached to it must survive that — losing the WebGL
- * context is exactly what used to end the immersive session.
- */
 export const acquireSceneHost = (canvas: HTMLCanvasElement): SceneHost => {
   return sceneHostRegistry.acquire(canvas);
 };
 
-/** Replaces a failed renderer while retaining the page-owned canvas and React destination. */
 export const recreateSceneHost = (canvas: HTMLCanvasElement): Promise<SceneHost> => {
   return sceneHostRegistry.recreate(canvas);
 };

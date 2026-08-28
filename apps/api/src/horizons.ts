@@ -82,7 +82,6 @@ const finite = (value: string | undefined): number | null => {
   return Number.isFinite(parsed) ? parsed : null;
 };
 
-/** Parses Horizons' documented CSV vector table while rejecting any changed API envelope. */
 export const parseHorizonsVector = (
   payload: unknown,
   target: HorizonsTarget,
@@ -222,8 +221,6 @@ export class JplHorizonsRepository implements HorizonsRepository {
     );
     return {
       cached: states.every(({ cached }) => cached),
-      // One collection can mix cache ages. Reporting the oldest retrieval is the conservative
-      // statement: no vector in the response is older than the instant printed to the visitor.
       retrievedAt: states.map(({ retrievedAt }) => retrievedAt).sort()[0] ?? epochIso,
       stale: states.some(({ stale }) => stale),
       value: states.map(({ value }) => value),

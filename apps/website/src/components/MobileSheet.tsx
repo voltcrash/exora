@@ -8,7 +8,6 @@ interface MobileSheetProps {
   title: string;
 }
 
-/** A phone-only top-layer surface for controls that would otherwise cover the scene. */
 export const MobileSheet = ({ children, eyebrow, onClose, open, title }: MobileSheetProps) => {
   const dialogRef = useRef<HTMLDialogElement>(null);
 

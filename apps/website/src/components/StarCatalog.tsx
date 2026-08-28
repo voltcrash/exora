@@ -17,7 +17,6 @@ type SearchState = "idle" | "loading" | "ready" | "error";
 type SurpriseState = "idle" | "loading" | "error";
 type PortalView = "collections" | "categories";
 
-/** Tab order for the discovery views. Module scope so the tab list keeps a stable identity. */
 const PORTAL_VIEWS: readonly PortalView[] = ["collections", "categories"];
 
 const categories = [
@@ -62,13 +61,6 @@ const collections = [
   },
 ] as const;
 
-/**
- * One star in the result list.
- *
- * Memoised for the same reason as its planetary counterpart: a keystroke in the search field
- * re-renders the dialog, and every row carries a layered CSS star that costs real paint. Stars
- * that survive a re-render should not be rebuilt for it.
- */
 const StarResult = memo(
   ({
     cached,
@@ -118,8 +110,6 @@ export const StarCatalog = ({ embedded = false, onClose, onSelect }: StarCatalog
   const [surpriseState, setSurpriseState] = useState<SurpriseState>("idle");
   const [suggestion, setSuggestion] = useState<string | null>(null);
 
-  // The catalog is mounted only for as long as it is open, so there is no closed-but-mounted
-  // state to synchronise: it opens with the component and closes when the page takes it away.
   useEffect(() => {
     const dialog = dialogRef.current;
     if (!embedded) dialog?.showModal();

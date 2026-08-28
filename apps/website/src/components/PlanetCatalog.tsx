@@ -28,7 +28,6 @@ type SurpriseState = "idle" | "loading" | "error";
 type PortalView = "collections" | "categories" | "filters";
 type PhysicalAxis = Exclude<keyof PhysicalPlanetFilters, "habitableZone" | "wellMeasured">;
 
-/** Tab order for the discovery views. Module scope so the tab list keeps a stable identity. */
 const PORTAL_VIEWS: readonly PortalView[] = ["collections", "categories", "filters"];
 
 const physicalAxes: readonly {
@@ -109,15 +108,6 @@ const collections = [
   },
 ] as const;
 
-/**
- * One world in the result list.
- *
- * Its own component, and memoised, because of what the observatory sliders do: every input event
- * re-runs the filter over the whole sampled field, and what comes back is mostly the same worlds
- * in the same order. Rebuilding two dozen rows — each a layered CSS planet, a handful of formatted
- * numbers and a dozen elements — for a result that did not change was the whole cost of dragging
- * a slider. Identity-stable planets mean React can now skip every row the move did not disturb.
- */
 const PlanetResult = memo(
   ({
     cached,
@@ -181,8 +171,6 @@ export const PlanetCatalog = ({ embedded = false, onClose, onSelect }: PlanetCat
     DEFAULT_PHYSICAL_PLANET_FILTERS,
   );
 
-  // The catalog is mounted only for as long as it is open, so there is no closed-but-mounted
-  // state to synchronise: it opens with the component and closes when the page takes it away.
   useEffect(() => {
     const dialog = dialogRef.current;
     if (!embedded) dialog?.showModal();
@@ -293,11 +281,6 @@ export const PlanetCatalog = ({ embedded = false, onClose, onSelect }: PlanetCat
     };
   }, [activeCategory, portalView, query]);
 
-  // The sliders and the list they drive move at different speeds on purpose. A control has to
-  // track the pointer to feel connected to it, but re-sampling the field is a whole list rebuild
-  // and there is no value in doing that at pointer rate — a reader reads the result once the
-  // slider stops. Deferring the field lets React paint the thumb immediately and abandon any
-  // list pass the next input event has already made obsolete.
   const settledFilters = useDeferredValue(physicalFilters);
   const visiblePlanets = useMemo(
     () =>
@@ -305,8 +288,6 @@ export const PlanetCatalog = ({ embedded = false, onClose, onSelect }: PlanetCat
     [planets, portalView, settledFilters],
   );
 
-  // The observatory controls read the whole sampled field rather than one collection, so opening
-  // that view clears the category and query the other two views leave behind.
   const selectPortalView = useCallback((view: PortalView): void => {
     if (view === "filters") {
       setActiveCategory(null);

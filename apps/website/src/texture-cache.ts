@@ -4,16 +4,6 @@ import type { Scene } from "@babylonjs/core/scene.js";
 import type { RockyPaletteFamily } from "@exora/worldgen";
 import { configureKtx2Transcoder } from "./ktx2-transcoder.ts";
 
-/**
- * Generic memoizing cache: the same `path` always resolves to the same created value, so callers
- * that ask for the same immutable asset from multiple places (e.g. several rocky planets reusing
- * the same basalt detail map) never trigger a duplicate load or a duplicate GPU allocation. A
- * synchronous factory failure is caught once, the path is marked failed, and every subsequent
- * (and the failing) request receives `fallback()` instead of retrying a known-bad load.
- *
- * Kept free of Babylon types so the dedup/fallback behavior is unit-testable without a WebGL
- * context.
- */
 export const createKeyedCache = <T>(
   factory: (path: string) => T,
   fallback: (path: string) => T,
@@ -82,10 +72,6 @@ export const detailTexturePath = (
 export const chemistryTexturePath = (family: ChemistryDetailFamily): string =>
   `/textures/chemistry/${family}.ktx2`;
 
-/** Selects only two high-resolution PBR families per world instead of uploading all five. The
- * chemistry texture supplies the palette-specific grain while these two maps supply physical
- * response, keeping the desktop shader sharper and substantially lighter than the old 30-sample
- * five-material blend. */
 export const surfaceDetailSelectionForPalette = (
   palette: RockyPaletteFamily,
 ): SurfaceDetailSelection => {
@@ -183,11 +169,8 @@ export const surfaceDetailSelectionForPalette = (
   }
 };
 
-/** Flat-up normal map pixel (128, 128, 255) used when a detail normal map fails to load. */
 const FALLBACK_NORMAL_PIXEL = new Uint8Array([128, 128, 255, 255]);
-/** Mid-gray roughness pixel used when a detail roughness map fails to load. */
 const FALLBACK_ROUGHNESS_PIXEL = new Uint8Array([128, 128, 128, 255]);
-/** Neutral white color detail leaves the procedural palette unchanged on load failure. */
 const FALLBACK_COLOR_PIXEL = new Uint8Array([255, 255, 255, 255]);
 
 const fallbackTexturesByScene = new WeakMap<
@@ -218,19 +201,12 @@ const getFallbackTexture = (scene: Scene, kind: "color" | "normal" | "roughness"
 
 const cachesByScene = new WeakMap<Scene, { get: (path: string) => Texture }>();
 
-/**
- * Loads only the selected chemistry map and two selected PBR families, then reuses them for the
- * lifetime of the scene. This avoids decoding/uploading irrelevant material families and makes
- * the 2K source maps practical on desktop while Quest only requests the 1K chemistry map.
- */
 export const getSurfaceDetailTextures = (
   scene: Scene,
   selection: SurfaceDetailSelection,
   includePbrMaps: boolean,
   anisotropicFiltering = 16,
 ): SelectedSurfaceDetailMaps => {
-  // Babylon reads `URLConfig` when it first builds its decoder worker pool, so the pipeline has
-  // to be pointed at this origin before the first KTX2 texture below is constructed.
   configureKtx2Transcoder();
 
   let cache = cachesByScene.get(scene);
@@ -246,15 +222,11 @@ export const getSurfaceDetailTextures = (
           undefined,
           undefined,
           () => {
-            // Swap in a neutral fallback and drop this path from the cache so future callers
-            // (and this one, next time) get the fallback instead of a broken texture.
             console.warn(`[texture-cache] failed to load ${path}, using neutral fallback`);
           },
         );
         texture.wrapU = Texture.WRAP_ADDRESSMODE;
         texture.wrapV = Texture.WRAP_ADDRESSMODE;
-        // These tile across a sphere, so most of the visible surface is viewed at a grazing
-        // angle where low anisotropy is exactly where mip selection blurs the detail away.
         texture.anisotropicFilteringLevel = anisotropicFiltering;
         texture.gammaSpace = isColor;
         return texture;

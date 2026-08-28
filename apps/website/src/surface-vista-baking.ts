@@ -1,22 +1,11 @@
 import type { Vector3 } from "@babylonjs/core/Maths/math.vector.js";
 import type { RenderQualityProfile } from "./render-quality.ts";
 
-/** Half-width of the ground patch, graded to keep detail nearby and reach at the horizon. */
 export const SURFACE_HALF_EXTENT = 240;
 
-/**
- * How the grid's vertices are spread from the middle of the patch to its rim.
- *
- * A uniform grid has to choose between detail underfoot and reach toward the horizon; this one
- * refuses the choice. `u` runs [-1, 1] across the grid and the cubic term stretches the outer rows
- * outward, so on desktop the quads by the viewer are about half a unit across and the ones on the
- * rim about seven — the same vertex budget covering thirteen times the ground.
- */
 export const gradeSurfaceAxis = (u: number): number =>
   SURFACE_HALF_EXTENT * (0.28 * u + 0.72 * u * u * u);
 
-/** Inverse of `gradeSurfaceAxis`, normalized to [-1, 1], by Newton iteration from a linear guess. Used to
- * step a shadow ray through the grid in grid space rather than in world space. */
 export const inverseSurfaceGradeAxis = (x: number): number => {
   const target = Math.min(1, Math.max(-1, x / SURFACE_HALF_EXTENT));
   let u = target;
@@ -44,8 +33,6 @@ export const bakeSurfaceSunVisibility = (
   const visibility = new Float32Array(stride * stride);
   const horizontal = Math.hypot(sunDirection.x, sunDirection.z);
 
-  // A sun at or below the horizon leaves the whole patch in shade; one directly overhead casts
-  // nothing. Either way there is no march to run.
   if (horizontal < 1e-4 || sunDirection.y <= 0.01) {
     visibility.fill(sunDirection.y > 0.01 ? 1 : 0);
     return visibility;
@@ -55,8 +42,6 @@ export const bakeSurfaceSunVisibility = (
   const stepZ = sunDirection.z / horizontal;
   const rise = sunDirection.y / horizontal;
   const steps = 22;
-  // Out to a third of the patch: beyond that a blocker would have to be taller than any terrain
-  // this generator raises to still be in the way.
   const maxDistance = SURFACE_HALF_EXTENT * 0.62;
 
   const heightAtGrid = (worldX: number, worldZ: number): number => {
@@ -83,7 +68,6 @@ export const bakeSurfaceSunVisibility = (
       let shade = 0;
 
       for (let step = 0; step < steps; step += 1) {
-        // Geometric spacing: fine where a small rock can block the sun, coarse where only a ridge can.
         const t = (step + 1) / steps;
         const distance = maxDistance * t * t;
         const sampleX = worldX + stepX * distance;
@@ -93,15 +77,12 @@ export const bakeSurfaceSunVisibility = (
         const rayHeight = origin + rise * distance;
         const blocker = heightAtGrid(sampleX, sampleZ);
         if (blocker > rayHeight) {
-          // How far the blocker overtops the ray, measured against the sun's own angular size:
-          // a ridge just clipping the disc dims it, one well above it puts the vertex in umbra.
           const overtop = (blocker - rayHeight) / Math.max(distance * 0.035 + 0.12, 0.05);
           shade = Math.max(shade, Math.min(1, overtop));
           if (shade >= 1) break;
         }
       }
 
-      // Steeper relief casts harder shadows; a nearly flat world barely shades itself at all.
       visibility[iz * stride + ix] = 1 - shade * Math.min(1, 0.55 + reliefScale * 0.12);
     }
   }
@@ -109,23 +90,6 @@ export const bakeSurfaceSunVisibility = (
   return visibility;
 };
 
-/**
- * Ambient occlusion from the shape of the ground itself.
- *
- * A hollow sees less of the sky than a crest does, and that difference is most of what gives a
- * crater floor, a dune trough or a canyon its depth under diffuse light. Comparing each vertex to
- * the average of a ring around it, at two radii, approximates it closely enough to read — and
- * unlike a screen-space pass it is stable when the camera moves.
- */
-/**
- * Low-passes the outer rows of the height grid in step with how far apart their vertices are.
- *
- * The grading that buys the horizon also means the rim quads are fourteen times the width of the
- * ones underfoot, and terrain detail finer than a quad does not get smaller out there — it turns
- * into single-triangle slivers that flicker as the camera moves and read as scratches drawn on
- * the ground. Blurring each row by roughly the width of its own quads removes exactly the
- * frequencies the mesh cannot carry, and leaves the near field untouched.
- */
 export const bandlimitSurfaceFarField = (heights: Float32Array, resolution: number): void => {
   const stride = resolution + 1;
   const source = Float32Array.from(heights);
@@ -134,7 +98,6 @@ export const bandlimitSurfaceFarField = (heights: Float32Array, resolution: numb
     const v = (iz / resolution) * 2 - 1;
     for (let ix = 0; ix <= resolution; ix += 1) {
       const u = (ix / resolution) * 2 - 1;
-      // How coarse this vertex's own neighbourhood is, as a fraction of the coarsest in the grid.
       const coarseness = Math.max(Math.abs(u), Math.abs(v));
       const strength = Math.min(1, Math.max(0, (coarseness - 0.34) / 0.66)) ** 1.5;
       if (strength <= 0.01) continue;
@@ -183,7 +146,6 @@ export const bakeSurfaceOcclusion = (heights: Float32Array, resolution: number):
           }
         }
         const weight = 1 / radius;
-        // Above the ring average the vertex is a crest and sees the whole sky; below it, a hollow.
         openness += weight * Math.tanh((center - sum / Math.max(count, 1)) * 1.6);
         weightTotal += weight;
       }

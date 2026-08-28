@@ -39,7 +39,6 @@ test("separate serverless instances have independent in-memory budgets", () => {
 
   expect(firstInstance.check("client", 0).allowed).toBe(true);
   expect(firstInstance.check("client", 0).allowed).toBe(false);
-  // This is deliberately allowed: local memory is a per-instance safeguard, not a global limit.
   expect(secondInstance.check("client", 0).allowed).toBe(true);
 });
 
@@ -58,7 +57,6 @@ test("a wait is never rounded down to zero seconds", () => {
   const limiter = createRateLimiter({ limit: 1, windowMs: 1_000 });
   limiter.check("a", 0);
 
-  // 1ms of window left still has to read as "wait", or the caller retries into the same window.
   expect(limiter.check("a", 999).retryAfterSeconds).toBe(1);
 });
 
@@ -77,10 +75,7 @@ test("eviction drops the least recently seen client", () => {
   limiter.check("a", 1); // "a" is refused, but the touch makes "b" the oldest
   limiter.check("c", 2); // evicts "b"
 
-  // "a" survived and is still over its budget. Checked first on purpose: with only two slots,
-  // probing a third client would itself evict one, which is the trap this ordering avoids.
   expect(limiter.check("a", 3).allowed).toBe(false);
-  // "b" was forgotten, so it starts from a fresh window.
   expect(limiter.check("b", 4).allowed).toBe(true);
 });
 
@@ -106,8 +101,6 @@ test("spoofed or malformed proxy identities share the conservative fallback buck
 });
 
 test("a decision reports the budget it was actually made against", () => {
-  // The response header is built from this, so a limiter configured away from the default must
-  // not have callers told the default's number.
   const limiter = createRateLimiter({ limit: 7, windowMs: 1_000 });
 
   expect(limiter.check("a", 0).limit).toBe(7);

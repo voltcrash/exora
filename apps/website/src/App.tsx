@@ -170,9 +170,6 @@ const loadRequestedObject = async (): Promise<ActiveObject> => {
 };
 
 export const App = () => {
-  // The canvas and the renderer behind it belong to the page, not to either view. Travelling
-  // from a world to its host star swaps which view is mounted, and a WebXR session cannot
-  // survive its WebGL context being torn down and rebuilt underneath it.
   const [canvas, setCanvas] = useState<HTMLCanvasElement | null>(null);
   const {
     host: sceneHost,
@@ -194,30 +191,17 @@ export const App = () => {
   });
   const [systemHostName, setSystemHostName] = useState<string | null>(null);
 
-  // Whether the interface has been put away, leaving the world on its own. Held here rather than
-  // in the view showing it, for the same reason the travel phase is: it is a property of the page
-  // and has to survive one destination being exchanged for another.
   const [chromeHidden, setChromeHidden] = useState(false);
 
-  // Held here rather than inside each view, because the point of the phase is that it outlives
-  // the swap: the destination arriving has to be mounted already knowing a jump is in the air,
-  // or it paints its own loading card over the flight for the frame before it finds out.
   const [travelPhase, setTravelPhase] = useState<TravelPhase>("idle");
   useEffect(() => sceneHost?.onTravelPhase(setTravelPhase), [sceneHost]);
 
-  // Discover covers the canvas completely, so for as long as it is open the scene behind it is
-  // being rendered for nobody. Parking the loop gives that work back to the interface.
   const overlayOpen = discoverOpen;
   useEffect(() => {
-    // The desktop dialog may be toggled by a controller while VR remains active. Keep the headset
-    // loop running in that case; only the flat page can safely park rendering behind the dialog.
     if (!sceneHost || !overlayOpen || sceneHost.isInXr()) return;
     return sceneHost.suspendRendering();
   }, [overlayOpen, sceneHost]);
 
-  // Whether a destination is what is on screen, with nothing layered over it. Everything else the
-  // page can be showing — a dialog, a recovery screen, the first load — is somewhere the Tab
-  // shortcut below has to stand down and let the key go back to traversing focus.
   const onMainScreen =
     !overlayOpen &&
     activeObject !== null &&
@@ -235,9 +219,6 @@ export const App = () => {
     return () => window.removeEventListener("popstate", loadFromLocation);
   }, [loadFromLocation]);
 
-  // Backspace — labelled Delete on Apple keyboards — is the one-key toggle for Discover. The
-  // listener belongs to the page so the same key can both mount and unmount the full-screen
-  // surface. It yields to text entry and to recovery/loading screens where Discover cannot open.
   useEffect(() => {
     const toggleDiscoverWithShortcut = (event: KeyboardEvent): void => {
       const target = event.target;
@@ -256,8 +237,6 @@ export const App = () => {
       }
       if (!discoverOpen && !onMainScreen) return;
 
-      // Backspace has historically meant browser navigation when focus belongs to the page.
-      // Suppress it only once the press is known to belong to Discover.
       event.preventDefault();
       if (discoverOpen) {
         setDiscoverOpen(false);
@@ -270,14 +249,6 @@ export const App = () => {
     return () => document.removeEventListener("keydown", toggleDiscoverWithShortcut);
   }, [discoverOpen, onMainScreen]);
 
-  // Tab puts the interface away and brings it back. It is the whole of the way back, because the
-  // desktop button that hides the interface is hidden along with it — which is why that button
-  // wears the key on its face, the way the Discover trigger wears its deletion-key symbol. On a
-  // touch screen the same button remains available as the way back.
-  //
-  // Taking the browser's focus key is only defensible taken narrowly, so `togglesClearView`
-  // declines everywhere the key already means something: over a dialog, inside a text field, in a
-  // chord. Shift+Tab is left traversing, which is what still reaches this page's controls.
   useEffect(() => {
     const toggleChrome = (event: KeyboardEvent): void => {
       const target = event.target;
@@ -295,8 +266,6 @@ export const App = () => {
         return;
       }
 
-      // Only once the press is known to be the shortcut is suppressing the browser's own focus
-      // traversal the right thing to do.
       event.preventDefault();
       setChromeHidden((hidden) => !hidden);
     };
@@ -305,10 +274,6 @@ export const App = () => {
     return () => document.removeEventListener("keydown", toggleChrome);
   }, [onMainScreen]);
 
-  // Keeps the canonical link and the shared-link URL on the destination actually being shown.
-  // Travel rewrites the query string through `pushState`, which moves neither on its own, so
-  // without this every world would go on claiming to be the landing page — and `sitemap.xml`
-  // would be offering destinations that each declare themselves a duplicate of the root.
   useEffect(() => {
     const canonical = canonicalUrlForSearch(window.location.search);
     document
@@ -319,7 +284,6 @@ export const App = () => {
       ?.setAttribute("content", canonical);
   }, [activeObject]);
 
-  // Stable identities keep destination changes deterministic while a scene is mounted.
   const selectPlanet = useCallback((planet: ExoplanetProfile, cached: boolean): void => {
     window.history.pushState({}, "", `?planet=${encodeURIComponent(planet.name)}`);
     setDiscoverOpen(false);
@@ -357,12 +321,6 @@ export const App = () => {
     setActiveObject({ region, type: "region" });
   }, []);
 
-  /**
-   * Travel to a whole host system from the browser interface.
-   *
-   * Reports back whether the archive had anything to place, the way `selectHostStar` does, so
-   * the view that asked can say so rather than the page going somewhere empty.
-   */
   const selectSystem = useCallback(async (hostStar: string): Promise<boolean> => {
     const system = await reachSystem(hostStar);
     if (!system) return false;
@@ -440,12 +398,6 @@ export const App = () => {
         }
         tabIndex={0}
       />
-      {/*
-        The dark a jump crosses in. It covers the swap itself — the one moment of travel that
-        cannot be flown through, because building a destination stalls the frame loop while it
-        runs — and belongs to the page rather than to either view, so that it survives the two of
-        them being exchanged underneath it. The renderer times the flight by the same constants.
-      */}
       <div
         className={`travel-veil ${travelPhase === "crossing" ? "crossing" : ""}`}
         aria-hidden="true"

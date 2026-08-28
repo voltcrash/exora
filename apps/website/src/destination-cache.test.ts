@@ -51,7 +51,6 @@ const systemPayload = {
   },
 } as const;
 
-/** Counts what actually left for the network, which is the whole point of the cache. */
 const countingArchive = (): { calls: string[] } => {
   const calls: string[] = [];
   vi.stubGlobal("fetch", (input: string) => {
@@ -78,8 +77,6 @@ test("a destination asked for twice is only fetched once", async () => {
 });
 
 test("a warmed destination is answered from memory when the jump takes it", async () => {
-  // The reason the cache exists: the click that follows a warmed view costs no request at all,
-  // so the flight never has to stop in the air waiting for one.
   const archive = countingArchive();
 
   warmDestinations(featuredPlanet.hostStar);
@@ -113,8 +110,6 @@ test("a canonical SIMBAD name reaches the NASA-named host system once", async ()
 });
 
 test("a host the archive links no worlds to is not remembered as a system", async () => {
-  // Nothing to cache and nothing to be sure of: an empty answer may be the archive being slow to
-  // agree with itself, and a page that cached it would never offer that system again.
   vi.stubGlobal("fetch", () =>
     Promise.resolve(
       Response.json({ data: [], meta: { cached: false, count: 0, query: "", source: "NASA" } }),

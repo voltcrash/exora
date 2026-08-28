@@ -25,13 +25,6 @@ export interface ImmersiveSupport {
 
 export type ImmersiveDestination = { launchUrl: string | null; mode: ImmersiveMode } | null;
 
-/**
- * Chooses one presentation without changing Quest's established preference for VR.
- *
- * Some headsets expose both session modes, while phones expose AR alone. Selecting VR first is
- * what keeps a Quest tap entering the same opaque `immersive-vr` session it did before AR was
- * added; AR becomes the natural fallback on an AR-capable phone or through Variant Launch.
- */
 export const chooseImmersiveDestination = ({
   ar,
   launchUrl,
@@ -42,13 +35,6 @@ export const chooseImmersiveDestination = ({
   return launchUrl ? { launchUrl, mode: "ar" } : null;
 };
 
-/**
- * Returns the recommended Variant Launch Card handoff when its configured SDK is ready.
- *
- * The small Apple-mobile gate prevents Variant's URL factory from turning a desktop with no XR
- * hardware into a false AR offer. Variant's initialization result then decides whether this
- * particular iPhone/iPad needs the handoff; its viewer falls through to ordinary WebXR detection.
- */
 export const getVariantLaunchUrl = (): string | null => {
   const appleMobile =
     /iPad|iPhone|iPod/.test(navigator.userAgent) ||
@@ -67,7 +53,6 @@ export const getVariantLaunchUrl = (): string | null => {
   }
 };
 
-/** Re-evaluates iPhone availability when Variant's asynchronous device check completes. */
 export const onVariantLaunchReady = (listener: () => void): (() => void) => {
   window.addEventListener("exora:variant-launch-ready", listener);
   if (window.__exoraVariantLaunchDetail) listener();

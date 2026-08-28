@@ -16,8 +16,6 @@ export const findAssetProvenanceGaps = async ({ publicRootPath, provenance }) =>
     await Promise.all(
       [...supportedAssetExtensions].map(async ([directory, extensions]) => {
         const directoryPath = path.join(publicRootPath, directory);
-        // Git does not retain empty directories. A route may stop shipping one asset class
-        // entirely without leaving a directory for CI to scan.
         if (!(await stat(directoryPath).catch(() => null))) return [];
 
         const entries = await readdir(directoryPath, {

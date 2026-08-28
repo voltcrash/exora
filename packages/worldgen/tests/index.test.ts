@@ -45,8 +45,6 @@ const featuredPlanet: ExoplanetProfile = {
   },
 };
 
-/** Kepler-62 f: a real 208 K equilibrium temperature, which is the cold-desert regime rather
- * than the temperate one — Mars sits at 210 K. Used as the base for the rocky fixtures below. */
 const coldDesertRockyPlanet: ExoplanetProfile = {
   ...featuredPlanet,
   id: "kepler-62-f",
@@ -62,7 +60,6 @@ const coldDesertRockyPlanet: ExoplanetProfile = {
   },
 };
 
-/** Kepler-452 b: 265 K, inside the band where liquid surface water is possible at all. */
 const temperateRockyPlanet: ExoplanetProfile = {
   ...coldDesertRockyPlanet,
   id: "kepler-452-b",
@@ -160,12 +157,6 @@ test("temperate rocky planets produce displaced terrain with low basins", () => 
   expect(recipe.atmosphere.label).toContain("inferred");
 });
 
-/**
- * Equilibrium temperature is a blackbody figure for an airless body, and reading it as a surface
- * temperature is what used to hand Mars an ocean and an ice-blue palette: at 210 K it fell inside
- * a "temperate" band that ran down to 180 K, and inside an ice threshold that ran up to 250 K.
- * Both of those swept up Earth (255 K) as well. A world in Mars's regime is a cold desert.
- */
 test("worlds in Mars's thermal regime infer a cold desert, not an ice world with an ocean", () => {
   const recipe = deriveWorldRecipe({
     ...coldDesertRockyPlanet,
@@ -185,7 +176,6 @@ test("worlds in Mars's thermal regime infer a cold desert, not an ice world with
   expect(recipe.inferred.paletteFamily).not.toBe("ice-blue");
   expect(recipe.surface.waterLevel).toBe(0);
   expect(recipe.terrain.oceanCoverage).toBe(0);
-  // Polar caps, not a glaciated world, and next to no weather.
   expect(recipe.surface.iceCapStrength).toBeLessThan(0.4);
   expect(recipe.surface.iceCapStrength).toBeGreaterThan(0);
   expect(recipe.terrain.polarIceBias).toBeGreaterThan(0.6);
@@ -853,13 +843,10 @@ test("a gallery of seeded giants is deterministic and visually distinct across f
 
   const recipes = gallery.map((planet) => deriveWorldRecipe(planet));
 
-  // Stable: deriving the same fixed-seed planet twice reproduces an identical recipe.
   for (const [index, planet] of gallery.entries()) {
     expect(deriveWorldRecipe(planet)).toEqual(recipes[index]);
   }
 
-  // Distinct: no two giants in the gallery render with the same deep/light color pair, so the
-  // gallery does not silently collapse onto one shared look.
   const colorSignatures = recipes.map((recipe) =>
     recipe.renderer === "gas-giant"
       ? JSON.stringify([recipe.cloudBands.deepColor, recipe.cloudBands.lightColor])

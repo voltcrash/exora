@@ -2,11 +2,6 @@ import { renderToStaticMarkup } from "react-dom/server";
 import { expect, test, vi } from "vite-plus/test";
 import { WorldForge } from "./CustomPlanetBuilder.tsx";
 
-/**
- * The tab list is only worth anything if the panel it opens is actually announced as the tab's
- * panel. `renderToStaticMarkup` gives us the wiring without needing a DOM — the dialog never
- * opens, but the markup carries the relationship a screen reader reads.
- */
 const forgeMarkup = (): string =>
   renderToStaticMarkup(
     <WorldForge
@@ -28,8 +23,6 @@ test("only the tab whose panel is mounted claims to control one", () => {
   const markup = forgeMarkup();
 
   expect(markup).toContain('aria-controls="forge-mode-panel-planet"');
-  // The star panel is not rendered while the planet tab is open, so pointing at it would leave
-  // a dangling IDREF.
   expect(markup).not.toContain('aria-controls="forge-mode-panel-star"');
 });
 
@@ -48,7 +41,6 @@ test("only the selected tab is in the page's tab order", () => {
   expect(tabs).toHaveLength(2);
   expect(tabs.filter((tag) => tag.includes('tabindex="0"'))).toHaveLength(1);
   expect(tabs.filter((tag) => tag.includes('tabindex="-1"'))).toHaveLength(1);
-  // The one stop in the tab order is the selected tab, not an arbitrary one.
   const selected = tabs.find((tag) => tag.includes('aria-selected="true"'));
   expect(selected).toContain('tabindex="0"');
 });

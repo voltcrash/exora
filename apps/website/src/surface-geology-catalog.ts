@@ -19,8 +19,6 @@ const provinces = (
 };
 
 export const MEASURED_GEOLOGY: Readonly<Record<number, MeasuredGeology>> = {
-  // Mercury — crater-saturated crust darkened by graphite, cut by kilometre-high lobate scarps
-  // where the whole planet contracted as it cooled, with smooth volcanic plains between.
   199: {
     skyColor: rgb(0.003, 0.004, 0.008),
     provinces: provinces(
@@ -59,9 +57,6 @@ export const MEASURED_GEOLOGY: Readonly<Record<number, MeasuredGeology>> = {
       secondaryScale: 8,
     },
   },
-  // Venus — basalt plains under a 92-bar atmosphere. Almost no craters survive its global
-  // resurfacing, nothing erodes without water, and Venera's own photographs show flat, layered,
-  // platy slabs in an orange light that the CO2 column filters out of the sunlight above.
   299: {
     skyColor: rgb(0.3, 0.185, 0.062),
     provinces: provinces(
@@ -100,8 +95,6 @@ export const MEASURED_GEOLOGY: Readonly<Record<number, MeasuredGeology>> = {
       secondaryScale: 5,
     },
   },
-  // Earth — the one surface anyone has stood on. Folded ranges, a vegetated lowland, standing
-  // water, and an impact record almost entirely erased by weather and plate tectonics.
   399: {
     skyColor: rgb(0.28, 0.45, 0.85),
     provinces: provinces(
@@ -116,8 +109,6 @@ export const MEASURED_GEOLOGY: Readonly<Record<number, MeasuredGeology>> = {
       rgb(0.33, 0.3, 0.235),
       rgb(0.72, 0.735, 0.755),
     ],
-    // Soil under a biosphere, not bare mineral fines: what settles on Earth's flats and fills its
-    // hollows is vegetated, and it is the single strongest colour cue the planet has.
     regolithColor: rgb(0.09, 0.115, 0.05),
     bedrockColor: rgb(0.21, 0.2, 0.19),
     frostColor: rgb(0.82, 0.86, 0.9),
@@ -144,8 +135,6 @@ export const MEASURED_GEOLOGY: Readonly<Record<number, MeasuredGeology>> = {
       secondaryScale: 15,
     },
   },
-  // The Moon — the crater density ceiling for the inner system, under metres of impact-ground
-  // regolith, with dark basalt maria flooding the near-side basins.
   301: {
     skyColor: rgb(0.003, 0.004, 0.008),
     provinces: provinces(
@@ -184,9 +173,6 @@ export const MEASURED_GEOLOGY: Readonly<Record<number, MeasuredGeology>> = {
       secondaryScale: 9,
     },
   },
-  // Mars — a cold desert, not an ice world. Dark basaltic sand blown into dune seas over
-  // ochre dust, wind-carved yardang ridges, the deepest canyon system known, the largest
-  // volcanoes known, and permanent ice confined to roughly a hundredth of the surface.
   499: {
     skyColor: rgb(0.6, 0.36, 0.23),
     provinces: provinces(
@@ -227,8 +213,6 @@ export const MEASURED_GEOLOGY: Readonly<Record<number, MeasuredGeology>> = {
       secondaryScale: 8,
     },
   },
-  // Phobos — a dark, grooved, regolith-covered fragment, its surface dominated by Stickney's
-  // ejecta rather than by anything endogenic.
   401: {
     skyColor: rgb(0.003, 0.004, 0.008),
     provinces: provinces(["impact-highlands", 0.7], ["regolith-plain", 0.3]),
@@ -274,7 +258,6 @@ export const MEASURED_GEOLOGY: Readonly<Record<number, MeasuredGeology>> = {
     bedrockColor: rgb(0.086, 0.082, 0.078),
     frostCoverage: 0,
     craterDensity: 0.6,
-    // Deimos's craters are largely buried: its regolith is thick enough to smooth the body out.
     regolithDepth: 0.95,
     boulderDensity: 0.4,
     boulderScale: 0.9,
@@ -292,8 +275,6 @@ export const MEASURED_GEOLOGY: Readonly<Record<number, MeasuredGeology>> = {
       secondaryScale: 10,
     },
   },
-  // Io — sulfur and sulfur dioxide over silicate, resurfaced fast enough that not one impact
-  // crater has ever been identified on it, with tectonic peaks taller than anything on Earth.
   501: {
     skyColor: rgb(0.03, 0.028, 0.016),
     provinces: provinces(
@@ -335,8 +316,6 @@ export const MEASURED_GEOLOGY: Readonly<Record<number, MeasuredGeology>> = {
       secondaryScale: 6,
     },
   },
-  // Europa — the smoothest solid surface known: bright water ice crazed by double ridges and
-  // rafted into chaos blocks, with total relief of only a few hundred metres.
   502: {
     skyColor: rgb(0.004, 0.005, 0.009),
     provinces: provinces(["fractured-ice", 0.74], ["glacial-plain", 0.26]),
@@ -355,8 +334,6 @@ export const MEASURED_GEOLOGY: Readonly<Record<number, MeasuredGeology>> = {
     regolithDepth: 0.3,
     boulderDensity: 0.55,
     boulderScale: 1.25,
-    // A fraction of the inner planets' relief: Europa is the smoothest solid body known, and what
-    // little it has is in the ridges rather than in any regional slope.
     relief: 1.6,
     featureScale: 0.85,
     strataStrength: 0.3,
@@ -373,8 +350,6 @@ export const MEASURED_GEOLOGY: Readonly<Record<number, MeasuredGeology>> = {
       secondaryScale: 6,
     },
   },
-  // Ganymede — dark, ancient, cratered terrain cut across by bright grooved bands where the
-  // crust pulled apart.
   503: {
     skyColor: rgb(0.004, 0.005, 0.009),
     provinces: provinces(
@@ -413,8 +388,6 @@ export const MEASURED_GEOLOGY: Readonly<Record<number, MeasuredGeology>> = {
       secondaryScale: 14,
     },
   },
-  // Callisto — the most heavily cratered surface in the Solar System, its ice darkened to a
-  // lag of dust and its small craters erased by sublimation.
   504: {
     skyColor: rgb(0.003, 0.004, 0.008),
     provinces: provinces(["impact-highlands", 0.66], ["regolith-plain", 0.34]),
@@ -449,8 +422,6 @@ export const MEASURED_GEOLOGY: Readonly<Record<number, MeasuredGeology>> = {
       secondaryScale: 10,
     },
   },
-  // Enceladus — the brightest surface in the Solar System: fresh plume fallout over a young
-  // south-polar terrain of tiger-stripe fractures.
   602: {
     skyColor: rgb(0.005, 0.007, 0.011),
     provinces: provinces(
@@ -489,8 +460,6 @@ export const MEASURED_GEOLOGY: Readonly<Record<number, MeasuredGeology>> = {
       secondaryScale: 6,
     },
   },
-  // Titan — sand seas of organic grains covering a fifth of the moon, fluvial valleys cut by
-  // methane rain, polar lakes, and an orange haze thick enough to hide the Sun.
   606: {
     skyColor: rgb(0.42, 0.24, 0.075),
     provinces: provinces(
@@ -532,8 +501,6 @@ export const MEASURED_GEOLOGY: Readonly<Record<number, MeasuredGeology>> = {
       secondaryScale: 7,
     },
   },
-  // Iapetus — two hemispheres in one body: a dark dust-mantled leading side and bright trailing
-  // ice, split by an equatorial ridge 13 km high.
   608: {
     skyColor: rgb(0.003, 0.004, 0.008),
     provinces: provinces(
@@ -572,8 +539,6 @@ export const MEASURED_GEOLOGY: Readonly<Record<number, MeasuredGeology>> = {
       secondaryScale: 10,
     },
   },
-  // Triton — nitrogen frost over a cantaloupe terrain of dimpled cells, with active plumes and
-  // almost no craters on a surface younger than 100 Myr.
   801: {
     skyColor: rgb(0.05, 0.055, 0.075),
     provinces: provinces(
@@ -612,8 +577,6 @@ export const MEASURED_GEOLOGY: Readonly<Record<number, MeasuredGeology>> = {
       secondaryScale: 14,
     },
   },
-  // Charon — grey water ice, a tectonic chasm system four times the length of the Grand Canyon,
-  // and a north polar cap stained red by tholins escaping from Pluto.
   901: {
     skyColor: rgb(0.003, 0.004, 0.008),
     provinces: provinces(
@@ -652,8 +615,6 @@ export const MEASURED_GEOLOGY: Readonly<Record<number, MeasuredGeology>> = {
       secondaryScale: 14,
     },
   },
-  // Pluto — nitrogen ice convecting into cells tens of kilometres across on Sputnik Planitia,
-  // walled by water-ice mountains and bordered by tholin-dark uplands.
   999: {
     skyColor: rgb(0.075, 0.08, 0.1),
     provinces: provinces(
@@ -693,8 +654,6 @@ export const MEASURED_GEOLOGY: Readonly<Record<number, MeasuredGeology>> = {
       secondaryScale: 15,
     },
   },
-  // Ceres — a dark carbonaceous crust at 9% albedo, pocked by craters and spotted with the
-  // brightest salt deposits in the belt.
   2_000_001: {
     skyColor: rgb(0.003, 0.004, 0.008),
     provinces: provinces(["impact-highlands", 0.58], ["regolith-plain", 0.28], ["salt-pan", 0.14]),
@@ -731,8 +690,6 @@ export const MEASURED_GEOLOGY: Readonly<Record<number, MeasuredGeology>> = {
   },
 };
 
-/** Bright water-ice moons whose surfaces differ mainly in how much of the crater record and how
- * much of the tectonics survives. Stated as one shape with per-body dials rather than repeated. */
 const icyMoonGeology = (
   cratering: number,
   tectonics: number,
@@ -777,8 +734,6 @@ const icyMoonGeology = (
   },
 });
 
-/* Saturnian and Uranian ice moons, ordered by how much of each surface is crater record versus
- * tectonic resurfacing. Mimas is the crater extreme; Ariel and Miranda the tectonic one. */
 export const ICY_MOONS: Readonly<Record<number, MeasuredGeology>> = {
   601: icyMoonGeology(0.94, 0.06, 0.96, 2.6),
   603: icyMoonGeology(0.82, 0.18, 1, 2.4),
@@ -788,7 +743,5 @@ export const ICY_MOONS: Readonly<Record<number, MeasuredGeology>> = {
   702: icyMoonGeology(0.82, 0.12, 0.3, 2.1),
   703: icyMoonGeology(0.6, 0.34, 0.42, 2.6),
   704: icyMoonGeology(0.76, 0.18, 0.38, 2.4),
-  // Miranda's coronae stack scarps 20 km high on a body 470 km across — the most extreme relief
-  // to radius ratio in the Solar System.
   705: icyMoonGeology(0.34, 0.58, 0.5, 4.8),
 };

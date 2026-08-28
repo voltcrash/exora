@@ -120,11 +120,6 @@ const lagrangePair = (
   { angleDegrees: -60, label: "L5", radiusKilometers, reference },
 ];
 
-/**
- * An authored, deliberately bounded set of the moons that explain each system's architecture.
- * Mean elements are JPL SSD values, not a live state vector. The renderer preserves order,
- * inclination, direction, and period while logarithmically compressing radial distance.
- */
 export const PLANETARY_SUBSYSTEMS: readonly PlanetarySubsystem[] = [
   {
     aurora: null,
@@ -507,7 +502,6 @@ export const findPlanetarySubsystem = (name: string): PlanetarySubsystem | null 
   return PLANETARY_SUBSYSTEMS.find((system) => system.id === normalized) ?? null;
 };
 
-/** Log-compresses distance without changing orbital ordering or the primary-relative data. */
 export const subsystemOrbitRadius = (
   subsystem: PlanetarySubsystem,
   distanceKilometers: number,

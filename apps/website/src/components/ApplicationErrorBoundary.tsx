@@ -9,7 +9,6 @@ interface ApplicationErrorBoundaryState {
   failed: boolean;
 }
 
-/** Last-resort UI for React render, lifecycle, and lazy-chunk failures. */
 export class ApplicationErrorBoundary extends Component<
   ApplicationErrorBoundaryProps,
   ApplicationErrorBoundaryState

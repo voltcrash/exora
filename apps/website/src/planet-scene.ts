@@ -40,90 +40,22 @@ const LIGHT_DIRECTION = new Vector3(-0.82, 0.3, -0.38).normalize();
 const DESKTOP_MOVE_SPEED = 5.2;
 const SURFACE_GROUND_ORIGIN_Z = 18;
 const SURFACE_GROUND_BASE_Y = -1.6;
-/** How far out the wheel reaches in a surface excursion, before the ground runs out under it. */
 const SURFACE_FAR_LIMIT = 18.4;
-/** Scrolling back past this inside a surface excursion is what asks to return to orbit. */
 const SURFACE_RETURN_RADIUS = 18.1;
-/**
- * Where a jump out of a surface excursion stops pulling back.
- *
- * Short of the radius that asks for orbit, so that leaving the *world* is never read by the view
- * as a request to leave the vista — the return would animate the same camera the flight is on.
- */
 const SURFACE_DEPARTURE_RADIUS = 17.6;
 
-/**
- * The distances a descent, and the climb back to orbit, are flown between.
- *
- * Each half of the move carries on the way the visitor's scroll was already going: scrolling in
- * keeps closing on the world until the dark takes it, and comes out of the dark still closing, on
- * ground that is now underfoot. The two `-ENTRY` distances are the ones nobody ever sees, because
- * they are set at the instant the dark is deepest; they exist so that the second half of the move
- * has somewhere to travel from.
- */
 const SURFACE_PLUNGE_RADIUS = 7.9;
 const SURFACE_ENTRY_RADIUS = 15.6;
 const SURFACE_RESTING_RADIUS = 12.8;
 const ORBIT_CLIMB_RADIUS = 21.6;
 const ORBIT_ENTRY_RADIUS = 10.6;
 const ORBIT_RETURN_RADIUS = 12.2;
-/** Where the wearer stands when the immersive session drops onto the terrain. */
 const XR_SURFACE_STAND = new Vector3(0, 0, 12);
-/**
- * How the vista camera sits once it has settled onto the terrain.
- *
- * Babylon measures beta down from straight up, so this is a camera a little above the spot it
- * orbits, looking slightly down at it. It used to look down steeply enough that the sky over the
- * ridge line was a band barely wider than the host star's own disc — nowhere for a star to hang
- * without leaving the frame, which is part of why this one ended up down among the rocks.
- */
 const SURFACE_RESTING_BETA = 1.37;
-/**
- * Vertical field of view for the vista, in radians.
- *
- * Wider than the orbital view's default 0.8 for two reasons that pull the same way: a horizon
- * needs width to read as a horizon, and the sun sits fourteen degrees up while the camera looks
- * eleven degrees down, so a 46-degree frame would cut the disc off the top of the screen.
- */
 const SURFACE_FIELD_OF_VIEW = 1.02;
 const ORBIT_FIELD_OF_VIEW = 0.8;
-/**
- * Which way the host star lies from anyone standing on the terrain.
- *
- * A sun is a direction and an angular size, at a distance nothing on the ground can be measured
- * against. This one used to be a fixed point 36 units in front of the terrain's origin — inside
- * the patch the wheel and WASD move across — so it behaved like the boulder it was standing next
- * to: walking the vista swung it through forty degrees of sky, doubled its disc, and left it
- * hanging in front of ridges that were further away than it was. Only the direction survives now;
- * the star rides an anchor pinned to the viewer, the same way the vacuum starfield does.
- *
- * Ahead and twenty-seven degrees to the left, which is the strip of sky this camera frames, and
- * fourteen
- * degrees up — mid-afternoon light. Low, because a low sun is what rakes a landscape: it throws
- * every ridge, dune crest and crater rim into a shadow as long as the feature is tall, which is
- * the whole reason the terrain bakes its own shadowing. Not lower, because below about ten degrees
- * a flat surface catches so little of the light that ambient sky glow drowns the shading out and
- * the ground goes back to reading as one flat colour. And to the side rather than straight ahead,
- * because a sun directly down the camera's axis back-lights every rock in the frame into a
- * silhouette; across the view it rakes them, and a raked rock has a shape.
- */
 const SURFACE_STAR_DIRECTION = new Vector3(-0.44, 0.245, 0.864).normalize();
-/**
- * Far enough out that ridges decide whether the star is visible, rather than standing beside it.
- *
- * Scaled with the ground: the patch now reaches 150 units from its own origin in every direction,
- * so a star at the old 320 was only twice as far away as the far rim — close enough to sit among
- * the terrain rather than beyond all of it.
- */
 const SURFACE_STAR_DISTANCE = 900;
-/**
- * How wide the host star's disc is in the surface sky, as an angular radius in radians.
- *
- * Distance is a free choice for something drawn as a sky object, so the size that has to be pinned
- * down is the angle it covers — and it is the same angle the old, far closer placement subtended.
- * The floor keeps a modest star from shrinking to a dot in a sky that holds nothing else to judge
- * it against; the slope carries the relative sizes worldgen derives from each system's geometry.
- */
 const surfaceStarAngularRadius = (apparentRadiusRadians: number): number =>
   0.021 + apparentRadiusRadians * 0.39;
 
@@ -196,20 +128,13 @@ void main(void) {
   cloudBand *= smoothstep(-0.14, 0.35, direction.y) * (1.0 - smoothstep(0.62, 0.96, direction.y));
   sky = mix(sky, cloudColor, cloudBand * cloudiness * (0.34 + density * 0.46));
 
-  // Naked-eye stars in the planet's own sky. The lattice only chooses WHERE each star sits; its
-  // brightness then falls off from a point inside its cell. Thresholding the cell hash directly
-  // instead lights the whole cell, which fills the sky with little squares rather than stars.
   vec2 starGrid = vec2(longitude * 88.0, asin(direction.y) * 104.0);
   vec2 starCell = floor(starGrid);
   vec2 starOffset = vec2(hash(starCell + 3.7), hash(starCell + 8.1));
   float starDistance = length((fract(starGrid) - starOffset) * vec2(1.0, 1.2));
   float magnitude = pow(hash(starCell + 9.4), 4.0) * step(0.84, hash(starCell));
-  // A tight core over a wider halo — the same two-term point spread the orbital starfield uses,
-  // and the reason a star reads as a light source instead of as a lit pixel.
   float star = (exp(-starDistance * starDistance * 300.0) + exp(-starDistance * 10.0) * 0.14)
     * magnitude;
-  // Scintillation. Unlike the vacuum starfield this one really is being viewed through moving
-  // air, so the twinkle is physical here, and it deepens with the thickness of that air.
   star *= 1.0 - (0.12 + density * 0.3)
     * (0.5 + 0.5 * sin(time * (2.2 + hash(starCell + 1.3) * 5.0) + hash(starCell) * 40.0));
   star *= smoothstep(0.02, 0.5, direction.y) * starVisibility;
@@ -325,10 +250,6 @@ void main(void) {
     vec3(flowingSurface.x * 7.0, flowingSurface.y * (16.0 + turbulence * 3.0), flowingSurface.z * 7.0) + vec3(17.1, flow * 0.45, 3.7)
   );
 
-  // Each storm gets a deterministic latitude/longitude/scale/phase derived from its own index
-  // and the planet seed, so a multi-storm giant never reads as identical circles pasted around
-  // the sphere. MAX_GIANT_STORMS is a quality-tier compile constant; activeStorms (from the
-  // recipe's stormCount) clamps how many of those slots actually render.
   float stormMask = 0.0;
   vec3 stormTint = vec3(0.0);
   int activeStorms = int(min(stormCount, float(MAX_GIANT_STORMS)));
@@ -363,9 +284,6 @@ void main(void) {
   vec3 blendedStormColor = stormMask > 0.0001 ? stormTint / stormMask : stormColor;
   stormMask = clamp(stormMask, 0.0, 1.0);
 
-  // Zonal warp keeps jet bands from reading as mathematically perfect horizontal stripes: it
-  // nudges the effective latitude before banding, and storms visibly disturb the flow around
-  // them via the same bandPhase term.
   float zonalNoise = fbm(vec3(latitude * 3.1 + 5.4, flow * 0.22, 8.8));
   float latitudeWarp = latitude + (zonalNoise - 0.5) * zonalVariation * 0.7;
   float bandPhase = latitudeWarp * jetCount * 1.42
@@ -386,8 +304,6 @@ void main(void) {
   cloudColor = mix(cloudColor, mix(deepColor, lightColor, 0.5), clamp(haze, 0.0, 1.0) * 0.18);
   cloudColor = mix(cloudColor, blendedStormColor, clamp(stormMask, 0.0, 0.9));
 
-  // Polar structure: giants darken and haze toward the poles instead of holding the same band
-  // pattern edge to edge.
   float poleMask = pow(smoothstep(0.5, 1.3, abs(latitude)), 2.0);
   cloudColor = mix(cloudColor, mix(deepColor, midColor, 0.4), poleMask * clamp(polarVariation, 0.0, 1.0) * 0.7);
 
@@ -431,11 +347,6 @@ void main(void) {
 }
 `;
 
-/**
- * Spacecraft mosaics already contain the geology and cloud structure that procedural noise can
- * only approximate. This shader leaves that color intact and supplies the physically legible
- * pieces a flat map does not carry: a night hemisphere, solar tint, soft limb, and grazing sheen.
- */
 const KNOWN_BODY_FRAGMENT_SHADER = `
 precision highp float;
 
@@ -542,8 +453,6 @@ void main(void) {
     vec3(flowingSurface.x * (5.0 + bandTurbulence * 3.0), flowingSurface.y * (13.0 + bandTurbulence * 4.0), flowingSurface.z * (5.0 + bandTurbulence * 3.0)) + vec3(hazeNoise * 2.0)
   );
 
-  // Subdued, wider-spread band warp than the gas giant shader -- ice giants read as more
-  // uniform and hazier, not just a re-tinted gas giant.
   float zonalNoise = fbm(vec3(latitude * 2.6 + 9.1, flow * 0.15, 4.4));
   float latitudeWarp = latitude + (zonalNoise - 0.5) * zonalVariation * 0.8;
   float bandPhase = latitudeWarp * bandScale * 1.65
@@ -554,11 +463,6 @@ void main(void) {
   float bands = smoothstep(0.5 - halfWidth, 0.5 + halfWidth, bandWave);
   bands = mix(0.5, bands, clamp(bandContrast, 0.0, 1.0));
 
-  // Fewer, subtler storms than a gas giant, each with its own deterministic latitude/phase/tint.
-  // The storm noise field is sampled once outside the loop and each storm reads it at a
-  // different threshold and latitude band -- sampling fbm per storm instead would trip the
-  // per-pixel cost of this shader by itself, and buys no visible variation the offsets below
-  // do not already give.
   float stormField = fbm(rotateY(surface, -flow * 1.6) * 5.5 + vec3(12.4, 4.2, 8.7));
   float stormMask = 0.0;
   int activeStorms = int(min(stormCount, float(MAX_GIANT_STORMS)));
@@ -586,11 +490,7 @@ void main(void) {
     lightColor,
     clamp(bands * 0.32 + stormMask * 0.82 + filament * 0.13, 0.0, 1.0)
   );
-  // Strong haze flattens contrast further -- the defining difference from a gas giant's crisper
-  // cloud definition.
   atmosphereColor = mix(atmosphereColor, hazeColor, clamp(haze, 0.0, 1.0) * 0.22);
-  // Polar treatment differs from the gas giant: a desaturating haze cap rather than a bright
-  // sheen hotspot.
   atmosphereColor = mix(atmosphereColor, hazeColor, pole * polarGlow * 0.55);
 
   float diffuse = max(dot(normal, lightDirection), 0.0);
@@ -622,18 +522,12 @@ varying vec3 vObjectPosition;
 varying float vHeight;
 
 void main(void) {
-  // Geometry is displaced once, CPU-side. Recover the actual displaced height here so coastlines,
-  // snow lines, and material transitions follow the visible terrain instead of an unrelated
-  // cosmetic noise field.
   vec3 direction = normalize(position);
   float terrainHeight = (length(position) - planetRadius) / max(elevation * 0.5, 0.0001);
   vec4 worldPosition = world * vec4(position, 1.0);
 
   vHeight = clamp(0.5 + terrainHeight * 0.25, 0.0, 1.0);
   vSurfacePosition = direction;
-  // Object-space (pre-world-transform) position, used by the fragment shader for triplanar
-  // microdetail sampling so the detail texture stays glued to the surface instead of swimming
-  // through it as the planet rotates.
   vObjectPosition = position;
   vWorldPosition = worldPosition.xyz;
   vWorldNormal = normalize(mat3(world) * normal);
@@ -741,8 +635,6 @@ vec3 perturbNormal(vec3 position, vec3 normal, float height) {
 }
 
 #if defined(SURFACE_COLOR_DETAIL) || defined(SURFACE_MICRODETAIL)
-/** Sharpened per-axis blend weights for object-space triplanar sampling (Babylon translates
- * texture2D/attribute/varying to their WebGL2 equivalents automatically). */
 vec3 triplanarBlend(vec3 objectNormal) {
   vec3 blend = pow(abs(objectNormal), vec3(4.0));
   return blend / max(blend.x + blend.y + blend.z, 0.0001);
@@ -750,9 +642,6 @@ vec3 triplanarBlend(vec3 objectNormal) {
 #endif
 
 #ifdef SURFACE_MICRODETAIL
-// Whiteout-blended triplanar normal map: samples the three axis-aligned projections of the
-// given normal map and combines them relative to the base object-space normal so seams between
-// projections stay hidden.
 vec3 sampleTriplanarNormal(sampler2D tex, vec3 p, vec3 blend, vec3 objectNormal) {
   vec3 nx = texture2D(tex, p.yz).xyz * 2.0 - 1.0;
   vec3 ny = texture2D(tex, p.xz).xyz * 2.0 - 1.0;
@@ -793,8 +682,6 @@ void main(void) {
   float craterThreshold = mix(0.91, 0.76, craterDensity);
   float crater = smoothstep(craterThreshold, craterThreshold + 0.09, craterNoise);
   float craterRim = smoothstep(craterThreshold - 0.035, craterThreshold, craterNoise) - crater;
-  // Fracture channels (thin, ridge-following cracks) and separate rounded hotspots (isolated
-  // upwelling cells), both bounded by lavaStrength so activity never reads as a whole-planet glow.
   float fractureField = abs(
     ridgedFbm(surface * 7.8 + vec3(2.4, 18.1, 9.7)) -
     ridgedFbm(surface * 7.8 + vec3(9.6, 3.2, 21.4))
@@ -805,9 +692,6 @@ void main(void) {
   float lavaGlow = clamp(fractures * 0.85 + hotspots * 0.6, 0.0, max(lavaStrength * 0.92, 0.0));
   float surfaceHeight = macroDetail * 0.32 + erosion * 0.1 + mineralDetail * 0.025 - crater * 0.04 + craterRim * 0.025;
   vec3 normal = perturbNormal(vWorldPosition, baseNormal, surfaceHeight);
-  // Ice coverage grows from the poles inward as iceCapStrength rises: near 1.0 it eats through
-  // the lower-latitude threshold entirely, giving a globally glaciated world instead of just
-  // wider polar caps.
   float polarBoundary = abs(surface.y) + (macroDetail - 0.5) * 0.16 + (mineralDetail - 0.5) * 0.04;
   float polarThreshold = mix(0.58, 0.04, smoothstep(0.74, 1.0, iceCapStrength));
   float polarMask = smoothstep(polarThreshold, polarThreshold + 0.3, polarBoundary) * iceCapStrength;
@@ -815,8 +699,6 @@ void main(void) {
 
   float detailRoughness = 0.55;
 #if defined(SURFACE_COLOR_DETAIL) || defined(SURFACE_MICRODETAIL)
-  // Low-frequency domain warp on the sample position so the same tiled texture does not repeat
-  // identically across every triplanar cell.
   vec3 warp = vec3(
     noise(surface * 2.3 + 4.1),
     noise(surface * 2.3 + 8.7),
@@ -838,9 +720,6 @@ void main(void) {
 #endif
 
 #ifdef SURFACE_MICRODETAIL
-  // Each chemistry family selects two physically appropriate 2K materials. The secondary map
-  // emerges on slopes, crater rims, highlands, and fractures, replacing the old five-family
-  // branch forest with a predictable twelve texture samples per fragment.
   float slope = 1.0 - clamp(dot(baseNormal, surface), 0.0, 1.0);
   float secondaryWeight = clamp(
     slope * 1.4 + craterRim * 1.6 + crater * 0.35 + erosion * 0.12 + fractures * 0.45,
@@ -858,8 +737,6 @@ void main(void) {
   );
   vec3 objectDetailNormal = normalize(mix(primaryNormal, secondaryNormal, secondaryWeight));
 
-  // Fade microdetail out with distance: rich up close, smooth again from orbit so the planet
-  // does not read as sandpaper in a wide shot.
   float normalDetailFade = 1.0 - smoothstep(
     detailFadeStart,
     detailFadeEnd,
@@ -876,14 +753,9 @@ void main(void) {
   rockColor *= 0.94 + (microDetail - 0.5) * 0.06;
   rockColor = mix(rockColor, highColor * 1.08, craterRim * 0.36);
   rockColor = mix(rockColor, lowColor * 0.38, crater * 0.68);
-  // Dark volcanic crust: the ground around active fracture/hotspot networks reads as cooled,
-  // ash-dark basalt rather than plain rock, independent of the emissive glow itself.
   rockColor = mix(rockColor, vec3(0.018, 0.012, 0.011), clamp(lavaStrength * 0.55, 0.0, 1.0) * (1.0 - lavaGlow));
 
 #ifdef SURFACE_COLOR_DETAIL
-  // Preserve macro palette readability while borrowing real grain and mineral hue variation from
-  // the chemistry texture. Luminance-relative tinting prevents a dark carbon map from simply
-  // crushing all procedural elevation color to black.
   float chemistryLuminance = max(dot(chemistryColor, vec3(0.2126, 0.7152, 0.0722)), 0.08);
   vec3 relativeChemistry = clamp(chemistryColor / chemistryLuminance, vec3(0.45), vec3(1.8));
   vec3 chemicallyTextured = rockColor * relativeChemistry * (0.78 + chemistryLuminance * 0.36);
@@ -897,19 +769,14 @@ void main(void) {
   float coastline = vHeight + (macroDetail - 0.5) * 0.025;
   float shoreline = waterLevel > 0.0 ? smoothstep(waterLevel + 0.016, waterLevel - 0.012, coastline) : 0.0;
   float waterMask = shoreline;
-  // Ice-locked oceans (high iceCapStrength on a water world) keep the basin shape but stop
-  // acting like liquid: no ripple, no glint, tinted toward ice instead of the liquid color.
   float frozenWater = waterMask * smoothstep(0.55, 0.82, iceCapStrength);
   float liquidWater = waterMask * (1.0 - frozenWater);
 
-  // Subtle animated ripple, liquid areas only, so the surface is not perfectly still.
   vec3 rippleSample = surface * 42.0 + vec3(time * 0.6, time * -0.44, time * 0.31);
   float ripple = (noise(rippleSample) - 0.5) * 0.05 * liquidWater;
   vec3 waterNormal = normalize(baseNormal + vec3(ripple, ripple * 0.6, -ripple));
   normal = normalize(mix(normal, mix(baseNormal, waterNormal, liquidWater > 0.0 ? 1.0 : 0.0), waterMask * 0.94));
 
-  // Shallow (near the shore) vs. deep (basin interior) tint, using distance past the shoreline
-  // threshold as a cheap depth proxy — no separate depth buffer needed.
   float depthProxy = waterLevel > 0.0 ? clamp((waterLevel - coastline) / max(waterLevel, 0.05), 0.0, 1.0) : 0.0;
   vec3 liquidColor = mix(waterColorShallow, waterColor, depthProxy);
   vec3 waterSurfaceColor = mix(liquidColor, iceColor, frozenWater / max(waterMask, 0.0001));
@@ -918,20 +785,13 @@ void main(void) {
 
   float diffuse = max(dot(normal, lightDirection), 0.0);
   float wrappedLight = 0.22 + diffuse * 0.94;
-  // Camera exposure adapts to the host system: stellarIntensity still changes highlights and hue,
-  // but a dim M-dwarf no longer hides the surface material the visualization is meant to show.
   float surfaceExposure = 0.78 + clamp(stellarIntensity, 0.65, 3.2) * 0.2;
   vec3 viewDirection = normalize(cameraPosition - vWorldPosition);
   vec3 halfDirection = normalize(lightDirection + viewDirection);
-  // Fresnel reflectance: water (and ice) throw more of the sky/star back at grazing angles,
-  // rock stays mostly matte.
   float fresnel = pow(1.0 - max(dot(normal, viewDirection), 0.0), 5.0);
   float waterFresnel = fresnel * (liquidWater * 0.85 + frozenWater * 0.22);
-  // A tight, bright star glint on liquid water; a softer, dimmer one on ice.
   float waterSpecular = pow(max(dot(normal, halfDirection), 0.0), 130.0) * liquidWater;
   float iceSpecular = pow(max(dot(normal, halfDirection), 0.0), 34.0) * frozenWater * 0.4;
-  // Smoother materials (ice) throw a tighter, brighter highlight; rougher ones (dust, rock) a
-  // dim, broad one — giving the surface meaningful, material-driven roughness variation.
   float rockSpecular = pow(max(dot(normal, halfDirection), 0.0), mix(6.0, 70.0, 1.0 - detailRoughness)) * (1.0 - waterMask) * (1.0 - detailRoughness) * 0.1;
   float rim = pow(1.0 - max(dot(normal, viewDirection), 0.0), 3.0);
 
@@ -994,18 +854,11 @@ float fbm(vec3 point) {
 
 void main(void) {
   vec3 normal = normalize(vWorldNormal);
-  // Wind drift is a translation along the (seed-chosen) prevailing direction, independent of
-  // the planet's own rotation, which the cloud mesh already inherits from its parent transform.
   vec3 drift = vec3(windDirection.x, 0.0, windDirection.y) * time * 0.03;
-  // Higher base frequency prevents the cloud shell from reading as a handful of blurry polygons
-  // at orbital distance while still leaving room for recognizable planetary-scale systems.
   vec3 samplePosition = normal * (cloudScale * 1.7 + 4.2) + drift;
   float cloudNoise = fbm(samplePosition);
 
 #ifdef CLOUD_DETAIL
-  // A second, higher-frequency octave group sampled at a different scale/speed than the base
-  // layer, so the cloud field reads as multi-scale structure (large systems + fine wisps)
-  // instead of one blob of noise. Skipped on fill-rate-constrained tiers.
   vec3 fineSamplePosition = normal * (cloudScale * 4.6 + 11.0) - drift * 1.7;
   float fineNoise = fbm(fineSamplePosition + cloudNoise * 0.6);
   float billows = 1.0 - abs(fineNoise * 2.0 - 1.0);
@@ -1065,19 +918,14 @@ void main(void) {
   float rim = pow(1.0 - max(dot(normal, viewDirection), 0.0), 2.25);
   float pulse = 0.92 + sin(time * 0.42) * 0.08 * activity;
 
-  // Cheap Rayleigh-like approximation: thin/edge-on air scatters shorter wavelengths harder, so
-  // push the limb color toward blue as it thins away from the (thicker-looking) disc center.
   vec3 rayleighTint = mix(atmosphereColor, vec3(0.55, 0.72, 1.0), scatterStrength * 0.5);
   vec3 rimColor = mix(atmosphereColor, rayleighTint, smoothstep(0.15, 0.85, rim));
 
-  // Terminator behavior: the day-side limb reads bright and scattered, the night-side limb goes
-  // dim and desaturated instead of glowing uniformly all the way around.
   float sunFacing = dot(normal, lightDirection);
   float dayNight = smoothstep(-0.55, 0.35, sunFacing);
   vec3 nightTint = mix(atmosphereColor * 0.22, vec3(0.05, 0.04, 0.09), 0.5);
   vec3 litColor = mix(nightTint, rimColor, dayNight);
 
-  // Mie-like forward glow concentrated toward the star direction as seen from the camera.
   float mie = pow(max(dot(viewDirection, lightDirection), 0.0), 10.0) * haze * dayNight;
 
   float alpha = smoothstep(0.03, 1.0, rim) * density * (0.42 + activity * 0.16) * pulse;
@@ -1110,11 +958,6 @@ void main(void) {
 }
 `;
 
-/**
- * Deterministic, procedural radial density so a ring never renders as one flat, uniformly
- * transparent disc: `vUv.x` sweeps 0 (inner edge) to 1 (outer edge) and layered value-noise
- * over that single axis produces bands, gaps, and per-band shading/color variation.
- */
 const RING_FRAGMENT_SHADER = `
 precision highp float;
 
@@ -1162,8 +1005,6 @@ void main(void) {
 
   vec3 normal = normalize(vWorldNormal);
   vec3 viewDirection = normalize(cameraPosition - vWorldPosition);
-  // Rings are unshadowed thin discs, lit from both faces; abs() keeps the underside from
-  // reading as pitch black while still tracking the host-star direction for day/night balance.
   float lit = 0.35 + abs(dot(normal, lightDirection)) * 0.85;
   float grazing = pow(1.0 - abs(dot(normal, viewDirection)), 1.4);
 
@@ -1179,11 +1020,6 @@ export type ViewMode = "orbit" | "subsystem" | "surface" | "transition";
 interface PlanetWorldOptions {
   onFirstFrame: () => void;
   onViewModeChange: (mode: ViewMode) => void;
-  /**
-   * Travel to the star this world orbits, when a visitor clicks it in the sky.
-   *
-   * Left out by a World Forge world, which has no archive behind it and so no star to resolve.
-   */
   onSelectHostStar?: () => void;
   planet: ExoplanetProfile;
   recipe: WorldRecipe;
@@ -1193,15 +1029,6 @@ const toColor3 = ([red, green, blue]: Rgb): Color3 => new Color3(red, green, blu
 
 const HOST_STAR_OFFSET = new Vector3(-18, 11, 32);
 
-/**
- * The planet's own sun, hanging in its sky.
- *
- * This used to be a flat emissive sphere with a translucent shell around it, which is a shape lit
- * from nowhere rather than a light source: it read as a grey ping-pong ball taped to the
- * background. It is now the same photosphere the star scene draws, at `distant` detail — real
- * limb darkening and granulation on the disc, and a glare with diffraction spikes carrying the
- * brightness that the display cannot.
- */
 const createHostStar = (
   scene: Scene,
   recipe: WorldRecipe,
@@ -1227,13 +1054,6 @@ const createHostStar = (
   return surface;
 };
 
-/**
- * Builds a single flat annulus (inner radius -> outer radius) in the XZ plane: `uv.x` sweeps
- * radially (0 at the inner edge, 1 at the outer edge) so a shader can drive procedural radial
- * density from it, `uv.y` sweeps angularly. A handful of radial subdivisions (rather than one
- * quad strip) let the per-fragment band noise read as more than a flat gradient across the
- * width. One draw call, unlike the previous stacked-torus approach.
- */
 const buildRingMesh = (
   scene: Scene,
   innerRadius: number,
@@ -1373,10 +1193,6 @@ const createPlanet = (
   planetRoot.parent = orbitalRoot;
   const orbitalMeshes: AbstractMesh[] = [];
 
-  // Rocky worlds get an icosphere: its near-uniform vertex distribution avoids the pinched
-  // triangles a UV sphere has at the poles, which otherwise show up as displacement/crater
-  // artifacts once terrain pushes vertices in and out along their normals. Gas/ice giants have
-  // no vertex displacement, so they keep the cheaper UV sphere.
   const knownTexture = planetProfile.solarSystem?.texture;
   const planet =
     recipe.renderer === "rocky" && !knownTexture
@@ -1766,8 +1582,6 @@ const mixColor3 = (from: Rgb, to: Rgb, amount: number): Color3 => {
   return new Color3(mixed.r, mixed.g, mixed.b);
 };
 
-/** What a sky with nothing in it looks like: not quite black, because the zodiacal light and the
- * unresolved stars behind it are not quite nothing. */
 const AIRLESS_SKY: Rgb = [0.003, 0.004, 0.008];
 
 const createSurfaceSky = (
@@ -1782,15 +1596,6 @@ const createSurfaceSky = (
   const atmosphere = recipe.atmosphere.color;
   const isGasGiant = recipe.renderer === "gas-giant";
   const isIceGiant = recipe.renderer === "ice-giant";
-  /**
-   * How much air there is to look through, which is the one number a sky is made of.
-   *
-   * This used to start at 0.25 for every rocky world and climb with cloud cover, so the Moon —
-   * which has no atmosphere at all, and whose sky is black at noon with the sun blazing in it —
-   * got a quarter-density blue one. The geology's own haze figure is the honest answer: zero on
-   * the Moon and Mercury, a hundredth on Europa, a third on Mars where suspended dust does the
-   * scattering, and nearly total on Venus and Titan.
-   */
   const air = geology
     ? Math.min(1, Math.max(0, geology.hazeDensity))
     : Math.min(1, Math.max(0, recipe.renderer === "rocky" ? recipe.atmosphere.density : 1));
@@ -1800,16 +1605,12 @@ const createSurfaceSky = (
       ? 0.8
       : Math.min(1, recipe.surface.cloudCover * air * 1.6);
   const density = isGasGiant ? 1 : isIceGiant ? 0.9 : air;
-  // What this world's air actually scatters. The geology states it outright for a body a mission
-  // has stood on or flown through; everything else falls back to the recipe's inferred colour.
   const skyTint = geology ? geology.skyColor : atmosphere;
   const zenithColor = isGasGiant
     ? mixColor3(atmosphere, recipe.cloudBands.deepColor, 0.62)
     : isIceGiant
       ? mixColor3(atmosphere, recipe.atmosphereBands.deepColor, 0.66)
-      : // Deeper and darker overhead than at the horizon, because that is the shorter path
-        // through the air — the same reason Earth's zenith is a stronger blue than its skyline.
-        mixColor3(AIRLESS_SKY, skyTint, Math.min(1, air ** 0.6 * 1.15) * 0.72);
+      : mixColor3(AIRLESS_SKY, skyTint, Math.min(1, air ** 0.6 * 1.15) * 0.72);
   const horizonColor = isGasGiant
     ? mixColor3(atmosphere, recipe.cloudBands.lightColor, 0.35)
     : isIceGiant
@@ -1824,11 +1625,6 @@ const createSurfaceSky = (
     : isIceGiant
       ? toColor3(recipe.atmosphereBands.hazeColor)
       : toColor3(recipe.surface.cloudColor);
-  // Wide enough that the whole terrain patch stays inside it from every corner a visitor can
-  // stand in, with the star hanging inside it too. The dome writes no depth, so nothing sorts
-  // against it — but ground that ends up outside it is ground the sky can be drawn over, and
-  // pinning the dome to the viewer puts the far side of an 82-unit patch well outside the
-  // 90-unit radius it used to have.
   const mesh = markAsVirtualBackground(
     MeshBuilder.CreateSphere(
       "surfaceSky",
@@ -1864,8 +1660,6 @@ const createSurfaceSky = (
   material.setFloat("seed", recipe.seed);
   material.setFloat("density", density);
   material.setFloat("cloudiness", cloudiness);
-  // Stars burn through a thin sky in broad daylight — from the Moon they are there the whole time,
-  // and only a real atmosphere scatters enough light to hide them.
   material.setFloat(
     "starVisibility",
     isGasGiant ? 0 : isIceGiant ? 0.02 : Math.max(0, 1 - air * 2.2),
@@ -1876,8 +1670,6 @@ const createSurfaceSky = (
   material.backFaceCulling = false;
   material.disableDepthWrite = true;
   mesh.material = material;
-  // The ground reads these back: a lit sky is the ambient source for everything under it, and its
-  // colour is what distance fades into. Sharing the values is what keeps the two agreeing.
   return { horizonColor, material, mesh, zenithColor };
 };
 
@@ -1889,7 +1681,6 @@ const createSurfaceEnvironment = (
   onSelectHostStar?: () => void,
 ): {
   cloudLayers: Mesh[];
-  /** World-space ground height under any point a visitor can reach. */
   groundHeightAt: (x: number, z: number) => number;
   meshes: AbstractMesh[];
   motes: SurfaceMotes | null;
@@ -1900,11 +1691,6 @@ const createSurfaceEnvironment = (
   vista: SurfaceVista | null;
 } => {
   const root = new TransformNode("surfaceEnvironment", scene);
-  // What the vista treats as unreachably far — the sky dome, and the host star hanging on it —
-  // rides this instead of the ground, and the render loop pins it to wherever the viewer is.
-  // Babylon's own `infiniteDistance` cannot do the job: it is skipped outright on a parented mesh
-  // (`transformNode.ts` applies it only when `!this.parent`), so the flag the dome carried had no
-  // effect and the sky slid with every step, tipping its own horizon as it went.
   const skyAnchor = new TransformNode("surfaceSkyAnchor", scene);
   skyAnchor.parent = root;
   const meshes: AbstractMesh[] = [];
@@ -1913,9 +1699,6 @@ const createSurfaceEnvironment = (
   meshes.push(surfaceSky.mesh);
   let motes: SurfaceMotes | null = null;
 
-  // Rocky worlds get real ground: measured or inferred geology, landform provinces, baked sun
-  // shadowing and triplanar material. A giant has no ground at all, so it gets the top of its own
-  // convecting cloud layer instead — the same horizon, air and light, none of the rock.
   const vista = geology
     ? createSurfaceVista(scene, {
         geology,
@@ -1924,7 +1707,6 @@ const createSurfaceEnvironment = (
             ? {
                 deepColor: geology.liquidColor,
                 shallowColor: geology.liquidShallowColor,
-                // Thin, cold air raises almost no swell; a thick atmosphere raises a lot of it.
                 waveHeight: 0.5 + geology.hazeDensity * 1.4,
               }
             : null,
@@ -1942,8 +1724,6 @@ const createSurfaceEnvironment = (
   if (vista && geology) {
     meshes.push(vista.mesh);
     if (vista.liquid) meshes.push(vista.liquid.mesh);
-    // Loose rock, sharing the ground's material so it takes the same sun, the same baked shadow
-    // and the same air — and merged into one mesh, so the whole field costs a single draw call.
     const scatter = createSurfaceScatter(scene, {
       geology,
       material: vista.material,
@@ -1954,7 +1734,6 @@ const createSurfaceEnvironment = (
     });
     if (scatter) meshes.push(scatter);
 
-    // Whatever this world holds up in its air, between the eye and everything else.
     motes = createSurfaceMotes(scene, {
       geology,
       parent: skyAnchor,
@@ -1967,15 +1746,6 @@ const createSurfaceEnvironment = (
   }
 
   const cloudLayers: Mesh[] = [];
-  /**
-   * No drifting haze banks any more, on any world.
-   *
-   * Every excursion's sky is drawn by the dome above it and its distance by the vista's own aerial
-   * perspective, and both of those know what that world's air is made of. These flattened emissive
-   * spheres knew neither: on the Moon one hung over a black airless sky as a lit ellipse, and over
-   * Jupiter's cloud deck they read as saucers cut out of the sky. Kept as an empty list so the
-   * render loop and the world's own teardown keep their shape.
-   */
   const hazeCount = 0;
   for (let index = 0; index < hazeCount; index += 1) {
     const haze = MeshBuilder.CreateSphere(
@@ -2001,10 +1771,6 @@ const createSurfaceEnvironment = (
     meshes.push(haze);
   }
 
-  // The same star as the orbital view, seen from under the planet's air. It keeps the real
-  // photosphere and the glare rather than the flat emissive ball plus alpha shell it used to be —
-  // through an atmosphere the glare is if anything more of the read, not less, since scattering
-  // spreads a bright source out much further than vacuum does.
   const surfaceStar = createStellarSurface({
     detail: "distant",
     diameter:
@@ -2014,7 +1780,6 @@ const createSurfaceEnvironment = (
     position: SURFACE_STAR_DIRECTION.scale(SURFACE_STAR_DISTANCE),
     profile,
     recipe: recipe.star,
-    // Group 1 puts the star over the sky dome, which draws in group 0 without a depth write.
     renderingGroupId: 1,
     scene,
     seed: recipe.seed,
@@ -2022,9 +1787,6 @@ const createSurfaceEnvironment = (
   });
   meshes.push(...surfaceStar.meshes);
 
-  // Air thick enough and the sun is not a disc any more: Huygens saw no sun at all from Titan's
-  // surface, and neither Venera nor Magellan ever resolved one through Venus's cloud deck. What
-  // reaches the ground is the whole sky glowing, which the dome above is already drawing.
   if (geology && geology.hazeDensity > 0.85) {
     for (const target of surfaceStar.meshes) {
       target.isVisible = false;
@@ -2033,9 +1795,6 @@ const createSurfaceEnvironment = (
     meshes.splice(0, meshes.length, ...meshes.filter((mesh) => !surfaceStar.meshes.includes(mesh)));
   }
 
-  // The same route out as the orbital view offers, from down here. A star disabled just above is
-  // left alone: a disabled mesh is not picked, so a world whose air hides its sun has nothing in
-  // the sky to click, which is the honest answer.
   if (onSelectHostStar) makeStarTravelTarget(scene, surfaceStar, onSelectHostStar);
 
   for (const mesh of meshes) {
@@ -2068,13 +1827,6 @@ const setEnvironmentEnabled = (
   }
 };
 
-/**
- * Builds a planet into the shared scene.
- *
- * Everything expensive here — terrain displacement, shader compilation, the rock field — runs
- * synchronously, which is what lets `world-scope.ts` tell exactly what this world added to a
- * scene it does not own. The host fades the headset to black around the call.
- */
 export const createPlanetWorld = (
   host: SceneHost,
   {
@@ -2087,18 +1839,8 @@ export const createPlanetWorld = (
 ): MountedWorld => {
   const { camera, canvas, engine, profile, scene } = host;
 
-  // Babylon clears the depth buffer between rendering groups by default. Group 1 holds every
-  // additive shell in the scene (the planet's atmosphere and cloud layers, the host star's
-  // corona, the surface-view star halo), so with the depth buffer wiped they drew over the
-  // opaque planet instead of behind it — which read as the planet being semi-transparent with
-  // the star shining through it. Keeping group 0's depth lets those shells occlude correctly;
-  // they still show around the limb, where no opaque geometry is in front of them.
   scene.setRenderingAutoClearDepthStencil(1, false, true, true);
 
-  // The target moves first, and everything else after it. `setTarget` rebuilds alpha, beta and
-  // radius from wherever the camera was left standing by the previous destination, so angles and
-  // distances assigned before it are silently thrown away — which framed every arriving world
-  // from the last one's viewpoint rather than from its own.
   camera.setTarget(PLANET_POSITION.clone());
   camera.lowerRadiusLimit = 10.5;
   camera.upperRadiusLimit = 25;
@@ -2111,9 +1853,6 @@ export const createPlanetWorld = (
 
   createPlanetKeyLight(scene, LIGHT_DIRECTION, recipe.star);
 
-  // The archive reports where this planet's host system is on the sky and how far away it is, so
-  // the orbital view can be given the sky that system actually has. A procedural world, or a
-  // catalogue row missing any of the three, falls back to the seeded field.
   const starfield = createStarfield({
     count: profile.starCount,
     scene,
@@ -2133,13 +1872,7 @@ export const createPlanetWorld = (
   } = createPlanet(scene, recipe, profile, planetProfile);
   const hostStar = createHostStar(scene, recipe, profile, orbitalRoot, onSelectHostStar);
   orbitalMeshes.push(...hostStar.meshes);
-  // The deep-space starfield belongs to the orbital view only. Down on the surface the sky shader
-  // owns what the sky contains, and it has to: stars there are seen through an atmosphere that
-  // scatters them out entirely in daylight, so a vacuum starfield shining through a lit sky would
-  // be showing the viewer something no one standing on that planet could see.
   orbitalMeshes.push(starfield.mesh);
-  // Measured geology for a Solar System body, inferred geology for a catalogue world, and nothing
-  // at all for a giant — which has no ground for a visitor to stand on in the first place.
   const surfaceGeology =
     deriveSurfaceGeology(
       recipe,
@@ -2173,7 +1906,6 @@ export const createPlanetWorld = (
     : recipe.rotationSpeed;
   let viewState: "entering" | "leaving" | "orbit" | "surface" = "orbit";
   let viewTransitionSeconds = 0;
-  /** Where the visitor's own scroll had got to when it asked for the other view. */
   let viewTransitionFrom = 0;
   let viewTransitionSwapped = false;
   const pressedMovementKeys = new Set<string>();
@@ -2228,14 +1960,6 @@ export const createPlanetWorld = (
 
   applyViewEnvironment(false);
 
-  /**
-   * Hands the world over to the other half of itself, at the instant the dark is deepest.
-   *
-   * Everything that cannot be moved through goes here together: the ground and sky appearing or
-   * being taken away, the fog, the colour behind it all, and where the camera is pointing and
-   * from what angle. Doing any of it a frame earlier or later puts it on screen, and a world that
-   * changes out from under a moving camera reads as a glitch rather than as an arrival.
-   */
   const swapViewEnvironment = (entering: boolean): void => {
     applyViewEnvironment(entering);
     camera.fov = entering ? SURFACE_FIELD_OF_VIEW : ORBIT_FIELD_OF_VIEW;
@@ -2245,8 +1969,6 @@ export const createPlanetWorld = (
     camera.target = (entering ? surfaceTarget : orbitTarget).clone();
     camera.alpha = -Math.PI / 2;
     camera.beta = entering ? SURFACE_RESTING_BETA : Math.PI / 2.13;
-    // A visitor who asked for less movement is put down where the view rests, and the dark that
-    // was covering the flight covers a plain cut instead.
     camera.radius = host.prefersReducedMotion()
       ? entering
         ? SURFACE_RESTING_RADIUS
@@ -2275,13 +1997,9 @@ export const createPlanetWorld = (
     viewTransitionFrom = camera.radius;
     viewTransitionSwapped = false;
     camera.detachControl();
-    // The environment stays as it is for now. It used to change here, at the top of the move,
-    // where the veil covering it had not begun to darken — so the world being left vanished in
-    // one frame and the camera then flew through whatever had replaced it.
     onViewModeChange("transition");
   };
 
-  // A/X has one immersive-world action: point at the planet and press once to enter terrain.
   planet.metadata = {
     ...planet.metadata,
     exoraXrPrimaryAction: () => {
@@ -2290,12 +2008,6 @@ export const createPlanetWorld = (
   };
   const renderObserver = scene.onBeforeRenderObservable.add(() => {
     const isInXr = host.isInXr();
-    // Two clocks, deliberately. Anything that integrates — walking, rotation, drifting cloud —
-    // reads the clamped one, so that a single long frame cannot teleport it across the world.
-    // Anything with a fixed duration reads the real one, because clamping *that* is what makes a
-    // move take five seconds on a machine drawing three frames a second: every frame advances it
-    // by fifty milliseconds however long the frame really was, and the camera falls out of step
-    // with the dark on screen that is covering for it.
     const realDeltaSeconds = engine.getDeltaTime() / 1_000;
     const deltaSeconds = Math.min(realDeltaSeconds, 0.05);
     elapsedSeconds += deltaSeconds;
@@ -2324,9 +2036,6 @@ export const createPlanetWorld = (
 
       if (isInXr) {
         activeCamera.position.addInPlace(movementDelta);
-        // A wearer walking the terrain has to stay on it. Without this the rig keeps whatever
-        // height it started at and the ground rises through the floor or drops away underfoot,
-        // which in a headset is not a visual glitch — it is the thing that makes people ill.
         const rig = host.xrCamera();
         if (rig && viewState === "surface") {
           const standing =
@@ -2336,9 +2045,6 @@ export const createPlanetWorld = (
       } else {
         camera.target.addInPlace(movementDelta);
         if (viewState === "surface") {
-          // How far a visitor may walk from where they landed. Well inside the patch, so the eye
-          // never approaches the rim where the ground dissolves — and near enough the middle that
-          // the host star stays far beyond every piece of ground between it and the viewer.
           camera.target.x = Math.min(55, Math.max(-55, camera.target.x));
           camera.target.z = Math.min(76, Math.max(-40, camera.target.z));
           surfaceTarget.copyFrom(camera.target);
@@ -2348,17 +2054,12 @@ export const createPlanetWorld = (
       }
     }
 
-    // The vista camera walks over ground that now has real relief, so it has to ride it. An arc
-    // camera has only one height to give — the target's — and the eye hangs off it at a fixed
-    // offset, so both ends are checked and the higher requirement wins: the eye never sinks into
-    // a ridge it is standing behind, and the target never floats over a hollow it is looking into.
     if (!isInXr && viewState === "surface") {
       const eyeAboveTarget = camera.radius * Math.cos(camera.beta);
       const underTarget = surfaceEnvironment.groundHeightAt(camera.target.x, camera.target.z);
       const eye = camera.globalPosition;
       const underEye = surfaceEnvironment.groundHeightAt(eye.x, eye.z);
       const wanted = Math.max(underTarget + 1.15, underEye + 1.5 - eyeAboveTarget);
-      // Followed rather than snapped: a step onto a boulder should not throw the horizon.
       camera.target.y += (wanted - camera.target.y) * Math.min(1, deltaSeconds * 5.5);
       surfaceTarget.y = camera.target.y;
     }
@@ -2368,11 +2069,6 @@ export const createPlanetWorld = (
       beginViewTransition("leaving");
 
     if (viewState === "entering" || viewState === "leaving") {
-      // Timed off the clock rather than stepped per frame. What used to be here moved the camera
-      // by a fraction of the distance remaining *each frame*, so the same descent took half as
-      // long on a 120 Hz display as on a 60 Hz one, arrived somewhere different on each, and
-      // never quite reached the end — whatever the decay had got to when the clock ran out was
-      // snapped away by the limits going back on.
       viewTransitionSeconds += realDeltaSeconds;
       const progress = Math.min(1, (viewTransitionSeconds * 1_000) / SURFACE_TRANSITION_MS);
       const entering = viewState === "entering";
@@ -2382,10 +2078,7 @@ export const createPlanetWorld = (
         swapViewEnvironment(entering);
       }
 
-      // One move in one direction, in two halves that never share a frame: away from where the
-      // scroll started, then on to where the other view rests.
       if (host.prefersReducedMotion()) {
-        // Nothing to fly: the swap above already put the camera where this view rests.
       } else if (viewTransitionSwapped) {
         const settling = (progress - SURFACE_SWAP_AT) / (1 - SURFACE_SWAP_AT);
         const from = entering ? SURFACE_ENTRY_RADIUS : ORBIT_ENTRY_RADIUS;
@@ -2426,8 +2119,6 @@ export const createPlanetWorld = (
     cloudLayer?.setVector3("cameraPosition", activePosition);
     ringMaterial?.setVector3("cameraPosition", activePosition);
     hostStar.update(elapsedSeconds, activePosition);
-    // The sky rides the viewer: the dome keeps its horizon level with the eye that is under it,
-    // and the star holds one direction and one angular size however far a visitor walks.
     surfaceEnvironment.vista?.update(elapsedSeconds, activePosition);
     surfaceEnvironment.motes?.update(elapsedSeconds, activePosition);
     surfaceEnvironment.skyAnchor.position.copyFrom(activePosition);
@@ -2437,15 +2128,6 @@ export const createPlanetWorld = (
 
   const firstFrameObserver = scene.onAfterRenderObservable.addOnce(onFirstFrame);
 
-  /**
-   * A jump out of this world takes the camera, so a descent still in the air lands first.
-   *
-   * Both are flights, and both write the same one camera every frame: left to run together they
-   * would each undo the other's step, which is the one kind of stutter no amount of easing fixes.
-   * Landing rather than freezing is what makes it safe for the jump to come to nothing — a
-   * destination the archive cannot resolve flies back to a world that is in one of its two
-   * states, not stranded between them with its controls taken away.
-   */
   const releaseCameraToTravel = host.onTravelPhase((phase) => {
     if (phase !== "departing") return;
     if (viewState === "entering" || viewState === "leaving") {
@@ -2453,13 +2135,6 @@ export const createPlanetWorld = (
     }
   });
 
-  /**
-   * Moves the rig to the spot that makes sense for a view.
-   *
-   * On the very first pose Babylon has yet to add the wearer's real height to the rig, so the
-   * position it expects is the floor. Every later move happens mid-session, where the camera
-   * already sits at head height and the offset has to be added back by hand.
-   */
   const placeXrCamera = (surface: boolean, initial: boolean): void => {
     const rig = host.xrCamera();
     if (!rig) return;
@@ -2474,7 +2149,6 @@ export const createPlanetWorld = (
     }
   };
 
-  /** Restores the desktop camera so leaving the headset lands on the view the wearer left in. */
   const syncDesktopCamera = (surface: boolean): void => {
     camera.fov = surface ? SURFACE_FIELD_OF_VIEW : ORBIT_FIELD_OF_VIEW;
     camera.lowerRadiusLimit = surface ? 7.5 : 10.5;
@@ -2488,7 +2162,6 @@ export const createPlanetWorld = (
     camera.attachControl(canvas, true);
   };
 
-  /** Switches view from inside the headset, where the orbit camera transition cannot be used. */
   const applyXrView = (surface: boolean, initial: boolean): void => {
     viewState = surface ? "surface" : "orbit";
     viewTransitionSeconds = 0;
@@ -2498,19 +2171,9 @@ export const createPlanetWorld = (
   };
 
   return {
-    /**
-     * How far a jump may pull back from this world before it stops holding up.
-     *
-     * In orbit there is nothing behind the camera but a sky that follows it, so a departure can
-     * be flown as far as it likes. A surface excursion stands on a ground patch 72 by 82 units
-     * across under a dome half that wide again: pull back past the far limit the view already
-     * keeps for the wheel, and the visitor is shown the edge of the world instead of leaving it.
-     */
     farthestView: () => (viewState === "surface" ? SURFACE_DEPARTURE_RADIUS : undefined),
     focusXrRig: (initial) => applyXrView(viewState === "surface", initial),
     restoreDesktopView: () => syncDesktopCamera(viewState === "surface"),
-    // Meshes, materials and the key light are removed by the world scope the host opened around
-    // this build; what is left here is everything that lives outside the scene graph.
     dispose: () => {
       camera.fov = ORBIT_FIELD_OF_VIEW;
       window.removeEventListener("keydown", onMovementKeyDown);

@@ -2,56 +2,23 @@ import type { Rgb, RockyPaletteFamily, RockyWorldRecipe, WorldRecipe } from "@ex
 import { ICY_MOONS, MEASURED_GEOLOGY } from "./surface-geology-catalog.ts";
 import type { ChemistryDetailFamily, SurfaceDetailFamily } from "./texture-cache.ts";
 
-/**
- * What a world's ground is made of and shaped like, as the standing-on-it view needs it.
- *
- * The orbital view of a known body is a mission mosaic wrapped on a sphere: it is a photograph,
- * and it is right by construction. The surface view has no such luxury — no one has photographed
- * the ground of an exoplanet, and even for the Solar System the imagery that exists is a map from
- * above, not a horizon. So this module states, per world, the geology a vista has to honour:
- * which landform provinces the ground belongs to, what colour its rock and its dust are, how much
- * of it is cratered, mantled, frosted, layered or molten.
- *
- * Two sources feed it, and they are kept apart on purpose:
- *  - `measured`  — a Solar System body whose surface geology is established by mission science.
- *                  Mercury's crater saturation, Venus's near-total absence of craters, Io's
- *                  complete absence of them, Europa's flatness, Titan's dune seas. These are
- *                  facts, and the renderer is not allowed to invent past them.
- *  - `inferred`  — an exoplanet, where the recipe's measured mass/radius/temperature is all
- *                  anyone has. The provinces here are a cautious reading of that thermal and
- *                  mineral regime, not a claim about a place.
- */
 export type TerrainArchetype =
-  /** Crater-saturated ancient crust: overlapping rims, basin floors, ejecta rays. */
   | "impact-highlands"
-  /** Smooth volcanic plains cut by wrinkle ridges and collapsed lava channels. */
   | "flood-basalt"
-  /** Aeolian sand seas: long transverse dune trains with steep slip faces. */
   | "dune-sea"
-  /** Wind-carved parallel ridges and layered mesas separated by deflation hollows. */
   | "yardang-badlands"
-  /** Deep graben and chasma with terraced walls and landslide aprons on the floor. */
   | "canyon-rift"
-  /** Broad, low-angle shields with summit calderas and radiating fissure vents. */
   | "volcanic-shield"
-  /** Active flow fields: crusted lava lakes, levéed channels, spatter cones. */
   | "lava-fields"
-  /** Ice plains pocked by sublimation hollows, with occasional rock nunataks. */
   | "glacial-plain"
-  /** Ridged, cracked ice crust: double ridges, lineae, and rafted chaos blocks. */
   | "fractured-ice"
-  /** Tectonically uplifted ranges with talus fans and through-cut valleys. */
   | "folded-mountains"
-  /** Wave-cut benches, spits and shallow shelves beside standing liquid. */
   | "coastal-shelf"
-  /** Evaporite flats crazed into polygonal desiccation plates. */
   | "salt-pan"
-  /** Gently rolling ground under a deep mantle of fines, pitted by small craters. */
   | "regolith-plain";
 
 export interface TerrainProvince {
   archetype: TerrainArchetype;
-  /** Share of the vista this province takes, across a set summing to 1. */
   weight: number;
 }
 
@@ -66,71 +33,35 @@ export interface SurfaceDetailChoice {
 }
 
 export interface SurfaceGeology {
-  /**
-   * What a visitor is standing on.
-   *
-   * `rock` is ground. `cloud` is a giant's cloud deck — the top of a convecting layer, which is
-   * the only thing an excursion to a gas or ice giant can stand on, and which has never claimed
-   * to be anything else. It shares the vista's geometry and light and none of its materials: a
-   * cloud has no bedrock, no bedding, no loose rock, and it scatters light through itself rather
-   * than reflecting it off a surface.
-   */
   medium: "cloud" | "rock";
-  /** Loose fines that collect in hollows and mantle shallow slopes. */
   regolithColor: Rgb;
-  /** Freshly broken rock, seen on scarps and steep slopes where fines cannot rest. */
   bedrockColor: Rgb;
-  /** Boulders per unit area, 0-1. */
   boulderDensity: number;
-  /** Characteristic boulder size in scene units (1 unit ≈ 1 m at eye height). */
   boulderScale: number;
-  /** Impacts per unit area, 0-1. Zero is a real answer: Io has no impact craters at all. */
   craterDensity: number;
   detail: SurfaceDetailChoice;
-  /** How far the dominant landform runs before it repeats, in scene units. */
   featureScale: number;
   frostColor: Rgb;
-  /** Share of flat, shaded ground carrying frost or evaporite, 0-1. */
   frostCoverage: number;
-  /** Optical thickness of the air between the eye and the horizon, 0-1. */
   hazeDensity: number;
   lavaColor: Rgb;
-  /** Strength of molten fissure glow, 0-1. */
   lavaGlow: number;
-  /** Standing liquid height in the height field's own units, or null for a dry world. */
   liquidLevel: number | null;
-  /** The colour of a deep body of it, and of a shallow one — which is most of what tells a
-   * viewer where the shore is. */
   liquidColor: Rgb;
   liquidShallowColor: Rgb;
   provenance: "inferred" | "measured";
   provinces: readonly TerrainProvince[];
-  /**
-   * What colour the sky is from the ground, which is a fact about the air rather than about the
-   * rock beneath it — and not something the surface palette can be asked for. Left to the
-   * inference, Titan's came out blue: its equilibrium temperature marks it as a deep-frozen world,
-   * and frozen worlds get their atmosphere tinted toward ice, so the orange smog moon whose sky
-   * hides its own sun was given a clear blue one.
-   */
   skyColor: Rgb;
-  /** Bottom-to-top colour ramp for the exposed ground, sampled by altitude. */
   ramp: readonly [Rgb, Rgb, Rgb, Rgb, Rgb];
-  /** Depth of the fines mantle: 0 is bare rock, 1 an ocean of dust. */
   regolithDepth: number;
-  /** Vertical scale of the vista, in scene units. */
   relief: number;
   seed: number;
-  /** Vertical spacing of visible bedding planes, in scene units. */
   strataSpacing: number;
-  /** How strongly bedding shows on scarps, 0-1. */
   strataStrength: number;
   windDirection: number;
-  /** Strength of wind-blown streaking and drift, 0-1. */
   windStreaks: number;
 }
 
-/** The subset of a geology a Solar System body states outright; the rest is filled from the
- * recipe so a body never silently loses a field when this table grows. */
 export type MeasuredGeology = Partial<Omit<SurfaceGeology, "provenance" | "seed">>;
 
 const rgb = (red: number, green: number, blue: number): Rgb => [red, green, blue];
@@ -162,16 +93,6 @@ const provinces = (
     : [{ archetype: "regolith-plain", weight: 1 }];
 };
 
-/**
- * Ground truth for the Solar System, keyed by NAIF id.
- *
- * Every number here answers to a mission result rather than to a preference, and the ones that
- * look surprising are the ones that matter most: Venus's crater density is near zero because the
- * whole planet was resurfaced within the last ~500 Myr; Io's is exactly zero because nothing
- * survives its resurfacing at all; Europa's relief is a few hundred metres across a body the size
- * of the Moon. Getting these right is the difference between a world and a texture swap.
- */
-
 const isRocky = (recipe: WorldRecipe): recipe is RockyWorldRecipe => recipe.renderer === "rocky";
 
 const createSeededRandom = (seed: number): (() => number) => {
@@ -185,16 +106,6 @@ const createSeededRandom = (seed: number): (() => number) => {
   };
 };
 
-/**
- * Reads a set of landform provinces off a rocky recipe's own thermal and mineral regime.
- *
- * Nothing here is a claim about a place — an exoplanet's surface has never been seen. What the
- * catalogue does constrain is the regime: a world hot enough to melt rock has flow fields, one
- * cold enough to freeze its volatiles out has ice, one with standing liquid has a shoreline, one
- * with a thin atmosphere keeps its crater record because nothing erases it. The seeded draw only
- * chooses between provinces the regime already allows, so two worlds with the same physics still
- * differ without either of them contradicting what is known.
- */
 const inferProvinces = (recipe: RockyWorldRecipe, random: () => number): TerrainProvince[] => {
   const { surface, terrain } = recipe;
   const entries: [TerrainArchetype, number][] = [];
@@ -216,20 +127,16 @@ const inferProvinces = (recipe: RockyWorldRecipe, random: () => number): Terrain
     entries.push(["regolith-plain", 0.14 + random() * 0.16]);
     if (random() > 0.55) entries.push(["canyon-rift", 0.1 + random() * 0.16]);
   } else if (air < 0.12) {
-    // Nothing erodes an airless world but more impacts, so the crater record is the landscape.
     entries.push(["impact-highlands", 0.4 + terrain.craterDensity * 0.28]);
     entries.push(["regolith-plain", 0.2 + random() * 0.18]);
     entries.push(["flood-basalt", 0.12 + random() * 0.18]);
   } else {
-    // A dry world with air: wind is the only agent left, and it builds dunes and carves yardangs.
     entries.push(["dune-sea", 0.2 + air * 0.3]);
     entries.push(["yardang-badlands", 0.18 + terrain.erosionAmount * 0.3]);
     entries.push(["impact-highlands", 0.12 + terrain.craterDensity * 0.2 * (1 - air)]);
     if (random() > 0.6) entries.push(["salt-pan", 0.1 + random() * 0.14]);
   }
 
-  // One province drawn from outside the regime's default set, so a world reads as a place with a
-  // history rather than as one process applied uniformly.
   const accents: TerrainArchetype[] = [
     "canyon-rift",
     "folded-mountains",
@@ -245,10 +152,6 @@ const inferProvinces = (recipe: RockyWorldRecipe, random: () => number): Terrain
   return [...provinces(...entries)];
 };
 
-/** Widens a recipe's three-stop palette into the five-stop ramp the ground shading samples,
- * keeping the recipe's own mineral hue while pulling the extremes further apart than a straight
- * interpolation would — real ground is darker in its hollows and brighter on its crests than the
- * midpoint of a two-colour blend. */
 const rampFromRecipe = (recipe: RockyWorldRecipe): SurfaceGeology["ramp"] => {
   const { highColor, lowColor, midColor } = recipe.surface;
   return [
@@ -344,14 +247,6 @@ const DETAIL_BY_PALETTE: Readonly<Record<string, SurfaceDetailChoice>> = {
   },
 };
 
-/**
- * The cloud deck a giant's excursion stands on.
- *
- * Not terrain and not presented as terrain: it is the top of the convecting layer whose bands the
- * orbital view shows from above, given the same horizon, air and light as everything else so it
- * reads as a place rather than as a fogged plane. Its swells run along the world's own banding,
- * because that is what a jet stream does to a cloud layer.
- */
 export const cloudDeckGeology = (recipe: WorldRecipe): SurfaceGeology | null => {
   const bands =
     recipe.renderer === "gas-giant"
@@ -371,7 +266,6 @@ export const cloudDeckGeology = (recipe: WorldRecipe): SurfaceGeology | null => 
 
   return {
     medium: "cloud",
-    // Long swells running with the banding, over a broader roll: cloud streets over convection.
     provinces: provinces(["dune-sea", 0.56], ["glacial-plain", 0.44]),
     ramp: [
       scale(bands.deep, 0.5),
@@ -393,7 +287,6 @@ export const cloudDeckGeology = (recipe: WorldRecipe): SurfaceGeology | null => 
     strataStrength: 0,
     strataSpacing: 1,
     windStreaks: 0,
-    // Bands run east-west, so the swells lie across the direction a visitor faces.
     windDirection: Math.PI / 2,
     lavaGlow: 0,
     lavaColor: rgb(0, 0, 0),
@@ -427,8 +320,6 @@ const inferredGeology = (recipe: RockyWorldRecipe): SurfaceGeology => {
     medium: "rock",
     provinces: inferProvinces(recipe, random),
     ramp,
-    // Fines are ground out by impacts on an airless world and blown into a mantle on a windy
-    // one; a wet world washes them into its basins instead, so it keeps more bare rock exposed.
     regolithColor: mix(ramp[2], ramp[3], 0.45 + random() * 0.2),
     bedrockColor: scale(mix(ramp[0], ramp[2], 0.4), 0.9),
     frostColor: mix(rgb(0.86, 0.91, 0.96), surface.cloudColor, 0.3),
@@ -451,8 +342,6 @@ const inferredGeology = (recipe: RockyWorldRecipe): SurfaceGeology => {
     liquidColor: surface.waterColor,
     liquidShallowColor: surface.waterColorShallow,
     hazeDensity: clamp01(air * 0.7 + surface.cloudCover * 0.2),
-    // The recipe's atmosphere colour is what this world's air would scatter; with no air to
-    // scatter in, the sky is simply space.
     skyColor: mix(rgb(0.003, 0.004, 0.008), recipe.atmosphere.color, clamp01(air * 1.6) ** 0.6),
     detail,
     provenance: "inferred",
@@ -462,18 +351,9 @@ const inferredGeology = (recipe: RockyWorldRecipe): SurfaceGeology => {
 
 export interface SolarBodyIdentity {
   naifId: number;
-  /** How much of this body's surface has actually been resolved by a mission. */
   surfaceStatus?: "mapped" | "modeled" | "unresolved";
 }
 
-/**
- * A body whose surface no mission has resolved.
- *
- * Its size and orbit are measured, and nothing else is. Rather than dressing it in a plausible
- * landscape — which would be an astronomical claim with nothing behind it — the vista gets a
- * featureless graded plain: no craters, no mountains, no colour beyond the neutral grey the
- * orbital view already uses for the same reason.
- */
 const unresolvedGeology = (recipe: RockyWorldRecipe): SurfaceGeology => ({
   medium: "rock",
   provinces: provinces(["regolith-plain", 1]),
@@ -518,13 +398,6 @@ const unresolvedGeology = (recipe: RockyWorldRecipe): SurfaceGeology => ({
   seed: recipe.seed,
 });
 
-/**
- * The geology a surface vista should be built from.
- *
- * A Solar System body with mission-resolved terrain answers from `MEASURED_GEOLOGY`; one whose
- * surface has never been resolved gets the deliberately featureless plain above; everything else
- * is read off the recipe's own measured physical properties.
- */
 export const deriveSurfaceGeology = (
   recipe: WorldRecipe,
   identity?: SolarBodyIdentity | null,
@@ -543,8 +416,6 @@ export const deriveSurfaceGeology = (
   return {
     ...inferred,
     ...measured,
-    // Water level stays with the recipe: it is what the orbital view and the vista's own liquid
-    // plane already agree on, and the measured table has no business restating it.
     liquidLevel: inferred.liquidLevel,
     liquidColor: measured.liquidColor ?? inferred.liquidColor,
     liquidShallowColor: measured.liquidShallowColor ?? inferred.liquidShallowColor,
@@ -556,14 +427,6 @@ export const deriveSurfaceGeology = (
   };
 };
 
-/**
- * What each measured body's rock is made of, in the same vocabulary the exoplanet inference uses.
- *
- * Only the mineral family is stated here; the colours a vista actually paints come from that
- * body's own ramp above. The two are separate because the family is a claim about chemistry and
- * the ramp is a claim about appearance, and for a body like Europa — water ice, but grey-white
- * rather than the blue an "ice" family would suggest — they genuinely disagree.
- */
 const MEASURED_PALETTE_FAMILY: Readonly<Record<number, RockyPaletteFamily>> = {
   199: "basaltic-dark",
   299: "basaltic-dark",
@@ -601,13 +464,6 @@ export interface MeasuredSurfaceAppearance {
   paletteFamily: RockyPaletteFamily;
 }
 
-/**
- * The three-stop palette a Solar System body's recipe should carry, taken from its measured ramp.
- *
- * Without this a known world's surface colours come out of the same inference an exoplanet gets,
- * which for Mars (210 K, so "ice" under the old threshold) produced a blue-white ice palette for
- * a planet whose defining visual fact is that it is rust-coloured.
- */
 export const measuredSurfaceAppearance = (naifId: number): MeasuredSurfaceAppearance | null => {
   const geology = MEASURED_GEOLOGY[naifId] ?? ICY_MOONS[naifId];
   const family = MEASURED_PALETTE_FAMILY[naifId];
@@ -620,7 +476,5 @@ export const measuredSurfaceAppearance = (naifId: number): MeasuredSurfaceAppear
   };
 };
 
-/** Whether a body's ground truth is stated here rather than inferred — used by tests and by the
- * telemetry that tells a visitor which of the two they are looking at. */
 export const hasMeasuredGeology = (naifId: number): boolean =>
   naifId in MEASURED_GEOLOGY || naifId in ICY_MOONS;

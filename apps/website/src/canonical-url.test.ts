@@ -7,8 +7,6 @@ test("the landing page is canonical to itself", () => {
 });
 
 test("a catalogued destination is canonical to its own URL", () => {
-  // The point of the change: this used to resolve to the root, which told a crawler the world
-  // was a duplicate of the landing page.
   expect(canonicalUrlForSearch("?planet=Kepler-22%20b")).toBe(
     `${SITE_ORIGIN}/?planet=Kepler-22%20b`,
   );
@@ -40,14 +38,12 @@ test("a procedural recipe collapses to the root rather than creating generated c
 
 test("tracking parameters cannot mint a distinct canonical for the same page", () => {
   expect(canonicalUrlForSearch("?utm_source=newsletter&fbclid=abc")).toBe(`${SITE_ORIGIN}/`);
-  // A destination keeps its identity, and the extra parameters are dropped from it.
   expect(canonicalUrlForSearch("?planet=Kepler-22%20b&utm_source=newsletter")).toBe(
     `${SITE_ORIGIN}/?planet=Kepler-22%20b`,
   );
 });
 
 test("the destinations resolve in the order the app resolves them", () => {
-  // `loadRequestedObject` checks star, then system, then planet, so the canonical has to agree.
   expect(canonicalUrlForSearch("?planet=Kepler-22%20b&star=Sirius")).toBe(
     `${SITE_ORIGIN}/?star=Sirius`,
   );

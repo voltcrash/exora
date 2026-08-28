@@ -34,16 +34,8 @@ export interface BlackHoleProfile {
   };
 }
 
-/** Kilometres across a non-spinning event horizon per solar mass. */
 const SCHWARZSCHILD_DIAMETER_KM_PER_SOLAR_MASS = 5.906_5;
 
-/**
- * Five public landmarks, chosen for historical recognition and the quality of their measurements.
- *
- * A black hole is not a surface that can be textured from a photograph. The mass, distance and
- * classification below remain observational data; `visual` is deliberately kept separate as the
- * recipe for Exora's disclosed interpretation of the surrounding luminous matter.
- */
 export const BLACK_HOLES: readonly BlackHoleProfile[] = [
   {
     aliases: ["Sgr A*", "Sag A*", "Sagittarius A-star"],
@@ -234,7 +226,6 @@ export const findBlackHole = (value: string): BlackHoleProfile | undefined => {
   );
 };
 
-/** A non-spinning reference diameter, not a claim that the black hole's spin is known. */
 export const schwarzschildDiameterKilometers = (blackHole: BlackHoleProfile): number =>
   blackHole.massSolar * SCHWARZSCHILD_DIAMETER_KM_PER_SOLAR_MASS;
 

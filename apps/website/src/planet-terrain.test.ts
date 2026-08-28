@@ -58,7 +58,6 @@ test("buildCraterField placement is not latitude-biased", () => {
   expect(craters.length).toBeGreaterThan(10);
   const polar = craters.filter((c) => Math.abs(c.direction.y) > 0.8).length;
   const equatorial = craters.filter((c) => Math.abs(c.direction.y) < 0.3).length;
-  // Uniform sphere sampling should not systematically starve either band.
   expect(polar).toBeLessThan(craters.length);
   expect(equatorial).toBeGreaterThan(0);
 });

@@ -303,11 +303,6 @@ test("chooses a surprise star from a curated SIMBAD result", async () => {
 });
 
 test("a catalog request keeps its deadline when the caller supplies a cancellation", async () => {
-  // Every catalog call site passes its own controller so it can drop a result it no longer wants.
-  // Preferring that signal used to hand it to `fetch` unchanged, discarding the timeout with it,
-  // so a stalled archive left the request outstanding instead of failing and saying so. The
-  // deadline itself is timed in request-deadline.test.ts; what matters here is that the request
-  // is issued under something other than the caller's bare signal.
   const controller = new AbortController();
   let issued: AbortSignal | undefined;
 

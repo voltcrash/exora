@@ -41,13 +41,6 @@ const STAR_IDENTITIES: readonly SearchIdentity[] = [
   { name: "TRAPPIST-1", aliases: ["2MASS J23062928-0502285"] },
 ] as const;
 
-/**
- * The objects Exora names on its own account, rather than whatever the archives happen to return.
- *
- * They already exist to correct misspellings; the sitemap uses the same list so the destinations
- * offered to a search engine are exactly the ones the interface treats as landmarks, and the two
- * cannot drift into naming different worlds.
- */
 export const NOTABLE_PLANET_NAMES: readonly string[] = PLANET_IDENTITIES.map(({ name }) => name);
 export const NOTABLE_STAR_NAMES: readonly string[] = STAR_IDENTITIES.map(({ name }) => name);
 

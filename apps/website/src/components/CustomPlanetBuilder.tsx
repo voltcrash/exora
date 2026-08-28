@@ -13,7 +13,6 @@ import { useTabList } from "../use-tab-list.ts";
 
 type ForgeMode = "planet" | "star";
 
-/** Tab order for the forge modes. Module scope so the tab list keeps a stable identity. */
 const FORGE_MODES: readonly ForgeMode[] = ["planet", "star"];
 
 interface WorldForgeProps {
@@ -134,14 +133,9 @@ export const WorldForge = ({
   const [parameters, setParameters] = useState(initialParameters);
   const [starParameters, setStarParameters] = useState(initialStarParameters);
 
-  // The forge is mounted only for as long as it is open, so it opens with the component and
-  // closes when the page takes it away. `initialMode` seeds the mode above rather than being
-  // written back here, which is what it already amounted to: the old effect only ever reached
-  // `setMode` on the pass that opened the dialog.
   useEffect(() => {
     const dialog = dialogRef.current;
     if (!embedded) dialog?.showModal();
-    // Focus has to wait for the dialog to be in the top layer before it will take.
     const focusName = window.setTimeout(() => nameRef.current?.focus(), 0);
 
     return () => {

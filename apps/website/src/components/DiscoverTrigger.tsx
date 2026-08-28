@@ -2,7 +2,6 @@ interface DiscoverTriggerProps {
   onClick: () => void;
 }
 
-/** The single doorway into every catalog and creation tool. */
 export const DiscoverTrigger = ({ onClick }: DiscoverTriggerProps) => (
   <button
     id="open-discover"

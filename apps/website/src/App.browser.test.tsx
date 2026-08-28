@@ -15,28 +15,6 @@ const planetSceneStub = vi.hoisted(() => ({
   viewModeReady: Promise.resolve(),
 }));
 
-/**
- * The suite for the things a Node test cannot answer.
- *
- * Everything here needs a real engine: whether a control still has an accessible name after the
- * stylesheet has hidden its label, whether a dialog actually reaches the top layer, whether the
- * page survives a destination it cannot resolve. The unit suite covers the logic behind all of
- * this and covers it faster — what runs here is only what depends on layout, CSS, or the browser's
- * own dialog and history behaviour.
- *
- * Runs at a desktop and a phone viewport, configured as two browser instances, because the
- * defects worth catching here are the ones that appear at exactly one of those widths.
- */
-
-/**
- * The renderer is stubbed rather than driven.
- *
- * Babylon's real output is covered against a NullEngine in `renderer-smoke.test.ts`, which checks
- * the thing worth checking — that each world builds, draws a frame, and releases what it took.
- * Repeating that through SwiftShader here would cost seconds per test and prove less. What these
- * tests need from the renderer is only that it reports a first frame, because until it does, a
- * full-screen loading overlay sits over every control they are trying to reach.
- */
 const mountedWorld = () => ({
   dispose: () => undefined,
   focusXrRig: () => undefined,
@@ -48,9 +26,6 @@ const mountedWorld = () => ({
 vi.mock("./scene-host.ts", () => {
   let insideHeadset = false;
   const host = {
-    // Travel is flown by the real renderer's camera, which this suite does not have one of. The
-    // page's own half of a jump — panels leaving with the world, the dark over the swap — is
-    // driven by the phase, so the stub reports a page that is never between destinations.
     beginTravel: () => undefined,
     cancelTravel: () => undefined,
     camera: null,
@@ -83,7 +58,6 @@ vi.mock("./scene-host.ts", () => {
     setInXr: (value: boolean) => {
       insideHeadset = value;
     },
-    /** How many overlays are currently holding the loop parked, for the assertions below. */
     renderSuspensions: 0,
     suspendRendering: () => {
       host.renderSuspensions += 1;
@@ -101,7 +75,6 @@ vi.mock("./scene-host.ts", () => {
   return { acquireSceneHost: () => host, recreateSceneHost: () => host };
 });
 
-/** The stub above, reached through the module the app imports it from. */
 const stubbedHost = (): {
   renderSuspensions: number;
   setInXr: (value: boolean) => void;
@@ -161,13 +134,6 @@ vi.mock("./mission-scene.ts", () => ({
   },
 }));
 
-/**
- * The one scene stub that keeps a piece of the real thing.
- *
- * Babylon is stubbed out as everywhere else here, but the layout is not: the system view's whole
- * job is printing what the diorama did to the numbers, and a fabricated layout would let those
- * readouts be wrong in exactly the way this test exists to catch.
- */
 vi.mock("./system-scene.ts", async () => {
   const { deriveSystemLayout } = await import("./system-layout.ts");
   return {
@@ -208,13 +174,6 @@ const namedPlanet = (name: string): ExoplanetProfile => ({
   name,
 });
 
-/**
- * A stand-in archive.
- *
- * Answers the shapes the client validates and nothing more. `missing` names the objects this
- * archive should claim not to have, which is how the deep-link tests reproduce a shared URL for a
- * world that has since been renamed or withdrawn.
- */
 const stubArchive = ({ missing = [] as string[] } = {}) => {
   const calls: string[] = [];
 
@@ -235,8 +194,6 @@ const stubArchive = ({ missing = [] as string[] } = {}) => {
     const url = new URL(path, window.location.origin);
     const requested = decodeURIComponent(url.pathname.split("/").pop() ?? "");
 
-    // API stubbing must not turn a missing production asset into the renderer's intentional
-    // seeded-sky fallback. Pass the real catalog request through to Vite's public directory.
     if (url.pathname === "/sky/hyg-v44-vmag65.bin") return fetchBundledAsset(url);
 
     if (missing.includes(requested)) return new Response(null, { status: 404 });
@@ -290,7 +247,6 @@ const stubArchive = ({ missing = [] as string[] } = {}) => {
     if (url.pathname === "/api/planets") {
       const host = url.searchParams.get("host");
       if (host) {
-        // A host answers with its own system, which is what the diorama is built from.
         return planetList(
           host,
           missing.includes(host)
@@ -317,8 +273,6 @@ const stubArchive = ({ missing = [] as string[] } = {}) => {
       });
     }
 
-    // `/api/stars/featured` is a collection despite its shape, which is why it is answered here
-    // rather than alongside the single-object lookup above.
     if (url.pathname === "/api/stars" || url.pathname === "/api/stars/featured") {
       const data =
         url.pathname === "/api/stars/featured"
@@ -344,15 +298,6 @@ const stubArchive = ({ missing = [] as string[] } = {}) => {
 let root: Root | null = null;
 let container: HTMLElement | null = null;
 
-/**
- * Renders without `act`, deliberately.
- *
- * These tests drive the page the way a visitor does — real clicks, real typing, real navigation —
- * and `act` exists to flush updates that nothing real is waiting on. Declaring an act environment
- * around genuine events makes React warn about every one of them. Readiness comes instead from
- * `expect.element`, which retries until the page has caught up, which is the same thing a visitor
- * experiences and the only thing worth asserting.
- */
 const mountApp = (search = ""): void => {
   window.history.replaceState({}, "", `/${search}`);
   renderApp();
@@ -407,8 +352,6 @@ test("the landing page reaches a rendered world", async () => {
   mountApp();
 
   await expect.element(page.getByRole("heading", { level: 1 })).toBeVisible();
-  // The loading overlay is fixed at z-index 10 over everything, so a control being visible is
-  // also the assertion that the first frame was reported and the overlay stood down.
   await expect.element(page.getByRole("button", { name: "Open Discover" })).toBeVisible();
 });
 
@@ -425,9 +368,6 @@ test("Discover opens directly into the Solar System at this width", async () => 
   stubArchive();
   mountApp();
 
-  // The regression this exists for: below 760px the labels are hidden and the glyphs left behind
-  // are aria-hidden, so on the mobile instance these buttons resolve by name only because each
-  // one carries an aria-label. A Node test cannot see that, because no stylesheet has run.
   await expect.element(page.getByRole("button", { name: "Open Discover" })).toBeVisible();
   await userEvent.click(page.getByRole("button", { name: "Open Discover" }));
   await expect.element(page.getByRole("dialog", { name: /Start close to home/ })).toBeVisible();
@@ -495,8 +435,6 @@ test("a deep link to a system resolves to the diorama, and says what it compress
     "?system=Kepler-90",
   );
 
-  // The three compressions are the reason this view exists in its own right: a diorama that did
-  // not state them would be a picture claiming a linear layout it does not have.
   await expect.element(page.getByText(/LOG · .+ AU → .+ m/)).toBeVisible();
   await expect.element(page.getByText(/EARTH ×/)).toBeVisible();
   await expect.element(page.getByText(/^1 s = /)).toBeVisible();
@@ -514,9 +452,6 @@ test("a world in the diorama is reachable, and offers the way back to the system
   await expect.element(page.getByRole("heading", { level: 1 })).toHaveTextContent("Kepler-90 c");
   expect(window.location.search).toBe("?planet=Kepler-90%20c");
 
-  // The return leg rides in the telemetry panel's detail rows, which this stylesheet has always
-  // hidden below 960px — the same rule that hides "visit star" there. So the assertion holds
-  // where the control exists, and the mobile instance is left asserting the outward leg only.
   if (window.innerWidth < 960) return;
 
   await userEvent.click(page.getByRole("button", { name: /Whole system/ }));
@@ -566,8 +501,6 @@ test("the catalog opens, searches, and travels to a result", async () => {
 
   await userEvent.click(result);
 
-  // Travel closes the dialog, swaps the world, and rewrites the URL so the destination is
-  // shareable — the three halves of one action, none of which a Node test observes.
   await expect.element(page.getByRole("heading", { level: 1 })).toHaveTextContent("TRAPPIST-1 e");
   expect(window.location.search).toBe("?planet=TRAPPIST-1%20e");
   expect(calls.some((path) => path.includes("q=TRAPPIST-1"))).toBe(true);
@@ -580,7 +513,6 @@ test("the star catalog opens and travels to a star", async () => {
   await openDiscoverSection("Stars");
   await expect.element(page.getByRole("heading", { name: "Follow the light." })).toBeVisible();
 
-  // The alphabetized catalog is already visible, and searching remains available as a refinement.
   await userEvent.fill(page.getByPlaceholder(/Type a common name or catalog ID/), "Sirius");
   const result = page.getByRole("button", { name: /Sirius/ }).first();
   await expect.element(result).toBeVisible();
@@ -779,8 +711,6 @@ test("the Solar System's complete object list scrolls inside its left panel", as
   }
 
   await expect.element(page.getByRole("heading", { name: "Worlds in the diorama" })).toBeVisible();
-  // The renderer now starts after the first paint, so the heading can be visible while the
-  // measured orbit list is still being laid out. Wait for the list item the scroll assertion uses.
   await expect.element(page.getByRole("button", { name: /Makemake/ })).toBeVisible();
   const intro = document.querySelector<HTMLElement>(".system-experience .world-intro");
   expect(intro).not.toBeNull();
@@ -800,7 +730,6 @@ test("a dialog closes on Escape and returns the page", async () => {
   await openDiscoverSection("Exoplanets");
   await expect.element(page.getByRole("dialog")).toBeVisible();
 
-  // Discover owns Escape so the same close path works from every embedded workspace.
   await userEvent.keyboard("{Escape}");
   expect(document.querySelector("dialog[open]")).toBeNull();
 });
@@ -910,14 +839,9 @@ test("Tab toggles the interface away and back, and only on the main screen", asy
   mountApp();
   await expect.element(page.getByRole("heading", { level: 1 })).toBeVisible();
 
-  // Both instances offer the control. What the phone instance adds is that the button loses its
-  // copy at that width, so it resolves by name here only because it carries an aria-label.
   const clearView = page.getByRole("button", { name: "Hide the interface" });
   await expect.element(clearView).toBeVisible();
 
-  // Held as nodes rather than queried again after the press. Panels are hidden rather than faded,
-  // which takes them out of the accessibility tree as well as off the screen — so a role query
-  // would stop finding the very elements the assertions below are about.
   const panels = [".topbar", ".hud", ".mission-control"].map((selector) => {
     const panel = document.querySelector<HTMLElement>(selector);
     expect(panel, selector).not.toBeNull();
@@ -931,16 +855,12 @@ test("Tab toggles the interface away and back, and only on the main screen", asy
     }
   };
 
-  // The button goes first. A phone keeps that one control visible so touch can bring the chrome
-  // back; desktop has Tab and clears the entire deck.
   await userEvent.click(clearView);
   await expectCleared();
   if (mobile) {
     await expect.element(page.getByRole("button", { name: "Show the interface" })).toBeVisible();
   }
 
-  // Discover remains reachable when the chrome is hidden, and closing it returns to that same
-  // uncluttered renderer rather than silently restoring the panels behind it.
   await userEvent.keyboard("{Backspace}");
   await expect.element(page.getByRole("dialog")).toBeVisible();
   await userEvent.keyboard("{Backspace}");
@@ -951,7 +871,6 @@ test("Tab toggles the interface away and back, and only on the main screen", asy
   else await userEvent.keyboard("{Tab}");
   for (const { panel } of panels) await expect.element(panel).toBeVisible();
 
-  // …and the same control takes them away again, which is the half a one-way action never had.
   if (mobile) await userEvent.click(page.getByRole("button", { name: "Hide the interface" }));
   else await userEvent.keyboard("{Tab}");
   await expectCleared();
@@ -968,8 +887,6 @@ test("terrain view fades every interface region and reveals the hovered one", as
 
   const shell = document.querySelector<HTMLElement>(".experience-shell");
   expect(shell).not.toBeNull();
-  // The heading can commit one render before the async world-mount effect installs this callback.
-  // Await the mocked scene's lifecycle signal instead of making runner speed part of the test.
   await planetSceneStub.viewModeReady;
   planetSceneStub.setViewMode?.("surface");
   await expect.poll(() => shell!.classList.contains("view-surface")).toBe(true);
@@ -1003,13 +920,9 @@ test("Tab keeps traversing focus wherever the shortcut stands down", async () =>
   const shell = document.querySelector<HTMLElement>(".experience-shell");
   expect(shell).not.toBeNull();
 
-  // Shift+Tab is what the shortcut leaves alone, and is therefore what still reaches the page's
-  // own controls from the keyboard now that plain Tab is spoken for.
   await userEvent.keyboard("{Shift>}{Tab}{/Shift}");
   expect(shell!.classList.contains("chrome-hidden")).toBe(false);
 
-  // A dialog is not the main screen: it traps focus for its own controls, and Tab has to keep
-  // moving between them rather than hiding an interface nobody can see behind the scrim.
   await openDiscoverSection("Exoplanets");
   await expect.element(page.getByRole("dialog")).toBeVisible();
 
@@ -1023,10 +936,6 @@ test("an open overlay parks the renderer, and closing it starts the loop again",
   mountApp();
   await expect.element(page.getByRole("heading", { level: 1 })).toBeVisible();
 
-  // The reason this matters is not the wasted GPU time on its own. A modal covers the canvas
-  // with a blurred scrim, and a canvas that keeps changing underneath one forces the browser to
-  // rebuild that blur over the entire viewport every frame — which is what made the catalog and
-  // the forge drop frames while a reader was only scrolling a list or dragging a slider.
   expect(stubbedHost().renderSuspensions).toBe(0);
 
   await openDiscoverSection("Exoplanets");
@@ -1037,8 +946,6 @@ test("an open overlay parks the renderer, and closing it starts the loop again",
   await expect.element(page.getByRole("dialog")).not.toBeInTheDocument();
   expect(stubbedHost().renderSuspensions).toBe(0);
 
-  // The forge is a separate overlay over the same canvas and has to hold the loop just as the
-  // catalog did — the release is per-overlay, not a single global flag someone can leave set.
   await openDiscoverSection("World Forge");
   await expect.element(page.getByRole("dialog")).toBeVisible();
   expect(stubbedHost().renderSuspensions).toBe(1);
@@ -1058,7 +965,6 @@ test("VR presents the active destination without a console and exits to the same
   await userEvent.click(page.getByRole("button", { name: "XR: VR AVAILABLE" }));
   expect(page.getByRole("dialog")).not.toBeInTheDocument();
 
-  // Session exit does not select another destination or alter the browser interface.
   stubbedHost().setInXr(false);
   await expect.element(destination).toBeVisible();
   expect(destination.element().textContent).toBe(destinationName);
@@ -1094,8 +1000,6 @@ test("nothing overflows the viewport horizontally", async () => {
   mountApp();
   await expect.element(page.getByRole("heading", { level: 1 })).toBeVisible();
 
-  // Cheap, but it is the failure that a phone viewport actually produces: one control that did
-  // not shrink drags a horizontal scrollbar across the whole experience.
   expect(document.documentElement.scrollWidth).toBeLessThanOrEqual(
     document.documentElement.clientWidth,
   );

@@ -2,10 +2,6 @@ import type { ExoplanetProfile } from "@exora/contracts";
 
 export type { ExoplanetProfile } from "@exora/contracts";
 
-/**
- * A resilient local fixture used while the API starts or when NASA TAP cannot
- * be reached. The renderer consumes Exora's normalized contract either way.
- */
 export const featuredPlanet: ExoplanetProfile = {
   id: "kepler-297-b",
   name: "Kepler-297 b",

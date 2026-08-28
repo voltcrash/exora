@@ -47,18 +47,9 @@ export const StarExperience = ({
   const visual = deriveStarVisual(star);
   const custom = result.mode === "custom";
   const solar = result.mode === "solar";
-  // A jump in the air owns the screen: this view's panels go with the world being left, and its
-  // loading card stays down, because the flight is what stands in for it now.
   const travelling = travelPhase === "departing" || travelPhase === "crossing";
   const settled = sceneState !== "loading" || travelPhase !== "idle";
 
-  /**
-   * The name the archive files this system under.
-   *
-   * SIMBAD and NASA rarely spell a host the same way, so the diorama is asked for under whichever
-   * alias actually returned worlds, falling back to the star's own name. Held in a ref so the
-   * browser action always uses the latest archive result.
-   */
   const dioramaHostRef = useRef(star.name);
   useEffect(() => {
     dioramaHostRef.current = systemHostName ?? systemPlanets[0]?.hostStar ?? star.name;
@@ -67,11 +58,7 @@ export const StarExperience = ({
   const openSystem = async (): Promise<void> => {
     if (dioramaState === "loading") return;
     setDioramaState("loading");
-    // The pull-away and the archive request go out together, so the click reads immediately
-    // rather than after however long the answer takes.
     host?.beginTravel();
-    // A lookup that fails outright is a destination that is not there: it has to reach the
-    // `cancelTravel` below, or the flight would hang pulled back with no world to return to.
     const found = await onSelectSystem(dioramaHostRef.current).catch(() => false);
     if (!found) host?.cancelTravel();
     setDioramaState(found ? "idle" : "error");
@@ -110,9 +97,6 @@ export const StarExperience = ({
     return () => window.clearInterval(fpsTimer);
   }, [host]);
 
-  // The world is handed to the shared renderer, which disposes the previous one as it takes
-  // this one. Nothing is torn down when this view unmounts: a running immersive session is
-  // living on that renderer, and the destination replacing this view is what releases it.
   useEffect(() => {
     if (!host) return;
     let abandoned = false;

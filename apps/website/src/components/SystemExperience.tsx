@@ -42,15 +42,6 @@ const PLAYBACK_RATES = [
   { label: "1 d/s", secondsPerSecond: 86_400 },
 ] as const;
 
-/**
- * The whole host system, as somewhere to stand rather than a list to read.
- *
- * The one thing this view has to do that the planet and star views do not is admit what the
- * picture is doing to the numbers. A diorama that fits a system into a room has compressed two
- * scales and picked a clock rate, none of which is a fact about the system, so all three are
- * printed above the fold rather than left for the layout to imply — and each world carries what
- * had to be assumed to draw its orbit at all.
- */
 export const SystemExperience = ({
   chromeHidden,
   host,
@@ -75,17 +66,12 @@ export const SystemExperience = ({
   const [playbackRate, setPlaybackRate] = useState(3_600);
   const [playbackDirection, setPlaybackDirection] = useState<1 | -1>(1);
   const worldRef = useRef<SystemWorld | null>(null);
-  // The same guard `starJumpState` gives the panel button, in a form the scene can read. The
-  // diorama's own star is clicked through a handler the mount closes over once, so it would
-  // otherwise keep testing the state as it stood on the frame the world was built.
   const starJumpRef = useRef(false);
   const ephemerisRef = useRef<EphemerisResponse | null>(null);
   const displayedAtRef = useRef(displayedAt);
   const requestSequence = useRef(0);
   const { cached, hostStar, planets } = result;
   const solar = planets.length > 0 && planets.every((planet) => planet.solarSystem);
-  // A jump in the air owns the screen: this view's panels go with the world being left, and its
-  // loading card stays down, because the flight is what stands in for it now.
   const travelling = travelPhase === "departing" || travelPhase === "crossing";
   const settled = sceneState !== "loading" || travelPhase !== "idle";
 
@@ -127,19 +113,13 @@ export const SystemExperience = ({
     if (starJumpRef.current) return;
     starJumpRef.current = true;
     setStarJumpState("loading");
-    // The pull-away and the archive request go out together, so the click reads immediately
-    // rather than after however long the answer takes.
     host?.beginTravel();
-    // A lookup that fails outright is a destination that is not there: it has to reach the
-    // `cancelTravel` below, or the flight would hang pulled back with no world to return to.
     const found = await onSelectHostStar(hostStar).catch(() => false);
     if (!found) host?.cancelTravel();
     starJumpRef.current = false;
     setStarJumpState(found ? "idle" : "error");
   };
 
-  // The one route out of a diorama that has to be looked up. Asked for as the orbits are drawn,
-  // so that standing at the star is a flight rather than a flight and then a wait.
   useEffect(() => {
     void reachStar(hostStar).catch(() => null);
   }, [hostStar]);
@@ -174,9 +154,6 @@ export const SystemExperience = ({
     return () => window.clearInterval(fpsTimer);
   }, [host]);
 
-  // The world is handed to the shared renderer, which disposes the previous one as it takes this
-  // one. Nothing is torn down when this view unmounts: a running immersive session is living on
-  // that renderer, and the destination replacing this view is what releases it.
   useEffect(() => {
     if (!host) return;
     let abandoned = false;
@@ -426,11 +403,6 @@ export const SystemExperience = ({
             </span>
             <FrameRateSignal fps={fps} />
           </div>
-          {/*
-            The three numbers a reader needs before reading anything off the layout. None of them
-            is a fact about the system — they are what had to be done to fit it into a room — so
-            they are stated rather than left for the picture to imply.
-          */}
           <dl className="system-scale">
             <div>
               <dt>Orbit radii</dt>

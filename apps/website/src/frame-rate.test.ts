@@ -7,8 +7,6 @@ test("a scene running at the refresh rate fills the meter", () => {
 });
 
 test("a panel that never quite reports its own rate still fills it", () => {
-  // The reading in the screenshot this readout was built from: 57 on a 60 Hz display is a scene
-  // with nothing left to give, and a meter that called that four fifths would never be full.
   expect(frameRateStrength("57")).toBe(4);
   expect(frameRateStrength("55")).toBe(4);
 });
@@ -23,8 +21,6 @@ test("the bars fall with the frame rate", () => {
 });
 
 test("a stalled renderer is one bar, not an empty meter", () => {
-  // Zero frames is a reading, and a reading is worth showing as the worst one there is. An empty
-  // meter is reserved for the second before the first sample lands.
   expect(frameRateStrength("0")).toBe(1);
 });
 

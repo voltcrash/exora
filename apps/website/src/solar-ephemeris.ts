@@ -1,6 +1,5 @@
 import type { EphemerisVector } from "@exora/contracts";
 
-/** Gaussian gravitational constant squared, in AU³/day², for heliocentric two-body propagation. */
 const SOLAR_MU_AU3_PER_DAY2 = 0.000_295_912_208_285_591_1;
 
 export interface Vector3Value {
@@ -41,21 +40,12 @@ const solveEccentricAnomaly = (meanAnomaly: number, eccentricity: number): numbe
   return eccentricAnomaly;
 };
 
-/**
- * Advances one authoritative Horizons state vector without inventing a catalog phase.
- *
- * Horizons supplies both position and velocity. Between explicit lookups Exora converts that
- * state into its osculating heliocentric ellipse and advances it under the Sun's two-body field.
- * The UI labels this interval as derived; selecting a new time obtains a fresh JPL anchor.
- */
 export const propagateEphemerisVector = (
   vector: EphemerisVector,
   displayedAt: Date,
 ): Vector3Value => {
   const position = vector.positionAu;
   const elapsedDays = (displayedAt.getTime() - new Date(vector.epoch).getTime()) / 86_400_000;
-  // Preserve the authoritative sample byte-for-byte at its own epoch; no derived arithmetic is
-  // needed until the clock actually moves away from it.
   if (elapsedDays === 0) return { ...position };
   const velocity = vector.velocityAuPerDay;
   const radius = magnitude(position);

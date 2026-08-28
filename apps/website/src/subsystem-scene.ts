@@ -22,7 +22,6 @@ import { createStarfield } from "./star-visuals.ts";
 
 export interface SubsystemWorldOptions {
   onFirstFrame: () => void;
-  /** Travel to a moon, when a visitor clicks it on its track. Named, since only some are worlds. */
   onSelectMoon?: (name: string) => void;
   planet: ExoplanetProfile;
   subsystem: PlanetarySubsystem;
@@ -244,9 +243,6 @@ export const createSubsystemWorld = (
     body.material = moonMaterial;
     body.parent = orbitalRoot;
     if (onSelectMoon) {
-      // Explicit for the reason the star's hit volume is: at this scene's performance priority
-      // Babylon creates every mesh unpickable, so a body that does not claim to be a target is
-      // one a click passes straight through.
       body.isPickable = true;
       body.actionManager = new ActionManager(scene);
       body.actionManager.registerAction(

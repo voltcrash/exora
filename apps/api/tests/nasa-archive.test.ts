@@ -41,15 +41,12 @@ test("normalizes NASA columns into the Exora contract", () => {
       equilibriumTemperatureKelvin: 1500,
       massJupiter: 9,
       radiusJupiter: 1.5,
-      // The orbit itself, which is what a system diorama draws rather than infers.
       orbitalEccentricity: 0.06,
       orbitalInclinationDegrees: 88.4,
       hostTemperatureKelvin: 8840,
       hostRadiusSolar: 1.77,
       hostMassSolar: 1.96,
       hostLuminosityLogSolar: 1.02,
-      // With the distance, these place the system in the galaxy rather than only on the sky,
-      // which is what lets the renderer draw the stars a visitor there would actually see.
       distanceParsecs: 108.875,
       rightAscensionDegrees: 201.1501727,
       declinationDegrees: -51.5045384,
@@ -195,7 +192,6 @@ test("resolves a planet by name whatever casing the caller used", async () => {
 
   expect(exact.value?.name).toBe("HIP 65426 b");
   expect(lowercased.value?.name).toBe("HIP 65426 b");
-  // Shared links preserve the sender's casing, so exact archive lookup must ignore case.
   for (const query of requestedQueries) {
     expect(query).toContain("lower(pl_name)=lower(");
   }
@@ -215,18 +211,14 @@ test("the query cache is bounded, so arbitrary searches cannot grow it without l
   await repository.search("first", 12);
   expect(requests).toBe(1);
 
-  // Every distinct search term is a distinct cache key, which is exactly how an unbounded map
-  // would grow for the life of the process.
   for (let index = 0; index < DEFAULT_MAX_ENTRIES; index += 1) {
     await repository.search(`flood-${index}`, 12);
   }
 
-  // The newest flood entry is still resident.
   const beforeResident = requests;
   await repository.search(`flood-${DEFAULT_MAX_ENTRIES - 1}`, 12);
   expect(requests).toBe(beforeResident);
 
-  // The oldest one was evicted rather than kept forever, so it costs a fresh request.
   const beforeEvicted = requests;
   await repository.search("first", 12);
   expect(requests).toBe(beforeEvicted + 1);

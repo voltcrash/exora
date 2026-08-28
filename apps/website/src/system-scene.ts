@@ -1,30 +1,3 @@
-/**
- * A host system as a place, rather than as a list of sibling worlds.
- *
- * Every other destination in Exora is one object. This one is the space between them: the host
- * star at the centre, each confirmed planet on the orbit the archive actually measured for it,
- * turning at its own measured period. The diorama is centred at roughly standing eye height, so
- * inside a headset the orbital plane runs through the room and the outer worlds pass by at head
- * level — which is the whole point of drawing a system rather than tabulating one.
- *
- * Two things had to be compressed to fit a system into a room, and both are compressed here by
- * `system-layout.ts` and printed by the interface rather than left to look linear: orbit radii,
- * which span decades within a single host, and body radii, which are four to five orders of
- * magnitude smaller than the orbits they sit on. Nothing else is invented. A planet whose shape
- * or plane the archive never solved for is drawn circular and coplanar *and says so*, in the
- * browser readout, and a planet the archive places nowhere at all is not placed.
- *
- * On the render budget: the bodies are deliberately coarse spheres lit by one point light, at
- * `profile.systemBodySegments`, because a dozen of them are on screen at once and each covers a
- * few dozen pixels. Full detail — the displaced terrain, the band shaders, the cloud shells —
- * arrives when a world becomes the subject of its own scene, which is what selecting one here
- * does. The host star is the exception: it is a single mesh and is drawn resolved, since a
- * system with a flat disc at the middle of it would be a diagram rather than a place.
- *
- * Built synchronously like the other destinations, so `world-scope.ts` can tell exactly what it
- * added to a scene it does not own.
- */
-
 import { ActionManager } from "@babylonjs/core/Actions/actionManager.js";
 import { ExecuteCodeAction } from "@babylonjs/core/Actions/directActions.js";
 import "@babylonjs/core/Culling/ray.js";
@@ -64,61 +37,28 @@ import {
   type SystemLayout,
 } from "./system-layout.ts";
 
-/**
- * Where the middle of the diorama sits above the floor.
- *
- * Roughly a standing wearer's eye height, so the orbital plane runs through the room at the
- * height they are already looking, and walking into the system means walking among the orbits
- * rather than looking down at a table.
- */
 const SYSTEM_CENTRE = new Vector3(0, 1.4, 0);
-/** Where a session opens: outside the widest orbit it can reach, facing the star. */
 const XR_SYSTEM_STAND = new Vector3(0, 0, -16.5);
-/**
- * How far above the orbital plane the wearer's eyes open a session.
- *
- * A system seen from within its own plane is a line, which is why the desktop camera is pinned
- * well above it and says so. The headset used to be the one view that ignored that: the plane
- * runs through the room at eye height, so a standing wearer sixteen metres out looked along it
- * within about a degree and every orbit collapsed into the same bright streak. Twenty degrees is
- * enough to open them back into rings while still reading as standing over a system rather than
- * looking down at a table.
- */
 const XR_SYSTEM_ELEVATION_RADIANS = (14 * Math.PI) / 180;
-/** The eye height a wearer is assumed to arrive at, used only to aim the deck before tracking. */
 const NOMINAL_EYE_HEIGHT = 1.6;
-/** Half-width of the square cross-section each orbit is drawn as, in scene units. */
 const ORBIT_THICKNESS = 0.011;
 
 export interface SystemWorldOptions {
   hostName: string;
   onFirstFrame: () => void;
-  /** Travel to the star at the centre, when a visitor clicks it. */
   onSelectHostStar?: () => void;
-  /** Travel to one of this system's own worlds, when a visitor clicks it on its orbit. */
   onSelectWorld?: (planet: ExoplanetProfile) => void;
   planets: readonly ExoplanetProfile[];
 }
 
 export interface SystemWorld extends MountedWorld {
-  /** The layout the diorama was drawn from, so the interface can print what was compressed. */
   layout: SystemLayout;
-  /** Switches between seeded catalog phases and validated heliocentric Horizons vectors. */
   setEphemeris: (vectors: readonly EphemerisVector[] | null) => void;
-  /** Advances the displayed instant from the last authoritative Horizons state-vector anchor. */
   setEphemerisTime: (epoch: Date) => void;
 }
 
 const toColor3 = ([red, green, blue]: Rgb): Color3 => new Color3(red, green, blue);
 
-/**
- * One colour standing in for a whole world, at the size a diorama draws it.
- *
- * INFERRED, like every other appearance in Exora: it comes from the same worldgen recipe the
- * full-detail renderer uses, collapsed to the tint that recipe would average out to. Reusing the
- * recipe rather than picking a colour per planet kind is what keeps a world recognisable — the
- * ochre giant in the diorama is the ochre giant you arrive at.
- */
 const dioramaBodyColor = (recipe: WorldRecipe): Color3 => {
   if (recipe.renderer === "rocky") {
     const ground = Color3.Lerp(
@@ -153,13 +93,11 @@ const dioramaBodyColor = (recipe: WorldRecipe): Color3 => {
   );
 };
 
-/** A molten world is the one kind that emits rather than only reflects, so it keeps that here. */
 const dioramaBodyGlow = (recipe: WorldRecipe): Color3 =>
   recipe.renderer === "rocky" && recipe.surface.lavaStrength > 0.05
     ? toColor3(recipe.surface.emissiveColor).scale(Math.min(0.7, recipe.surface.lavaStrength))
     : Color3.Black();
 
-/** The closed curve one orbit traces, in its own plane, already mapped into scene units. */
 const buildOrbitPath = (
   mapping: DistanceMapping,
   elements: OrbitElements,
@@ -168,10 +106,6 @@ const buildOrbitPath = (
   const points: Vector3[] = [];
   for (let index = 0; index < segments; index += 1) {
     const trueAnomaly = (index / segments) * Math.PI * 2;
-    // Every radius goes through the same mapping the semi-major axes did, so a point on the curve
-    // sits at the mapped distance the planet actually has there. What that produces is not an
-    // ellipse — but the star stays at the focus and perihelion stays nearer than aphelion by the
-    // measured amount, which is what drawing the shape is for.
     const radius = mapDistance(
       mapping,
       orbitRadiusAu(elements.semiMajorAxisAu, elements.eccentricity, trueAnomaly),
@@ -181,13 +115,6 @@ const buildOrbitPath = (
   return points;
 };
 
-/**
- * A closed orbit line with enough body to survive being seen edge-on.
- *
- * A flat ribbon vanishes exactly when the wearer is standing in the orbital plane, which in this
- * scene is most of the time. A four-sided tube costs four vertices per segment — a fraction of
- * what a torus would — and is visible from anywhere in the room.
- */
 const buildOrbitRibbon = (scene: Scene, name: string, path: readonly Vector3[]): Mesh => {
   const count = path.length;
   const positions = new Float32Array(count * 4 * 3);
@@ -201,7 +128,6 @@ const buildOrbitRibbon = (scene: Scene, name: string, path: readonly Vector3[]):
     const point = path[index] as Vector3;
     next.subtractToRef(previous, tangent);
     tangent.normalize();
-    // The curve is planar in XZ, so the in-plane normal is the tangent turned a quarter turn.
     side.set(-tangent.z, 0, tangent.x);
 
     const corners = [
@@ -279,8 +205,6 @@ const buildWorld = (
   ribbonMaterial.disableLighting = true;
   ribbonMaterial.emissiveColor = Color3.Lerp(color, new Color3(0.42, 0.68, 0.78), 0.55);
   ribbonMaterial.alpha = 0.42;
-  // Depth is still tested, so an orbit passing behind the star is correctly hidden by it; only
-  // the write is dropped, so orbits crossing each other blend instead of z-fighting.
   ribbonMaterial.disableDepthWrite = true;
   ribbonMaterial.backFaceCulling = false;
   ribbonMaterial.freeze();
@@ -299,21 +223,13 @@ const buildWorld = (
   body.isPickable = true;
   const bodyMaterial = new StandardMaterial(`diorama-world-material-${planet.id}`, scene);
   bodyMaterial.diffuseColor = color;
-  // A lit sphere with a specular highlight reads as a billiard ball; a planet does not have one.
   bodyMaterial.specularColor = Color3.Black();
-  // Enough that the night side is a silhouette rather than a hole in the starfield, and no more:
-  // the terminator is the only thing telling a viewer which way the star is from here.
   bodyMaterial.ambientColor = Color3.Black();
   bodyMaterial.emissiveColor = color.scale(0.055).add(dioramaBodyGlow(recipe));
   bodyMaterial.freeze();
   body.material = bodyMaterial;
 
   if (onSelect) {
-    // What a visitor aims at is not the body. These are drawn four to five orders of magnitude
-    // larger than their orbits and are still a handful of pixels across at the distance the whole
-    // system has to fit into, so the click target is an invisible sphere several times the body's
-    // radius, centred on it and carried along by it. Fully transparent rather than hidden:
-    // Babylon's pick predicate rejects `isVisible === false`, so a hidden mesh cannot be picked.
     const pickTarget = MeshBuilder.CreateSphere(
       `diorama-world-target-${planet.id}`,
       { diameter: Math.max(0.62, orbit.bodyRadiusSceneUnits * 4.4), segments: 10 },
@@ -352,26 +268,18 @@ export const createSystemWorld = (
   const primary = planets[0];
 
   scene.clearColor = new Color4(0.001, 0.002, 0.006, 1);
-  // Group 1 holds the star's corona and glare. Keeping group 0's depth lets a planet in front of
-  // the star occlude them, instead of the halo painting over every world it passes behind.
   scene.setRenderingAutoClearDepthStencil(1, false, true, true);
 
   const outerReach = Math.max(
     layout.mapping.outerSceneUnits,
     ...layout.orbits.map((orbit) => orbit.semiMajorAxisSceneUnits),
   );
-  // The target moves first, and everything else after it. `setTarget` rebuilds alpha, beta and
-  // radius from wherever the camera was left standing by the previous destination, so angles
-  // assigned before it are silently thrown away — which lands a diorama exactly edge-on, as a
-  // flat line, depending only on where the visitor happened to travel from.
   camera.setTarget(SYSTEM_CENTRE.clone());
   camera.lowerRadiusLimit = 3.5;
   camera.upperRadiusLimit = outerReach * 3.6;
   camera.lowerBetaLimit = 0.16;
   camera.upperBetaLimit = Math.PI - 0.16;
   camera.alpha = -Math.PI / 2;
-  // Well above the plane, because a system seen edge-on is a line. Low enough that the orbits
-  // still read as rings in perspective rather than as a flat chart.
   camera.beta = 1.02;
   camera.radius = outerReach * 1.9;
   if (!host.isInXr()) camera.attachControl(canvas, true);
@@ -379,8 +287,6 @@ export const createSystemWorld = (
   const root = new TransformNode("diorama-root", scene);
   root.position.copyFrom(SYSTEM_CENTRE);
 
-  // Every planet of a host shares its sky, so the diorama gets the real one: this is the view out
-  // of this system, with the near stars swung out of the places Earth sees them in.
   const starfield = createStarfield({
     count: profile.starCount,
     scene,
@@ -388,9 +294,6 @@ export const createSystemWorld = (
     viewpoint: primary ? skyViewpointFrom(primary.observation) : null,
   });
 
-  // The host star's own physical parameters come from the NASA row every planet here carries, so
-  // the centre of the diorama is the measured star rather than a stand-in — and it needs no
-  // SIMBAD resolution, which is what lets a system be visited even when its name is not in SIMBAD.
   const starRecipe = primary ? deriveHostStar(primary) : null;
   const stellarSurface = starRecipe
     ? createStellarSurface({
@@ -406,18 +309,10 @@ export const createSystemWorld = (
       })
     : null;
 
-  // The copy beside the diorama tells a visitor to select the star at the centre to stand at it.
   if (stellarSurface && onSelectHostStar) {
     makeStarTravelTarget(scene, stellarSurface, onSelectHostStar);
   }
 
-  /**
-   * One light for the whole system, at the star, which is exactly where a planetary system's
-   * light comes from. Babylon's standard falloff is linear to `range`, and the default range is
-   * effectively infinite, so this lights every body from the centre without an inverse-square
-   * term — which would be meaningless here anyway, since the distances it would fall off over
-   * are logarithmically compressed rather than real.
-   */
   const starLight = new PointLight("diorama-star-light", SYSTEM_CENTRE.clone(), scene);
   starLight.diffuse = starRecipe ? toColor3(starRecipe.color) : Color3.White();
   starLight.specular = Color3.Black();
@@ -427,8 +322,6 @@ export const createSystemWorld = (
     buildWorld(scene, profile, layout, orbit, root, onSelectWorld),
   );
 
-  // Placed once at the phase they start from, so the very first frame already shows a system
-  // rather than every world stacked along one radius waiting for the render loop.
   const applyPositions = (elapsedSeconds: number): void => {
     for (const world of drawn) {
       world.bodyPlane.rotation.x = world.orbit.tiltRadians;
@@ -455,7 +348,6 @@ export const createSystemWorld = (
       const radiusAu = Math.hypot(position.x, position.y, position.z);
       if (!Number.isFinite(radiusAu) || radiusAu <= 0) continue;
       const displayRadius = mapDistance(layout.mapping, radiusAu);
-      // Horizons' ecliptic X/Y plane becomes the scene's horizontal X/Z plane; ecliptic Z is up.
       world.bodyPlane.rotation.x = 0;
       world.body.position.set(
         (position.x / radiusAu) * displayRadius,
@@ -477,21 +369,14 @@ export const createSystemWorld = (
 
   const firstFrameObserver = scene.onAfterRenderObservable.addOnce(onFirstFrame);
 
-  /** Puts the wearer outside the widest orbit it can reach, facing the star. */
   const placeXrCamera = (initial: boolean, elevation = XR_SYSTEM_ELEVATION_RADIANS): void => {
     const rig = host.xrCamera();
     if (!rig) return;
     const headOffset = initial ? 0 : rig.realWorldHeight;
     const standoff = Math.max(XR_SYSTEM_STAND.z, -(outerReach + 3.5));
     const eyeHeight = SYSTEM_CENTRE.y + Math.abs(standoff - SYSTEM_CENTRE.z) * Math.tan(elevation);
-    // Babylon adds the wearer's tracked height to whatever is written here, so the deck is set
-    // to the height that leaves their eyes at `eyeHeight` for a wearer of ordinary stature.
     const deckY = eyeHeight - NOMINAL_EYE_HEIGHT + headOffset;
     rig.position.set(XR_SYSTEM_STAND.x, deckY, standoff);
-    // Aimed level, deliberately: `setTarget` rotates the tracking space itself, so pitching it at
-    // the star below would tilt the wearer's whole world and take gravity with it. The target
-    // therefore sits at the rig's own height — the system is twenty degrees under a level gaze,
-    // which is a glance down rather than a rotation.
     rig.setTarget(new Vector3(XR_SYSTEM_STAND.x, deckY, SYSTEM_CENTRE.z));
   };
 
@@ -509,8 +394,6 @@ export const createSystemWorld = (
       applyEphemerisPositions();
     },
     restoreDesktopView: () => camera.attachControl(canvas, true),
-    // Meshes, materials, action managers and the point light all belong to the world scope the
-    // host opened around this build. What is left here is what lives outside the scene graph.
     dispose: () => {
       scene.onBeforeRenderObservable.remove(renderObserver);
       scene.onAfterRenderObservable.remove(firstFrameObserver);
