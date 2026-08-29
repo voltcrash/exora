@@ -1,6 +1,9 @@
 import type { ApiErrorResponse, ExoplanetProfile, StarProfile } from "@exora/contracts";
 import {
   apiErrorResponseSchema,
+  blackHoleResponseSchema,
+  blackHoleSearchResponseSchema,
+  FEATURED_BLACK_HOLES,
   ephemerisResponseSchema,
   planetResponseSchema,
   planetSearchResponseSchema,
@@ -9,6 +12,11 @@ import {
 } from "@exora/contracts";
 import { Hono, type Context } from "hono";
 import { cors } from "hono/cors";
+import {
+  BlackHoleArchiveError,
+  type BlackHoleRepository,
+  VizierBlackHoleRepository,
+} from "./black-hole-archive.ts";
 import {
   HORIZONS_API_VERSION,
   HORIZONS_SOURCE,
@@ -41,6 +49,7 @@ import {
 } from "./simbad-archive.ts";
 
 interface CreateAppOptions {
+  blackHoleRepository?: BlackHoleRepository;
   horizonsRateLimiter?: RateLimiter;
   horizonsRepository?: HorizonsRepository;
   rateLimiter?: RateLimiter;
@@ -54,6 +63,13 @@ const apiError = (code: ApiErrorResponse["error"]["code"], message: string): Api
   apiErrorResponseSchema.parse({ error: { code, message } });
 
 const renderApiError = (error: unknown, context: Context): Response => {
+  if (error instanceof BlackHoleArchiveError) {
+    return context.json(
+      apiError("UPSTREAM_UNAVAILABLE", "BlackCAT is temporarily unavailable."),
+      502,
+    );
+  }
+
   if (error instanceof NasaArchiveError) {
     return context.json(
       apiError("UPSTREAM_UNAVAILABLE", "NASA Exoplanet Archive is temporarily unavailable."),
@@ -160,6 +176,7 @@ const starCollection = (
 };
 
 export const createApp = ({
+  blackHoleRepository = new VizierBlackHoleRepository(),
   horizonsRateLimiter = createRateLimiter({ limit: 8, windowMs: 60_000 }),
   horizonsRepository = new JplHorizonsRepository(),
   rateLimiter = createRateLimiter(DEFAULT_RATE_LIMIT),
@@ -221,6 +238,67 @@ export const createApp = ({
   app.get("/api/health", (context) =>
     context.json({ service: "exora-api", status: "ok" as const }),
   );
+
+  app.get("/api/black-holes/featured", (context) => {
+    setCachePolicy(context, CACHE_POLICY.catalog);
+    return context.json(
+      blackHoleSearchResponseSchema.parse({
+        data: FEATURED_BLACK_HOLES,
+        meta: {
+          cached: true,
+          count: FEATURED_BLACK_HOLES.length,
+          query: "featured",
+          source: "Exora curated featured",
+          stale: false,
+        },
+      }),
+    );
+  });
+
+  app.get("/api/black-holes", async (context) => {
+    if (context.req.query("source") !== "observed") {
+      return context.json(apiError("INVALID_REQUEST", "Black-hole source must be observed."), 400);
+    }
+    const result = await blackHoleRepository.browse(requestedLimit(context, 50));
+    setCachePolicy(context, CACHE_POLICY.catalog);
+    return context.json(
+      blackHoleSearchResponseSchema.parse({
+        data: result.value,
+        meta: {
+          cached: result.cached,
+          count: result.value.length,
+          query: "observed",
+          source: "BlackCAT / CDS VizieR",
+          stale: result.stale,
+        },
+      }),
+    );
+  });
+
+  app.get("/api/black-holes/:name", async (context) => {
+    const name = context.req.param("name").trim();
+    if (!name || name.length > MAX_NAME_LENGTH) {
+      return context.json(apiError("INVALID_REQUEST", "Black-hole name is invalid."), 400);
+    }
+    const result = await blackHoleRepository.findByName(name);
+    if (!result.value) {
+      return context.json(
+        apiError("NOT_FOUND", `No observed black hole named ${name} was found.`),
+        404,
+      );
+    }
+    setCachePolicy(context, CACHE_POLICY.catalog);
+    return context.json(
+      blackHoleResponseSchema.parse({
+        data: result.value,
+        meta: {
+          cached: result.cached,
+          source: "BlackCAT / CDS VizieR",
+          stale: result.stale,
+        },
+      }),
+    );
+  });
 
   app.get("/api/ephemerides", async (context) => {
     const decision = horizonsRateLimiter.check(

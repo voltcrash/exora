@@ -9,7 +9,7 @@ import {
 test("the curated black-hole catalog contains five unique real destinations", () => {
   expect(BLACK_HOLES).toHaveLength(5);
   expect(new Set(BLACK_HOLES.map(({ id }) => id)).size).toBe(5);
-  expect(BLACK_HOLES.every(({ source }) => source.url.startsWith("https://"))).toBe(true);
+  expect(BLACK_HOLES.every(({ source }) => source.url?.startsWith("https://"))).toBe(true);
 });
 
 test("common and catalog aliases resolve without punctuation sensitivity", () => {

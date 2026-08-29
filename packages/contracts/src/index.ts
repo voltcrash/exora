@@ -1,6 +1,13 @@
 import type { z } from "zod";
 import {
   apiErrorResponseSchema,
+  blackHoleKindSchema,
+  blackHoleMetadataSchema,
+  blackHoleProfileSchema,
+  blackHoleProvenanceSchema,
+  blackHoleResponseSchema,
+  blackHoleSearchResponseSchema,
+  blackHoleStatusSchema,
   ephemerisResponseSchema,
   ephemerisVectorSchema,
   exoplanetObservationSchema,
@@ -35,6 +42,14 @@ export type StarApiMetadata = z.infer<typeof starMetadataSchema>;
 export type StarResponse = z.infer<typeof starResponseSchema>;
 export type StarSearchResponse = z.infer<typeof starSearchResponseSchema>;
 
+export type BlackHoleKind = z.infer<typeof blackHoleKindSchema>;
+export type BlackHoleProvenance = z.infer<typeof blackHoleProvenanceSchema>;
+export type BlackHoleStatus = z.infer<typeof blackHoleStatusSchema>;
+export type BlackHoleProfile = z.infer<typeof blackHoleProfileSchema>;
+export type BlackHoleApiMetadata = z.infer<typeof blackHoleMetadataSchema>;
+export type BlackHoleResponse = z.infer<typeof blackHoleResponseSchema>;
+export type BlackHoleSearchResponse = z.infer<typeof blackHoleSearchResponseSchema>;
+
 export type EphemerisVector = z.infer<typeof ephemerisVectorSchema>;
 export type EphemerisResponse = z.infer<typeof ephemerisResponseSchema>;
 export type ApiErrorResponse = z.infer<typeof apiErrorResponseSchema>;
@@ -43,3 +58,4 @@ export type ContractSchema = z.ZodType;
 export type SchemaOutput<Schema extends ContractSchema> = z.infer<Schema>;
 
 export * from "./schemas.ts";
+export { FEATURED_BLACK_HOLES } from "./featured-black-holes.ts";

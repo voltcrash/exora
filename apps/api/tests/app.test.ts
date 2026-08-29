@@ -1,6 +1,7 @@
-import type { ExoplanetProfile, StarProfile } from "@exora/contracts";
+import { FEATURED_BLACK_HOLES, type ExoplanetProfile, type StarProfile } from "@exora/contracts";
 import { expect, test, vi } from "vite-plus/test";
 import { createApp } from "../src/app.ts";
+import type { BlackHoleRepository } from "../src/black-hole-archive.ts";
 import { NasaArchiveError, type PlanetRepository } from "../src/nasa-archive.ts";
 import { createRateLimiter } from "../src/rate-limit.ts";
 import type { HorizonsRepository } from "../src/horizons.ts";
@@ -84,11 +85,65 @@ const systemAliasRepository: SystemAliasRepository = {
   resolveHost: async () => ({ cached: true, value: "HIP 65426" }),
 };
 
+const blackHoleRepository: BlackHoleRepository = {
+  browse: async () => ({ cached: true, stale: false, value: [FEATURED_BLACK_HOLES[3]!] }),
+  findByName: async (name) => ({
+    cached: false,
+    stale: false,
+    value: name.toLowerCase() === "cygnus x-1" ? FEATURED_BLACK_HOLES[3]! : null,
+  }),
+};
+
 test("returns service health", async () => {
   const response = await createApp({ repository }).request("/api/health");
 
   expect(response.status).toBe(200);
   expect(await response.json()).toEqual({ service: "exora-api", status: "ok" });
+});
+
+test("returns featured, observed, and exact black-hole responses", async () => {
+  const app = createApp({ blackHoleRepository, repository });
+  const featured = await app.request("/api/black-holes/featured");
+  const observed = await app.request("/api/black-holes?source=observed&limit=50");
+  const detail = await app.request("/api/black-holes/Cygnus%20X-1");
+
+  expect(featured.status).toBe(200);
+  const featuredPayload = await featured.json();
+  expect(featuredPayload).toMatchObject({
+    meta: { count: 5, query: "featured", source: "Exora curated featured" },
+  });
+  expect(featuredPayload.data.slice(0, 2)).toMatchObject([
+    { name: "Sagittarius A*" },
+    { name: "M87*" },
+  ]);
+  expect(observed.status).toBe(200);
+  expect(await observed.json()).toMatchObject({
+    data: [{ provenance: "observed", status: "confirmed" }],
+    meta: { count: 1, query: "observed", source: "BlackCAT / CDS VizieR" },
+  });
+  expect(detail.status).toBe(200);
+  expect(await detail.json()).toMatchObject({ data: { name: "Cygnus X-1" } });
+});
+
+test("validates black-hole source and names before repository access", async () => {
+  const app = createApp({ blackHoleRepository, repository });
+  const missingSource = await app.request("/api/black-holes");
+  const syntheticSource = await app.request("/api/black-holes?source=procedural");
+  const tooLong = await app.request(`/api/black-holes/${"x".repeat(101)}`);
+
+  expect(missingSource.status).toBe(400);
+  expect(syntheticSource.status).toBe(400);
+  expect(tooLong.status).toBe(400);
+  expect(await missingSource.json()).toMatchObject({ error: { code: "INVALID_REQUEST" } });
+});
+
+test("returns a structured 404 for an unknown observed black hole", async () => {
+  const response = await createApp({ blackHoleRepository, repository }).request(
+    "/api/black-holes/Unknown",
+  );
+
+  expect(response.status).toBe(404);
+  expect(await response.json()).toMatchObject({ error: { code: "NOT_FOUND" } });
 });
 
 test("public read-only API CORS is wildcard and never credentialed", async () => {

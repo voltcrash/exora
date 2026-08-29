@@ -74,6 +74,14 @@ export const BlackHoleExperience = ({
   const travelling = travelPhase === "departing" || travelPhase === "crossing";
   const settled = sceneState !== "loading" || travelPhase !== "idle";
   const diameterKilometers = schwarzschildDiameterKilometers(blackHole);
+  const massMetric: PanelMetric =
+    blackHole.massSolar === null
+      ? { label: "Mass estimate", value: "Unavailable" }
+      : { ...scaled(blackHole.massSolar, "M☉"), label: "Mass estimate" };
+  const diameterMetric: PanelMetric =
+    diameterKilometers === null
+      ? { label: "Schwarzschild Ø", value: "Unavailable" }
+      : { ...scaled(diameterKilometers, "KM"), label: "Schwarzschild Ø" };
 
   useEffect(() => host?.onXrStatus(setXrStatus), [host]);
 
@@ -108,20 +116,25 @@ export const BlackHoleExperience = ({
   }, [blackHole, host]);
 
   const panel: DestinationPanelModel = {
-    footer: (
+    footer: blackHole.source.url ? (
       <>
         <a href={blackHole.source.url} target="_blank" rel="noreferrer">
           {blackHole.source.title} ↗
         </a>{" "}
         · {blackHole.source.retrievedOn}
       </>
+    ) : (
+      <>
+        {blackHole.source.title} · {blackHole.source.retrievedOn}
+      </>
     ),
-    label: "Observed black hole data",
+    label:
+      blackHole.provenance === "observed" ? "Observed black hole data" : "Procedural visualization",
     links: [],
     metrics: [
-      { ...scaled(blackHole.massSolar, "M☉"), label: "Mass estimate" },
+      massMetric,
       distanceMetric(blackHole),
-      { ...scaled(diameterKilometers, "KM"), label: "Schwarzschild Ø" },
+      diameterMetric,
       { label: "Accretion", value: blackHole.observation.accretion.toUpperCase() },
     ],
     source: blackHole.source.archive,
@@ -176,13 +189,17 @@ export const BlackHoleExperience = ({
 
       <main className={cx("hud")} data-testid="hud">
         <DestinationIdentity
-          category="OBSERVED BLACK HOLE"
+          category={`${blackHole.provenance.toUpperCase()} BLACK HOLE`}
           classification={blackHoleKindLabel(blackHole)}
           name={<BlackHoleName name={blackHole.name} />}
           nameId="black-hole-name"
           note="INTERPRETIVE GRAVITATIONAL-LENSING MODEL · NOT TELESCOPE IMAGERY"
           summary={blackHole.observation.summary}
-          tags={[blackHole.milestone, blackHole.host, blackHole.constellation]}
+          tags={[
+            blackHole.milestone,
+            blackHole.host,
+            ...(blackHole.constellation ? [blackHole.constellation] : []),
+          ]}
           tagsLabel="Black hole classification"
           tone="black-hole"
         />

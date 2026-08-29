@@ -211,6 +211,74 @@ export const starSearchResponseSchema = z.strictObject({
   }),
 });
 
+export const blackHoleKindSchema = z.enum([
+  "stellar-mass",
+  "intermediate-mass",
+  "supermassive",
+  "ultramassive",
+]);
+
+export const blackHoleProvenanceSchema = z.enum(["observed", "procedural"]);
+export const blackHoleStatusSchema = z.enum(["confirmed", "candidate", "synthetic"]);
+
+export const blackHoleProfileSchema = z.strictObject({
+  aliases: z.array(nonEmptyString).readonly(),
+  catalogDesignation: nonEmptyString,
+  constellation: nullableString,
+  distanceLightYears: nullableFiniteNumber,
+  host: nonEmptyString,
+  id: nonEmptyString,
+  kind: blackHoleKindSchema,
+  massSolar: nullableFiniteNumber,
+  massUncertaintySolar: nullableFiniteNumber,
+  milestone: nonEmptyString,
+  name: nonEmptyString,
+  observation: z.strictObject({
+    accretion: z.enum(["active", "dormant", "quiet"]),
+    companion: nullableString,
+    declinationDegrees: nullableFiniteNumber,
+    redshift: nullableFiniteNumber,
+    rightAscensionDegrees: nullableFiniteNumber,
+    summary: nonEmptyString,
+  }),
+  provenance: blackHoleProvenanceSchema,
+  source: z.strictObject({
+    archive: nonEmptyString,
+    catalog: nonEmptyString,
+    measurement: nonEmptyString,
+    retrievedOn: retrievedDate,
+    title: nonEmptyString,
+    url: z.url().optional(),
+  }),
+  status: blackHoleStatusSchema,
+  visual: z.strictObject({
+    diskActivity: finiteNumber.min(0).max(1),
+    diskHueDegrees: finiteNumber.min(0).max(360),
+    diskTiltDegrees: finiteNumber.min(0).max(90),
+    jetStrength: finiteNumber.min(0).max(1),
+    seed: finiteNumber,
+  }),
+});
+
+export const blackHoleMetadataSchema = z.strictObject({
+  cached: z.boolean(),
+  source: z.enum(["BlackCAT / CDS VizieR", "Exora curated featured"]),
+  stale: z.boolean(),
+});
+
+export const blackHoleResponseSchema = z.strictObject({
+  data: blackHoleProfileSchema,
+  meta: blackHoleMetadataSchema,
+});
+
+export const blackHoleSearchResponseSchema = z.strictObject({
+  data: z.array(blackHoleProfileSchema),
+  meta: blackHoleMetadataSchema.extend({
+    count: z.number().int().nonnegative(),
+    query: z.string(),
+  }),
+});
+
 export const ephemerisVectorSchema = z.strictObject({
   epoch: timestamp,
   name: nonEmptyString,
