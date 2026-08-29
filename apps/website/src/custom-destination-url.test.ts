@@ -1,11 +1,28 @@
-import { WORLDGEN_VERSION, type CustomPlanetParameters } from "@exora/worldgen";
+import {
+  WORLDGEN_VERSION,
+  type CustomBlackHoleParameters,
+  type CustomPlanetParameters,
+} from "@exora/worldgen";
 import { expect, test } from "vite-plus/test";
 import {
+  customBlackHoleUrl,
   customPlanetUrl,
   customStarUrl,
+  parseCustomBlackHoleUrl,
   parseCustomPlanetUrl,
   parseCustomStarUrl,
 } from "./custom-destination-url.ts";
+
+const blackHole: CustomBlackHoleParameters = {
+  diskActivity: 0.72,
+  diskHueDegrees: 28,
+  diskTiltDegrees: 62,
+  jetStrength: 0.46,
+  kind: "supermassive",
+  mass: 0.48,
+  name: "Nyx Ω",
+  seed: 88_021,
+};
 
 const planet: CustomPlanetParameters = {
   activity: 0.64,
@@ -30,6 +47,7 @@ const encodeTestRecipe = (recipe: unknown): string => {
 };
 
 test("custom destination recipes round-trip Unicode Forge inputs", () => {
+  const blackHoleValue = new URLSearchParams(customBlackHoleUrl(blackHole)).get("customBlackHole");
   const planetValue = new URLSearchParams(customPlanetUrl(planet)).get("custom");
   const starValue = new URLSearchParams(
     customStarUrl({
@@ -43,6 +61,7 @@ test("custom destination recipes round-trip Unicode Forge inputs", () => {
     }),
   ).get("customStar");
 
+  expect(parseCustomBlackHoleUrl(blackHoleValue!)).toEqual(blackHole);
   expect(parseCustomPlanetUrl(planetValue!)).toEqual(planet);
   expect(parseCustomStarUrl(starValue!)).toMatchObject({ name: "Solara α", seed: 42_017 });
 });

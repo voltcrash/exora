@@ -1,10 +1,13 @@
 import type { ExoplanetProfile, StarKind, StarProfile } from "@exora/contracts";
 
 export {
+  generateCustomBlackHole,
   generateProceduralBlackHole,
   generateProceduralBlackHoles,
 } from "./procedural-black-holes.ts";
 export type {
+  CustomBlackHole,
+  CustomBlackHoleParameters,
   ProceduralBlackHoleAtOptions,
   ProceduralBlackHoleOptions,
 } from "./procedural-black-holes.ts";

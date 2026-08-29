@@ -1,9 +1,9 @@
 import type { ExoplanetProfile, StarProfile } from "@exora/contracts";
-import type { CustomStar, CustomWorld } from "@exora/worldgen";
+import type { CustomBlackHole, CustomStar, CustomWorld } from "@exora/worldgen";
 import { useEffect, useRef, useState } from "react";
 import type { BlackHoleProfile } from "../black-holes.ts";
 import type { SolarRegionProfile } from "../solar-regions.ts";
-import { WorldForge } from "./CustomPlanetBuilder.tsx";
+import { WorldForge, type ForgeMode } from "./CustomPlanetBuilder.tsx";
 import { BlackHoleCatalog } from "./BlackHoleCatalog.tsx";
 import { PlanetCatalog } from "./PlanetCatalog.tsx";
 import { SolarSystemCatalog } from "./SolarSystemCatalog.tsx";
@@ -14,9 +14,10 @@ import sharedStyles from "./ExperienceShared.module.css";
 export type DiscoverSection = "solar" | "worlds" | "stars" | "black-holes" | "forge";
 
 interface DiscoverScreenProps {
-  initialForgeMode: "planet" | "star";
+  initialForgeMode: ForgeMode;
   initialSection?: DiscoverSection;
   onClose: () => void;
+  onGenerateBlackHole: (blackHole: CustomBlackHole) => void;
   onGeneratePlanet: (world: CustomWorld) => void;
   onGenerateStar: (star: CustomStar) => void;
   onSelectBlackHole: (blackHole: BlackHoleProfile) => void;
@@ -127,7 +128,8 @@ const sectionCopy: Record<DiscoverSection, { eyebrow: string; title: string; sum
   forge: {
     eyebrow: "EXORA CELESTIAL SYNTHESIS",
     title: "Make the next discovery.",
-    summary: "Build a world or star from first principles and launch it into the live renderer.",
+    summary:
+      "Build a world, star, or black hole from first principles and launch it into the live renderer.",
   },
 };
 
@@ -135,6 +137,7 @@ export const DiscoverScreen = ({
   initialForgeMode,
   initialSection = "worlds",
   onClose,
+  onGenerateBlackHole,
   onGeneratePlanet,
   onGenerateStar,
   onSelectBlackHole,
@@ -284,6 +287,7 @@ export const DiscoverScreen = ({
                 embedded
                 initialMode={initialForgeMode}
                 onClose={() => setSection("solar")}
+                onGenerateBlackHole={onGenerateBlackHole}
                 onGeneratePlanet={onGeneratePlanet}
                 onGenerateStar={onGenerateStar}
               />

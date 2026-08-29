@@ -1,8 +1,10 @@
 import type { ExoplanetProfile, StarProfile } from "@exora/contracts";
 import {
   deriveWorldRecipe,
+  generateCustomBlackHole,
   generateCustomStar,
   generateCustomWorld,
+  type CustomBlackHole,
   type CustomStar,
   type CustomWorld,
   type WorldRecipe,
@@ -85,6 +87,21 @@ const defaultPlanetObject = (): ActiveObject => ({
 
 const loadRequestedObject = async (): Promise<ActiveObject> => {
   const parameters = new URLSearchParams(window.location.search);
+  const customBlackHole = parameters.get("customBlackHole");
+  if (customBlackHole !== null) {
+    const { parseCustomBlackHoleUrl } = await import("./custom-destination-url.ts");
+    const customParameters = parseCustomBlackHoleUrl(customBlackHole);
+    if (!customParameters) {
+      return {
+        detail:
+          "This custom-black-hole link contains an invalid or incompatible World Forge recipe. Return to the featured world and generate a new link.",
+        kind: "black hole",
+        name: "custom recipe",
+        type: "missing",
+      };
+    }
+    return { blackHole: generateCustomBlackHole(customParameters).blackHole, type: "black-hole" };
+  }
   const blackHoleName = parameters.get("blackHole");
   if (blackHoleName) {
     const { findBlackHole, findProceduralBlackHole } = await import("./black-holes.ts");
@@ -188,6 +205,7 @@ export const App = () => {
   const [activeObject, setActiveObject] = useState<ActiveObject | null>(() => {
     const parameters = new URLSearchParams(window.location.search);
     return parameters.has("blackHole") ||
+      parameters.has("customBlackHole") ||
       parameters.has("region") ||
       parameters.has("planet") ||
       parameters.has("star") ||
@@ -371,6 +389,15 @@ export const App = () => {
     });
   }, []);
 
+  const generateBlackHole = useCallback(({ blackHole, parameters }: CustomBlackHole): void => {
+    void import("./custom-destination-url.ts").then(({ customBlackHoleUrl }) => {
+      window.history.pushState({}, "", customBlackHoleUrl(parameters));
+      setDiscoverOpen(false);
+      setSystemHostName(null);
+      setActiveObject({ blackHole, type: "black-hole" });
+    });
+  }, []);
+
   const returnHome = useCallback((): void => {
     window.history.replaceState({}, "", "/");
     setSystemHostName(null);
@@ -530,8 +557,15 @@ export const App = () => {
       {discoverOpen && activeObject && activeObject.type !== "missing" ? (
         <Suspense fallback={null}>
           <DiscoverScreen
-            initialForgeMode={activeObject.type === "star" ? "star" : "planet"}
+            initialForgeMode={
+              activeObject.type === "star"
+                ? "star"
+                : activeObject.type === "black-hole"
+                  ? "black-hole"
+                  : "planet"
+            }
             onClose={closeDiscover}
+            onGenerateBlackHole={generateBlackHole}
             onGeneratePlanet={generatePlanet}
             onGenerateStar={generateStar}
             onSelectBlackHole={selectBlackHole}

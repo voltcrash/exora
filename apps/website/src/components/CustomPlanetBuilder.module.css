@@ -50,7 +50,7 @@
 
 .forge-tabs {
   display: grid;
-  grid-template-columns: 1fr 1fr;
+  grid-template-columns: repeat(3, 1fr);
   gap: 8px;
   padding: 12px 28px;
   border-bottom: 1px solid var(--line);
@@ -94,10 +94,25 @@
   background: rgb(139 230 234 / 6%);
 }
 
-.forge-tabs button:last-child.active {
+.forge-tabs button:nth-child(2).active {
   border-color: rgb(255 198 98 / 42%);
   color: #ffe8bd;
   background: rgb(255 190 80 / 7%);
+}
+
+.forge-tabs button:last-child.active {
+  border-color: rgb(197 164 255 / 46%);
+  color: #efe4ff;
+  background: rgb(117 75 186 / 12%);
+}
+
+.black-hole-symbol {
+  width: 23px;
+  height: 23px;
+  border: 2px solid #c5a4ff;
+  border-radius: 50%;
+  background: #020104;
+  box-shadow: 0 0 11px rgb(197 164 255 / 45%);
 }
 
 .builder-header p,
@@ -144,6 +159,52 @@
 .star-builder-body .builder-identity {
   border-color: rgb(255 198 98 / 18%);
   background: rgb(255 190 80 / 3%);
+}
+
+.black-hole-builder-body .builder-identity {
+  border-color: rgb(197 164 255 / 20%);
+  background: rgb(117 75 186 / 5%);
+}
+
+.black-hole-preview {
+  min-height: 66px;
+  display: grid;
+  grid-template-columns: 38px 1fr;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 12px;
+  border: 1px solid rgb(197 164 255 / 18%);
+  border-radius: 12px;
+  background: rgb(117 75 186 / 5%);
+}
+
+.black-hole-preview > span:last-child {
+  display: grid;
+  gap: 4px;
+}
+
+.black-hole-preview small {
+  color: var(--faint);
+  font-family: var(--mono);
+  font-size: 7px;
+  letter-spacing: 0.08em;
+}
+
+.black-hole-preview strong {
+  color: #e9dcff;
+  font-size: 10px;
+  font-weight: 500;
+}
+
+.preview-black-hole {
+  width: 34px;
+  height: 34px;
+  border: 5px solid rgb(211 154 97 / 70%);
+  border-radius: 50%;
+  background: #010102;
+  box-shadow:
+    0 0 8px rgb(197 164 255 / 78%),
+    0 0 24px rgb(197 164 255 / 25%);
 }
 
 .stellar-preview {

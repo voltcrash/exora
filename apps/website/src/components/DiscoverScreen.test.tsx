@@ -8,6 +8,7 @@ const discoverMarkup = (initialSection?: DiscoverSection): string =>
       initialForgeMode="planet"
       {...(initialSection ? { initialSection } : {})}
       onClose={vi.fn()}
+      onGenerateBlackHole={vi.fn()}
       onGeneratePlanet={vi.fn()}
       onGenerateStar={vi.fn()}
       onSelectBlackHole={vi.fn()}

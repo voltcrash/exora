@@ -1,14 +1,22 @@
 import {
   WORLDGEN_VERSION,
+  type CustomBlackHoleParameters,
   type CustomPlanetParameters,
   type CustomStarParameters,
 } from "@exora/worldgen";
 
 type CustomDestinationRecipe =
+  | { parameters: CustomBlackHoleParameters; type: "black-hole"; version: number }
   | { parameters: CustomPlanetParameters; type: "planet"; version: number }
   | { parameters: CustomStarParameters; type: "star"; version: number };
 
 const MAX_RECIPE_LENGTH = 2_048;
+const BLACK_HOLE_KINDS = new Set<CustomBlackHoleParameters["kind"]>([
+  "intermediate-mass",
+  "stellar-mass",
+  "supermassive",
+  "ultramassive",
+]);
 const PLANET_KINDS = new Set<CustomPlanetParameters["kind"]>(["gas-giant", "ice-giant", "rocky"]);
 const STAR_KINDS = new Set<CustomStarParameters["kind"]>([
   "binary",
@@ -28,6 +36,22 @@ const isNumberBetween = (value: unknown, minimum: number, maximum: number): valu
 const isName = (value: unknown): value is string => typeof value === "string" && value.length <= 32;
 
 const isUnit = (value: unknown): value is number => isNumberBetween(value, 0, 1);
+
+const isBlackHoleParameters = (value: unknown): value is CustomBlackHoleParameters => {
+  if (!isRecord(value)) return false;
+  return (
+    isUnit(value.diskActivity) &&
+    isNumberBetween(value.diskHueDegrees, 0, 360) &&
+    isNumberBetween(value.diskTiltDegrees, 0, 90) &&
+    isUnit(value.jetStrength) &&
+    typeof value.kind === "string" &&
+    BLACK_HOLE_KINDS.has(value.kind as CustomBlackHoleParameters["kind"]) &&
+    isUnit(value.mass) &&
+    isName(value.name) &&
+    Number.isInteger(value.seed) &&
+    isNumberBetween(value.seed, 0, 999_999)
+  );
+};
 
 const isPlanetParameters = (value: unknown): value is CustomPlanetParameters => {
   if (!isRecord(value)) return false;
@@ -91,6 +115,9 @@ const decodeRecipe = (value: string): CustomDestinationRecipe | null => {
   try {
     const recipe: unknown = JSON.parse(decodeBase64Url(value));
     if (!isRecord(recipe) || recipe.version !== WORLDGEN_VERSION) return null;
+    if (recipe.type === "black-hole" && isBlackHoleParameters(recipe.parameters)) {
+      return { parameters: recipe.parameters, type: "black-hole", version: WORLDGEN_VERSION };
+    }
     if (recipe.type === "planet" && isPlanetParameters(recipe.parameters)) {
       return {
         parameters: recipe.parameters,
@@ -112,6 +139,14 @@ export const customPlanetUrl = (parameters: CustomPlanetParameters): string =>
 
 export const customStarUrl = (parameters: CustomStarParameters): string =>
   `?customStar=${encodeRecipe({ parameters, type: "star", version: WORLDGEN_VERSION })}`;
+
+export const customBlackHoleUrl = (parameters: CustomBlackHoleParameters): string =>
+  `?customBlackHole=${encodeRecipe({ parameters, type: "black-hole", version: WORLDGEN_VERSION })}`;
+
+export const parseCustomBlackHoleUrl = (value: string): CustomBlackHoleParameters | null => {
+  const recipe = decodeRecipe(value);
+  return recipe?.type === "black-hole" ? recipe.parameters : null;
+};
 
 export const parseCustomPlanetUrl = (value: string): CustomPlanetParameters | null => {
   const recipe = decodeRecipe(value);

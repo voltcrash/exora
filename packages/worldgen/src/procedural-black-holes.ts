@@ -14,6 +14,22 @@ export interface ProceduralBlackHoleAtOptions {
   sequence: number;
 }
 
+export interface CustomBlackHoleParameters {
+  diskActivity: number;
+  diskHueDegrees: number;
+  diskTiltDegrees: number;
+  jetStrength: number;
+  kind: BlackHoleKind;
+  mass: number;
+  name: string;
+  seed: number;
+}
+
+export interface CustomBlackHole {
+  blackHole: BlackHoleProfile;
+  parameters: CustomBlackHoleParameters;
+}
+
 interface MassClass {
   kind: BlackHoleKind;
   maximum: number;
@@ -57,6 +73,11 @@ const roundedMass = (mass: number): number => {
   if (mass >= 1_000) return Math.round(mass);
   return Math.round(mass * 10) / 10;
 };
+
+const clamp = (value: number, minimum: number, maximum: number): number =>
+  Number.isFinite(value) ? Math.min(maximum, Math.max(minimum, value)) : minimum;
+
+const clampUnit = (value: number): number => clamp(value, 0, 1);
 
 const normalizedSeed = (seed: number): number => {
   if (!Number.isFinite(seed)) throw new RangeError("seed must be finite");
@@ -127,4 +148,59 @@ export const generateProceduralBlackHoles = ({
   return Array.from({ length: count }, (_, offset) =>
     generateProceduralBlackHole({ seed, sequence: offset + 1 }),
   );
+};
+
+export const generateCustomBlackHole = (parameters: CustomBlackHoleParameters): CustomBlackHole => {
+  const seed = normalizedSeed(parameters.seed);
+  const massClass = MASS_CLASSES.find(({ kind }) => kind === parameters.kind) ?? MASS_CLASSES[0]!;
+  const mass = clampUnit(parameters.mass);
+  const massSolar = roundedMass(
+    10 **
+      (Math.log10(massClass.minimum) +
+        mass * (Math.log10(massClass.maximum) - Math.log10(massClass.minimum))),
+  );
+  const diskActivity = clampUnit(parameters.diskActivity);
+  const name = parameters.name.trim() || "Untitled Black Hole";
+
+  return {
+    parameters,
+    blackHole: blackHoleProfileSchema.parse({
+      aliases: [],
+      catalogDesignation: `FORGE-BH-${seed.toString().padStart(6, "0")}`,
+      constellation: null,
+      distanceLightYears: null,
+      host: "Custom spacetime",
+      id: `custom-black-hole-${seed}`,
+      kind: massClass.kind,
+      massSolar,
+      massUncertaintySolar: null,
+      milestone: "World Forge gravitational visualization",
+      name,
+      observation: {
+        accretion: diskActivity > 0.68 ? "active" : diskActivity > 0.18 ? "quiet" : "dormant",
+        companion: null,
+        declinationDegrees: null,
+        redshift: null,
+        rightAscensionDegrees: null,
+        summary:
+          "A deterministic World Forge visualization. Its mass and appearance are user-defined parameters, not telescope measurements or an astronomical discovery.",
+      },
+      provenance: "procedural",
+      source: {
+        archive: "Exora Custom Generator",
+        catalog: "procedural",
+        measurement: "User-defined parameter; not a telescope measurement.",
+        retrievedOn: "2026-08-29",
+        title: "Exora World Forge black-hole generator",
+      },
+      status: "synthetic",
+      visual: {
+        diskActivity,
+        diskHueDegrees: clamp(parameters.diskHueDegrees, 0, 360),
+        diskTiltDegrees: clamp(parameters.diskTiltDegrees, 0, 90),
+        jetStrength: clampUnit(parameters.jetStrength),
+        seed,
+      },
+    }),
+  };
 };

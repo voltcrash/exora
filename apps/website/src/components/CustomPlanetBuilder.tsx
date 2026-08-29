@@ -1,7 +1,10 @@
 import {
+  generateCustomBlackHole,
   generateCustomStar,
   generateCustomWorld,
   WORLDGEN_VERSION,
+  type CustomBlackHole,
+  type CustomBlackHoleParameters,
   type CustomPlanetParameters,
   type CustomStar,
   type CustomStarParameters,
@@ -17,14 +20,15 @@ import { bindStyles } from "../styles/bind-styles.ts";
 
 const cx = bindStyles(sharedStyles, catalogStyles, builderStyles);
 
-type ForgeMode = "planet" | "star";
+export type ForgeMode = "black-hole" | "planet" | "star";
 
-const FORGE_MODES: readonly ForgeMode[] = ["planet", "star"];
+const FORGE_MODES: readonly ForgeMode[] = ["planet", "star", "black-hole"];
 
 interface WorldForgeProps {
   embedded?: boolean;
   initialMode: ForgeMode;
   onClose: () => void;
+  onGenerateBlackHole: (blackHole: CustomBlackHole) => void;
   onGeneratePlanet: (world: CustomWorld) => void;
   onGenerateStar: (star: CustomStar) => void;
 }
@@ -53,6 +57,25 @@ const initialStarParameters: CustomStarParameters = {
   seed: 42_017,
   temperatureKelvin: 5_772,
 };
+
+const initialBlackHoleParameters: CustomBlackHoleParameters = {
+  diskActivity: 0.72,
+  diskHueDegrees: 28,
+  diskTiltDegrees: 62,
+  jetStrength: 0.46,
+  kind: "supermassive",
+  mass: 0.48,
+  name: "Nyx",
+  seed: 88_021,
+};
+
+const BLACK_HOLE_MASS_RANGES: Record<CustomBlackHoleParameters["kind"], readonly [number, number]> =
+  {
+    "stellar-mass": [3, 100],
+    "intermediate-mass": [100, 100_000],
+    supermassive: [100_000, 10_000_000_000],
+    ultramassive: [10_000_000_000, 100_000_000_000],
+  };
 
 const toHex = (color: Rgb): string =>
   `#${color
@@ -126,10 +149,23 @@ const stellarColor = (temperatureKelvin: number): string => {
   return "#ff4b24";
 };
 
+const blackHoleMass = ({ kind, mass }: CustomBlackHoleParameters): number => {
+  const [minimum, maximum] = BLACK_HOLE_MASS_RANGES[kind];
+  return 10 ** (Math.log10(minimum) + mass * (Math.log10(maximum) - Math.log10(minimum)));
+};
+
+const blackHoleMassLabel = (parameters: CustomBlackHoleParameters): string => {
+  const mass = blackHoleMass(parameters);
+  if (mass >= 1_000_000_000) return `${(mass / 1_000_000_000).toFixed(1)} billion M☉`;
+  if (mass >= 1_000_000) return `${(mass / 1_000_000).toFixed(1)} million M☉`;
+  return `${Math.round(mass).toLocaleString()} M☉`;
+};
+
 export const WorldForge = ({
   embedded = false,
   initialMode,
   onClose,
+  onGenerateBlackHole,
   onGeneratePlanet,
   onGenerateStar,
 }: WorldForgeProps) => {
@@ -138,6 +174,7 @@ export const WorldForge = ({
   const [mode, setMode] = useState<ForgeMode>(initialMode);
   const [parameters, setParameters] = useState(initialParameters);
   const [starParameters, setStarParameters] = useState(initialStarParameters);
+  const [blackHoleParameters, setBlackHoleParameters] = useState(initialBlackHoleParameters);
 
   useEffect(() => {
     const dialog = dialogRef.current;
@@ -159,6 +196,11 @@ export const WorldForge = ({
     key: Key,
     value: CustomStarParameters[Key],
   ): void => setStarParameters((current) => ({ ...current, [key]: value }));
+
+  const updateBlackHole = <Key extends keyof CustomBlackHoleParameters>(
+    key: Key,
+    value: CustomBlackHoleParameters[Key],
+  ): void => setBlackHoleParameters((current) => ({ ...current, [key]: value }));
 
   const tabs = useTabList({
     label: "Object type",
@@ -196,7 +238,8 @@ export const WorldForge = ({
         onSubmit={(event) => {
           event.preventDefault();
           if (mode === "planet") onGeneratePlanet(generateCustomWorld(parameters));
-          else onGenerateStar(generateCustomStar(starParameters));
+          else if (mode === "star") onGenerateStar(generateCustomStar(starParameters));
+          else onGenerateBlackHole(generateCustomBlackHole(blackHoleParameters));
         }}
       >
         {!embedded ? (
@@ -239,6 +282,17 @@ export const WorldForge = ({
             <span>
               <small>STAR MAKER</small>
               <strong>IGNITE A STAR</strong>
+            </span>
+          </button>
+          <button
+            {...tabs.tabProps("black-hole")}
+            className={cx(mode === "black-hole" ? "active" : "")}
+            onClick={() => setMode("black-hole")}
+          >
+            <span className={cx("black-hole-symbol")} aria-hidden="true" />
+            <span>
+              <small>BLACK HOLE MAKER</small>
+              <strong>COLLAPSE SPACETIME</strong>
             </span>
           </button>
         </div>
@@ -367,7 +421,7 @@ export const WorldForge = ({
               />
             </section>
           </div>
-        ) : (
+        ) : mode === "star" ? (
           <div
             className={cx("builder-body star-builder-body")}
             data-style-role="builder-body"
@@ -464,6 +518,108 @@ export const WorldForge = ({
               />
             </section>
           </div>
+        ) : (
+          <div
+            className={cx("builder-body black-hole-builder-body")}
+            data-style-role="builder-body"
+            {...tabs.panelProps("black-hole")}
+          >
+            <section className={cx("builder-identity")} aria-label="Black hole identity">
+              <label>
+                <span>BLACK HOLE NAME</span>
+                <input
+                  ref={nameRef}
+                  type="text"
+                  maxLength={32}
+                  value={blackHoleParameters.name}
+                  onChange={(event) => updateBlackHole("name", event.currentTarget.value)}
+                />
+              </label>
+              <label>
+                <span>MASS CLASS</span>
+                <select
+                  value={blackHoleParameters.kind}
+                  onChange={(event) =>
+                    updateBlackHole(
+                      "kind",
+                      event.currentTarget.value as CustomBlackHoleParameters["kind"],
+                    )
+                  }
+                >
+                  <option value="stellar-mass">Stellar mass</option>
+                  <option value="intermediate-mass">Intermediate mass</option>
+                  <option value="supermassive">Supermassive</option>
+                  <option value="ultramassive">Ultramassive</option>
+                </select>
+              </label>
+              <div className={cx("black-hole-preview")} aria-label="Derived black hole mass">
+                <span className={cx("preview-black-hole")} aria-hidden="true" />
+                <span>
+                  <small>EVENT HORIZON CLASS</small>
+                  <strong>{blackHoleMassLabel(blackHoleParameters)}</strong>
+                </span>
+              </div>
+              <label>
+                <span>GENERATION SEED</span>
+                <span className={cx("seed-input")}>
+                  <input
+                    type="number"
+                    min={0}
+                    max={999999}
+                    value={blackHoleParameters.seed}
+                    onChange={(event) =>
+                      updateBlackHole("seed", event.currentTarget.valueAsNumber || 0)
+                    }
+                  />
+                  <button
+                    type="button"
+                    onClick={() => updateBlackHole("seed", Math.floor(Math.random() * 1_000_000))}
+                  >
+                    RANDOMIZE
+                  </button>
+                </span>
+              </label>
+            </section>
+
+            <section className={cx("builder-parameters")} aria-label="Black hole parameters">
+              <RangeControl
+                label="Mass"
+                value={blackHoleParameters.mass}
+                valueLabel={blackHoleMassLabel(blackHoleParameters)}
+                onChange={(value) => updateBlackHole("mass", value)}
+              />
+              <RangeControl
+                label="Accretion disk activity"
+                value={blackHoleParameters.diskActivity}
+                valueLabel={percentage(blackHoleParameters.diskActivity)}
+                onChange={(value) => updateBlackHole("diskActivity", value)}
+              />
+              <RangeControl
+                label="Accretion disk hue"
+                min={0}
+                max={360}
+                step={1}
+                value={blackHoleParameters.diskHueDegrees}
+                valueLabel={`${blackHoleParameters.diskHueDegrees}°`}
+                onChange={(value) => updateBlackHole("diskHueDegrees", value)}
+              />
+              <RangeControl
+                label="Disk inclination"
+                min={0}
+                max={90}
+                step={1}
+                value={blackHoleParameters.diskTiltDegrees}
+                valueLabel={`${blackHoleParameters.diskTiltDegrees}°`}
+                onChange={(value) => updateBlackHole("diskTiltDegrees", value)}
+              />
+              <RangeControl
+                label="Relativistic jet strength"
+                value={blackHoleParameters.jetStrength}
+                valueLabel={percentage(blackHoleParameters.jetStrength)}
+                onChange={(value) => updateBlackHole("jetStrength", value)}
+              />
+            </section>
+          </div>
         )}
 
         <footer className={cx("builder-footer")}>
@@ -475,7 +631,9 @@ export const WorldForge = ({
             <span className={cx("button-orbit")} aria-hidden="true" />
             <span>
               <small>COMPILE PARAMETERS</small>
-              <strong>GENERATE {mode === "planet" ? "PLANET" : "STAR"}</strong>
+              <strong>
+                GENERATE {mode === "planet" ? "PLANET" : mode === "star" ? "STAR" : "BLACK HOLE"}
+              </strong>
             </span>
             <span aria-hidden="true">↗</span>
           </button>

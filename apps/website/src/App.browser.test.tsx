@@ -835,6 +835,26 @@ desktopTest("the World Forge opens and builds a world the page then shows", asyn
   expect(window.location.search).toContain("custom=");
 });
 
+desktopTest("the World Forge builds a black hole with a reloadable recipe", async () => {
+  stubArchive();
+  mountApp();
+
+  await openDiscoverSection("World Forge");
+  await userEvent.click(page.getByRole("tab", { name: /COLLAPSE SPACETIME/i }));
+  await userEvent.fill(page.getByLabelText("BLACK HOLE NAME"), "Umbra Prime");
+  await userEvent.click(page.getByRole("button", { name: /GENERATE BLACK HOLE/i }));
+
+  await expect.element(page.getByRole("heading", { level: 1 })).toHaveTextContent("Umbra Prime");
+  const sharedSearch = window.location.search;
+  expect(sharedSearch).toMatch(/^\?customBlackHole=[A-Za-z0-9_-]+$/);
+  await expect.element(page.getByLabelText(/Procedural visualization/i)).toBeVisible();
+
+  remountAppAtCurrentUrl();
+
+  await expect.element(page.getByRole("heading", { level: 1 })).toHaveTextContent("Umbra Prime");
+  expect(window.location.search).toBe(sharedSearch);
+});
+
 desktopTest("a generated world survives a reload and its URL opens as a deep link", async () => {
   stubArchive();
   mountApp();

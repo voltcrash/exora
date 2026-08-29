@@ -1,5 +1,8 @@
 import { expect, test } from "vite-plus/test";
-import { generateProceduralBlackHoles } from "../src/procedural-black-holes.ts";
+import {
+  generateCustomBlackHole,
+  generateProceduralBlackHoles,
+} from "../src/procedural-black-holes.ts";
 
 test("the same seed always produces identical black-hole profiles", () => {
   expect(generateProceduralBlackHoles({ count: 12, seed: 42 })).toEqual(
@@ -45,4 +48,33 @@ test("a larger count preserves the deterministic prefix", () => {
   expect(generateProceduralBlackHoles({ count: 5, seed: 7 })).toEqual(
     generateProceduralBlackHoles({ count: 10, seed: 7 }).slice(0, 5),
   );
+});
+
+test("World Forge parameters produce a named black hole with the requested appearance", () => {
+  const generated = generateCustomBlackHole({
+    diskActivity: 0.82,
+    diskHueDegrees: 214,
+    diskTiltDegrees: 38,
+    jetStrength: 0.67,
+    kind: "intermediate-mass",
+    mass: 0.5,
+    name: "  Janus  ",
+    seed: 7319,
+  });
+
+  expect(generated.blackHole).toMatchObject({
+    id: "custom-black-hole-7319",
+    kind: "intermediate-mass",
+    massSolar: 3162,
+    name: "Janus",
+    provenance: "procedural",
+    status: "synthetic",
+    visual: {
+      diskActivity: 0.82,
+      diskHueDegrees: 214,
+      diskTiltDegrees: 38,
+      jetStrength: 0.67,
+      seed: 7319,
+    },
+  });
 });
