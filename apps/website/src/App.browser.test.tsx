@@ -362,6 +362,7 @@ beforeEach(() => {
 });
 
 afterEach(() => {
+  document.documentElement.style.removeProperty("font-family");
   root?.unmount();
   container?.remove();
   root = null;
@@ -561,6 +562,23 @@ test("the black-hole atlas opens and travels to a sourced horizon", async () => 
   expect(title).not.toBeNull();
   expect(title?.scrollWidth).toBeLessThanOrEqual(title?.clientWidth ?? 0);
   expect(window.location.search).toBe("?blackHole=Sagittarius%20A*");
+});
+
+/*
+ * Exora asks for its webfont a second after the first paint, so a visitor's first read of a name is
+ * in whatever sans their platform supplies — and the widest of those are wide enough to hang a long
+ * catalogue word out of the column that holds it. Naming that font keeps this a measurement of the
+ * layout rather than of whichever fonts the machine running the suite happens to install.
+ */
+test("a long destination name stays inside its column before the webfont arrives", async () => {
+  stubArchive();
+  document.documentElement.style.fontFamily = "Verdana, DejaVu Sans, sans-serif";
+  mountApp("?blackHole=Sagittarius%20A*");
+
+  await expect.element(page.getByRole("heading", { level: 1 })).toHaveTextContent("Sagittarius A*");
+  const title = document.querySelector<HTMLElement>("#black-hole-name");
+  expect(title).not.toBeNull();
+  expect(title?.scrollWidth).toBeLessThanOrEqual(title?.clientWidth ?? 0);
 });
 
 test("the Home System catalog opens the Oort Cloud with an explicit inferred-model warning", async () => {

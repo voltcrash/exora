@@ -86,10 +86,13 @@
 }
 
 .identity-name {
+  /* The size the design asks for; `--identity-name-fit` is what the measured heading settles on. */
+  --identity-name-size: clamp(46px, 5vw, 76px);
+
   max-width: 100%;
   margin: 0;
   color: var(--ink);
-  font-size: clamp(46px, 5vw, 76px);
+  font-size: calc(var(--identity-name-size) * var(--identity-name-fit, 1));
   font-weight: 400;
   line-height: 0.92;
   letter-spacing: -0.07em;
@@ -702,7 +705,7 @@
   }
 
   .identity-name {
-    font-size: clamp(40px, 4.4vw, 62px);
+    --identity-name-size: clamp(40px, 4.4vw, 62px);
   }
 }
 
