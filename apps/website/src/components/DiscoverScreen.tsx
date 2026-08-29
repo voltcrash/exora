@@ -118,7 +118,7 @@ const sectionCopy: Record<DiscoverSection, { eyebrow: string; title: string; sum
   stars: {
     eyebrow: "SIMBAD STELLAR ARCHIVE",
     title: "Follow the light.",
-    summary: "Search the stellar catalog, browse distinct families, or take a surprise jump.",
+    summary: "Search the stellar catalog or browse distinct stellar families.",
   },
   "black-holes": {
     eyebrow: "NASA / EHT / ESA COMPACT OBJECT ATLAS",

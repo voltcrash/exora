@@ -278,30 +278,37 @@ export const StarCatalog = ({ embedded = false, onClose, onSelect }: StarCatalog
             </button>
           </div>
         ) : null}
-        <button
-          className={cx("surprise-journey")}
-          type="button"
-          disabled={surpriseState === "loading"}
-          onClick={takeMeSomewhere}
-        >
-          <span className={cx("surprise-symbol")} aria-hidden="true">
+        <div className={cx("catalog-search")}>
+          <span className={cx("star-search-mark")} aria-hidden="true">
             ✦
           </span>
-          <span className={cx("surprise-copy")}>
-            <small>TAKE ME SOMEWHERE</small>
-            <strong>
-              {surpriseState === "loading"
-                ? "Plotting a surprise course…"
-                : surpriseState === "error"
-                  ? "Signal lost — try another jump"
-                  : "Jump to a random stellar destination"}
-            </strong>
-          </span>
-          <span className={cx("surprise-action")}>
-            {surpriseState === "loading" ? "SCANNING" : "SURPRISE ME"}{" "}
-            <span aria-hidden="true">↗</span>
-          </span>
-        </button>
+          <input
+            ref={inputRef}
+            type="search"
+            value={query}
+            onChange={(event) => {
+              setActiveCategory(null);
+              setQuery(event.target.value);
+            }}
+            placeholder="Type a common name or catalog ID — misspellings are okay"
+            autoComplete="off"
+            minLength={1}
+            aria-autocomplete="list"
+            aria-controls="star-search-results"
+            aria-describedby="star-catalog-status"
+          />
+          <button
+            className={cx("random-world")}
+            type="button"
+            disabled={surpriseState === "loading"}
+            aria-busy={surpriseState === "loading"}
+            title={surpriseState === "error" ? "Signal lost — try again" : undefined}
+            onClick={takeMeSomewhere}
+          >
+            <span aria-hidden="true">✦</span>
+            Random world
+          </button>
+        </div>
         {!embedded ? (
           <div className={cx("discovery-intro")}>
             <span>
@@ -372,30 +379,6 @@ export const StarCatalog = ({ embedded = false, onClose, onSelect }: StarCatalog
             ))}
           </div>
         )}
-        <div className={cx("discovery-divider")}>
-          <span>OR SEARCH BY NAME</span>
-        </div>
-        <div className={cx("catalog-search")}>
-          <span className={cx("star-search-mark")} aria-hidden="true">
-            ✦
-          </span>
-          <input
-            ref={inputRef}
-            type="search"
-            value={query}
-            onChange={(event) => {
-              setActiveCategory(null);
-              setQuery(event.target.value);
-            }}
-            placeholder="Type a common name or catalog ID — misspellings are okay"
-            autoComplete="off"
-            minLength={1}
-            aria-autocomplete="list"
-            aria-controls="star-search-results"
-            aria-describedby="star-catalog-status"
-          />
-          <span className={cx("search-key")}>ESC</span>
-        </div>
         <div className={cx("catalog-meta")}>
           <p id="star-catalog-status" role="status">
             {status}

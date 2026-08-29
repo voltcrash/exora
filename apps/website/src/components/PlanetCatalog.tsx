@@ -188,7 +188,7 @@ export const PlanetCatalog = ({ embedded = false, onClose, onSelect }: PlanetCat
 
   useEffect(() => {
     const normalizedQuery = query.trim();
-    if (portalView === "filters") {
+    if (portalView === "filters" && normalizedQuery.length < 1) {
       setSuggestion(null);
       const controller = new AbortController();
       setSearchState("loading");
@@ -334,10 +334,10 @@ export const PlanetCatalog = ({ embedded = false, onClose, onSelect }: PlanetCat
     searchState === "idle"
       ? "Loading the alphabetical planet catalog…"
       : searchState === "loading"
-        ? portalView === "filters"
-          ? "Calibrating the physical planet field…"
-          : query.trim()
-            ? `Scanning NASA archive for “${query.trim()}”…`
+        ? query.trim()
+          ? `Scanning NASA archive for “${query.trim()}”…`
+          : portalView === "filters"
+            ? "Calibrating the physical planet field…"
             : activeLabel
               ? `Opening ${activeLabel}…`
               : "Loading the alphabetical planet catalog…"
@@ -383,30 +383,35 @@ export const PlanetCatalog = ({ embedded = false, onClose, onSelect }: PlanetCat
             </button>
           </div>
         ) : null}
-        <button
-          className={cx("surprise-journey")}
-          type="button"
-          disabled={surpriseState === "loading"}
-          onClick={takeMeSomewhere}
-        >
-          <span className={cx("surprise-symbol")} aria-hidden="true">
-            ✦
-          </span>
-          <span className={cx("surprise-copy")}>
-            <small>TAKE ME SOMEWHERE</small>
-            <strong>
-              {surpriseState === "loading"
-                ? "Plotting a surprise course…"
-                : surpriseState === "error"
-                  ? "Signal lost — try another jump"
-                  : "Jump to a random confirmed world"}
-            </strong>
-          </span>
-          <span className={cx("surprise-action")}>
-            {surpriseState === "loading" ? "SCANNING" : "SURPRISE ME"}{" "}
-            <span aria-hidden="true">↗</span>
-          </span>
-        </button>
+        <div className={cx("catalog-search")}>
+          <span className={cx("search-reticle")} aria-hidden="true" />
+          <input
+            ref={inputRef}
+            type="search"
+            value={query}
+            onChange={(event) => {
+              setActiveCategory(null);
+              setQuery(event.target.value);
+            }}
+            placeholder="Type a name or catalog ID — misspellings are okay"
+            autoComplete="off"
+            minLength={1}
+            aria-autocomplete="list"
+            aria-controls="planet-search-results"
+            aria-describedby="catalog-status"
+          />
+          <button
+            className={cx("random-world")}
+            type="button"
+            disabled={surpriseState === "loading"}
+            aria-busy={surpriseState === "loading"}
+            title={surpriseState === "error" ? "Signal lost — try again" : undefined}
+            onClick={takeMeSomewhere}
+          >
+            <span aria-hidden="true">✦</span>
+            Random world
+          </button>
+        </div>
         {!embedded ? (
           <div className={cx("discovery-intro")}>
             <span>
@@ -564,30 +569,6 @@ export const PlanetCatalog = ({ embedded = false, onClose, onSelect }: PlanetCat
             </div>
           </section>
         )}
-        <div className={cx("discovery-divider")}>
-          <span>{portalView === "filters" ? "VISIBLE PLANET FIELD" : "OR SEARCH BY NAME"}</span>
-        </div>
-        {portalView !== "filters" ? (
-          <div className={cx("catalog-search")}>
-            <span className={cx("search-reticle")} aria-hidden="true" />
-            <input
-              ref={inputRef}
-              type="search"
-              value={query}
-              onChange={(event) => {
-                setActiveCategory(null);
-                setQuery(event.target.value);
-              }}
-              placeholder="Type a name or catalog ID — misspellings are okay"
-              autoComplete="off"
-              minLength={1}
-              aria-autocomplete="list"
-              aria-controls="planet-search-results"
-              aria-describedby="catalog-status"
-            />
-            <span className={cx("search-key")}>ESC</span>
-          </div>
-        ) : null}
         <div className={cx("catalog-meta")}>
           <p id="catalog-status" role="status">
             {status}

@@ -72,6 +72,21 @@ test("embedded destinations omit their duplicate catalog intro panels", () => {
   expect(discoverMarkup("black-holes")).not.toContain("THE HORIZON FIVE");
 });
 
+test("search leads every searchable discovery view and contains the random action", () => {
+  for (const section of ["worlds", "stars"] as const) {
+    const markup = discoverMarkup(section);
+    const searchPosition = markup.indexOf('type="search"');
+    const tabsPosition = markup.indexOf('role="tablist"');
+
+    expect(searchPosition).toBeGreaterThan(-1);
+    expect(searchPosition).toBeLessThan(tabsPosition);
+    expect(markup.match(/type="search"/g)).toHaveLength(1);
+    expect(markup).toContain("Random world");
+    expect(markup).not.toContain("Jump to a random");
+    expect(markup).not.toContain("SURPRISE ME");
+  }
+});
+
 test("an embedded catalog becomes a named region inside the full-screen dialog", () => {
   const markup = discoverMarkup("worlds");
 

@@ -1117,7 +1117,7 @@ desktopTest("Discover resets its scroll position when changing sections", async 
   mountApp();
   await expect.element(page.getByRole("heading", { level: 1 })).toBeVisible();
 
-  await openDiscoverSection("Exoplanets");
+  await openDiscoverSection("Solar System");
   const discoverStage = document.querySelector<HTMLElement>('[data-testid="discover-stage"]')!;
   discoverStage.scrollTop = 500;
   expect(discoverStage.scrollTop).toBeGreaterThan(0);
