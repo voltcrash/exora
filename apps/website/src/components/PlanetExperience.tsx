@@ -2,19 +2,28 @@ import type { ExoplanetProfile, StarProfile } from "@exora/contracts";
 import { deriveWorldRecipe, WORLDGEN_VERSION, type WorldRecipe } from "@exora/worldgen";
 import { useEffect, useMemo, useRef, useState, type CSSProperties } from "react";
 import type { PlanetLoadResult } from "../api-client.ts";
+import {
+  present,
+  presentTabs,
+  type DestinationPanelModel,
+  type PanelBody,
+  type PanelFact,
+  type PanelMetric,
+} from "../destination-panel.ts";
 import { warmDestinations } from "../destination-cache.ts";
 import type { ViewMode } from "../planet-scene.ts";
 import { formatMeasurement, formatNumber, formatPlanetName } from "../planet-utils.tsx";
 import type { PlanetarySubsystem } from "../planetary-subsystems.ts";
 import type { SceneHost, XrStatus } from "../scene-host.ts";
 import { SURFACE_TRANSITION_MS, type TravelPhase } from "../travel-transition.ts";
-import { FrameRateSignal } from "./FrameRateSignal.tsx";
+import { DestinationIdentity } from "./DestinationIdentity.tsx";
+import { DestinationPanel } from "./DestinationPanel.tsx";
 import { MissionControl } from "./MissionControl.tsx";
-import { MobileSheet } from "./MobileSheet.tsx";
 import sharedStyles from "./ExperienceShared.module.css";
+import hudStyles from "./DestinationHud.module.css";
 import { bindStyles } from "../styles/bind-styles.ts";
 
-const cx = bindStyles(sharedStyles);
+const cx = bindStyles(sharedStyles, hudStyles);
 
 interface PlanetExperienceProps {
   chromeHidden: boolean;
@@ -29,6 +38,92 @@ interface PlanetExperienceProps {
   result: PlanetLoadResult;
   travelPhase: TravelPhase;
 }
+
+const visualNote = ({
+  custom,
+  isMoon,
+  solar,
+  solarIdentity,
+  subsystemActive,
+}: {
+  custom: boolean;
+  isMoon: boolean;
+  solar: boolean;
+  solarIdentity: ExoplanetProfile["solarSystem"];
+  subsystemActive: boolean;
+}): string => {
+  if (subsystemActive) {
+    return "JPL MEAN ORBITS · LOG-COMPRESSED DISTANCE · BODY SIZES EXAGGERATED";
+  }
+  if (custom) return `SHAREABLE URL RECIPE · WORLDGEN V${WORLDGEN_VERSION}`;
+  if (!solar) return "PLAUSIBLE VISUALIZATION FROM OBSERVED DATA";
+  if (solarIdentity?.surfaceStatus === "unresolved") {
+    return "UNRESOLVED SURFACE · PHYSICALLY CONSTRAINED NEUTRAL VISUALIZATION";
+  }
+  if (solarIdentity?.surfaceStatus === "modeled") {
+    return "MEASURED PROPORTIONS · UNRESOLVED NEUTRAL SURFACE";
+  }
+  if (solarIdentity?.texture?.topography) {
+    return "DAWN GLOBAL MOSAIC + MEASURED TOPOGRAPHY · EXORA LIGHTING";
+  }
+  if (solarIdentity?.texture) {
+    return isMoon
+      ? "NASA MISSION MOSAIC · MEASURED ROTATION + EXORA LIGHTING"
+      : "SPACECRAFT GLOBAL MOSAIC · EXORA ATMOSPHERE + LIGHTING";
+  }
+  return "KNOWN PLANET · PHYSICALLY TUNED ATMOSPHERIC VISUALIZATION";
+};
+
+const subsystemLayers = (subsystem: PlanetarySubsystem): readonly PanelBody[] => [
+  ...subsystem.rings.map((ring) => ({
+    id: `ring-${ring.name}`,
+    kind: "marker",
+    meta: "MEASURED BOUNDARIES",
+    name: ring.name,
+  })),
+  ...subsystem.lagrangePoints.map((point) => ({
+    id: `lagrange-${point.reference}-${point.label}`,
+    kind: "marker",
+    meta: `${point.reference} · DERIVED MARKER`,
+    name: point.label,
+  })),
+  ...(subsystem.magnetosphere
+    ? [
+        {
+          id: "magnetosphere",
+          kind: "marker",
+          meta: `${subsystem.magnetosphere.evidence} BOUNDARY`,
+          name: "Magnetosphere",
+        },
+      ]
+    : []),
+  ...(subsystem.aurora
+    ? [
+        {
+          id: "aurora",
+          kind: "marker",
+          meta: `${subsystem.aurora.evidence} LATITUDE · SIMULATED BRIGHTNESS`,
+          name: "Auroral regions",
+        },
+      ]
+    : []),
+  ...(subsystem.torus
+    ? [
+        {
+          id: "torus",
+          kind: "marker",
+          meta: `${subsystem.torus.evidence} STRUCTURE · SIMULATED DENSITY`,
+          name: `${subsystem.torus.moon} plasma torus`,
+        },
+      ]
+    : []),
+  ...subsystem.plumes.map((plume) => ({
+    id: `plume-${plume.moon}`,
+    kind: "marker",
+    meta: `${plume.evidence} EVIDENCE · SIMULATED PARTICLES`,
+    name: `${plume.moon} plume`,
+  })),
+];
 
 export const PlanetExperience = ({
   chromeHidden,
@@ -51,7 +146,6 @@ export const PlanetExperience = ({
   const [xrStatus, setXrStatus] = useState<XrStatus>("checking");
   const [hostJumpState, setHostJumpState] = useState<"idle" | "loading" | "error">("idle");
   const [systemJumpState, setSystemJumpState] = useState<"idle" | "loading" | "error">("idle");
-  const [orbitMenuOpen, setOrbitMenuOpen] = useState(false);
   const [findSolarWorld, setFindSolarWorld] = useState<
     ((name: string) => ExoplanetProfile | null) | null
   >(null);
@@ -59,6 +153,7 @@ export const PlanetExperience = ({
   const findSolarWorldRef = useRef<((name: string) => ExoplanetProfile | null) | null>(null);
   findSolarWorldRef.current = findSolarWorld;
   const planet = result.planet;
+  const custom = result.mode === "custom";
   const solar = result.mode === "solar";
   const solarIdentity = planet.solarSystem;
   const subsystemActive = sceneMode === "subsystem" && subsystem !== null;
@@ -94,7 +189,7 @@ export const PlanetExperience = ({
   const settled = sceneState !== "loading" || travelPhase !== "idle";
 
   const openHostStar = async (): Promise<void> => {
-    if (result.mode === "custom" || hostJumpRef.current) return;
+    if (custom || hostJumpRef.current) return;
     hostJumpRef.current = true;
     setHostJumpState("loading");
     host?.beginTravel();
@@ -107,7 +202,7 @@ export const PlanetExperience = ({
   };
 
   const openHostSystem = async (): Promise<void> => {
-    if (result.mode === "custom" || systemJumpState === "loading") return;
+    if (custom || systemJumpState === "loading") return;
     setSystemJumpState("loading");
     host?.beginTravel();
     const found = await onSelectSystem(planet.hostStar).catch(() => false);
@@ -116,8 +211,8 @@ export const PlanetExperience = ({
   };
 
   useEffect(() => {
-    if (result.mode !== "custom") warmDestinations(planet.hostStar);
-  }, [planet.hostStar, result.mode]);
+    if (!custom) warmDestinations(planet.hostStar);
+  }, [custom, planet.hostStar]);
 
   useEffect(() => host?.onXrStatus(setXrStatus), [host]);
 
@@ -159,7 +254,7 @@ export const PlanetExperience = ({
               planet,
               recipe,
               onViewModeChange: setViewMode,
-              ...(result.mode === "custom" ? {} : { onSelectHostStar: () => void openHostStar() }),
+              ...(custom ? {} : { onSelectHostStar: () => void openHostStar() }),
               onFirstFrame: () => {
                 if (!abandoned) setSceneState("ready");
               },
@@ -176,6 +271,7 @@ export const PlanetExperience = ({
       abandoned = true;
     };
   }, [
+    custom,
     host,
     onSelectHostStar,
     onSelectPlanet,
@@ -183,7 +279,6 @@ export const PlanetExperience = ({
     onSelectSystem,
     planet,
     recipe,
-    result.mode,
     subsystem,
     subsystemActive,
   ]);
@@ -219,10 +314,250 @@ export const PlanetExperience = ({
     : (observation.radiusEarth ?? observation.radiusJupiter);
   const localOrbitKilometers = solarIdentity?.orbitalSemiMajorAxisKilometers ?? null;
 
+  const primaryBody = isMoon ? (solarIdentity.parent ?? null) : null;
+
   const openPrimaryBody = (): void => {
     if (!isMoon || !solarIdentity.parent) return;
     const primary = findSolarWorld?.(solarIdentity.parent);
     if (primary) onSelectPlanet(primary, true);
+  };
+
+  const hostSpectrum = [
+    observation.hostSpectralType ?? "Spectrum unavailable",
+    observation.hostTemperatureKelvin === null
+      ? null
+      : `${formatNumber(observation.hostTemperatureKelvin, 0)} K`,
+    observation.hostRadiusSolar === null
+      ? null
+      : `${formatNumber(observation.hostRadiusSolar, 2)} R☉`,
+  ]
+    .filter(Boolean)
+    .join(" · ");
+
+  const worldMetrics: readonly PanelMetric[] = [
+    { label: "Mass", unit: massUnit, value: formatMeasurement(massValue) },
+    { label: "Radius", unit: radiusUnit, value: formatMeasurement(radiusValue) },
+    {
+      label: "Orbit",
+      unit: localOrbitKilometers === null ? "AU" : "KM",
+      value: formatMeasurement(localOrbitKilometers ?? observation.semiMajorAxisAu, 1),
+    },
+    solarIdentity
+      ? {
+          label: "Period",
+          unit: "DAYS",
+          value: formatMeasurement(solarIdentity.orbitalPeriodDays ?? null, 2),
+        }
+      : { label: "Distance", unit: "PC", value: formatMeasurement(observation.distanceParsecs, 1) },
+  ];
+
+  const subsystemMetrics: readonly PanelMetric[] = subsystem
+    ? [
+        { label: "Moons", value: subsystem.moons.length.toString() },
+        { label: "Ring layers", value: subsystem.rings.length.toString() },
+        { label: "Resonances", value: subsystem.resonances.length.toString() },
+        { label: "Fields", value: subsystemLayers(subsystem).length.toString() },
+      ]
+    : [];
+
+  const worldFacts: readonly PanelFact[] = present<PanelFact>([
+    {
+      detail: `Exora inference · ${recipe.confidence} confidence`,
+      label: "Atmosphere model",
+      tone: "accent",
+      value: recipe.atmosphere.label.split(" · ")[0],
+    },
+    !custom && {
+      detail: hostSpectrum,
+      label: "Host spectrum",
+      value: observation.hostSpectralType ?? "Not reported",
+    },
+    custom && {
+      detail: "The generated URL carries this recipe, so the same world rebuilds from the link.",
+      label: "Shareable recipe",
+      value: `Worldgen v${WORLDGEN_VERSION}`,
+    },
+    primaryBody
+      ? {
+          detail: `NAIF ${String(solarIdentity?.naifId ?? 0)} · direct parent ${primaryBody}`,
+          label: `Orbit around ${primaryBody}`,
+          value: `${formatNumber(solarIdentity?.orbitalPeriodDays ?? null, 3)} day sidereal`,
+        }
+      : null,
+    solarIdentity
+      ? {
+          ...(solarIdentity.spkId ? { detail: `NAIF ${String(solarIdentity.naifId)}` } : {}),
+          label: "Permanent identifier",
+          value: solarIdentity.spkId
+            ? `SPK ${solarIdentity.spkId}`
+            : `NAIF ${String(solarIdentity.naifId)}`,
+        }
+      : null,
+  ]);
+
+  const panel: DestinationPanelModel = {
+    footer: `${planet.source.archive} · ${planet.source.table} · ${planet.source.retrievedOn}`,
+    label: custom ? "Custom planet data" : "Observed planet data",
+    links: present([
+      subsystem && {
+        action: subsystemActive ? "RETURN TO WORLD" : "EXPLORE MOONS + FIELDS ↗",
+        glyph: subsystemActive ? "◉" : "⌾",
+        id: "subsystem",
+        onSelect: () => setSceneMode(subsystemActive ? "world" : "subsystem"),
+        pressed: subsystemActive,
+        title: subsystemActive ? `${planet.name} close view` : `${planet.name} system`,
+        tone: "cyan" as const,
+      },
+      !custom &&
+        !subsystemActive && {
+          action: hostJumpState === "loading" ? "RESOLVING…" : "VISIT STAR ↗",
+          disabled: hostJumpState === "loading",
+          ...(hostJumpState === "error"
+            ? { error: "SIMBAD could not resolve this host name." }
+            : {}),
+          glyph: "☀",
+          id: "host-star",
+          onSelect: () => void openHostStar(),
+          title: planet.hostStar,
+        },
+      !custom &&
+        !subsystemActive && {
+          action: systemJumpState === "loading" ? "PLACING ORBITS…" : "VIEW EVERY ORBIT ↗",
+          disabled: systemJumpState === "loading",
+          ...(systemJumpState === "error"
+            ? { error: "The archive links no placeable orbits to this host." }
+            : {}),
+          glyph: "◎",
+          id: "whole-system",
+          onSelect: () => void openHostSystem(),
+          title: "Whole system",
+        },
+      primaryBody && !subsystemActive
+        ? {
+            action: "VISIT PRIMARY ↗",
+            glyph: "◉",
+            id: "primary-body",
+            onSelect: openPrimaryBody,
+            title: primaryBody,
+          }
+        : null,
+    ]),
+    metrics: subsystemActive ? subsystemMetrics : worldMetrics,
+    source: custom ? "WORLD FORGE" : solar ? "NASA/JPL" : "NASA ARCHIVE",
+    tabs:
+      subsystemActive && subsystem
+        ? presentTabs([
+            {
+              blocks: [
+                {
+                  bodies: subsystem.moons.map((moon) => {
+                    const destination = findSolarWorld?.(moon.name);
+                    return {
+                      id: String(moon.naifId),
+                      meta: `NAIF ${String(moon.naifId)} · ${formatNumber(moon.orbitalSemiMajorAxisKilometers, 0)} km · ${moon.retrograde ? "retrograde" : "prograde"} · i ${String(moon.inclinationDegrees)}°`,
+                      name: moon.name,
+                      ...(destination
+                        ? { onSelect: () => onSelectPlanet(destination, true) }
+                        : { status: "UNRESOLVED" }),
+                    };
+                  }),
+                  label: "SELECTED MOONS · JPL MEAN ELEMENTS",
+                  type: "bodies",
+                },
+              ],
+              count: subsystem.moons.length,
+              id: "moons",
+              label: "Moons",
+            },
+            {
+              blocks: [
+                {
+                  bodies: subsystemLayers(subsystem),
+                  label: "VISIBLE SYSTEM LAYERS",
+                  type: "bodies",
+                },
+              ],
+              id: "layers",
+              label: "Layers",
+            },
+            {
+              blocks: [
+                {
+                  facts: subsystem.resonances.map((resonance) => ({
+                    detail: resonance.note,
+                    label: resonance.ratio,
+                    value: resonance.bodies.join(" · "),
+                  })),
+                  type: "facts",
+                },
+                subsystem.resonances.length === 0 && {
+                  text: "No principal resonance authored for this view.",
+                  type: "status" as const,
+                },
+              ].filter(Boolean) as never,
+              count: subsystem.resonances.length,
+              id: "resonances",
+              label: "Resonances",
+            },
+            {
+              blocks: [
+                {
+                  facts: [
+                    {
+                      detail:
+                        "JPL mean elements preserve parent-relative distance, inclination, period, and retrograde direction.",
+                      label: "Orbit evidence",
+                      tone: "cyan" as const,
+                      value: "Measured",
+                    },
+                    {
+                      detail:
+                        "Field boundaries, auroral brightness, plasma density, and plume particles are explanatory visualizations.",
+                      label: "Transient layers",
+                      tone: "accent" as const,
+                      value: "Simulated",
+                    },
+                    {
+                      detail: "Neutral silhouettes only; no surface geography has been invented.",
+                      label: "Minor moons",
+                      value: "Unresolved surfaces",
+                    },
+                  ],
+                  type: "facts",
+                },
+              ],
+              id: "evidence",
+              label: "Evidence",
+            },
+          ])
+        : presentTabs([
+            { blocks: [{ facts: worldFacts, type: "facts" }], id: "record", label: "Record" },
+            solarIdentity?.surfaceNote
+              ? {
+                  blocks: [
+                    {
+                      facts: [
+                        {
+                          detail: solarIdentity.surfaceNote,
+                          label: "Surface evidence",
+                          value: solarIdentity.surfaceStatus ?? "Unresolved",
+                        },
+                      ],
+                      type: "facts",
+                    },
+                  ],
+                  id: "evidence",
+                  label: "Evidence",
+                }
+              : null,
+          ]),
+    title: subsystemActive
+      ? "Subsystem layout"
+      : custom
+        ? "Chosen properties"
+        : solar
+          ? "Planetary parameters"
+          : "Observed properties",
   };
 
   return (
@@ -247,429 +582,28 @@ export const PlanetExperience = ({
       </header>
 
       <main className={cx("hud")} data-testid="hud">
-        <section
-          className={cx("world-intro")}
-          data-testid="world-intro"
-          aria-labelledby="world-name"
-        >
-          <p className={cx("eyebrow")}>
-            <span>
-              {result.mode === "custom"
-                ? "GENERATED WORLD"
-                : solar
-                  ? "SOLAR SYSTEM WORLD"
-                  : "CONFIRMED WORLD"}
-            </span>
-            <span>{solar ? planet.solarSystem?.bodyType : planet.kind.replace("-", " ")}</span>
-          </p>
-          <h1 id="world-name">{formatPlanetName(planet.name)}</h1>
-          <div className={cx("world-tags")} aria-label="World classification">
-            <span>{recipe.classification}</span>
-            <span>
-              {observation.equilibriumTemperatureKelvin === null
-                ? "TEMP UNKNOWN"
-                : `${formatNumber(observation.equilibriumTemperatureKelvin, 0)} K`}
-            </span>
-            <span>{observation.discoveryMethod}</span>
-          </div>
-          <p className={cx("world-summary")}>
-            {solar ? planet.solarSystem?.summary : recipe.summary}
-          </p>
-          <p className={cx("visual-note")}>
-            <span aria-hidden="true" />{" "}
-            {subsystemActive
-              ? "JPL MEAN ORBITS · LOG-COMPRESSED DISTANCE · BODY SIZES EXAGGERATED"
-              : result.mode === "custom"
-                ? `SHAREABLE URL RECIPE · WORLDGEN V${WORLDGEN_VERSION}`
-                : solar
-                  ? solarIdentity?.surfaceStatus === "unresolved"
-                    ? "UNRESOLVED SURFACE · PHYSICALLY CONSTRAINED NEUTRAL VISUALIZATION"
-                    : solarIdentity?.surfaceStatus === "modeled"
-                      ? "MEASURED PROPORTIONS · UNRESOLVED NEUTRAL SURFACE"
-                      : solarIdentity?.texture?.topography
-                        ? "DAWN GLOBAL MOSAIC + MEASURED TOPOGRAPHY · EXORA LIGHTING"
-                        : solarIdentity?.texture
-                          ? isMoon
-                            ? "NASA MISSION MOSAIC · MEASURED ROTATION + EXORA LIGHTING"
-                            : "SPACECRAFT GLOBAL MOSAIC · EXORA ATMOSPHERE + LIGHTING"
-                          : "KNOWN PLANET · PHYSICALLY TUNED ATMOSPHERIC VISUALIZATION"
-                  : "PLAUSIBLE VISUALIZATION FROM OBSERVED DATA"}
-          </p>
-        </section>
+        <DestinationIdentity
+          category={custom ? "GENERATED WORLD" : solar ? "SOLAR SYSTEM WORLD" : "CONFIRMED WORLD"}
+          classification={
+            (solar ? solarIdentity?.bodyType : planet.kind.replace("-", " ")) ?? "WORLD"
+          }
+          name={formatPlanetName(planet.name)}
+          nameId="world-name"
+          note={visualNote({ custom, isMoon, solar, solarIdentity, subsystemActive })}
+          summary={(solar ? solarIdentity?.summary : recipe.summary) ?? recipe.summary}
+          tags={[
+            recipe.classification,
+            observation.equilibriumTemperatureKelvin === null
+              ? "TEMP UNKNOWN"
+              : `${formatNumber(observation.equilibriumTemperatureKelvin, 0)} K`,
+            observation.discoveryMethod,
+          ]}
+          tagsLabel="World classification"
+          tone={subsystemActive ? "subsystem" : "world"}
+        />
 
-        <aside
-          className={cx("telemetry")}
-          data-testid="telemetry"
-          aria-label={result.mode === "custom" ? "Custom planet data" : "Observed planet data"}
-        >
-          <div className={cx("telemetry-heading")}>
-            <span>
-              <small>
-                {result.mode === "custom" ? "WORLD FORGE" : solar ? "NASA/JPL" : "NASA ARCHIVE"}
-              </small>
-              {result.mode === "custom"
-                ? "Chosen properties"
-                : solar
-                  ? "Planetary parameters"
-                  : "Observed properties"}
-            </span>
-            <FrameRateSignal fps={fps} />
-          </div>
-          {subsystem ? (
-            <div className={cx("telemetry-detail host-system-detail subsystem-switch-detail")}>
-              <span>PLANETARY SUBSYSTEM</span>
-              <button
-                className={cx("system-jump subsystem-jump")}
-                type="button"
-                aria-pressed={subsystemActive}
-                onClick={() => setSceneMode(subsystemActive ? "world" : "subsystem")}
-              >
-                <span aria-hidden="true">{subsystemActive ? "◉" : "⌾"}</span>
-                <strong>
-                  {subsystemActive ? `${planet.name} close view` : `${planet.name} system`}
-                </strong>
-                <small>{subsystemActive ? "RETURN TO WORLD" : "EXPLORE MOONS + FIELDS ↗"}</small>
-              </button>
-              <small>
-                {subsystem.moons.length} selected moon{subsystem.moons.length === 1 ? "" : "s"} ·{" "}
-                {subsystem.rings.length
-                  ? `${subsystem.rings.length} ring layers`
-                  : "no known rings"}{" "}
-                · {subsystem.resonances.length} resonance
-                {subsystem.resonances.length === 1 ? "" : "s"}
-              </small>
-            </div>
-          ) : null}
-          {subsystemActive && subsystem ? (
-            <>
-              <div className={cx("telemetry-detail subsystem-science-detail")}>
-                <span>ORBIT EVIDENCE</span>
-                <strong>MEASURED</strong>
-                <small>
-                  JPL mean elements preserve parent-relative distance, inclination, period, and
-                  retrograde direction.
-                </small>
-              </div>
-              <div className={cx("telemetry-detail subsystem-science-detail")}>
-                <span>TRANSIENT LAYERS</span>
-                <strong>SIMULATED</strong>
-                <small>
-                  Field boundaries, auroral brightness, plasma density, and plume particles are
-                  explanatory visualizations.
-                </small>
-              </div>
-              <div className={cx("telemetry-detail subsystem-science-detail")}>
-                <span>MINOR MOONS</span>
-                <strong>UNRESOLVED SURFACES</strong>
-                <small>Neutral silhouettes only; no surface geography has been invented.</small>
-              </div>
-              <div className={cx("telemetry-detail subsystem-members")}>
-                <span>SELECTED MOONS · MEAN ELEMENTS</span>
-                <ul>
-                  {subsystem.moons.map((candidate) => {
-                    const destination = findSolarWorld?.(candidate.name);
-                    return (
-                      <li key={candidate.naifId}>
-                        {destination ? (
-                          <button
-                            type="button"
-                            onClick={() => onSelectPlanet(destination, true)}
-                            aria-label={`Visit ${candidate.name}, NAIF ${candidate.naifId}`}
-                          >
-                            <strong>{candidate.name}</strong>
-                            <small>VISIT ↗</small>
-                          </button>
-                        ) : (
-                          <span>
-                            <strong>{candidate.name}</strong>
-                            <small>UNRESOLVED</small>
-                          </span>
-                        )}
-                        <small>
-                          NAIF {candidate.naifId} ·{" "}
-                          {formatNumber(candidate.orbitalSemiMajorAxisKilometers, 0)} km ·{" "}
-                          {candidate.retrograde ? "retrograde" : "prograde"} · i{" "}
-                          {candidate.inclinationDegrees}°
-                          {candidate.shepherds ? ` · shepherds ${candidate.shepherds}` : ""}
-                        </small>
-                      </li>
-                    );
-                  })}
-                </ul>
-              </div>
-              <div className={cx("telemetry-detail subsystem-resonances")}>
-                <span>MAJOR RESONANCES</span>
-                {subsystem.resonances.length ? (
-                  subsystem.resonances.map((resonance) => (
-                    <p key={`${resonance.ratio}-${resonance.bodies.join("-")}`}>
-                      <strong>{resonance.ratio}</strong>
-                      <small>{resonance.bodies.join(" · ")}</small>
-                    </p>
-                  ))
-                ) : (
-                  <small>No principal resonance authored for this view.</small>
-                )}
-              </div>
-              <div className={cx("telemetry-detail subsystem-layer-key")}>
-                <span>VISIBLE SYSTEM LAYERS</span>
-                <ul>
-                  {subsystem.rings.map((ring) => (
-                    <li key={ring.name}>
-                      <strong>{ring.name}</strong>
-                      <small>MEASURED BOUNDARIES</small>
-                    </li>
-                  ))}
-                  {subsystem.lagrangePoints.map((point) => (
-                    <li key={`${point.reference}-${point.label}`}>
-                      <strong>{point.label}</strong>
-                      <small>{point.reference} · DERIVED MARKER</small>
-                    </li>
-                  ))}
-                  {subsystem.magnetosphere ? (
-                    <li>
-                      <strong>MAGNETOSPHERE</strong>
-                      <small>{subsystem.magnetosphere.evidence} BOUNDARY</small>
-                    </li>
-                  ) : null}
-                  {subsystem.aurora ? (
-                    <li>
-                      <strong>AURORAL REGIONS</strong>
-                      <small>{subsystem.aurora.evidence} LATITUDE · SIMULATED BRIGHTNESS</small>
-                    </li>
-                  ) : null}
-                  {subsystem.torus ? (
-                    <li>
-                      <strong>{subsystem.torus.moon} PLASMA TORUS</strong>
-                      <small>{subsystem.torus.evidence} STRUCTURE · SIMULATED DENSITY</small>
-                    </li>
-                  ) : null}
-                  {subsystem.plumes.map((plume) => (
-                    <li key={plume.moon}>
-                      <strong>{plume.moon} PLUME</strong>
-                      <small>{plume.evidence} EVIDENCE · SIMULATED PARTICLES</small>
-                    </li>
-                  ))}
-                </ul>
-              </div>
-            </>
-          ) : null}
-          <dl>
-            <div>
-              <dt>Mass</dt>
-              <dd>
-                {formatMeasurement(massValue)} <small>{massUnit}</small>
-              </dd>
-            </div>
-            <div>
-              <dt>Radius</dt>
-              <dd>
-                {formatMeasurement(radiusValue)} <small>{radiusUnit}</small>
-              </dd>
-            </div>
-            <div>
-              <dt>Orbit</dt>
-              <dd>
-                {formatMeasurement(localOrbitKilometers ?? observation.semiMajorAxisAu, 1)}{" "}
-                <small>{localOrbitKilometers === null ? "AU" : "KM"}</small>
-              </dd>
-            </div>
-            <div>
-              <dt>Distance</dt>
-              <dd>
-                {formatMeasurement(observation.distanceParsecs, 1)} <small>PC</small>
-              </dd>
-            </div>
-          </dl>
-          <div className={cx("telemetry-detail host-system-detail")}>
-            <span>HOST SYSTEM</span>
-            {result.mode === "custom" ? (
-              <strong>USER DEFINED</strong>
-            ) : (
-              <>
-                <button
-                  className={cx("system-jump")}
-                  type="button"
-                  disabled={hostJumpState === "loading"}
-                  onClick={() => void openHostStar()}
-                >
-                  <span aria-hidden="true">☀</span>
-                  <strong>{planet.hostStar}</strong>
-                  <small>{hostJumpState === "loading" ? "RESOLVING…" : "VISIT STAR ↗"}</small>
-                </button>
-                <button
-                  className={cx("system-jump diorama-jump")}
-                  type="button"
-                  disabled={systemJumpState === "loading"}
-                  onClick={() => void openHostSystem()}
-                >
-                  <span aria-hidden="true">◎</span>
-                  <strong>Whole system</strong>
-                  <small>
-                    {systemJumpState === "loading" ? "PLACING ORBITS…" : "VIEW EVERY ORBIT ↗"}
-                  </small>
-                </button>
-              </>
-            )}
-            <small>
-              {observation.hostSpectralType ?? "Spectrum unavailable"}
-              {observation.hostTemperatureKelvin === null
-                ? ""
-                : ` · ${formatNumber(observation.hostTemperatureKelvin, 0)} K`}
-              {observation.hostRadiusSolar === null
-                ? ""
-                : ` · ${formatNumber(observation.hostRadiusSolar, 2)} R☉`}
-            </small>
-            {hostJumpState === "error" ? (
-              <small className={cx("system-jump-error")} role="status">
-                SIMBAD could not resolve this host name.
-              </small>
-            ) : null}
-            {systemJumpState === "error" ? (
-              <small className={cx("system-jump-error")} role="status">
-                The archive links no placeable orbits to this host.
-              </small>
-            ) : null}
-          </div>
-          {isMoon && solarIdentity.parent ? (
-            <div className={cx("telemetry-detail host-system-detail")}>
-              <span>PRIMARY BODY</span>
-              <button className={cx("system-jump")} type="button" onClick={openPrimaryBody}>
-                <span aria-hidden="true">◉</span>
-                <strong>{solarIdentity.parent}</strong>
-                <small>VISIT PRIMARY ↗</small>
-              </button>
-              <small>
-                {formatNumber(solarIdentity.orbitalPeriodDays ?? null, 3)} day sidereal orbit · NAIF{" "}
-                {solarIdentity.naifId}
-              </small>
-            </div>
-          ) : null}
-          {solarIdentity ? (
-            <div className={cx("telemetry-detail")}>
-              <span>PERMANENT IDENTIFIER</span>
-              <strong>
-                {solarIdentity.spkId
-                  ? `SPK ${solarIdentity.spkId}`
-                  : `NAIF ${solarIdentity.naifId}`}
-              </strong>
-              <small>
-                NAIF {solarIdentity.naifId}
-                {solarIdentity.parent ? ` · direct parent ${solarIdentity.parent}` : ""}
-              </small>
-            </div>
-          ) : null}
-          {solarIdentity?.surfaceNote ? (
-            <div className={cx("telemetry-detail scientific-disclosure")}>
-              <span>SURFACE EVIDENCE</span>
-              <strong>{solarIdentity.surfaceStatus?.toUpperCase()}</strong>
-              <small>{solarIdentity.surfaceNote}</small>
-            </div>
-          ) : null}
-          <div className={cx("telemetry-detail")}>
-            <span>ATMOSPHERE MODEL</span>
-            <strong>{recipe.atmosphere.label.split(" · ")[0]}</strong>
-            <small>Exora inference · {recipe.confidence} confidence</small>
-          </div>
-          <p className={cx("source-note")}>
-            {planet.source.archive} · {planet.source.table} · {planet.source.retrievedOn}
-          </p>
-        </aside>
-
-        {subsystem || result.mode !== "custom" ? (
-          <div className={cx("mobile-scene-actions mobile-scene-actions-two")}>
-            {subsystem ? (
-              <button
-                className={cx("mobile-scene-action")}
-                type="button"
-                aria-pressed={subsystemActive}
-                onClick={() => {
-                  setSceneMode(subsystemActive ? "world" : "subsystem");
-                  setOrbitMenuOpen(false);
-                }}
-              >
-                <span aria-hidden="true">{subsystemActive ? "◉" : "⌾"}</span>
-                <span>
-                  <strong>{subsystemActive ? "Close orbit view" : `${planet.name} system`}</strong>
-                  <small>{subsystemActive ? "RETURN TO WORLD" : "MOONS + FIELDS"}</small>
-                </span>
-              </button>
-            ) : null}
-            {result.mode !== "custom" && !subsystemActive ? (
-              <button
-                className={cx("mobile-scene-action")}
-                type="button"
-                disabled={systemJumpState === "loading"}
-                onClick={() => void openHostSystem()}
-              >
-                <span aria-hidden="true">◎</span>
-                <span>
-                  <strong>Whole system</strong>
-                  <small>{systemJumpState === "loading" ? "PLACING ORBITS…" : "VIEW ORBITS"}</small>
-                </span>
-              </button>
-            ) : null}
-            {subsystemActive ? (
-              <button
-                className={cx("mobile-scene-action")}
-                type="button"
-                onClick={() => setOrbitMenuOpen(true)}
-              >
-                <span aria-hidden="true">☷</span>
-                <span>
-                  <strong>Orbit guide</strong>
-                  <small>MOONS + LAYERS</small>
-                </span>
-              </button>
-            ) : null}
-          </div>
-        ) : null}
+        <DestinationPanel fps={fps} model={panel} />
       </main>
-
-      {subsystem ? (
-        <MobileSheet
-          eyebrow={`${planet.name.toUpperCase()} SYSTEM`}
-          title="Orbit guide"
-          open={orbitMenuOpen}
-          onClose={() => setOrbitMenuOpen(false)}
-        >
-          <p className={cx("mobile-orbit-note")}>
-            JPL mean orbits · log-compressed distance · body sizes exaggerated
-          </p>
-          <div className={cx("mobile-orbit-groups")}>
-            <section>
-              <h3>{subsystem.moons.length} selected moons</h3>
-              <ul>
-                {subsystem.moons.map((candidate) => (
-                  <li key={candidate.naifId}>
-                    <strong>{candidate.name}</strong>
-                    <small>
-                      NAIF {candidate.naifId} · {candidate.surface} ·{" "}
-                      {candidate.retrograde ? "retrograde" : "prograde"}
-                    </small>
-                  </li>
-                ))}
-              </ul>
-            </section>
-            <section>
-              <h3>Rings + fields</h3>
-              <ul>
-                {subsystem.rings.map((ring) => (
-                  <li key={ring.name}>
-                    <strong>{ring.name}</strong>
-                    <small>MEASURED BOUNDARIES</small>
-                  </li>
-                ))}
-                {subsystem.lagrangePoints.map((point) => (
-                  <li key={`${point.reference}-${point.label}`}>
-                    <strong>{point.label}</strong>
-                    <small>{point.reference} · DERIVED MARKER</small>
-                  </li>
-                ))}
-              </ul>
-            </section>
-          </div>
-        </MobileSheet>
-      ) : null}
 
       <MissionControl
         chromeHidden={chromeHidden}
@@ -687,7 +621,7 @@ export const PlanetExperience = ({
           },
           ...(viewMode === "subsystem"
             ? [{ key: "CLICK", meaning: "VISIT MOON" }]
-            : viewMode === "orbit" && result.mode !== "custom"
+            : viewMode === "orbit" && !custom
               ? [{ key: "CLICK", meaning: "VISIT STAR" }]
               : []),
         ]}

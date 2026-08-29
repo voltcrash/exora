@@ -1,18 +1,20 @@
 import { useEffect, useState } from "react";
 import {
   blackHoleKindLabel,
-  formatBlackHoleMass,
   schwarzschildDiameterKilometers,
   type BlackHoleProfile,
 } from "../black-holes.ts";
+import type { DestinationPanelModel, PanelMetric } from "../destination-panel.ts";
 import type { SceneHost, XrStatus } from "../scene-host.ts";
 import type { TravelPhase } from "../travel-transition.ts";
-import { FrameRateSignal } from "./FrameRateSignal.tsx";
+import { DestinationIdentity } from "./DestinationIdentity.tsx";
+import { DestinationPanel } from "./DestinationPanel.tsx";
 import { MissionControl } from "./MissionControl.tsx";
 import sharedStyles from "./ExperienceShared.module.css";
+import hudStyles from "./DestinationHud.module.css";
 import { bindStyles } from "../styles/bind-styles.ts";
 
-const cx = bindStyles(sharedStyles);
+const cx = bindStyles(sharedStyles, hudStyles);
 
 interface BlackHoleExperienceProps {
   blackHole: BlackHoleProfile;
@@ -23,25 +25,27 @@ interface BlackHoleExperienceProps {
   travelPhase: TravelPhase;
 }
 
-const formatDistance = (blackHole: BlackHoleProfile): string => {
-  if (blackHole.distanceLightYears === null) {
-    return blackHole.observation.redshift === null
-      ? "NOT REPORTED"
-      : `REDSHIFT z ${blackHole.observation.redshift}`;
+/*
+ * A horizon is measured in quantities no tile is wide enough to spell out, so the magnitude is
+ * carried by the unit — "38.4" under "BILLION KM" — the same way a world's mass is carried by M⊕.
+ */
+const scaled = (value: number, unit: string): PanelMetric => {
+  if (value >= 1_000_000_000) {
+    return { label: "", unit: `BILLION ${unit}`, value: (value / 1_000_000_000).toFixed(1) };
   }
-  if (blackHole.distanceLightYears >= 1_000_000_000) {
-    return `${(blackHole.distanceLightYears / 1_000_000_000).toFixed(1)} BILLION LY`;
+  if (value >= 1_000_000) {
+    return { label: "", unit: `MILLION ${unit}`, value: (value / 1_000_000).toFixed(1) };
   }
-  if (blackHole.distanceLightYears >= 1_000_000) {
-    return `${(blackHole.distanceLightYears / 1_000_000).toFixed(1)} MILLION LY`;
-  }
-  return `${blackHole.distanceLightYears.toLocaleString("en-US")} LY`;
+  return { label: "", unit, value: value.toLocaleString("en-US", { maximumFractionDigits: 1 }) };
 };
 
-const formatDiameter = (kilometers: number): string => {
-  if (kilometers >= 1_000_000_000) return `${(kilometers / 1_000_000_000).toFixed(1)} BILLION KM`;
-  if (kilometers >= 1_000_000) return `${(kilometers / 1_000_000).toFixed(1)} MILLION KM`;
-  return `${kilometers.toLocaleString("en-US", { maximumFractionDigits: 0 })} KM`;
+const distanceMetric = (blackHole: BlackHoleProfile): PanelMetric => {
+  if (blackHole.distanceLightYears !== null) {
+    return { ...scaled(blackHole.distanceLightYears, "LY"), label: "Distance" };
+  }
+  return blackHole.observation.redshift === null
+    ? { label: "Distance", unit: "LY", value: "—" }
+    : { label: "Distance", unit: "z REDSHIFT", value: String(blackHole.observation.redshift) };
 };
 
 const BlackHoleName = ({ name }: { name: string }) => {
@@ -103,6 +107,54 @@ export const BlackHoleExperience = ({
     };
   }, [blackHole, host]);
 
+  const panel: DestinationPanelModel = {
+    footer: (
+      <>
+        <a href={blackHole.source.url} target="_blank" rel="noreferrer">
+          {blackHole.source.title} ↗
+        </a>{" "}
+        · {blackHole.source.retrievedOn}
+      </>
+    ),
+    label: "Observed black hole data",
+    links: [],
+    metrics: [
+      { ...scaled(blackHole.massSolar, "M☉"), label: "Mass estimate" },
+      distanceMetric(blackHole),
+      { ...scaled(diameterKilometers, "KM"), label: "Schwarzschild Ø" },
+      { label: "Accretion", value: blackHole.observation.accretion.toUpperCase() },
+    ],
+    source: blackHole.source.archive,
+    tabs: [
+      {
+        blocks: [
+          {
+            facts: [
+              {
+                detail: blackHole.observation.companion
+                  ? `Companion · ${blackHole.observation.companion}`
+                  : `${blackHole.kind.replaceAll("-", " ")} · ${blackHole.host}`,
+                label: "Catalog identity",
+                value: blackHole.catalogDesignation,
+              },
+              {
+                detail:
+                  "The diameter is a non-spinning reference calculated from the linked mass estimate. Disk brightness, tilt and motion are illustrative.",
+                label: "Model disclosure",
+                tone: "accent",
+                value: "Readable scale · observed mass",
+              },
+            ],
+            type: "facts",
+          },
+        ],
+        id: "record",
+        label: "Record",
+      },
+    ],
+    title: "Measured horizon record",
+  };
+
   return (
     <div
       className={cx(
@@ -123,84 +175,19 @@ export const BlackHoleExperience = ({
       </header>
 
       <main className={cx("hud")} data-testid="hud">
-        <section
-          className={cx("world-intro")}
-          data-testid="world-intro"
-          aria-labelledby="black-hole-name"
-        >
-          <p className={cx("eyebrow")}>
-            <span>OBSERVED BLACK HOLE</span>
-            <span>{blackHoleKindLabel(blackHole)}</span>
-          </p>
-          <h1 id="black-hole-name">
-            <BlackHoleName name={blackHole.name} />
-          </h1>
-          <div className={cx("world-tags")}>
-            <span>{blackHole.milestone}</span>
-            <span>{blackHole.host}</span>
-            <span>{blackHole.constellation}</span>
-          </div>
-          <p className={cx("world-summary")}>{blackHole.observation.summary}</p>
-          <p className={cx("visual-note black-hole-visual-note")}>
-            <span aria-hidden="true" /> INTERPRETIVE GRAVITATIONAL-LENSING MODEL · NOT TELESCOPE
-            IMAGERY
-          </p>
-        </section>
+        <DestinationIdentity
+          category="OBSERVED BLACK HOLE"
+          classification={blackHoleKindLabel(blackHole)}
+          name={<BlackHoleName name={blackHole.name} />}
+          nameId="black-hole-name"
+          note="INTERPRETIVE GRAVITATIONAL-LENSING MODEL · NOT TELESCOPE IMAGERY"
+          summary={blackHole.observation.summary}
+          tags={[blackHole.milestone, blackHole.host, blackHole.constellation]}
+          tagsLabel="Black hole classification"
+          tone="black-hole"
+        />
 
-        <aside
-          className={cx("telemetry black-hole-telemetry")}
-          data-testid="telemetry"
-          aria-label="Observed black hole data"
-        >
-          <div className={cx("telemetry-heading")}>
-            <span>
-              <small>{blackHole.source.archive}</small>
-              Measured horizon record
-            </span>
-            <FrameRateSignal fps={fps} />
-          </div>
-          <dl>
-            <div>
-              <dt>Mass estimate</dt>
-              <dd>{formatBlackHoleMass(blackHole.massSolar)}</dd>
-            </div>
-            <div>
-              <dt>Distance</dt>
-              <dd>{formatDistance(blackHole)}</dd>
-            </div>
-            <div>
-              <dt>Schwarzschild Ø</dt>
-              <dd>{formatDiameter(diameterKilometers)}</dd>
-            </div>
-            <div>
-              <dt>Accretion state</dt>
-              <dd>{blackHole.observation.accretion.toUpperCase()}</dd>
-            </div>
-          </dl>
-          <div className={cx("telemetry-detail")}>
-            <span>CATALOG IDENTITY</span>
-            <strong>{blackHole.catalogDesignation}</strong>
-            <small>
-              {blackHole.observation.companion
-                ? `COMPANION · ${blackHole.observation.companion}`
-                : `${blackHole.kind.replaceAll("-", " ")} · ${blackHole.host}`}
-            </small>
-          </div>
-          <div className={cx("telemetry-detail black-hole-science-detail")}>
-            <span>MODEL DISCLOSURE</span>
-            <strong>READABLE SCALE · OBSERVED MASS</strong>
-            <small>
-              The diameter is a non-spinning reference calculated from the linked mass estimate.
-              Disk brightness, tilt and motion are illustrative.
-            </small>
-          </div>
-          <p className={cx("source-note")}>
-            <a href={blackHole.source.url} target="_blank" rel="noreferrer">
-              {blackHole.source.title} ↗
-            </a>{" "}
-            · {blackHole.source.retrievedOn}
-          </p>
-        </aside>
+        <DestinationPanel fps={fps} model={panel} />
       </main>
 
       <MissionControl

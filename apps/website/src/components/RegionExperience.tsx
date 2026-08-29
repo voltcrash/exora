@@ -1,15 +1,18 @@
 import type { StarProfile } from "@exora/contracts";
 import { useEffect, useState } from "react";
+import type { DestinationPanelModel } from "../destination-panel.ts";
 import type { SceneHost, XrStatus } from "../scene-host.ts";
 import type { SolarRegionProfile } from "../solar-regions.ts";
 import { findSolarStar } from "../solar-system.ts";
 import type { TravelPhase } from "../travel-transition.ts";
-import { FrameRateSignal } from "./FrameRateSignal.tsx";
+import { DestinationIdentity } from "./DestinationIdentity.tsx";
+import { DestinationPanel } from "./DestinationPanel.tsx";
 import { MissionControl } from "./MissionControl.tsx";
 import sharedStyles from "./ExperienceShared.module.css";
+import hudStyles from "./DestinationHud.module.css";
 import { bindStyles } from "../styles/bind-styles.ts";
 
-const cx = bindStyles(sharedStyles);
+const cx = bindStyles(sharedStyles, hudStyles);
 
 interface RegionExperienceProps {
   chromeHidden: boolean;
@@ -22,7 +25,7 @@ interface RegionExperienceProps {
 }
 
 const distanceLabel = (value: number): string =>
-  `${value.toLocaleString("en-US", { maximumFractionDigits: 1 })} AU`;
+  `${value.toLocaleString("en-US", { maximumFractionDigits: 1 })}`;
 
 export const RegionExperience = ({
   chromeHidden,
@@ -77,10 +80,78 @@ export const RegionExperience = ({
 
   const evidenceLabel = region.evidence.replaceAll("-", " ").toUpperCase();
 
+  const panel: DestinationPanelModel = {
+    footer: `ANCHOR NAIF / SPK ${region.anchorNaifId} · RETRIEVED 2026-08-23`,
+    label: "Region data",
+    links: [
+      {
+        action: "VISIT PARENT ↗",
+        glyph: "☀",
+        id: "parent",
+        onSelect: openParent,
+        title: region.parent,
+      },
+    ],
+    metrics: [
+      { label: "Inner extent", unit: "AU", value: distanceLabel(region.distanceAu.inner) },
+      { label: "Outer extent", unit: "AU", value: distanceLabel(region.distanceAu.outer) },
+      { label: "Evidence", value: evidenceLabel.split(" ")[0] ?? evidenceLabel },
+      { label: "Particles", value: "SAMPLED" },
+    ],
+    source: "NASA / JPL · REGIONAL MODEL",
+    tabs: [
+      {
+        blocks: [
+          {
+            facts: [
+              {
+                detail: region.disclosure,
+                label: "Visualization status",
+                tone: "cyan",
+                value: evidenceLabel,
+              },
+              {
+                detail: region.distanceAu.note,
+                label: "Scale limits",
+                value: region.scaleNote,
+              },
+              {
+                detail: `NAIF ${String(region.anchorNaifId)}`,
+                label: "Permanent anchor",
+                value: `SPK ${region.anchorSpkId}`,
+              },
+            ],
+            type: "facts",
+          },
+        ],
+        id: "evidence",
+        label: "Evidence",
+      },
+      {
+        blocks: [
+          {
+            bodies: region.sources.map((source) => ({
+              id: source.datasetId,
+              kind: "marker",
+              meta: `${source.source} · ${source.retrievedOn}`,
+              name: source.datasetId,
+            })),
+            label: "AUTHORITATIVE DATASETS",
+            type: "bodies",
+          },
+        ],
+        count: region.sources.length,
+        id: "sources",
+        label: "Sources",
+      },
+    ],
+    title: "Scale and evidence",
+  };
+
   return (
     <div
       className={cx(
-        `experience-shell region-experience scene-${sceneState} ${travelling ? "travelling" : ""} ${chromeHidden ? "chrome-hidden" : ""}`,
+        `experience-shell ${sceneState === "error" ? "scene-error" : ""} ${travelling ? "travelling" : ""} ${chromeHidden ? "chrome-hidden" : ""}`,
       )}
     >
       <div className={cx("space-haze")} aria-hidden="true" />
@@ -95,93 +166,19 @@ export const RegionExperience = ({
         </a>
       </header>
       <main className={cx("hud")} data-testid="hud">
-        <section
-          className={cx("world-intro")}
-          data-testid="world-intro"
-          aria-labelledby="world-name"
-        >
-          <p className={cx("eyebrow")}>
-            <span>SOLAR SYSTEM REGION</span>
-            <span>{evidenceLabel}</span>
-          </p>
-          <h1 id="world-name">{region.name}</h1>
-          <div className={cx("world-tags")} aria-label="Region evidence classification">
-            <span>{evidenceLabel}</span>
-            <span>STATISTICAL VISUALIZATION</span>
-            <span>NON-LINEAR SCALE WHERE LABELLED</span>
-          </div>
-          <p className={cx("world-summary")}>{region.summary}</p>
-          <p className={cx("visual-note region-visual-note")}>
-            <span aria-hidden="true" /> {region.disclosure.toUpperCase()}
-          </p>
-          <p className={cx("region-scale-note")}>{region.scaleNote}</p>
-          <p className={cx("region-identifiers")} aria-label="Permanent anchor identifiers">
-            <strong>ANCHOR SPK {region.anchorSpkId}</strong>
-            <span>NAIF {region.anchorNaifId}</span>
-          </p>
-        </section>
-        <aside
-          className={cx("telemetry region-telemetry")}
-          data-testid="telemetry"
-          aria-label="Region data"
-        >
-          <div className={cx("telemetry-heading")}>
-            <span>
-              <small>NASA / JPL · REGIONAL MODEL</small>Scale and evidence
-            </span>
-            <FrameRateSignal fps={fps} />
-          </div>
-          <dl>
-            <div>
-              <dt>Inner extent</dt>
-              <dd>{distanceLabel(region.distanceAu.inner)}</dd>
-            </div>
-            <div>
-              <dt>Outer extent</dt>
-              <dd>{distanceLabel(region.distanceAu.outer)}</dd>
-            </div>
-            <div>
-              <dt>Evidence</dt>
-              <dd className={cx("region-evidence-value")}>{evidenceLabel}</dd>
-            </div>
-            <div>
-              <dt>Particles</dt>
-              <dd className={cx("region-evidence-value")}>SAMPLED</dd>
-            </div>
-          </dl>
-          <div className={cx("telemetry-detail host-system-detail")}>
-            <span>DIRECT PARENT</span>
-            <button className={cx("system-jump")} type="button" onClick={openParent}>
-              <span aria-hidden="true">☀</span>
-              <strong>{region.parent}</strong>
-              <small>VISIT PARENT ↗</small>
-            </button>
-          </div>
-          <div className={cx("telemetry-detail scientific-disclosure")}>
-            <span>VISUALIZATION STATUS</span>
-            <strong>{evidenceLabel}</strong>
-            <small>{region.disclosure}</small>
-          </div>
-          <div className={cx("telemetry-detail scientific-disclosure")}>
-            <span>SCALE LIMITS</span>
-            <strong>{region.scaleNote}</strong>
-            <small>{region.distanceAu.note}</small>
-          </div>
-          <div className={cx("telemetry-detail region-sources")}>
-            <span>AUTHORITATIVE DATASETS</span>
-            {region.sources.map((source) => (
-              <p key={source.datasetId}>
-                <strong>{source.datasetId}</strong>
-                <small>
-                  {source.source} · {source.retrievedOn}
-                </small>
-              </p>
-            ))}
-          </div>
-          <p className={cx("source-note")}>
-            ANCHOR NAIF / SPK {region.anchorNaifId} · RETRIEVED 2026-08-23
-          </p>
-        </aside>
+        <DestinationIdentity
+          category="SOLAR SYSTEM REGION"
+          classification={evidenceLabel}
+          name={region.name}
+          nameId="world-name"
+          note={region.disclosure.toUpperCase()}
+          summary={region.summary}
+          tags={[evidenceLabel, "STATISTICAL VISUALIZATION", "NON-LINEAR SCALE WHERE LABELLED"]}
+          tagsLabel="Region evidence classification"
+          tone="region"
+        />
+
+        <DestinationPanel fps={fps} model={panel} />
       </main>
       <MissionControl
         chromeHidden={chromeHidden}

@@ -319,6 +319,28 @@ const remountAppAtCurrentUrl = (): void => {
   renderApp();
 };
 
+/*
+ * The destination panel is a card beside the world on a desktop and a bottom sheet on a phone.
+ * These two helpers say what a visitor does rather than which viewport they are on, so a reading
+ * is asserted the same way at every width the suite runs at.
+ */
+const expandPanel = async (): Promise<void> => {
+  await expect
+    .poll(() => document.querySelector('[data-testid="panel-disclosure"]') !== null)
+    .toBe(true);
+  const disclosure = document.querySelector<HTMLButtonElement>('[data-testid="panel-disclosure"]');
+  if (!disclosure || getComputedStyle(disclosure).display === "none") return;
+  if (disclosure.getAttribute("aria-expanded") === "true") return;
+  await userEvent.click(page.elementLocator(disclosure));
+};
+
+const openPanelSection = async (name: string): Promise<void> => {
+  await expandPanel();
+  const section = page.getByRole("tab", { name: new RegExp(name) });
+  await expect.element(section).toBeVisible();
+  await userEvent.click(section);
+};
+
 const openDiscoverSection = async (
   name: "Black Holes" | "Exoplanets" | "Solar System" | "Stars" | "World Forge",
 ): Promise<void> => {
@@ -420,20 +442,12 @@ test("a deep link to a system resolves to the diorama, and says what it compress
   stubArchive();
   mountApp("?system=Kepler-90");
 
-  if (window.innerWidth <= 640) {
-    await expect
-      .element(page.getByLabelText("Interactive visualization of the Kepler-90 system"))
-      .toBeVisible();
-    await expect.element(page.getByRole("button", { name: /Orbit controls/ })).toBeVisible();
-    expect(getComputedStyle(document.querySelector('[data-testid="hud"]')!).display).toBe("none");
-    return;
-  }
-
   await expect.element(page.getByRole("heading", { level: 1 })).toHaveTextContent("Kepler-90");
   expect(document.querySelector('link[rel="canonical"]')?.getAttribute("href")).toContain(
     "?system=Kepler-90",
   );
 
+  await openPanelSection("Scale");
   await expect.element(page.getByText(/LOG · .+ AU → .+ m/)).toBeVisible();
   await expect.element(page.getByText(/EARTH ×/)).toBeVisible();
   await expect.element(page.getByText(/^1 s = /)).toBeVisible();
@@ -443,15 +457,11 @@ test("a world in the diorama is reachable, and offers the way back to the system
   stubArchive();
   mountApp("?system=Kepler-90");
 
-  if (window.innerWidth <= 640) {
-    await userEvent.click(page.getByRole("button", { name: /Orbit controls/ }));
-  }
+  await expandPanel();
   await userEvent.click(page.getByRole("button", { name: /Kepler-90 c/ }));
 
   await expect.element(page.getByRole("heading", { level: 1 })).toHaveTextContent("Kepler-90 c");
   expect(window.location.search).toBe("?planet=Kepler-90%20c");
-
-  if (window.innerWidth < 960) return;
 
   await userEvent.click(page.getByRole("button", { name: /Whole system/ }));
 
@@ -518,9 +528,7 @@ test("the star catalog opens and travels to a star", async () => {
   await userEvent.click(result);
 
   await expect.element(page.getByRole("heading", { level: 1 })).toHaveTextContent("Sirius");
-  if (window.innerWidth <= 640) {
-    await userEvent.click(page.getByRole("button", { name: /Known worlds/ }));
-  }
+  await expandPanel();
   await expect.element(page.getByRole("button", { name: /Sirius b/ })).toBeVisible();
   await expect.element(page.getByRole("button", { name: /Sirius c/ })).toBeVisible();
   expect(window.location.search).toBe("?star=Sirius");
@@ -570,9 +578,8 @@ test("the Home System catalog opens the Oort Cloud with an explicit inferred-mod
   await expect
     .element(page.getByText(/MODELED \/ INDIRECTLY INFERRED · NOT DIRECTLY OBSERVED/).first())
     .toBeVisible();
-  await expect
-    .element(page.getByLabelText("Permanent anchor identifiers"))
-    .toHaveTextContent("NAIF 10");
+  await expandPanel();
+  await expect.element(page.getByLabelText("Region data")).toHaveTextContent("NAIF 10");
   expect(window.location.search).toBe("?region=Oort%20Cloud");
 });
 
@@ -585,69 +592,30 @@ test("a Solar System planet switches into its dedicated parent-centered subsyste
   await expect.element(subsystem).toBeVisible();
   await userEvent.click(subsystem);
 
-  if (window.innerWidth <= 640) {
-    expect(getComputedStyle(document.querySelector('[data-testid="world-intro"]')!).display).toBe(
-      "none",
-    );
-    expect(getComputedStyle(document.querySelector('[data-testid="telemetry"]')!).display).toBe(
-      "none",
-    );
-    await userEvent.click(page.getByRole("button", { name: /Orbit guide/ }));
-    await expect
-      .element(
-        page.getByText("JPL mean orbits · log-compressed distance · body sizes exaggerated", {
-          exact: true,
-        }),
-      )
-      .toBeVisible();
-    await userEvent.keyboard("{Escape}");
-    await expect
-      .element(page.getByRole("button", { name: /Close orbit view/ }))
-      .toHaveAttribute("aria-pressed", "true");
-    return;
-  }
-
   await expect
     .element(
-      page.getByText(
-        window.innerWidth < 960
-          ? /SYSTEM SCALE · JPL MEAN ORBITS/
-          : "JPL MEAN ORBITS · LOG-COMPRESSED DISTANCE · BODY SIZES EXAGGERATED",
-        { exact: window.innerWidth >= 960 },
-      ),
-    )
-    .toBeVisible();
-  await expect
-    .element(
-      page.getByText(
-        window.innerWidth < 960
-          ? /UNRESOLVED SURFACES · NO INVENTED GEOGRAPHY/
-          : "UNRESOLVED SURFACES",
-        { exact: window.innerWidth >= 960 },
-      ),
+      page.getByText("JPL MEAN ORBITS · LOG-COMPRESSED DISTANCE · BODY SIZES EXAGGERATED", {
+        exact: true,
+      }),
     )
     .toBeVisible();
   await expect
     .element(page.getByRole("button", { name: /Jupiter close view/ }))
     .toHaveAttribute("aria-pressed", "true");
+
+  await openPanelSection("Moons");
+  await expect.element(page.getByRole("button", { name: /Europa/ })).toBeVisible();
+
+  await openPanelSection("Evidence");
+  await expect.element(page.getByText("Unresolved surfaces", { exact: true })).toBeVisible();
 });
 
 test("the Solar System diorama distinguishes cached JPL positions from catalog phases", async () => {
   stubArchive();
   mountApp("?system=Sun");
 
-  if (window.innerWidth <= 640) {
-    await userEvent.click(page.getByRole("button", { name: /Orbit controls/ }));
-    await expect.element(page.getByText("CATALOG POSITIONS", { exact: true })).toBeVisible();
-    await userEvent.click(page.getByRole("button", { name: "APPLY JPL" }));
-    await expect.element(page.getByText("CACHED JPL POSITIONS", { exact: true })).toBeVisible();
-    await expect.element(page.getByRole("button", { name: "PLAY" })).toBeEnabled();
-    await userEvent.click(page.getByRole("button", { name: "CATALOG ORBITS" }));
-    await expect.element(page.getByText("CATALOG POSITIONS", { exact: true })).toBeVisible();
-    return;
-  }
-
   await expect.element(page.getByRole("heading", { level: 1 })).toHaveTextContent("Sun");
+  await openPanelSection("Time");
   await expect.element(page.getByText("SIMPLIFIED CATALOG", { exact: true })).toBeVisible();
   await userEvent.click(page.getByRole("button", { name: "NOW" }));
 
@@ -661,64 +629,45 @@ test("the Solar System diorama distinguishes cached JPL positions from catalog p
   await expect.element(page.getByText("SIMPLIFIED CATALOG", { exact: true })).toBeVisible();
 });
 
-test("the Sun's complete world list scrolls inside its left panel", async () => {
+test("the Sun's complete world list scrolls inside the destination panel", async () => {
   stubArchive();
   mountApp("?star=Sun");
-
-  if (window.innerWidth <= 640) {
-    await userEvent.click(page.getByRole("button", { name: /Known worlds/ }));
-    await expect.element(page.getByRole("heading", { name: "Known worlds" })).toBeVisible();
-    const sheet = document.querySelector<HTMLElement>('[data-testid="mobile-sheet-body"]');
-    expect(sheet).not.toBeNull();
-    expect(getComputedStyle(sheet!).overflowY).toBe("auto");
-    await expect.element(page.getByRole("button", { name: /Makemake/ })).toBeVisible();
-    return;
-  }
 
   const telemetry = page.getByLabelText("Observed star data");
   await expect.element(telemetry).toHaveTextContent(/Earth distance\s*1\s*AU/);
   await expect.element(telemetry).toHaveTextContent(/Diameter\s*1,391,400\s*KM/);
   await expect.element(telemetry).toHaveTextContent(/Temperature\s*5,772\s*K/);
-  await expect.element(telemetry).toHaveTextContent("25.38 D SIDEREAL");
-  await expect.element(telemetry).toHaveTextContent(/AXIAL TILT 7.25°/);
-  await expect.element(page.getByRole("heading", { name: "Known worlds" })).toBeVisible();
-  const intro = document.querySelector<HTMLElement>('[data-testid="world-intro"]');
-  expect(intro).not.toBeNull();
-  expect(getComputedStyle(intro!).overflowY).toBe("auto");
-  expect(getComputedStyle(intro!).overscrollBehaviorY).toBe("contain");
-  expect(intro!.scrollHeight).toBeGreaterThan(intro!.clientHeight);
 
-  intro!.scrollTo({ top: intro!.scrollHeight });
-  expect(intro!.scrollTop).toBeGreaterThan(0);
+  await openPanelSection("Record");
+  await expect.element(telemetry).toHaveTextContent("25.38 d sidereal");
+  await expect.element(telemetry).toHaveTextContent(/Axial tilt 7.25°/);
+
+  await openPanelSection("Worlds");
+  const worlds = document.querySelector<HTMLElement>('[data-testid="panel-body"]');
+  expect(worlds).not.toBeNull();
+  expect(getComputedStyle(worlds!).overflowY).toBe("auto");
+  expect(getComputedStyle(worlds!).overscrollBehaviorY).toBe("contain");
+  expect(worlds!.scrollHeight).toBeGreaterThan(worlds!.clientHeight);
+
+  worlds!.scrollTo({ top: worlds!.scrollHeight });
+  expect(worlds!.scrollTop).toBeGreaterThan(0);
   await expect.element(page.getByRole("button", { name: /Makemake/ })).toBeVisible();
 });
 
-test("the Solar System's complete object list scrolls inside its left panel", async () => {
+test("the Solar System's complete object list scrolls inside the destination panel", async () => {
   stubArchive();
   mountApp("?system=Sun");
 
-  if (window.innerWidth <= 640) {
-    await userEvent.click(page.getByRole("button", { name: /Orbit controls/ }));
-    await expect
-      .element(page.getByRole("heading", { name: "Worlds in the diorama" }))
-      .toBeVisible();
-    const sheet = document.querySelector<HTMLElement>('[data-testid="mobile-sheet-body"]');
-    expect(sheet).not.toBeNull();
-    expect(getComputedStyle(sheet!).overflowY).toBe("auto");
-    await expect.element(page.getByRole("button", { name: /Makemake/ })).toBeVisible();
-    return;
-  }
-
-  await expect.element(page.getByRole("heading", { name: "Worlds in the diorama" })).toBeVisible();
+  await openPanelSection("Worlds");
   await expect.element(page.getByRole("button", { name: /Makemake/ })).toBeVisible();
-  const intro = document.querySelector<HTMLElement>('[data-testid="world-intro"]');
-  expect(intro).not.toBeNull();
-  expect(getComputedStyle(intro!).overflowY).toBe("auto");
-  expect(getComputedStyle(intro!).overscrollBehaviorY).toBe("contain");
-  expect(intro!.scrollHeight).toBeGreaterThan(intro!.clientHeight);
+  const worlds = document.querySelector<HTMLElement>('[data-testid="panel-body"]');
+  expect(worlds).not.toBeNull();
+  expect(getComputedStyle(worlds!).overflowY).toBe("auto");
+  expect(getComputedStyle(worlds!).overscrollBehaviorY).toBe("contain");
+  expect(worlds!.scrollHeight).toBeGreaterThan(worlds!.clientHeight);
 
-  intro!.scrollTo({ top: intro!.scrollHeight });
-  expect(intro!.scrollTop).toBeGreaterThan(0);
+  worlds!.scrollTo({ top: worlds!.scrollHeight });
+  expect(worlds!.scrollTop).toBeGreaterThan(0);
   await expect.element(page.getByRole("button", { name: /Makemake/ })).toBeVisible();
 });
 

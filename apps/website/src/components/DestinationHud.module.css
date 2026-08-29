@@ -1,0 +1,957 @@
+/*
+ * THE MAIN SCREEN — an identity column that never moves and one instrument that holds the rest.
+ *
+ * The two regions are answerable for different things and are sized accordingly. The left column
+ * carries only what identifies the destination, so it is the same five lines everywhere and keeps
+ * its place against the lower edge whether the object is a horizon with one paragraph of record or
+ * a star with sixty catalogued worlds. Everything that grows with a destination — measurements,
+ * onward travel, evidence, member bodies, playback — belongs to the panel opposite, which is
+ * bounded, tabbed and scrolled inside itself rather than allowed to run down the viewport.
+ */
+
+.hud {
+  inset: 84px 0 104px;
+  display: grid;
+  /* One row exactly as tall as the region, so the panel's own `max-height` has something finite
+     to resolve against and a long destination scrolls inside itself instead of past the viewport. */
+  grid-template-rows: minmax(0, 1fr);
+  grid-template-columns: minmax(0, 400px) 1fr minmax(0, 320px);
+  align-items: center;
+  gap: 28px;
+  padding: 24px 34px;
+}
+
+/* ── IDENTITY ─────────────────────────────────────────────────────────────────────────────── */
+
+.identity {
+  --tone: var(--accent);
+  --tone-ink: #ffc0a7;
+  --tone-line: rgb(255 107 50 / 30%);
+  --tone-soft: rgb(255 107 50 / 12%);
+
+  grid-column: 1;
+  align-self: end;
+  width: 100%;
+  padding-bottom: 16px;
+  text-shadow: 0 2px 28px rgb(0 0 0 / 92%);
+}
+
+.identity[data-tone="star"] {
+  --tone: #ffc96f;
+  --tone-ink: #ffdda4;
+  --tone-line: rgb(255 198 98 / 32%);
+  --tone-soft: rgb(255 187 71 / 10%);
+}
+
+.identity[data-tone="black-hole"] {
+  --tone: #b48bff;
+  --tone-ink: #ddccff;
+  --tone-line: rgb(180 139 255 / 34%);
+  --tone-soft: rgb(180 139 255 / 12%);
+}
+
+.identity[data-tone="region"],
+.identity[data-tone="subsystem"] {
+  --tone: var(--cyan);
+  --tone-ink: #d5f6f7;
+  --tone-line: rgb(139 230 234 / 32%);
+  --tone-soft: rgb(139 230 234 / 10%);
+}
+
+.identity-eyebrow {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  margin: 0 0 13px;
+  color: var(--tone);
+  font-family: var(--mono);
+  font-size: 8px;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+}
+
+.identity-eyebrow span:first-child::before {
+  content: "";
+  display: inline-block;
+  width: 18px;
+  height: 1px;
+  margin: 0 8px 3px 0;
+  background: currentcolor;
+}
+
+.identity-eyebrow span:last-child {
+  padding-left: 9px;
+  border-left: 1px solid var(--line);
+  color: var(--muted);
+}
+
+.identity-name {
+  max-width: 100%;
+  margin: 0;
+  color: var(--ink);
+  font-size: clamp(46px, 5vw, 76px);
+  font-weight: 400;
+  line-height: 0.92;
+  letter-spacing: -0.07em;
+  text-wrap: balance;
+  text-transform: uppercase;
+}
+
+.identity-name em {
+  color: var(--tone);
+  font-style: normal;
+  font-weight: 400;
+}
+
+.identity-tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 7px;
+  margin: 18px 0 15px;
+}
+
+.identity-tags span {
+  padding: 6px 8px;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  color: #bdc9cd;
+  background: rgb(7 11 13 / 48%);
+  font-family: var(--mono);
+  font-size: 7px;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.identity-tags span:first-child {
+  border-color: var(--tone-line);
+  color: var(--tone-ink);
+  background: var(--tone-soft);
+}
+
+/*
+ * Held to four lines so a destination with a long paragraph cannot lift the block off its baseline.
+ * The full sentence is never withheld from a reader who wants it: the identity is what it names.
+ */
+.identity-summary {
+  display: -webkit-box;
+  overflow: hidden;
+  margin: 0;
+  color: #aab6ba;
+  font-size: 12px;
+  line-height: 1.7;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 4;
+  line-clamp: 4;
+}
+
+.identity-note {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 15px 0 0;
+  color: var(--faint);
+  font-family: var(--mono);
+  font-size: 7px;
+  line-height: 1.5;
+  letter-spacing: 0.08em;
+}
+
+.identity-note span {
+  width: 6px;
+  height: 6px;
+  flex: 0 0 auto;
+  border-radius: 50%;
+  background: var(--tone);
+  box-shadow: 0 0 10px var(--tone-line);
+}
+
+/* ── PANEL ────────────────────────────────────────────────────────────────────────────────── */
+
+.panel {
+  grid-column: 3;
+  width: 100%;
+  max-height: 100%;
+  display: flex;
+  flex-direction: column;
+  padding: 16px 16px 14px;
+  border: 1px solid var(--line);
+  border-radius: 18px;
+  background: linear-gradient(155deg, rgb(24 45 49 / 18%), transparent 44%), var(--panel);
+  box-shadow: 0 18px 70px rgb(0 0 0 / 34%);
+  pointer-events: auto;
+  backdrop-filter: blur(22px);
+}
+
+.panel-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding-bottom: 14px;
+}
+
+.panel-title {
+  min-width: 0;
+  display: grid;
+  gap: 4px;
+}
+
+.panel-title small {
+  color: var(--cyan);
+  font-family: var(--mono);
+  font-size: 7px;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+}
+
+.panel-title strong {
+  overflow: hidden;
+  color: #dce8ea;
+  font-size: 12px;
+  font-weight: 500;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* The sheet's handle. Above the sheet breakpoint the panel is never closed, so it is not offered. */
+.panel-disclosure {
+  display: none;
+}
+
+.panel-metrics {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+  margin: 0;
+}
+
+.panel-metrics div {
+  min-width: 0;
+  padding: 10px 11px;
+  border: 1px solid rgb(229 244 247 / 8%);
+  border-radius: 12px;
+  background: rgb(255 255 255 / 2%);
+}
+
+.panel-metrics dt {
+  color: var(--faint);
+  font-family: var(--mono);
+  font-size: 7px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.panel-metrics dd {
+  display: flex;
+  align-items: baseline;
+  gap: 4px;
+  overflow: hidden;
+  margin: 7px 0 0;
+  color: #edf4f5;
+  font-family: var(--mono);
+  font-size: 19px;
+  font-weight: 400;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* A value that spells out a word rather than a number gets the room to finish it. */
+.panel-metrics dd[data-length="long"] {
+  font-size: 14px;
+}
+
+.panel-metrics dd[data-length="longest"] {
+  font-size: 11px;
+  letter-spacing: -0.01em;
+}
+
+.panel-metrics dd small {
+  color: var(--cyan);
+  font-size: 8px;
+}
+
+.panel-drawer {
+  min-height: 0;
+  display: flex;
+  flex: 0 1 auto;
+  flex-direction: column;
+}
+
+/* ── ONWARD TRAVEL ────────────────────────────────────────────────────────────────────────── */
+
+.panel-links {
+  display: grid;
+  gap: 6px;
+  margin-top: 12px;
+}
+
+.panel-link {
+  --link-tone: #ffc96f;
+  --link-ink: #fff0cf;
+  --link-line: rgb(255 198 98 / 24%);
+
+  min-height: 48px;
+  display: grid;
+  grid-template-columns: 24px minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 11px;
+  border: 1px solid var(--link-line);
+  border-radius: 12px;
+  background: color-mix(in srgb, var(--link-tone) 5%, transparent);
+  cursor: pointer;
+  text-align: left;
+}
+
+.panel-link[data-tone="cyan"] {
+  --link-tone: var(--cyan);
+  --link-ink: #e4fbfc;
+  --link-line: rgb(139 230 234 / 28%);
+}
+
+.panel-link > span {
+  color: var(--link-tone);
+  font-size: 19px;
+  line-height: 1;
+  text-align: center;
+  text-shadow: 0 0 14px color-mix(in srgb, var(--link-tone) 60%, transparent);
+}
+
+.panel-link strong {
+  overflow: hidden;
+  color: var(--link-ink);
+  font-family: var(--mono);
+  font-size: 9px;
+  font-weight: 500;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.panel-link small {
+  color: var(--link-tone);
+  font-family: var(--mono);
+  font-size: 7px;
+  letter-spacing: 0.06em;
+  white-space: nowrap;
+}
+
+.panel-link:hover:not(:disabled),
+.panel-link:focus-visible,
+.panel-link[aria-pressed="true"] {
+  border-color: color-mix(in srgb, var(--link-tone) 58%, transparent);
+  background: color-mix(in srgb, var(--link-tone) 11%, transparent);
+}
+
+.panel-link:disabled {
+  cursor: progress;
+  opacity: 0.62;
+}
+
+/* ── SECTIONS ─────────────────────────────────────────────────────────────────────────────── */
+
+.panel-tabs {
+  display: flex;
+  gap: 4px;
+  overflow-x: auto;
+  margin-top: 13px;
+  padding-bottom: 9px;
+  border-bottom: 1px solid var(--line);
+  scrollbar-width: none;
+}
+
+.panel-tabs::-webkit-scrollbar {
+  display: none;
+}
+
+.panel-tab {
+  min-height: 28px;
+  display: flex;
+  flex: 0 0 auto;
+  align-items: center;
+  gap: 5px;
+  padding: 0 10px;
+  border: 1px solid transparent;
+  border-radius: 999px;
+  color: var(--muted);
+  background: none;
+  cursor: pointer;
+  font-family: var(--mono);
+  font-size: 7px;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+}
+
+.panel-tab small {
+  padding: 1px 4px;
+  border-radius: 999px;
+  color: var(--faint);
+  background: rgb(229 244 247 / 8%);
+  font-size: 7px;
+}
+
+.panel-tab:hover {
+  color: #cfdcde;
+}
+
+.panel-tab[aria-selected="true"] {
+  border-color: rgb(139 230 234 / 26%);
+  color: #e6f6f7;
+  background: rgb(139 230 234 / 9%);
+}
+
+.panel-tab[aria-selected="true"] small {
+  color: var(--cyan);
+  background: rgb(139 230 234 / 14%);
+}
+
+.panel-body {
+  min-height: 0;
+  display: grid;
+  align-content: start;
+  gap: 12px;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  padding: 12px 2px 2px;
+  scrollbar-color: rgb(139 230 234 / 26%) transparent;
+  scrollbar-width: thin;
+}
+
+.panel-group {
+  display: grid;
+  gap: 7px;
+}
+
+.panel-group-label,
+.panel-facts dt {
+  margin: 0;
+  color: var(--faint);
+  font-family: var(--mono);
+  font-size: 7px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+/* ── FACTS ────────────────────────────────────────────────────────────────────────────────── */
+
+.panel-facts {
+  display: grid;
+  gap: 10px;
+  margin: 0;
+}
+
+.panel-facts > div {
+  display: grid;
+  gap: 4px;
+  padding-bottom: 10px;
+  border-bottom: 1px solid var(--line);
+}
+
+.panel-facts > div:last-child {
+  padding-bottom: 0;
+  border-bottom: 0;
+}
+
+.panel-facts dd {
+  display: grid;
+  gap: 4px;
+  margin: 0;
+}
+
+.panel-facts dd strong {
+  color: #dce6e8;
+  font-size: 9px;
+  font-weight: 500;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+}
+
+.panel-facts dd small {
+  color: var(--faint);
+  font-family: var(--mono);
+  font-size: 7px;
+  line-height: 1.6;
+}
+
+.panel-facts > div[data-tone="accent"] dd strong {
+  color: #ffc0a7;
+}
+
+.panel-facts > div[data-tone="cyan"] dd strong {
+  color: var(--cyan);
+}
+
+.panel-facts > div[data-tone="gold"] dd strong {
+  color: #ffdda4;
+}
+
+/* ── MEMBER BODIES ────────────────────────────────────────────────────────────────────────── */
+
+.panel-bodies {
+  display: grid;
+  gap: 6px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.panel-bodies button,
+.panel-bodies > li > span {
+  width: 100%;
+  min-height: 46px;
+  display: grid;
+  grid-template-columns: 20px minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 9px;
+  padding: 7px 9px;
+  border: 1px solid var(--line);
+  border-radius: 11px;
+  color: #dce6e8;
+  background: rgb(7 11 13 / 46%);
+  text-align: left;
+}
+
+.panel-bodies button {
+  border-color: rgb(255 198 98 / 18%);
+  cursor: pointer;
+}
+
+.panel-bodies button:hover,
+.panel-bodies button:focus-visible {
+  border-color: rgb(255 198 98 / 48%);
+  background: rgb(255 190 80 / 8%);
+}
+
+.panel-body-copy {
+  min-width: 0;
+  display: grid;
+  gap: 3px;
+}
+
+.panel-body-copy strong {
+  overflow: hidden;
+  font-size: 9px;
+  font-weight: 500;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.panel-body-copy small,
+.panel-body-action {
+  overflow: hidden;
+  color: var(--faint);
+  font-family: var(--mono);
+  font-size: 7px;
+  letter-spacing: 0.05em;
+  text-overflow: ellipsis;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+
+.panel-bodies button .panel-body-action {
+  color: #ffc96f;
+}
+
+.panel-orb {
+  width: 19px;
+  height: 19px;
+  border-radius: 50%;
+  background: radial-gradient(circle at 32% 28%, #c8f0e6, #447b79 48%, #14272a 76%);
+  box-shadow: 0 0 12px rgb(139 230 234 / 16%);
+}
+
+.panel-orb.gas-giant {
+  background: repeating-linear-gradient(8deg, #d9b37c 0 4px, #7d533d 5px 8px);
+}
+
+.panel-orb.ice-giant {
+  background: radial-gradient(circle at 32% 28%, #d8f6ff, #5798bb 52%, #1d3957 78%);
+}
+
+.panel-orb.marker {
+  width: 7px;
+  height: 7px;
+  margin: 0 6px;
+  background: var(--cyan);
+  box-shadow: 0 0 10px rgb(139 230 234 / 55%);
+}
+
+/* ── STATUS + FOOTER ──────────────────────────────────────────────────────────────────────── */
+
+.panel-status {
+  margin: 0;
+  color: var(--faint);
+  font-family: var(--mono);
+  font-size: 7px;
+  line-height: 1.6;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.panel-link-status {
+  margin-top: 8px;
+}
+
+.panel-status[data-tone="accent"] {
+  color: #ff9c79;
+}
+
+.panel-status[data-tone="cyan"] {
+  color: var(--cyan);
+}
+
+.panel-footer {
+  margin: 12px 0 0;
+  padding-top: 10px;
+  border-top: 1px solid var(--line);
+  color: #465258;
+  font-family: var(--mono);
+  font-size: 6px;
+  line-height: 1.6;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+}
+
+.panel-footer a {
+  color: inherit;
+  text-decoration: none;
+}
+
+.panel-footer a:hover,
+.panel-footer a:focus-visible {
+  color: var(--cyan);
+}
+
+/* ── EPHEMERIS CONTROLS ───────────────────────────────────────────────────────────────────── */
+
+.ephemeris {
+  display: grid;
+  gap: 9px;
+}
+
+.ephemeris label {
+  display: grid;
+  gap: 5px;
+}
+
+.ephemeris label > span,
+.ephemeris-state {
+  color: var(--cyan);
+  font-family: var(--mono);
+  font-size: 7px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.ephemeris-state[data-stale="true"] {
+  color: #ffb27a;
+}
+
+.ephemeris input,
+.ephemeris select,
+.ephemeris button {
+  min-height: 38px;
+  padding: 0 9px;
+  border: 1px solid rgb(139 230 234 / 22%);
+  border-radius: 10px;
+  color: #dce9eb;
+  background: rgb(139 230 234 / 5%);
+  font-family: var(--mono);
+  font-size: 8px;
+  letter-spacing: 0.06em;
+}
+
+.ephemeris button {
+  cursor: pointer;
+  text-transform: uppercase;
+}
+
+.ephemeris button:hover:not(:disabled),
+.ephemeris button:focus-visible,
+.ephemeris button[aria-pressed="true"] {
+  border-color: rgb(139 230 234 / 58%);
+  background: rgb(139 230 234 / 12%);
+}
+
+.ephemeris button:disabled {
+  opacity: 0.45;
+}
+
+.ephemeris-row {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 6px;
+}
+
+.ephemeris-row-three {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.panel :is(.panel-link, .panel-tab, .panel-bodies button, .ephemeris button):focus-visible,
+.ephemeris :is(input, select):focus-visible {
+  outline: 2px solid var(--cyan);
+  outline-offset: 2px;
+}
+
+/* ── NARROWER DESKTOPS ────────────────────────────────────────────────────────────────────── */
+
+@media (max-width: 1180px) {
+  .hud {
+    grid-template-columns: minmax(0, 340px) 1fr minmax(0, 288px);
+    gap: 20px;
+    padding: 22px 22px;
+  }
+
+  .identity-name {
+    font-size: clamp(40px, 4.4vw, 62px);
+  }
+}
+
+/* ── THE SHEET ────────────────────────────────────────────────────────────────────────────── */
+
+/*
+ * A phone has one column, so the panel stops being a column and becomes the surface along the
+ * bottom edge. Closed, it still answers the question the desktop panel answers first — which
+ * archive, and the four measured values — and the world keeps the rest of the screen. Opened, it
+ * is the same instrument with the same tabs, so nothing about a destination is reachable on one
+ * device and missing on the other.
+ */
+@media (max-width: 860px) {
+  .hud {
+    inset: 76px 0 0;
+    display: block;
+    padding: 0;
+  }
+
+  /*
+   * A phone puts the identity directly over the object rather than beside it, and a bright
+   * world — a star's disc most of all — is not a background small copy survives on its own.
+   */
+  .identity {
+    width: 100%;
+    padding: 12px 18px 26px;
+    background: linear-gradient(180deg, rgb(3 5 6 / 88%) 8%, rgb(3 5 6 / 62%) 62%, transparent);
+  }
+
+  /* The scrim spans the screen; the copy on it stays a column that can be read across. */
+  .identity-name,
+  .identity-summary,
+  .identity-note {
+    max-width: 480px;
+  }
+
+  .identity-eyebrow {
+    margin-bottom: 10px;
+  }
+
+  .identity-name {
+    font-size: clamp(38px, 11vw, 58px);
+  }
+
+  .identity-tags {
+    margin: 14px 0 12px;
+  }
+
+  .identity-summary {
+    font-size: 11px;
+    line-height: 1.6;
+    -webkit-line-clamp: 3;
+    line-clamp: 3;
+  }
+
+  .identity-note {
+    margin-top: 12px;
+    font-size: 6px;
+  }
+
+  .panel {
+    position: fixed;
+    right: 0;
+    bottom: 0;
+    left: 0;
+    width: 100%;
+    max-height: min(82dvh, 640px);
+    padding: 0 14px calc(12px + env(safe-area-inset-bottom));
+    border-width: 1px 0 0;
+    border-radius: 18px 18px 0 0;
+    background: linear-gradient(180deg, rgb(24 45 49 / 22%), transparent 30%), rgb(5 10 12 / 94%);
+    box-shadow: 0 -18px 60px rgb(0 0 0 / 52%);
+  }
+
+  .panel::before {
+    content: "";
+    width: 38px;
+    height: 3px;
+    margin: 7px auto 0;
+    border-radius: 999px;
+    background: rgb(229 244 247 / 20%);
+  }
+
+  .panel-head {
+    padding: 8px 0 10px;
+  }
+
+  .panel-disclosure {
+    width: 40px;
+    height: 40px;
+    display: grid;
+    flex: 0 0 auto;
+    place-items: center;
+    margin-right: -8px;
+    border: 0;
+    border-radius: 50%;
+    color: var(--muted);
+    background: none;
+    cursor: pointer;
+  }
+
+  .panel-disclosure svg {
+    width: 16px;
+    height: 16px;
+    fill: none;
+    stroke: currentcolor;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+    stroke-width: 1.6;
+    transition: transform 220ms ease;
+  }
+
+  .panel-disclosure[aria-expanded="false"] svg {
+    transform: rotate(180deg);
+  }
+
+  .panel[data-expanded="false"] .panel-drawer {
+    display: none;
+  }
+
+  .panel-metrics {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: 6px;
+  }
+
+  .panel-metrics div {
+    padding: 7px 8px;
+  }
+
+  .panel-metrics dd {
+    margin-top: 4px;
+    font-size: 14px;
+  }
+
+  .panel-metrics dd small {
+    font-size: 7px;
+  }
+
+  .panel-links {
+    grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+  }
+
+  .panel-tab {
+    min-height: 34px;
+  }
+
+  .panel-body {
+    padding-bottom: 4px;
+  }
+
+  .panel-bodies {
+    grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+  }
+
+  .panel-bodies button,
+  .panel-bodies > li > span {
+    min-height: 52px;
+  }
+}
+
+@media (max-width: 420px) {
+  .identity {
+    padding-inline: 16px;
+  }
+
+  .panel-metrics {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .panel-bodies {
+    grid-template-columns: 1fr;
+  }
+}
+
+/*
+ * A viewport with far more width than height — a laptop with the browser half-open, a phone turned
+ * on its side. Both regions give up height rather than either one giving up its place: the
+ * paragraph holds two lines, and the four values stand in one row instead of two.
+ */
+@media (max-height: 620px) {
+  .identity-summary {
+    -webkit-line-clamp: 2;
+    line-clamp: 2;
+  }
+}
+
+@media (max-height: 560px) {
+  .hud {
+    inset: 64px 0 36px;
+    padding: 12px 20px;
+  }
+
+  .identity {
+    padding-bottom: 8px;
+  }
+
+  .identity-name {
+    font-size: clamp(30px, 3.4vw, 44px);
+  }
+
+  .identity-tags {
+    margin: 12px 0 10px;
+  }
+
+  .identity-note {
+    margin-top: 10px;
+  }
+
+  .panel {
+    padding: 12px;
+  }
+
+  .panel-head {
+    padding-bottom: 10px;
+  }
+
+  .panel-metrics {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: 5px;
+  }
+
+  .panel-metrics div {
+    padding: 6px 7px;
+  }
+
+  .panel-metrics dd {
+    margin-top: 3px;
+    font-size: 13px;
+  }
+
+  .panel-metrics dd[data-length="long"] {
+    font-size: 11px;
+  }
+
+  .panel-metrics dd[data-length="longest"] {
+    font-size: 9px;
+  }
+
+  .panel-links {
+    margin-top: 8px;
+  }
+
+  .panel-link {
+    min-height: 42px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .panel-disclosure svg {
+    transition: none;
+  }
+}
