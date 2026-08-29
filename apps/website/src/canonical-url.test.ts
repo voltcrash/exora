@@ -1,66 +1,40 @@
 import { expect, test } from "vite-plus/test";
 import { canonicalUrlForSearch, SITE_ORIGIN } from "./canonical-url.ts";
 
-test("the landing page is canonical to itself", () => {
-  expect(canonicalUrlForSearch("")).toBe(`${SITE_ORIGIN}/`);
-  expect(canonicalUrlForSearch("?")).toBe(`${SITE_ORIGIN}/`);
+test("creates canonicals only for resolved catalog destinations", () => {
+  const cases: [string, string][] = [
+    ["", "/"],
+    ["?", "/"],
+    ["?planet=Kepler-22%20b", "/?planet=Kepler-22%20b"],
+    ["?blackHole=Sagittarius%20A*", "/?blackHole=Sagittarius%20A*"],
+    ["?star=Sirius", "/?star=Sirius"],
+    ["?system=TRAPPIST-1", "/?system=TRAPPIST-1"],
+    ["?region=Oort%20Cloud", "/?region=Oort%20Cloud"],
+    ["?planet=55%20Cnc%20e", "/?planet=55%20Cnc%20e"],
+    ["?star=Barnard's%20star", "/?star=Barnard's%20star"],
+    ["?planet=Earth&blackHole=M87*", "/?blackHole=M87*"],
+    ["?planet=Kepler-22%20b&star=Sirius", "/?star=Sirius"],
+    ["?planet=Kepler-22%20b&system=Kepler-22", "/?system=Kepler-22"],
+    ["?star=Sirius&system=Kepler-22", "/?star=Sirius"],
+    ["?planet=Earth&region=Kuiper%20Belt", "/?region=Kuiper%20Belt"],
+    ["?planet=Kepler-22%20b&utm_source=newsletter", "/?planet=Kepler-22%20b"],
+  ];
+
+  for (const [search, path] of cases) {
+    expect(canonicalUrlForSearch(search), search || "root").toBe(`${SITE_ORIGIN}${path}`);
+  }
 });
 
-test("a catalogued destination is canonical to its own URL", () => {
-  expect(canonicalUrlForSearch("?planet=Kepler-22%20b")).toBe(
-    `${SITE_ORIGIN}/?planet=Kepler-22%20b`,
-  );
-  expect(canonicalUrlForSearch("?blackHole=Sagittarius%20A*")).toBe(
-    `${SITE_ORIGIN}/?blackHole=Sagittarius%20A*`,
-  );
-  expect(canonicalUrlForSearch("?star=Sirius")).toBe(`${SITE_ORIGIN}/?star=Sirius`);
-  expect(canonicalUrlForSearch("?system=TRAPPIST-1")).toBe(`${SITE_ORIGIN}/?system=TRAPPIST-1`);
-  expect(canonicalUrlForSearch("?region=Oort%20Cloud")).toBe(`${SITE_ORIGIN}/?region=Oort%20Cloud`);
-});
-
-test("names with characters that need escaping survive the round trip", () => {
-  expect(canonicalUrlForSearch("?planet=55%20Cnc%20e")).toBe(`${SITE_ORIGIN}/?planet=55%20Cnc%20e`);
-  expect(canonicalUrlForSearch("?star=Barnard's%20star")).toBe(
-    `${SITE_ORIGIN}/?star=Barnard's%20star`,
-  );
-});
-
-test("a black-hole destination wins in the same order the app resolves it", () => {
-  expect(canonicalUrlForSearch("?planet=Earth&blackHole=M87*")).toBe(
-    `${SITE_ORIGIN}/?blackHole=M87*`,
-  );
-});
-
-test("a procedural recipe collapses to the root rather than creating generated canonicals", () => {
-  expect(canonicalUrlForSearch("?custom=My%20World")).toBe(`${SITE_ORIGIN}/`);
-  expect(canonicalUrlForSearch("?customStar=My%20Star")).toBe(`${SITE_ORIGIN}/`);
-});
-
-test("tracking parameters cannot mint a distinct canonical for the same page", () => {
-  expect(canonicalUrlForSearch("?utm_source=newsletter&fbclid=abc")).toBe(`${SITE_ORIGIN}/`);
-  expect(canonicalUrlForSearch("?planet=Kepler-22%20b&utm_source=newsletter")).toBe(
-    `${SITE_ORIGIN}/?planet=Kepler-22%20b`,
-  );
-});
-
-test("the destinations resolve in the order the app resolves them", () => {
-  expect(canonicalUrlForSearch("?planet=Kepler-22%20b&star=Sirius")).toBe(
-    `${SITE_ORIGIN}/?star=Sirius`,
-  );
-  expect(canonicalUrlForSearch("?planet=Kepler-22%20b&system=Kepler-22")).toBe(
-    `${SITE_ORIGIN}/?system=Kepler-22`,
-  );
-  expect(canonicalUrlForSearch("?star=Sirius&system=Kepler-22")).toBe(
-    `${SITE_ORIGIN}/?star=Sirius`,
-  );
-  expect(canonicalUrlForSearch("?planet=Earth&region=Kuiper%20Belt")).toBe(
-    `${SITE_ORIGIN}/?region=Kuiper%20Belt`,
-  );
-});
-
-test("an empty or blank destination is not treated as one", () => {
-  expect(canonicalUrlForSearch("?planet=")).toBe(`${SITE_ORIGIN}/`);
-  expect(canonicalUrlForSearch("?blackHole=%20%20")).toBe(`${SITE_ORIGIN}/`);
-  expect(canonicalUrlForSearch("?star=%20%20")).toBe(`${SITE_ORIGIN}/`);
-  expect(canonicalUrlForSearch("?system=")).toBe(`${SITE_ORIGIN}/`);
+test("collapses generated, tracking, and blank destinations to the root", () => {
+  for (const search of [
+    "?custom=My%20World",
+    "?customStar=My%20Star",
+    "?utm_source=newsletter&fbclid=abc",
+    "?planet=",
+    "?blackHole=%20%20",
+    "?star=%20%20",
+    "?system=",
+  ]) {
+    expect(canonicalUrlForSearch(search), search).toBe(`${SITE_ORIGIN}/`);
+  }
 });

@@ -2,7 +2,7 @@ import { renderToStaticMarkup } from "react-dom/server";
 import { expect, test } from "vite-plus/test";
 import { FrameRateSignal } from "./FrameRateSignal.tsx";
 
-test("keeps the signal bars beside a finite frame-rate reading", () => {
+test("renders finite and unavailable frame-rate readings compactly", () => {
   const markup = renderToStaticMarkup(<FrameRateSignal fps="51" />);
 
   expect(markup).toContain('data-testid="frame-rate-reading"');
@@ -10,13 +10,10 @@ test("keeps the signal bars beside a finite frame-rate reading", () => {
   expect(markup).toContain("<small>FPS</small>");
   expect(markup).not.toContain("DESKTOP");
   expect(markup).not.toContain("MOBILE");
-});
-
-test("prints a compact infinity symbol before a reading is available", () => {
   for (const fps of ["--", "Infinity", "NaN", ""]) {
-    const markup = renderToStaticMarkup(<FrameRateSignal fps={fps} />);
+    const unavailableMarkup = renderToStaticMarkup(<FrameRateSignal fps={fps} />);
 
-    expect(markup).toContain("<strong>∞</strong>");
-    expect(markup).not.toContain("<strong>Infinity</strong>");
+    expect(unavailableMarkup).toContain("<strong>∞</strong>");
+    expect(unavailableMarkup).not.toContain("<strong>Infinity</strong>");
   }
 });

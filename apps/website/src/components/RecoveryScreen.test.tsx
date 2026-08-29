@@ -2,8 +2,8 @@ import { renderToStaticMarkup } from "react-dom/server";
 import { expect, test, vi } from "vite-plus/test";
 import { RecoveryScreen } from "./RecoveryScreen.tsx";
 
-test("renders an actionable alert for an unrecoverable renderer failure", () => {
-  const markup = renderToStaticMarkup(
+test("distinguishes failed and automatically recovering renderers", () => {
+  const failedMarkup = renderToStaticMarkup(
     <RecoveryScreen
       action="RESTART RENDERER"
       detail="The graphics session could not be restored."
@@ -12,13 +12,11 @@ test("renders an actionable alert for an unrecoverable renderer failure", () => 
     />,
   );
 
-  expect(markup).toContain('role="alert"');
-  expect(markup).toContain("RENDERER OFFLINE");
-  expect(markup).toContain("RESTART RENDERER");
-});
+  expect(failedMarkup).toContain('role="alert"');
+  expect(failedMarkup).toContain("RENDERER OFFLINE");
+  expect(failedMarkup).toContain("RESTART RENDERER");
 
-test("announces automatic context recovery as progress", () => {
-  const markup = renderToStaticMarkup(
+  const pendingMarkup = renderToStaticMarkup(
     <RecoveryScreen
       action="RESTART NOW"
       detail="Waiting for the browser to restore graphics access."
@@ -28,6 +26,6 @@ test("announces automatic context recovery as progress", () => {
     />,
   );
 
-  expect(markup).toContain('role="status"');
-  expect(markup).toContain("RECONNECTING TO GPU");
+  expect(pendingMarkup).toContain('role="status"');
+  expect(pendingMarkup).toContain("RECONNECTING TO GPU");
 });

@@ -1,31 +1,25 @@
 import { expect, test } from "vite-plus/test";
 import { frameRateStrength } from "./frame-rate.ts";
 
-test("a scene running at the refresh rate fills the meter", () => {
-  expect(frameRateStrength("60")).toBe(4);
-  expect(frameRateStrength("144")).toBe(4);
-});
+test("maps frame-rate readings to signal strength", () => {
+  const readings = {
+    "144": 4,
+    "60": 4,
+    "57": 4,
+    "55": 4,
+    "54": 3,
+    "40": 3,
+    "39": 2,
+    "25": 2,
+    "24": 1,
+    "3": 1,
+    "0": 1,
+    "--": 0,
+    "": 0,
+    NaN: 0,
+  } as const;
 
-test("a panel that never quite reports its own rate still fills it", () => {
-  expect(frameRateStrength("57")).toBe(4);
-  expect(frameRateStrength("55")).toBe(4);
-});
-
-test("the bars fall with the frame rate", () => {
-  expect(frameRateStrength("54")).toBe(3);
-  expect(frameRateStrength("40")).toBe(3);
-  expect(frameRateStrength("39")).toBe(2);
-  expect(frameRateStrength("25")).toBe(2);
-  expect(frameRateStrength("24")).toBe(1);
-  expect(frameRateStrength("3")).toBe(1);
-});
-
-test("a stalled renderer is one bar, not an empty meter", () => {
-  expect(frameRateStrength("0")).toBe(1);
-});
-
-test("nothing measured yet lights nothing", () => {
-  expect(frameRateStrength("--")).toBe(0);
-  expect(frameRateStrength("")).toBe(0);
-  expect(frameRateStrength("NaN")).toBe(0);
+  for (const [reading, strength] of Object.entries(readings)) {
+    expect(frameRateStrength(reading), reading).toBe(strength);
+  }
 });

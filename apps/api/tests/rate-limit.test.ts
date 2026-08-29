@@ -1,39 +1,16 @@
 import { expect, test } from "vite-plus/test";
 import { clientKey, createRateLimiter } from "../src/rate-limit.ts";
 
-test("requests inside the budget are allowed and count down", () => {
+test("counts down isolated client budgets and resets their windows", () => {
   const limiter = createRateLimiter({ limit: 3, windowMs: 1_000 });
 
   expect(limiter.check("a", 0)).toMatchObject({ allowed: true, remaining: 2 });
   expect(limiter.check("a", 10)).toMatchObject({ allowed: true, remaining: 1 });
   expect(limiter.check("a", 20)).toMatchObject({ allowed: true, remaining: 0 });
-});
-
-test("the request past the budget is refused", () => {
-  const limiter = createRateLimiter({ limit: 2, windowMs: 1_000 });
-  limiter.check("a", 0);
-  limiter.check("a", 0);
-
   expect(limiter.check("a", 0)).toMatchObject({ allowed: false, remaining: 0 });
-});
-
-test("the window rolls over and the budget returns", () => {
-  const limiter = createRateLimiter({ limit: 1, windowMs: 1_000 });
-
-  expect(limiter.check("a", 0).allowed).toBe(true);
-  expect(limiter.check("a", 999).allowed).toBe(false);
   expect(limiter.check("a", 1_000).allowed).toBe(true);
-});
-
-test("clients are budgeted separately", () => {
-  const limiter = createRateLimiter({ limit: 1, windowMs: 1_000 });
-
-  expect(limiter.check("a", 0).allowed).toBe(true);
   expect(limiter.check("b", 0).allowed).toBe(true);
-  expect(limiter.check("a", 0).allowed).toBe(false);
-});
 
-test("separate serverless instances have independent in-memory budgets", () => {
   const firstInstance = createRateLimiter({ limit: 1, windowMs: 1_000 });
   const secondInstance = createRateLimiter({ limit: 1, windowMs: 1_000 });
 
@@ -42,7 +19,7 @@ test("separate serverless instances have independent in-memory budgets", () => {
   expect(secondInstance.check("client", 0).allowed).toBe(true);
 });
 
-test("a refused caller is told to wait past the end of the window", () => {
+test("reports the enforced budget and a nonzero wait through the end of its window", () => {
   const limiter = createRateLimiter({ limit: 1, windowMs: 60_000 });
   limiter.check("a", 0);
 
@@ -51,42 +28,35 @@ test("a refused caller is told to wait past the end of the window", () => {
   expect(refused.allowed).toBe(false);
   expect(refused.retryAfterSeconds).toBe(30);
   expect(refused.resetAt).toBe(60_000);
+  expect(refused.limit).toBe(1);
+
+  const shortWindow = createRateLimiter({ limit: 1, windowMs: 1_000 });
+  shortWindow.check("a", 0);
+  expect(shortWindow.check("a", 999).retryAfterSeconds).toBe(1);
 });
 
-test("a wait is never rounded down to zero seconds", () => {
-  const limiter = createRateLimiter({ limit: 1, windowMs: 1_000 });
-  limiter.check("a", 0);
-
-  expect(limiter.check("a", 999).retryAfterSeconds).toBe(1);
-});
-
-test("the tracked client count is bounded, since the keys come from request headers", () => {
+test("bounds tracked clients and evicts the least recently seen", () => {
   const limiter = createRateLimiter({ limit: 10, maxClients: 4, windowMs: 1_000 });
 
   for (let index = 0; index < 2_000; index += 1) limiter.check(`client-${index}`, 0);
 
   expect(limiter.size()).toBe(4);
+
+  const smallLimiter = createRateLimiter({ limit: 1, maxClients: 2, windowMs: 10_000 });
+  smallLimiter.check("a", 0);
+  smallLimiter.check("b", 0);
+  smallLimiter.check("a", 1);
+  smallLimiter.check("c", 2);
+
+  expect(smallLimiter.check("a", 3).allowed).toBe(false);
+  expect(smallLimiter.check("b", 4).allowed).toBe(true);
 });
 
-test("eviction drops the least recently seen client", () => {
-  const limiter = createRateLimiter({ limit: 1, maxClients: 2, windowMs: 10_000 });
-  limiter.check("a", 0);
-  limiter.check("b", 0);
-  limiter.check("a", 1); // "a" is refused, but the touch makes "b" the oldest
-  limiter.check("c", 2); // evicts "b"
-
-  expect(limiter.check("a", 3).allowed).toBe(false);
-  expect(limiter.check("b", 4).allowed).toBe(true);
-});
-
-test("Vercel's forwarding header is trusted only behind the configured proxy boundary", () => {
+test("trusts only a valid Vercel identity behind the configured proxy boundary", () => {
   const headers = { vercelForwardedFor: "203.0.113.7" };
 
   expect(clientKey(headers)).toBe("unknown");
   expect(clientKey(headers, { trustVercelProxy: true })).toBe("203.0.113.7");
-});
-
-test("spoofed or malformed proxy identities share the conservative fallback bucket", () => {
   expect(clientKey({ forwardedFor: "203.0.113.7" })).toBe("unknown");
   expect(
     clientKey({ forwardedFor: "203.0.113.7", realIp: "198.51.100.4" }, { trustVercelProxy: true }),
@@ -98,10 +68,4 @@ test("spoofed or malformed proxy identities share the conservative fallback buck
     "unknown",
   );
   expect(clientKey({})).toBe("unknown");
-});
-
-test("a decision reports the budget it was actually made against", () => {
-  const limiter = createRateLimiter({ limit: 7, windowMs: 1_000 });
-
-  expect(limiter.check("a", 0).limit).toBe(7);
 });
