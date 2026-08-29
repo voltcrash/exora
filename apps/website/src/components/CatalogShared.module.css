@@ -97,6 +97,7 @@
 }
 
 .black-hole-provenance {
+  grid-column: 1 / -1;
   align-self: center;
   justify-self: end;
   padding: 4px 7px;
