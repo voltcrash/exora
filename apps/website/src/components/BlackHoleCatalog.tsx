@@ -201,13 +201,18 @@ export const BlackHoleCatalog = ({
           ))}
         </div>
 
-        <section className={cx("black-hole-catalog-hero")} aria-labelledby="black-hole-atlas-title">
-          <div>
-            <p>{copy.eyebrow}</p>
-            <h2 id="black-hole-atlas-title">{copy.title}</h2>
-          </div>
-          <p>{copy.summary}</p>
-        </section>
+        {!embedded ? (
+          <section
+            className={cx("black-hole-catalog-hero")}
+            aria-labelledby="black-hole-atlas-title"
+          >
+            <div>
+              <p>{copy.eyebrow}</p>
+              <h2 id="black-hole-atlas-title">{copy.title}</h2>
+            </div>
+            <p>{copy.summary}</p>
+          </section>
+        ) : null}
 
         {view === "procedural" ? (
           <div className={cx("black-hole-generator-controls")}>

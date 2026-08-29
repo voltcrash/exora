@@ -302,12 +302,14 @@ export const StarCatalog = ({ embedded = false, onClose, onSelect }: StarCatalog
             <span aria-hidden="true">↗</span>
           </span>
         </button>
-        <div className={cx("discovery-intro")}>
-          <span>
-            {portalView === "collections" ? "CURATED JOURNEYS" : "EXPLORE BY STELLAR FAMILY"}
-          </span>
-          <small>Large targets are designed for gaze, pointer, touch, or mouse</small>
-        </div>
+        {!embedded ? (
+          <div className={cx("discovery-intro")}>
+            <span>
+              {portalView === "collections" ? "CURATED JOURNEYS" : "EXPLORE BY STELLAR FAMILY"}
+            </span>
+            <small>Large targets are designed for gaze, pointer, touch, or mouse</small>
+          </div>
+        ) : null}
         <div className={cx("discovery-tabs")} {...tabs.tabListProps}>
           <button {...tabs.tabProps("collections")} onClick={() => setPortalView("collections")}>
             Curated collections

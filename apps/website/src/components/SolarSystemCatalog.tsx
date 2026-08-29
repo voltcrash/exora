@@ -103,14 +103,16 @@ export const SolarSystemCatalog = ({
             </button>
           </div>
         ) : null}
-        <div className={cx("solar-system-hero")}>
-          <span>THE SOLAR SYSTEM</span>
-          <strong>Known worlds. Real surfaces. Our cosmic address.</strong>
-          <small>
-            Every body keeps its permanent JPL/NAIF identity · {SOLAR_SYSTEM_MOONS.length} principal
-            mapped moons
-          </small>
-        </div>
+        {!embedded ? (
+          <div className={cx("solar-system-hero")}>
+            <span>THE SOLAR SYSTEM</span>
+            <strong>Known worlds. Real surfaces. Our cosmic address.</strong>
+            <small>
+              Every body keeps its permanent JPL/NAIF identity · {SOLAR_SYSTEM_MOONS.length}{" "}
+              principal mapped moons
+            </small>
+          </div>
+        ) : null}
         <div className={cx("solar-catalog-tools")} role="search">
           <label>
             <span>SEARCH HOME SYSTEM</span>

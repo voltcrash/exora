@@ -407,16 +407,18 @@ export const PlanetCatalog = ({ embedded = false, onClose, onSelect }: PlanetCat
             <span aria-hidden="true">↗</span>
           </span>
         </button>
-        <div className={cx("discovery-intro")}>
-          <span>
-            {portalView === "collections"
-              ? "CURATED JOURNEYS"
-              : portalView === "categories"
-                ? "EXPLORE BY PHENOMENON"
-                : "HOLOGRAPHIC OBSERVATORY CONSOLE"}
-          </span>
-          <small>Large targets are designed for gaze, pointer, touch, or mouse</small>
-        </div>
+        {!embedded ? (
+          <div className={cx("discovery-intro")}>
+            <span>
+              {portalView === "collections"
+                ? "CURATED JOURNEYS"
+                : portalView === "categories"
+                  ? "EXPLORE BY PHENOMENON"
+                  : "HOLOGRAPHIC OBSERVATORY CONSOLE"}
+            </span>
+            <small>Large targets are designed for gaze, pointer, touch, or mouse</small>
+          </div>
+        ) : null}
         <div className={cx("discovery-tabs")} {...tabs.tabListProps}>
           <button {...tabs.tabProps("collections")} onClick={() => selectPortalView("collections")}>
             Curated collections

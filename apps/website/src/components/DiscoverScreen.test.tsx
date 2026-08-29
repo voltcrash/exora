@@ -60,7 +60,16 @@ test("the black-hole destination exposes the five sourced landmarks", () => {
   expect(markup).toContain("TON 618");
   expect(markup).toContain("Cygnus X-1");
   expect(markup).toContain("Gaia BH1");
-  expect(markup).toContain("interpretive gravitational-lensing visualization");
+  expect(markup).not.toContain("Where light loses the way out.");
+});
+
+test("embedded destinations omit their duplicate catalog intro panels", () => {
+  expect(discoverMarkup("worlds")).not.toContain("CURATED JOURNEYS");
+  expect(discoverMarkup("stars")).not.toContain(
+    "Large targets are designed for gaze, pointer, touch, or mouse",
+  );
+  expect(discoverMarkup("solar")).not.toContain("Known worlds. Real surfaces. Our cosmic address.");
+  expect(discoverMarkup("black-holes")).not.toContain("THE HORIZON FIVE");
 });
 
 test("an embedded catalog becomes a named region inside the full-screen dialog", () => {
