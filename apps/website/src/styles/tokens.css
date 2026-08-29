@@ -1,0 +1,17 @@
+:root {
+  color: #f4f7f8;
+  background: #030506;
+  font-family: "Exo 2", system-ui, sans-serif;
+  font-synthesis: none;
+  text-rendering: optimizeLegibility;
+  -webkit-font-smoothing: antialiased;
+  --accent: #ff6b32;
+  --accent-soft: rgb(255 107 50 / 12%);
+  --cyan: #8be6ea;
+  --ink: #f4f7f8;
+  --muted: #91a0a6;
+  --faint: #536168;
+  --line: rgb(229 244 247 / 12%);
+  --panel: rgb(8 13 15 / 78%);
+  --mono: "IBM Plex Mono", ui-monospace, monospace;
+}

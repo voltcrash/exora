@@ -1,0 +1,134 @@
+* {
+  box-sizing: border-box;
+}
+
+html,
+body,
+#app,
+.experience-shell {
+  width: 100%;
+  height: 100%;
+  margin: 0;
+  overflow: hidden;
+}
+
+body {
+  min-width: 320px;
+}
+
+button,
+input,
+select,
+kbd {
+  font: inherit;
+}
+
+button {
+  -webkit-tap-highlight-color: transparent;
+}
+
+#render-canvas {
+  position: fixed;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  border: 0;
+  outline: none;
+  touch-action: none;
+}
+
+/* Variant composites the iPhone camera beneath the page, so every viewport surface is transparent during AR. */
+html[data-presentation-mode="ar"],
+body[data-presentation-mode="ar"],
+body[data-presentation-mode="ar"] #app,
+body[data-presentation-mode="ar"] .experience-shell,
+body[data-presentation-mode="ar"] #render-canvas {
+  background: transparent !important;
+}
+
+body[data-presentation-mode="ar"] #app > :not(#render-canvas) {
+  visibility: hidden !important;
+}
+
+body[data-presentation-mode="ar"] .experience-shell > *,
+body[data-presentation-mode="ar"] .space-haze,
+body[data-presentation-mode="ar"] .viewport-grid,
+body[data-presentation-mode="ar"] .surface-veil,
+body[data-presentation-mode="ar"] .travel-veil {
+  display: none !important;
+}
+
+html[data-presentation-mode="ar"],
+body[data-presentation-mode="ar"],
+body[data-presentation-mode="ar"] #ar-overlay,
+body[data-presentation-mode="ar"] #render-canvas {
+  overscroll-behavior: none;
+  touch-action: none;
+}
+
+#ar-overlay {
+  position: fixed;
+  z-index: 100;
+  inset: 0;
+  pointer-events: auto;
+  background: transparent;
+}
+
+#ar-overlay[hidden] {
+  display: none;
+}
+
+#ar-overlay p {
+  position: absolute;
+  bottom: max(28px, env(safe-area-inset-bottom));
+  left: 50%;
+  width: max-content;
+  max-width: calc(100vw - 32px);
+  margin: 0;
+  padding: 10px 14px;
+  border: 1px solid rgb(139 230 234 / 42%);
+  border-radius: 999px;
+  color: #eafafa;
+  background: rgb(3 9 10 / 68%);
+  box-shadow: 0 8px 32px rgb(0 0 0 / 28%);
+  font-family: var(--mono);
+  font-size: 9px;
+  letter-spacing: 0.08em;
+  text-align: center;
+  transform: translateX(-50%);
+  backdrop-filter: blur(12px);
+}
+
+#ar-overlay .ar-background-toggle,
+#ar-overlay .ar-back-button {
+  position: absolute;
+  top: max(18px, env(safe-area-inset-top));
+  padding: 9px 12px;
+  border: 1px solid rgb(139 230 234 / 46%);
+  border-radius: 999px;
+  color: #eafafa;
+  background: rgb(3 9 10 / 76%);
+  box-shadow: 0 8px 28px rgb(0 0 0 / 24%);
+  font-family: var(--mono);
+  font-size: 8px;
+  letter-spacing: 0.08em;
+  pointer-events: auto;
+  touch-action: manipulation;
+}
+
+#ar-overlay .ar-background-toggle {
+  right: 18px;
+}
+
+#ar-overlay .ar-back-button {
+  left: 18px;
+}
+
+#ar-overlay .ar-back-button:disabled {
+  opacity: 0.55;
+}
+
+#ar-overlay .ar-background-toggle[aria-pressed="true"] {
+  border-color: rgb(255 190 80 / 58%);
+  color: #ffe2ae;
+}
