@@ -9,6 +9,7 @@ import {
 } from "@exora/worldgen";
 import { lazy, Suspense, useCallback, useEffect, useState, type CSSProperties } from "react";
 import {
+  loadBlackHoleByName,
   loadPlanetByName,
   type PlanetLoadResult,
   type StarLoadResult,
@@ -86,8 +87,11 @@ const loadRequestedObject = async (): Promise<ActiveObject> => {
   const parameters = new URLSearchParams(window.location.search);
   const blackHoleName = parameters.get("blackHole");
   if (blackHoleName) {
-    const { findBlackHole } = await import("./black-holes.ts");
-    const blackHole = findBlackHole(blackHoleName);
+    const { findBlackHole, findProceduralBlackHole } = await import("./black-holes.ts");
+    const blackHole =
+      findBlackHole(blackHoleName) ??
+      findProceduralBlackHole(blackHoleName) ??
+      (await loadBlackHoleByName(blackHoleName));
     return blackHole
       ? { blackHole, type: "black-hole" }
       : { kind: "black hole", name: blackHoleName, type: "missing" };
@@ -312,7 +316,8 @@ export const App = () => {
   }, []);
 
   const selectBlackHole = useCallback((blackHole: BlackHoleProfile): void => {
-    window.history.pushState({}, "", `?blackHole=${encodeURIComponent(blackHole.name)}`);
+    const identity = blackHole.provenance === "procedural" ? blackHole.id : blackHole.name;
+    window.history.pushState({}, "", `?blackHole=${encodeURIComponent(identity)}`);
     setDiscoverOpen(false);
     setSystemHostName(null);
     setActiveObject({ blackHole, type: "black-hole" });

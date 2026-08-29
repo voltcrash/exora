@@ -2,6 +2,7 @@ import { expect, test } from "vite-plus/test";
 import {
   BLACK_HOLES,
   findBlackHole,
+  findProceduralBlackHole,
   formatBlackHoleMass,
   schwarzschildDiameterKilometers,
 } from "./black-holes.ts";
@@ -24,4 +25,20 @@ test("derived size is explicitly the Schwarzschild reference diameter", () => {
   expect(cygnus).toBeDefined();
   expect(schwarzschildDiameterKilometers(cygnus!)).toBeCloseTo(125.22, 1);
   expect(formatBlackHoleMass(6_500_000_000)).toBe("6.5 billion M☉");
+});
+
+test("reconstructs a procedural deep link from its deterministic ID", () => {
+  const blackHole = findProceduralBlackHole("exora-synthetic-42-0007");
+
+  expect(blackHole).toMatchObject({
+    id: "exora-synthetic-42-0007",
+    name: "EXORA SYNTHETIC 0007",
+    provenance: "procedural",
+    status: "synthetic",
+  });
+  expect(findProceduralBlackHole("EXORA SYNTHETIC 0007")).toBeUndefined();
+});
+
+test("reports unavailable rather than formatting a fake observed mass", () => {
+  expect(formatBlackHoleMass(null)).toBe("Mass unavailable");
 });

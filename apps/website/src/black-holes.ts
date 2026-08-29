@@ -1,4 +1,5 @@
 import { FEATURED_BLACK_HOLES, type BlackHoleProfile } from "@exora/contracts";
+import { generateProceduralBlackHole } from "@exora/worldgen";
 
 export type { BlackHoleKind, BlackHoleProfile } from "@exora/contracts";
 
@@ -20,6 +21,19 @@ export const findBlackHole = (value: string): BlackHoleProfile | undefined => {
       (identity) => normalizeIdentity(identity) === requested,
     ),
   );
+};
+
+export const findProceduralBlackHole = (value: string): BlackHoleProfile | undefined => {
+  const match = value
+    .trim()
+    .toLowerCase()
+    .match(/^exora-synthetic-(\d+)-(\d{4,})$/);
+  if (!match) return undefined;
+  const seed = Number(match[1]);
+  const sequence = Number(match[2]);
+  if (!Number.isSafeInteger(seed) || !Number.isSafeInteger(sequence) || sequence < 1)
+    return undefined;
+  return generateProceduralBlackHole({ seed, sequence });
 };
 
 export const schwarzschildDiameterKilometers = (blackHole: BlackHoleProfile): number | null =>

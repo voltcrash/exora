@@ -1,10 +1,11 @@
-import type { ExoplanetProfile, StarProfile } from "@exora/contracts";
+import type { BlackHoleProfile, ExoplanetProfile, StarProfile } from "@exora/contracts";
 import { page, userEvent } from "vite-plus/test/browser/context";
 import { createRoot, type Root } from "react-dom/client";
 import { afterEach, beforeEach, expect, test, vi } from "vite-plus/test";
 import { App } from "./App.tsx";
 import { acquireSceneHost } from "./scene-host.ts";
 import { featuredPlanet } from "./planet-profile.ts";
+import { BLACK_HOLES } from "./black-holes.ts";
 import "./styles/tokens.css";
 import "./styles/globals.css";
 
@@ -176,6 +177,31 @@ const namedPlanet = (name: string): ExoplanetProfile => ({
   name,
 });
 
+const observedBlackHole: BlackHoleProfile = {
+  ...BLACK_HOLES[3]!,
+  aliases: ["V404 Cyg"],
+  catalogDesignation: "GS 2023+338",
+  id: "blackcat-gs-2023-338",
+  massSolar: null,
+  massUncertaintySolar: null,
+  milestone: "BlackCAT black-hole candidate",
+  name: "GS 2023+338",
+  observation: {
+    ...BLACK_HOLES[3]!.observation,
+    companion: "V404 Cyg",
+    summary: "An observed BlackCAT candidate with no reliable dynamical mass reported.",
+  },
+  source: {
+    archive: "BlackCAT / CDS VizieR",
+    catalog: "J/A+A/587/A61/tablea1 + J/A+A/587/A61/tablea4",
+    measurement: "No reliable dynamical mass is reported in BlackCAT.",
+    retrievedOn: "2026-08-29",
+    title: "BlackCAT",
+    url: "https://www.astro.puc.cl/BlackCAT/transients.php",
+  },
+  status: "candidate",
+};
+
 const stubArchive = ({ missing = [] as string[] } = {}) => {
   const calls: string[] = [];
 
@@ -223,6 +249,26 @@ const stubArchive = ({ missing = [] as string[] } = {}) => {
           sourceVersion: "1.2",
           stale: false,
         },
+      });
+    }
+
+    if (url.pathname === "/api/black-holes") {
+      return Response.json({
+        data: [observedBlackHole],
+        meta: {
+          cached: false,
+          count: 1,
+          query: "observed",
+          source: "BlackCAT / CDS VizieR",
+          stale: false,
+        },
+      });
+    }
+
+    if (url.pathname.startsWith("/api/black-holes/")) {
+      return Response.json({
+        data: observedBlackHole,
+        meta: { cached: false, source: "BlackCAT / CDS VizieR", stale: false },
       });
     }
 
@@ -440,6 +486,29 @@ desktopTest("a black-hole deep link resolves without an archive request", async 
   expect(calls.filter((path) => path.includes("/api/")).length).toBe(0);
 });
 
+desktopTest("an observed BlackCAT deep link resolves through the Exora API", async () => {
+  const calls = stubArchive();
+  mountApp("?blackHole=GS%202023%2B338");
+
+  await expect.element(page.getByRole("heading", { level: 1 })).toHaveTextContent("GS 2023+338");
+  await expect.element(page.getByText("OBSERVED BLACK HOLE")).toBeVisible();
+  expect(calls.some((path) => path.includes("/api/black-holes/GS%202023%2B338"))).toBe(true);
+});
+
+desktopTest(
+  "a procedural ID deep link reconstructs locally and remains clearly synthetic",
+  async () => {
+    const calls = stubArchive();
+    mountApp("?blackHole=exora-synthetic-42-0007");
+
+    await expect
+      .element(page.getByRole("heading", { level: 1 }))
+      .toHaveTextContent("EXORA SYNTHETIC 0007");
+    await expect.element(page.getByText("PROCEDURAL BLACK HOLE")).toBeVisible();
+    expect(calls.filter((path) => path.includes("/api/")).length).toBe(0);
+  },
+);
+
 desktopTest(
   "a deep link to a system resolves to the diorama, and says what it compressed",
   async () => {
@@ -575,6 +644,29 @@ desktopTest("the black-hole atlas opens and travels to a sourced horizon", async
   expect(title).not.toBeNull();
   expect(title?.scrollWidth).toBeLessThanOrEqual(title?.clientWidth ?? 0);
   expect(window.location.search).toBe("?blackHole=Sagittarius%20A*");
+});
+
+desktopTest("the hybrid atlas separates observed candidates from procedural objects", async () => {
+  stubArchive();
+  mountApp();
+  await openDiscoverSection("Black Holes");
+
+  await userEvent.click(page.getByRole("tab", { name: "OBSERVED" }));
+  await expect.element(page.getByRole("button", { name: /GS 2023\+338/ })).toBeVisible();
+  await expect.element(page.getByText("OBSERVED · CANDIDATE")).toBeVisible();
+  await expect.element(page.getByText("Mass unavailable")).toBeVisible();
+
+  await userEvent.click(page.getByRole("tab", { name: "PROCEDURAL" }));
+  await expect.element(page.getByText("PROCEDURAL · SYNTHETIC").first()).toBeVisible();
+  await expect.element(page.getByRole("button", { name: /EXORA SYNTHETIC 0001/ })).toBeVisible();
+  await userEvent.click(page.getByRole("button", { name: "GENERATE MORE" }));
+  const synthetic = page.getByRole("button", { name: /EXORA SYNTHETIC 0016/ });
+  await expect.element(synthetic).toBeVisible();
+  await userEvent.click(synthetic);
+  await expect
+    .element(page.getByRole("heading", { level: 1 }))
+    .toHaveTextContent("EXORA SYNTHETIC 0016");
+  expect(window.location.search).toBe("?blackHole=exora-synthetic-42-0016");
 });
 
 /*

@@ -43,6 +43,81 @@
     radial-gradient(circle at 86% 78%, rgb(220 137 69 / 8%), transparent 32%), #07070b;
 }
 
+.black-hole-tabs,
+.black-hole-generator-controls {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin: 18px 26px 0;
+}
+
+.black-hole-tabs button,
+.black-hole-generator-controls button,
+.black-hole-generator-controls input {
+  border: 1px solid rgb(190 155 255 / 20%);
+  border-radius: 999px;
+  color: #a99bbd;
+  background: rgb(18 14 25 / 72%);
+  font: 7px var(--mono);
+  letter-spacing: 0.1em;
+}
+
+.black-hole-tabs button,
+.black-hole-generator-controls button {
+  padding: 8px 13px;
+  cursor: pointer;
+}
+
+.black-hole-tabs button[aria-selected="true"],
+.black-hole-generator-controls button:hover {
+  border-color: rgb(197 164 255 / 60%);
+  color: #f2eaff;
+  background: rgb(95 62 147 / 28%);
+}
+
+.black-hole-generator-controls {
+  align-items: end;
+  margin-top: 0;
+  margin-bottom: 18px;
+}
+
+.black-hole-generator-controls label {
+  display: grid;
+  gap: 5px;
+  color: #796e89;
+  font: 6px var(--mono);
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+}
+
+.black-hole-generator-controls input {
+  width: 90px;
+  padding: 7px 10px;
+  border-radius: 8px;
+}
+
+.black-hole-provenance {
+  align-self: center;
+  justify-self: end;
+  padding: 4px 7px;
+  border: 1px solid rgb(197 164 255 / 22%);
+  border-radius: 999px;
+  color: #c7a8ff;
+  font: 6px var(--mono);
+  letter-spacing: 0.08em;
+}
+
+.black-hole-catalog-state {
+  margin: 12px 26px 22px;
+  padding: 18px;
+  border: 1px solid rgb(190 155 255 / 12%);
+  border-radius: 12px;
+  color: #8e879b;
+  font: 7px/1.6 var(--mono);
+  letter-spacing: 0.08em;
+  text-align: center;
+}
+
 .black-hole-catalog-hero {
   display: grid;
   grid-template-columns: minmax(260px, 0.75fr) minmax(320px, 1fr);

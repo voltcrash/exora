@@ -1,5 +1,7 @@
 import {
   type ContractSchema,
+  type BlackHoleProfile,
+  type BlackHoleResponse,
   type EphemerisResponse,
   type ExoplanetProfile,
   type PlanetResponse,
@@ -15,6 +17,7 @@ const OBJECT_LOOKUP_TIMEOUT_MS = 8_000;
 
 const PLANET_COLLECTION_TIMEOUT_MS = 8_000;
 const STAR_COLLECTION_TIMEOUT_MS = 10_000;
+const BLACK_HOLE_COLLECTION_TIMEOUT_MS = 10_000;
 const EPHEMERIS_TIMEOUT_MS = 20_000;
 
 interface CollectionOptions {
@@ -27,6 +30,8 @@ type SchemaSelector<Schema extends ContractSchema> = (contracts: ContractModule)
 
 const responseSchema = {
   Ephemeris: (contracts: ContractModule) => contracts.ephemerisResponseSchema,
+  BlackHole: (contracts: ContractModule) => contracts.blackHoleResponseSchema,
+  BlackHoleSearch: (contracts: ContractModule) => contracts.blackHoleSearchResponseSchema,
   Planet: (contracts: ContractModule) => contracts.planetResponseSchema,
   PlanetSearch: (contracts: ContractModule) => contracts.planetSearchResponseSchema,
   Star: (contracts: ContractModule) => contracts.starResponseSchema,
@@ -128,6 +133,53 @@ export interface RandomStarResult {
   cached: boolean;
   star: StarProfile;
 }
+
+export interface BlackHoleSearchResult {
+  blackHoles: BlackHoleProfile[];
+  cached: boolean;
+  stale: boolean;
+}
+
+const requestBlackHole = async (
+  name: string,
+  fetcher: Fetcher,
+  signal?: AbortSignal,
+): Promise<BlackHoleResponse | null> => {
+  try {
+    const response = await fetcher(`/api/black-holes/${encodeURIComponent(name)}`, {
+      headers: { accept: "application/json" },
+      signal: requestDeadline(OBJECT_LOOKUP_TIMEOUT_MS, signal),
+    });
+    if (!response.ok) return null;
+    return await parseApiPayload(responseSchema.BlackHole, await response.json());
+  } catch {
+    return null;
+  }
+};
+
+export const loadBlackHoleByName = async (
+  name: string,
+  fetcher: Fetcher = fetch,
+): Promise<BlackHoleProfile | null> => (await requestBlackHole(name, fetcher))?.data ?? null;
+
+export const loadObservedBlackHoles = async (
+  limit = 50,
+  options: CollectionOptions = {},
+): Promise<BlackHoleSearchResult> => {
+  const safeLimit = Math.max(1, Math.min(Math.trunc(limit), 100));
+  const response = await requestCollection(
+    `/api/black-holes?source=observed&limit=${safeLimit}`,
+    options,
+    BLACK_HOLE_COLLECTION_TIMEOUT_MS,
+    "Black-hole catalog",
+    responseSchema.BlackHoleSearch,
+  );
+  return {
+    blackHoles: response.data,
+    cached: response.meta.cached,
+    stale: response.meta.stale,
+  };
+};
 
 export const loadSolarEphemeris = async (
   epoch: Date,

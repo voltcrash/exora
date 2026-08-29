@@ -9,6 +9,11 @@ export interface ProceduralBlackHoleOptions {
   seed: number;
 }
 
+export interface ProceduralBlackHoleAtOptions {
+  seed: number;
+  sequence: number;
+}
+
 interface MassClass {
   kind: BlackHoleKind;
   maximum: number;
@@ -53,61 +58,73 @@ const roundedMass = (mass: number): number => {
   return Math.round(mass * 10) / 10;
 };
 
+const normalizedSeed = (seed: number): number => {
+  if (!Number.isFinite(seed)) throw new RangeError("seed must be finite");
+  return Math.trunc(seed) >>> 0;
+};
+
+export const generateProceduralBlackHole = ({
+  seed,
+  sequence,
+}: ProceduralBlackHoleAtOptions): BlackHoleProfile => {
+  if (!Number.isSafeInteger(sequence) || sequence < 1)
+    throw new RangeError("sequence must be a positive safe integer");
+  const safeSeed = normalizedSeed(seed);
+  const random = createRandom(hashString(`${safeSeed}:${sequence}`));
+  const massClass = MASS_CLASSES[Math.floor(random() * MASS_CLASSES.length)]!;
+  const massSolar = roundedMass(logUniform(random, massClass.minimum, massClass.maximum));
+  const diskActivity = between(random, 0.08, 1);
+  const jetStrength = diskActivity < 0.25 ? 0 : between(random, 0, 1);
+  const nameIndex = sequence.toString().padStart(4, "0");
+
+  return blackHoleProfileSchema.parse({
+    aliases: [],
+    catalogDesignation: `EXORA-${safeSeed}-${nameIndex}`,
+    constellation: null,
+    distanceLightYears: null,
+    host: "Procedural spacetime",
+    id: `exora-synthetic-${safeSeed}-${nameIndex}`,
+    kind: massClass.kind,
+    massSolar,
+    massUncertaintySolar: null,
+    milestone: "Generated visualization parameter set",
+    name: `EXORA SYNTHETIC ${nameIndex}`,
+    observation: {
+      accretion: diskActivity > 0.68 ? "active" : diskActivity > 0.25 ? "quiet" : "dormant",
+      companion: null,
+      declinationDegrees: null,
+      redshift: null,
+      rightAscensionDegrees: null,
+      summary:
+        "A deterministic Exora visualization. Its mass and appearance are generator parameters, not telescope measurements or an astronomical discovery.",
+    },
+    provenance: "procedural",
+    source: {
+      archive: "Exora Custom Generator",
+      catalog: "procedural",
+      measurement: "Generated parameter; not a telescope measurement.",
+      retrievedOn: "2026-08-29",
+      title: "Exora deterministic black-hole generator",
+    },
+    status: "synthetic",
+    visual: {
+      diskActivity,
+      diskHueDegrees: between(random, 8, 238),
+      diskTiltDegrees: between(random, 4, 82),
+      jetStrength,
+      seed: Math.floor(random() * 4_294_967_295),
+    },
+  });
+};
+
 export const generateProceduralBlackHoles = ({
   count,
   seed,
 }: ProceduralBlackHoleOptions): BlackHoleProfile[] => {
   if (!Number.isSafeInteger(count) || count < 0)
     throw new RangeError("count must be a non-negative safe integer");
-  if (!Number.isFinite(seed)) throw new RangeError("seed must be finite");
-
-  const normalizedSeed = Math.trunc(seed) >>> 0;
-  return Array.from({ length: count }, (_, offset) => {
-    const sequence = offset + 1;
-    const random = createRandom(hashString(`${normalizedSeed}:${sequence}`));
-    const massClass = MASS_CLASSES[Math.floor(random() * MASS_CLASSES.length)]!;
-    const massSolar = roundedMass(logUniform(random, massClass.minimum, massClass.maximum));
-    const diskActivity = between(random, 0.08, 1);
-    const jetStrength = diskActivity < 0.25 ? 0 : between(random, 0, 1);
-    const nameIndex = sequence.toString().padStart(4, "0");
-
-    return blackHoleProfileSchema.parse({
-      aliases: [],
-      catalogDesignation: `EXORA-${normalizedSeed}-${nameIndex}`,
-      constellation: null,
-      distanceLightYears: null,
-      host: "Procedural spacetime",
-      id: `exora-synthetic-${normalizedSeed}-${nameIndex}`,
-      kind: massClass.kind,
-      massSolar,
-      massUncertaintySolar: null,
-      milestone: "Generated visualization parameter set",
-      name: `EXORA SYNTHETIC ${nameIndex}`,
-      observation: {
-        accretion: diskActivity > 0.68 ? "active" : diskActivity > 0.25 ? "quiet" : "dormant",
-        companion: null,
-        declinationDegrees: null,
-        redshift: null,
-        rightAscensionDegrees: null,
-        summary:
-          "A deterministic Exora visualization. Its mass and appearance are generator parameters, not telescope measurements or an astronomical discovery.",
-      },
-      provenance: "procedural",
-      source: {
-        archive: "Exora Custom Generator",
-        catalog: "procedural",
-        measurement: "Generated parameter; not a telescope measurement.",
-        retrievedOn: "2026-08-29",
-        title: "Exora deterministic black-hole generator",
-      },
-      status: "synthetic",
-      visual: {
-        diskActivity,
-        diskHueDegrees: between(random, 8, 238),
-        diskTiltDegrees: between(random, 4, 82),
-        jetStrength,
-        seed: Math.floor(random() * 4_294_967_295),
-      },
-    });
-  });
+  normalizedSeed(seed);
+  return Array.from({ length: count }, (_, offset) =>
+    generateProceduralBlackHole({ seed, sequence: offset + 1 }),
+  );
 };

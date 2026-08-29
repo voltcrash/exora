@@ -2,7 +2,9 @@ import { expect, test } from "vite-plus/test";
 import {
   discoverRandomPlanet,
   discoverRandomStar,
+  loadBlackHoleByName,
   loadFeaturedPlanet,
+  loadObservedBlackHoles,
   loadPlanetFilterPool,
   loadPlanetByName,
   loadPlanetsByHost,
@@ -13,6 +15,7 @@ import {
   searchStars,
 } from "./api-client.ts";
 import { featuredPlanet } from "./planet-profile.ts";
+import { BLACK_HOLES } from "./black-holes.ts";
 
 test("uses normalized live API data", async () => {
   const result = await loadFeaturedPlanet(featuredPlanet, async () =>
@@ -25,6 +28,49 @@ test("uses normalized live API data", async () => {
   expect(result.mode).toBe("live");
   expect(result.cached).toBe(true);
   expect(result.planet.name).toContain("live");
+});
+
+test("parses observed black-hole collections through the shared contract", async () => {
+  const result = await loadObservedBlackHoles(50, {
+    fetcher: async (input) => {
+      expect(input).toBe("/api/black-holes?source=observed&limit=50");
+      return Response.json({
+        data: [BLACK_HOLES[3]],
+        meta: {
+          cached: true,
+          count: 1,
+          query: "observed",
+          source: "BlackCAT / CDS VizieR",
+          stale: true,
+        },
+      });
+    },
+  });
+
+  expect(result).toMatchObject({
+    blackHoles: [{ name: "Cygnus X-1", provenance: "observed" }],
+    cached: true,
+    stale: true,
+  });
+});
+
+test("loads an observed black hole by name and rejects malformed profiles", async () => {
+  const live = await loadBlackHoleByName("V404 Cyg", async (input) => {
+    expect(input).toBe("/api/black-holes/V404%20Cyg");
+    return Response.json({
+      data: BLACK_HOLES[3],
+      meta: { cached: false, source: "BlackCAT / CDS VizieR", stale: false },
+    });
+  });
+  const malformed = await loadBlackHoleByName("Candidate", async () =>
+    Response.json({
+      data: { id: "candidate", massSolar: "unknown", name: "Candidate" },
+      meta: { cached: false, source: "BlackCAT / CDS VizieR", stale: false },
+    }),
+  );
+
+  expect(live?.name).toBe("Cygnus X-1");
+  expect(malformed).toBeNull();
 });
 
 test("falls back when the API is unavailable", async () => {

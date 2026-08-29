@@ -152,10 +152,19 @@ export const BlackHoleExperience = ({
               },
               {
                 detail:
-                  "The diameter is a non-spinning reference calculated from the linked mass estimate. Disk brightness, tilt and motion are illustrative.",
+                  blackHole.massSolar === null
+                    ? "No catalog mass is available, so the scene uses a non-numeric visual reference. Disk brightness, tilt and motion are illustrative."
+                    : blackHole.provenance === "procedural"
+                      ? "The diameter is calculated from a generated mass parameter. It is not a telescope measurement. Disk brightness, tilt and motion are illustrative."
+                      : "The diameter is a non-spinning reference calculated from the linked mass estimate. Disk brightness, tilt and motion are illustrative.",
                 label: "Model disclosure",
                 tone: "accent",
-                value: "Readable scale · observed mass",
+                value:
+                  blackHole.massSolar === null
+                    ? "Visual reference · mass unavailable"
+                    : blackHole.provenance === "procedural"
+                      ? "Readable scale · generated parameter"
+                      : "Readable scale · observed mass",
               },
             ],
             type: "facts",
@@ -165,7 +174,8 @@ export const BlackHoleExperience = ({
         label: "Record",
       },
     ],
-    title: "Measured horizon record",
+    title:
+      blackHole.provenance === "observed" ? "Measured horizon record" : "Generated horizon record",
   };
 
   return (
