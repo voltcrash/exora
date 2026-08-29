@@ -53,6 +53,21 @@ vp run dev:api      # API only
 vp run ready        # check, test, and build every workspace
 ```
 
+Pull requests and pushes to `main` run formatting, linting, type checking, unit tests, asset
+provenance checks, production builds (including the JavaScript performance budget), production
+dependency auditing, and the desktop Chromium journey smoke suite. Install Chromium once, then run
+the browser suites locally with:
+
+```sh
+vp exec --filter website -- playwright install chromium
+vp run website#test:browser:desktop
+vp run website#test:browser:full
+```
+
+The full command adds the mobile Chromium configuration. Nightly and manual GitHub Actions runs also
+execute both Lighthouse profiles. See [Performance quality gates](docs/performance-quality.md) for
+the local Lighthouse command and manual workflow instructions.
+
 The site serves on <http://localhost:5173> and the API on <http://localhost:8787>:
 
 ```text
