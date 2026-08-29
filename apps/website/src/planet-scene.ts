@@ -26,7 +26,7 @@ import type { MountedWorld, SceneHost } from "./scene-host.ts";
 import { skyViewpointFrom } from "./sky-catalog.ts";
 import { createStellarSurface, makeStarTravelTarget, type StellarSurface } from "./star-surface.ts";
 import { createStarfield } from "./star-visuals.ts";
-import { markAsVirtualBackground } from "./world-presentation.ts";
+import { markAsVirtualBackground } from "./virtual-background.ts";
 import {
   easeAway,
   easeSettle,

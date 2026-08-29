@@ -8,7 +8,7 @@ import { VertexData } from "@babylonjs/core/Meshes/mesh.vertexData.js";
 import type { TransformNode } from "@babylonjs/core/Meshes/transformNode.js";
 import type { Scene } from "@babylonjs/core/scene.js";
 import { loadSkyCatalog, projectSky, type SkyViewpoint } from "./sky-catalog.ts";
-import { markAsVirtualBackground } from "./world-presentation.ts";
+import { markAsVirtualBackground } from "./virtual-background.ts";
 
 const STAR_PSF_GLSL = `
 float starPointSpread(vec2 corner, float spikeStrength, float spikeSharpness) {

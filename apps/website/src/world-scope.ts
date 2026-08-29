@@ -4,11 +4,11 @@ import type { Light } from "@babylonjs/core/Lights/light.js";
 import type { Material } from "@babylonjs/core/Materials/material.js";
 import type { Scene } from "@babylonjs/core/scene.js";
 import type { TransformNode } from "@babylonjs/core/Meshes/transformNode.js";
-import { createWorldPresentation, type WorldPresentation } from "./world-presentation.ts";
+import type { WorldPresentation } from "./world-presentation.ts";
 
 export interface WorldScope {
   dispose: () => void;
-  seal: () => void;
+  seal: () => Promise<void>;
   presentation: WorldPresentation;
 }
 
@@ -55,7 +55,7 @@ export const openWorldScope = (scene: Scene): WorldScope => {
       if (!presentation) throw new Error("A world presentation is unavailable before sealing.");
       return presentation;
     },
-    seal: () => {
+    seal: async () => {
       const after = read(scene);
       owned = {
         actionManagers: addedSince(before.actionManagers, after.actionManagers),
@@ -64,7 +64,8 @@ export const openWorldScope = (scene: Scene): WorldScope => {
         meshes: addedSince(before.meshes, after.meshes),
         transformNodes: addedSince(before.transformNodes, after.transformNodes),
       };
-      presentation = createWorldPresentation(scene);
+      const { createWorldPresentation } = await import("./world-presentation.ts");
+      presentation = await createWorldPresentation(scene);
       presentation.capture(owned);
     },
     dispose: () => {

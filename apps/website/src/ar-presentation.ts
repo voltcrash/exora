@@ -9,7 +9,8 @@ import type { PointerInfo } from "@babylonjs/core/Events/pointerEvents.js";
 import type { Scene } from "@babylonjs/core/scene.js";
 import type { IWebXRHitResult, WebXRHitTest } from "@babylonjs/core/XR/features/WebXRHitTest.js";
 import type { WebXRSessionManager } from "@babylonjs/core/XR/webXRSessionManager.js";
-import { VIRTUAL_BACKGROUND_LAYER_MASK, type WorldPresentation } from "./world-presentation.ts";
+import { VIRTUAL_BACKGROUND_LAYER_MASK } from "./virtual-background.ts";
+import type { WorldPresentation } from "./world-presentation.ts";
 
 export interface ArPresentation {
   begin: (

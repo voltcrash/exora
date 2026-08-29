@@ -3,23 +3,12 @@ import { PointerDragBehavior } from "@babylonjs/core/Behaviors/Meshes/pointerDra
 import type { Light } from "@babylonjs/core/Lights/light.js";
 import { Vector3 } from "@babylonjs/core/Maths/math.vector.js";
 import type { AbstractMesh } from "@babylonjs/core/Meshes/abstractMesh.js";
-import { Mesh } from "@babylonjs/core/Meshes/mesh.js";
-import { TransformNode } from "@babylonjs/core/Meshes/transformNode.js";
-import { VertexData } from "@babylonjs/core/Meshes/mesh.vertexData.js";
+import type { Mesh } from "@babylonjs/core/Meshes/mesh.js";
+import type { TransformNode } from "@babylonjs/core/Meshes/transformNode.js";
 import type { Scene } from "@babylonjs/core/scene.js";
 
-export const VIRTUAL_BACKGROUND_LAYER_MASK = 0x0800_0000;
-
-const AR_DISPLAY_DIAMETER_METERS = 0.68;
 const MIN_AR_SCALE_FACTOR = 0.25;
 const MAX_AR_SCALE_FACTOR = 4;
-
-export const markAsVirtualBackground = <MeshType extends AbstractMesh>(
-  mesh: MeshType,
-): MeshType => {
-  mesh.layerMask = VIRTUAL_BACKGROUND_LAYER_MASK;
-  return mesh;
-};
 
 export interface WorldPresentationContents {
   lights: readonly Light[];
@@ -39,41 +28,10 @@ export interface WorldPresentation {
   scaleBy: (factor: number) => void;
 }
 
-const finiteBounds = (meshes: readonly AbstractMesh[]): { maximum: Vector3; minimum: Vector3 } => {
-  const minimum = new Vector3(
-    Number.POSITIVE_INFINITY,
-    Number.POSITIVE_INFINITY,
-    Number.POSITIVE_INFINITY,
-  );
-  const maximum = new Vector3(
-    Number.NEGATIVE_INFINITY,
-    Number.NEGATIVE_INFINITY,
-    Number.NEGATIVE_INFINITY,
-  );
-
-  for (const mesh of meshes) {
-    if (
-      mesh.layerMask === VIRTUAL_BACKGROUND_LAYER_MASK ||
-      !mesh.isEnabled() ||
-      mesh.getTotalVertices() === 0
-    ) {
-      continue;
-    }
-    mesh.computeWorldMatrix(true);
-    const box = mesh.getBoundingInfo().boundingBox;
-    minimum.minimizeInPlace(box.minimumWorld);
-    maximum.maximizeInPlace(box.maximumWorld);
-  }
-
-  if (!Number.isFinite(minimum.x) || !Number.isFinite(maximum.x)) {
-    return { maximum: Vector3.One(), minimum: Vector3.One().scale(-1) };
-  }
-  return { maximum, minimum };
-};
-
-export const createWorldPresentation = (scene: Scene): WorldPresentation => {
-  const proxy = new Mesh("world-presentation-proxy", scene);
-  const contentsRoot = new TransformNode("world-presentation-contents", scene);
+export const createWorldPresentation = async (scene: Scene): Promise<WorldPresentation> => {
+  const { capturePresentationProxy, createPresentationProxy } =
+    await import("./world-presentation-proxy.ts");
+  const { contentsRoot, proxy } = createPresentationProxy(scene);
   contentsRoot.parent = proxy;
   proxy.isPickable = false;
   proxy.visibility = 0;
@@ -116,42 +74,11 @@ export const createWorldPresentation = (scene: Scene): WorldPresentation => {
       captured = true;
       frozenMeshes = meshes.filter((mesh) => mesh.isWorldMatrixFrozen);
 
-      const foreground = meshes.filter(
-        (mesh) => mesh !== proxy && mesh.layerMask !== VIRTUAL_BACKGROUND_LAYER_MASK,
-      );
-      const { maximum, minimum } = finiteBounds(foreground);
-      const size = maximum.subtract(minimum);
-      const widestDimension = Math.max(size.x, size.y, size.z, 0.001);
-      baseScale = AR_DISPLAY_DIAMETER_METERS / widestDimension;
-      minimumY = minimum.y;
-
-      const proxyGeometry = VertexData.CreateBox({
-        depth: Math.max(size.z, 0.001),
-        height: Math.max(size.y, 0.001),
-        width: Math.max(size.x, 0.001),
-      });
-      const center = minimum.add(maximum).scale(0.5);
-      const positions = proxyGeometry.positions;
-      if (positions) {
-        for (let index = 0; index < positions.length; index += 3) {
-          positions[index] = positions[index]! + center.x;
-          positions[index + 1] = positions[index + 1]! + center.y;
-          positions[index + 2] = positions[index + 2]! + center.z;
-        }
-      }
-      proxyGeometry.applyToMesh(proxy, true);
-
-      for (const mesh of meshes) {
-        if (mesh !== proxy && mesh.layerMask !== VIRTUAL_BACKGROUND_LAYER_MASK && !mesh.parent) {
-          mesh.parent = contentsRoot;
-        }
-      }
-      for (const node of transformNodes) {
-        if (node !== contentsRoot && !node.parent) node.parent = contentsRoot;
-      }
-      for (const light of lights) {
-        if (!light.parent) light.parent = contentsRoot;
-      }
+      ({ baseScale, minimumY } = capturePresentationProxy(proxy, contentsRoot, {
+        lights,
+        meshes,
+        transformNodes,
+      }));
     },
     dispose: () => {
       proxy.removeBehavior(drag);

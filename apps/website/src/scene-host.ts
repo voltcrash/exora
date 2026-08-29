@@ -45,7 +45,7 @@ import { createPersistentScene, resetPersistentScene } from "./scene-lifecycle.t
 import { createRenderLifecycle } from "./scene-render-lifecycle.ts";
 import { createXrIntegration, type XrStatus } from "./scene-xr-integration.ts";
 import { getVariantLaunchUrl, onVariantLaunchReady, type ImmersiveMode } from "./variant-launch.ts";
-import { VIRTUAL_BACKGROUND_LAYER_MASK } from "./world-presentation.ts";
+import { VIRTUAL_BACKGROUND_LAYER_MASK } from "./virtual-background.ts";
 import type * as XrRuntime from "./xr-runtime.ts";
 
 export type { XrStatus } from "./scene-xr-integration.ts";

@@ -202,7 +202,7 @@ const sceneCounts = (scene: Scene) => ({
   transformNodes: scene.transformNodes.length,
 });
 
-test("a black-hole world separates the shadow, photon ring and observed environment", () => {
+test("a black-hole world separates the shadow, photon ring and observed environment", async () => {
   const { engine, host, scene } = createHarness();
   const scope = openWorldScope(scene);
   const before = sceneCounts(scene);
@@ -213,7 +213,7 @@ test("a black-hole world separates the shadow, photon ring and observed environm
     blackHole,
     onFirstFrame: () => undefined,
   });
-  scope.seal();
+  await scope.seal();
 
   expect(scene.meshes.some(({ name }) => name === "event-horizon-shadow")).toBe(true);
   expect(scene.meshes.some(({ name }) => name === "photon-ring-reference")).toBe(true);
@@ -260,7 +260,7 @@ test.each(["Oort Cloud", "Heliosphere"])(
     const region = findSolarRegion(name);
     if (!region) throw new Error(`Expected ${name} fixture.`);
     const world = createSolarRegionWorld(host, { onFirstFrame: firstFrame, region });
-    scope.seal();
+    await scope.seal();
     await settleSky();
 
     expect(sceneCounts(scene).meshes).toBeGreaterThan(before.meshes);
@@ -288,7 +288,7 @@ test("a planetary subsystem renders measured tracks and releases every explanato
     planet: JUPITER,
     subsystem,
   });
-  scope.seal();
+  await scope.seal();
   await settleSky();
 
   expect(sceneCounts(scene).meshes).toBeGreaterThan(before.meshes + subsystem.moons.length * 2);
@@ -320,7 +320,7 @@ test.each(planets)(
       planet,
       recipe,
     });
-    scope.seal();
+    await scope.seal();
     await settleSky();
 
     expect(sceneCounts(scene).meshes).toBeGreaterThan(before.meshes);
@@ -347,7 +347,7 @@ test("a displaced rocky world keeps one shared normal per position instead of fl
     planet,
     recipe: deriveWorldRecipe(planet),
   });
-  scope.seal();
+  await scope.seal();
   await settleSky();
 
   const mesh = scene.meshes.find((candidate) => candidate.name === "planet")!;
@@ -413,7 +413,7 @@ test("star world renders one headless frame and releases its glow layer and scen
   const firstFrame = vi.fn();
   const scope = openWorldScope(scene);
   const world = createStarWorld(host, { onFirstFrame: firstFrame, star });
-  scope.seal();
+  await scope.seal();
   await settleSky();
 
   expect(sceneCounts(scene).meshes).toBeGreaterThan(before.meshes);
@@ -432,7 +432,7 @@ test("the corona shell winds inward, so approaching a star cannot clip its halo 
   const { engine, host, scene } = createHarness();
   const scope = openWorldScope(scene);
   const world = createStarWorld(host, { onFirstFrame: vi.fn(), star });
-  scope.seal();
+  await scope.seal();
   await settleSky();
 
   const facings = (mesh: AbstractMesh): number[] => {
@@ -486,7 +486,7 @@ test("the star world adds no geometry for the system's known worlds", async () =
     onFirstFrame: vi.fn(),
     star,
   });
-  scope.seal();
+  await scope.seal();
   await settleSky();
 
   const starAlone = sceneCounts(scene);
@@ -514,7 +514,7 @@ test("a world with no measured sky position falls back to the seeded starfield",
     },
   };
   const world = createStarWorld(host, { onFirstFrame: vi.fn(), star: forged });
-  scope.seal();
+  await scope.seal();
 
   expect(starfieldPointCount(scene)).toBe(testProfile.starCount);
   await settleSky();
@@ -526,7 +526,7 @@ test("a world with no measured sky position falls back to the seeded starfield",
   engine.dispose();
 }, 30_000);
 
-test("world scope preserves host contents while reclaiming every tracked world resource", () => {
+test("world scope preserves host contents while reclaiming every tracked world resource", async () => {
   const { engine, scene } = createHarness();
   MeshBuilder.CreateBox("host-mesh", undefined, scene);
   new StandardMaterial("host-material", scene);
@@ -541,7 +541,7 @@ test("world scope preserves host contents while reclaiming every tracked world r
   new HemisphericLight("world-light", Vector3.Down(), scene);
   new TransformNode("world-node", scene);
   new ActionManager(scene);
-  scope.seal();
+  await scope.seal();
   scope.dispose();
 
   expect(sceneCounts(scene)).toEqual(before);
@@ -595,7 +595,7 @@ test("the system diorama renders one headless frame and releases its scene conte
     onFirstFrame: firstFrame,
     planets: systemPlanets,
   });
-  scope.seal();
+  await scope.seal();
   await settleSky();
 
   expect(world.layout.orbits.map(({ planet }) => planet.name)).toEqual([
@@ -630,7 +630,7 @@ test("the diorama sends a visitor to the world or the star they click", async ()
     onSelectWorld: visitWorld,
     planets: systemPlanets,
   });
-  scope.seal();
+  await scope.seal();
   await settleSky();
 
   const target = scene.getMeshByName("diorama-world-target-system-inner");
@@ -676,7 +676,7 @@ test("a world sends a visitor to the star hanging in its sky", async () => {
     planet,
     recipe: deriveWorldRecipe(planet),
   });
-  scope.seal();
+  await scope.seal();
   await settleSky();
 
   const targets = scene.meshes.filter((mesh) => mesh.name === "star-pick-target");
@@ -704,7 +704,7 @@ test("a world built with no host star to reach draws nothing that looks clickabl
     planet,
     recipe: deriveWorldRecipe(planet),
   });
-  scope.seal();
+  await scope.seal();
   await settleSky();
 
   expect(scene.meshes.filter((mesh) => mesh.name === "star-pick-target")).toHaveLength(0);
@@ -728,7 +728,7 @@ test("a subsystem sends a visitor to the moon they click, by name", async () => 
     planet: JUPITER,
     subsystem,
   });
-  scope.seal();
+  await scope.seal();
   await settleSky();
 
   const io = scene.getMeshByName("Io-mapped-mission-mosaic");
@@ -747,7 +747,7 @@ test("a subsystem sends a visitor to the moon they click, by name", async () => 
   engine.dispose();
 }, 30_000);
 
-test("the diorama keeps its bodies inside the tier's geometry budget", () => {
+test("the diorama keeps its bodies inside the tier's geometry budget", async () => {
   const { engine, host, scene } = createHarness();
   const scope = openWorldScope(scene);
   const world = createSystemWorld(host, {
@@ -755,7 +755,7 @@ test("the diorama keeps its bodies inside the tier's geometry budget", () => {
     onFirstFrame: () => undefined,
     planets: systemPlanets,
   });
-  scope.seal();
+  await scope.seal();
 
   const body = scene.meshes.find((mesh) => mesh.name === "diorama-world-system-outer");
   const bodyVertices = body?.getTotalVertices() ?? 0;
@@ -770,7 +770,7 @@ test("the diorama keeps its bodies inside the tier's geometry budget", () => {
   engine.dispose();
 }, 30_000);
 
-test("a world moves along its orbit as the scene runs, and stays on it", () => {
+test("a world moves along its orbit as the scene runs, and stays on it", async () => {
   const { engine, host, scene } = createHarness();
   const scope = openWorldScope(scene);
   const world = createSystemWorld(host, {
@@ -778,7 +778,7 @@ test("a world moves along its orbit as the scene runs, and stays on it", () => {
     onFirstFrame: () => undefined,
     planets: systemPlanets,
   });
-  scope.seal();
+  await scope.seal();
 
   const body = scene.meshes.find((mesh) => mesh.name === "diorama-world-system-inner");
   if (!body) throw new Error("Expected the inner world to have been drawn.");
@@ -807,7 +807,7 @@ const questProfile = deriveRenderQuality({
   deviceMemory: 6,
 });
 
-test("the Solar System diorama accepts and clears authoritative Horizons positions", () => {
+test("the Solar System diorama accepts and clears authoritative Horizons positions", async () => {
   const { engine, host, scene } = createHarness();
   const scope = openWorldScope(scene);
   const solarWorld = {
@@ -827,7 +827,7 @@ test("the Solar System diorama accepts and clears authoritative Horizons positio
     onFirstFrame: () => undefined,
     planets: [solarWorld],
   });
-  scope.seal();
+  await scope.seal();
   const body = scene.meshes.find((mesh) => mesh.name === `diorama-world-${solarWorld.id}`);
   if (!body) throw new Error("Expected the Solar System world to be drawn.");
 
@@ -853,7 +853,7 @@ test("the Solar System diorama accepts and clears authoritative Horizons positio
   engine.dispose();
 });
 
-test("a seven-world diorama costs less than the one world it travels to", () => {
+test("a seven-world diorama costs less than the one world it travels to", async () => {
   vi.stubGlobal("window", new EventTarget());
   const planetHarness = createHarness(questProfile);
   const planetScope = openWorldScope(planetHarness.scene);
@@ -865,7 +865,7 @@ test("a seven-world diorama costs less than the one world it travels to", () => 
     planet: rocky,
     recipe: deriveWorldRecipe(rocky),
   });
-  planetScope.seal();
+  await planetScope.seal();
   const planetCost = {
     meshes: planetHarness.scene.meshes.length,
     vertices: sceneVertexCount(planetHarness.scene),
@@ -893,7 +893,7 @@ test("a seven-world diorama costs less than the one world it travels to", () => 
     onFirstFrame: () => undefined,
     planets: sevenWorlds,
   });
-  scope.seal();
+  await scope.seal();
 
   expect(world.layout.orbits).toHaveLength(7);
   expect(sceneVertexCount(scene)).toBeLessThan(planetCost.vertices);
@@ -920,7 +920,7 @@ test("the surface star holds one place in the sky wherever the viewer walks", as
     planet,
     recipe: deriveWorldRecipe(planet),
   });
-  scope.seal();
+  await scope.seal();
   await settleSky();
 
   vi.spyOn(engine, "getDeltaTime").mockReturnValue(16);

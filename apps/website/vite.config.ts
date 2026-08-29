@@ -24,16 +24,6 @@ const dropWebGpuShaders = (): Plugin => {
   };
 };
 
-const chunkFileName = ({ moduleIds }: { moduleIds: readonly string[] }): string => {
-  const babylonRuntimeModules = moduleIds.filter(
-    (moduleId) =>
-      /[\\/]@babylonjs[\\/]/.test(moduleId) && !/[\\/]Shaders[^\\/]*[\\/]/.test(moduleId),
-  );
-  return babylonRuntimeModules.length >= 120
-    ? "assets/babylon-vendor-[hash].js"
-    : "assets/[name]-[hash].js";
-};
-
 const SITE_ORIGIN = "https://exora.voltcrash.com";
 
 const buildSitemap = (): string => {
@@ -132,23 +122,6 @@ export default defineConfig(({ mode }) => {
     },
     build: {
       chunkSizeWarningLimit: MAX_JAVASCRIPT_FILE_BYTES / 1_000,
-      rolldownOptions: {
-        output: {
-          chunkFileNames: chunkFileName,
-          strictExecutionOrder: true,
-          codeSplitting: {
-            groups: [
-              {
-                name: "babylon-vendor",
-                test: (moduleId) =>
-                  /[\\/]@babylonjs[\\/]/.test(moduleId) &&
-                  !/[\\/]Shaders[^\\/]*[\\/]/.test(moduleId),
-                maxSize: 350_000,
-              },
-            ],
-          },
-        },
-      },
     },
     plugins: [variantLaunchSdk(variantLaunchKey), react(), dropWebGpuShaders(), emitSitemap()],
     server: {

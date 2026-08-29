@@ -4,17 +4,14 @@ import { Vector3 } from "@babylonjs/core/Maths/math.vector.js";
 import { MeshBuilder } from "@babylonjs/core/Meshes/meshBuilder.js";
 import { Scene } from "@babylonjs/core/scene.js";
 import { expect, test } from "vite-plus/test";
-import {
-  createWorldPresentation,
-  markAsVirtualBackground,
-  VIRTUAL_BACKGROUND_LAYER_MASK,
-} from "./world-presentation.ts";
+import { createWorldPresentation } from "./world-presentation.ts";
+import { markAsVirtualBackground, VIRTUAL_BACKGROUND_LAYER_MASK } from "./virtual-background.ts";
 
-test("AR wraps and fits the existing foreground while ignoring its virtual sky", () => {
+test("AR wraps and fits the existing foreground while ignoring its virtual sky", async () => {
   const engine = new NullEngine();
   const scene = new Scene(engine);
   scene.activeCamera = new FreeCamera("camera", new Vector3(0, 2, -5), scene);
-  const presentation = createWorldPresentation(scene);
+  const presentation = await createWorldPresentation(scene);
   const subject = MeshBuilder.CreateBox("subject", { size: 2 }, scene);
   subject.position.y = 2;
   const atmosphere = MeshBuilder.CreateSphere("atmosphere", { diameter: 2 }, scene);
