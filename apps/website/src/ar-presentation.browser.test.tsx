@@ -8,7 +8,8 @@ import type { WebXRSessionManager } from "@babylonjs/core/XR/webXRSessionManager
 import { afterEach, expect, test, vi } from "vite-plus/test";
 import { createArPresentation } from "./ar-presentation.ts";
 import type { WorldPresentation } from "./world-presentation.ts";
-import "./style.css";
+import "./styles/tokens.css";
+import "./styles/globals.css";
 
 afterEach(() => {
   delete document.documentElement.dataset.presentationMode;

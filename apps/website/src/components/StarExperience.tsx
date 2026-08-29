@@ -10,6 +10,10 @@ import type { TravelPhase } from "../travel-transition.ts";
 import { FrameRateSignal } from "./FrameRateSignal.tsx";
 import { MissionControl } from "./MissionControl.tsx";
 import { MobileSheet } from "./MobileSheet.tsx";
+import sharedStyles from "./ExperienceShared.module.css";
+import { bindStyles } from "../styles/bind-styles.ts";
+
+const cx = bindStyles(sharedStyles);
 
 interface StarExperienceProps {
   chromeHidden: boolean;
@@ -123,29 +127,35 @@ export const StarExperience = ({
 
   return (
     <div
-      className={`experience-shell star-experience ${settled ? "scene-ready" : ""} ${sceneState === "error" ? "scene-error" : ""} ${travelling ? "travelling" : ""} ${chromeHidden ? "chrome-hidden" : ""}`}
+      className={cx(
+        `experience-shell star-experience ${settled ? "scene-ready" : ""} ${sceneState === "error" ? "scene-error" : ""} ${travelling ? "travelling" : ""} ${chromeHidden ? "chrome-hidden" : ""}`,
+      )}
     >
-      <div className="space-haze" aria-hidden="true" />
-      <div className="viewport-grid" aria-hidden="true" />
+      <div className={cx("space-haze")} aria-hidden="true" />
+      <div className={cx("viewport-grid")} aria-hidden="true" />
 
-      <header className="topbar">
-        <a className="brand" href="/" aria-label="Exora home">
-          <span className="brand-mark" aria-hidden="true" />
-          <span className="brand-copy">
+      <header className={cx("topbar")} data-testid="topbar">
+        <a className={cx("brand")} href="/" aria-label="Exora home">
+          <span className={cx("brand-mark")} aria-hidden="true" />
+          <span className={cx("brand-copy")}>
             <strong>EXORA</strong>
             <small>UNIVERSE OBSERVATORY</small>
           </span>
         </a>
       </header>
 
-      <main className="hud">
-        <section className="world-intro" aria-labelledby="star-name">
-          <p className="eyebrow">
+      <main className={cx("hud")} data-testid="hud">
+        <section
+          className={cx("world-intro")}
+          data-testid="world-intro"
+          aria-labelledby="star-name"
+        >
+          <p className={cx("eyebrow")}>
             <span>{custom ? "GENERATED STAR" : solar ? "OUR STAR" : "OBSERVED STAR"}</span>
             <span>{starKindLabel(star)}</span>
           </p>
           <h1 id="star-name">{star.name}</h1>
-          <div className="world-tags">
+          <div className={cx("world-tags")}>
             <span>{visual.label}</span>
             <span>{observation.spectralType ?? "SPECTRUM UNKNOWN"}</span>
             <span>
@@ -153,8 +163,8 @@ export const StarExperience = ({
               {formatNumber(visual.temperatureKelvin, 0)} K
             </span>
           </div>
-          <p className="world-summary">{starSummary(star)}</p>
-          <p className="visual-note">
+          <p className={cx("world-summary")}>{starSummary(star)}</p>
+          <p className={cx("visual-note")}>
             <span aria-hidden="true" />{" "}
             {custom
               ? `SHAREABLE URL RECIPE · WORLDGEN V${WORLDGEN_VERSION}`
@@ -165,7 +175,7 @@ export const StarExperience = ({
                   : "SIMBAD STELLAR MEASUREMENTS · EXORA STELLAR SURFACE"}
           </p>
           {!custom ? (
-            <section className="known-worlds" aria-labelledby="known-worlds-title">
+            <section className={cx("known-worlds")} aria-labelledby="known-worlds-title">
               <div>
                 <p>CONNECTED SYSTEM</p>
                 <h2 id="known-worlds-title">Known worlds</h2>
@@ -181,7 +191,7 @@ export const StarExperience = ({
               ) : null}
               {systemPlanets.length > 0 ? (
                 <button
-                  className="system-jump diorama-jump"
+                  className={cx("system-jump diorama-jump")}
                   type="button"
                   disabled={dioramaState === "loading"}
                   onClick={() => void openSystem()}
@@ -194,19 +204,19 @@ export const StarExperience = ({
                 </button>
               ) : null}
               {dioramaState === "error" ? (
-                <small className="system-jump-error" role="status">
+                <small className={cx("system-jump-error")} role="status">
                   The archive links no placeable orbits to this host.
                 </small>
               ) : null}
               {systemPlanets.length > 0 ? (
-                <div className="known-world-list">
+                <div className={cx("known-world-list")}>
                   {systemPlanets.map((planet) => (
                     <button
                       key={planet.id}
                       type="button"
                       onClick={() => onSelectPlanet(planet, systemCached)}
                     >
-                      <span className={`known-world-orb ${planet.kind}`} aria-hidden="true" />
+                      <span className={cx(`known-world-orb ${planet.kind}`)} aria-hidden="true" />
                       <span>
                         <strong>{planet.name}</strong>
                         <small>{planet.kind.replace("-", " ")} · VISIT ↗</small>
@@ -220,10 +230,11 @@ export const StarExperience = ({
         </section>
 
         <aside
-          className="telemetry"
+          className={cx("telemetry")}
+          data-testid="telemetry"
           aria-label={custom ? "Custom star data" : "Observed star data"}
         >
-          <div className="telemetry-heading">
+          <div className={cx("telemetry-heading")}>
             <span>
               <small>{custom ? "WORLD FORGE" : solar ? "NASA/JPL" : "SIMBAD ARCHIVE"}</small>
               {custom
@@ -320,14 +331,14 @@ export const StarExperience = ({
               </>
             )}
           </dl>
-          <div className="telemetry-detail">
+          <div className={cx("telemetry-detail")}>
             <span>CATALOG ID</span>
             <strong>{star.catalogName}</strong>
             <small>
               {star.objectType} · {star.kind.replaceAll("-", " ")}
             </small>
           </div>
-          <div className="telemetry-detail">
+          <div className={cx("telemetry-detail")}>
             <span>{custom ? "GENERATION SEED" : solar ? "ROTATION" : "SPACE MOTION"}</span>
             <strong>
               {custom
@@ -344,7 +355,7 @@ export const StarExperience = ({
                   : `RA ${formatNumber(observation.properMotionRaMasPerYear, 1)} · DEC ${formatNumber(observation.properMotionDecMasPerYear, 1)} MAS/YR`}
             </small>
           </div>
-          <p className="source-note">
+          <p className={cx("source-note")}>
             {custom
               ? "EXORA CUSTOM GENERATOR · PROCEDURAL"
               : solar
@@ -355,10 +366,10 @@ export const StarExperience = ({
         </aside>
 
         {!custom ? (
-          <div className="mobile-scene-actions mobile-scene-actions-two">
+          <div className={cx("mobile-scene-actions mobile-scene-actions-two")}>
             {systemPlanets.length > 0 ? (
               <button
-                className="mobile-scene-action"
+                className={cx("mobile-scene-action")}
                 type="button"
                 disabled={dioramaState === "loading"}
                 onClick={() => void openSystem()}
@@ -371,7 +382,7 @@ export const StarExperience = ({
               </button>
             ) : null}
             <button
-              className="mobile-scene-action"
+              className={cx("mobile-scene-action")}
               type="button"
               onClick={() => setWorldsOpen(true)}
             >
@@ -401,7 +412,7 @@ export const StarExperience = ({
           <small>NO CONFIRMED WORLDS LINKED</small>
         ) : null}
         {systemPlanets.length > 0 ? (
-          <div className="known-world-list">
+          <div className={cx("known-world-list")}>
             {systemPlanets.map((planet) => (
               <button
                 key={planet.id}
@@ -411,7 +422,7 @@ export const StarExperience = ({
                   onSelectPlanet(planet, systemCached);
                 }}
               >
-                <span className={`known-world-orb ${planet.kind}`} aria-hidden="true" />
+                <span className={cx(`known-world-orb ${planet.kind}`)} aria-hidden="true" />
                 <span>
                   <strong>{planet.name}</strong>
                   <small>{planet.kind.replace("-", " ")} · VISIT ↗</small>
@@ -434,8 +445,8 @@ export const StarExperience = ({
         xr={{ host, status: xrStatus }}
       />
 
-      <div className="loading-screen" role="status">
-        <div className="loading-orbit" aria-hidden="true">
+      <div className={cx("loading-screen")} role="status">
+        <div className={cx("loading-orbit")} aria-hidden="true">
           <span />
         </div>
         <p>RESOLVING STAR</p>

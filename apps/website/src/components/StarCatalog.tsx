@@ -6,6 +6,11 @@ import { starKindLabel } from "../star-utils.ts";
 import { starNotableTrait, suggestStarName } from "../search-discovery.ts";
 import { useTabList } from "../use-tab-list.ts";
 import { StarCatalogVisual } from "./CatalogVisual.tsx";
+import sharedStyles from "./ExperienceShared.module.css";
+import catalogStyles from "./CatalogShared.module.css";
+import { bindStyles } from "../styles/bind-styles.ts";
+
+const cx = bindStyles(sharedStyles, catalogStyles);
 
 interface StarCatalogProps {
   embedded?: boolean;
@@ -72,23 +77,23 @@ const StarResult = memo(
     star: StarProfile;
   }) => (
     <li>
-      <button className="catalog-result" type="button" onClick={() => onSelect(star, cached)}>
-        <span className="result-preview">
+      <button className={cx("catalog-result")} type="button" onClick={() => onSelect(star, cached)}>
+        <span className={cx("result-preview")}>
           <StarCatalogVisual star={star} />
         </span>
-        <span className="result-marker star-result-marker" aria-hidden="true" />
-        <span className="result-identity">
+        <span className={cx("result-marker star-result-marker")} aria-hidden="true" />
+        <span className={cx("result-identity")}>
           <strong>{star.name}</strong>
           <small>
             {star.catalogName} · {star.objectType}
           </small>
-          <span className="result-trait">{starNotableTrait(star)}</span>
+          <span className={cx("result-trait")}>{starNotableTrait(star)}</span>
         </span>
-        <span className="result-metrics">
+        <span className={cx("result-metrics")}>
           <small>{starKindLabel(star)}</small>
           <strong>{star.observation.spectralType ?? "SPECTRUM UNKNOWN"}</strong>
         </span>
-        <span className="result-state">
+        <span className={cx("result-state")}>
           {formatNumber(star.observation.distanceParsecs, 1)} PC · EXPLORE
         </span>
       </button>
@@ -244,7 +249,8 @@ export const StarCatalog = ({ embedded = false, onClose, onSelect }: StarCatalog
   return (
     <dialog
       ref={dialogRef}
-      className={`planet-catalog star-catalog${embedded ? " embedded-catalog" : ""}`}
+      className={cx(`planet-catalog star-catalog${embedded ? " embedded-catalog" : ""}`)}
+      data-embedded={embedded}
       open={embedded || undefined}
       role={embedded ? "region" : undefined}
       aria-label={embedded ? "Star catalog" : undefined}
@@ -255,15 +261,15 @@ export const StarCatalog = ({ embedded = false, onClose, onSelect }: StarCatalog
         if (!embedded && event.target === dialogRef.current) onClose();
       }}
     >
-      <div className="catalog-scroll-region">
+      <div className={cx("catalog-scroll-region")} data-style-role="catalog-scroll-region">
         {!embedded ? (
-          <div className="catalog-header">
+          <div className={cx("catalog-header")}>
             <div>
               <p>DISCOVERY PORTAL · SIMBAD STELLAR ARCHIVE</p>
               <h2 id="star-catalog-title">Choose a star to discover</h2>
             </div>
             <button
-              className="catalog-close"
+              className={cx("catalog-close")}
               type="button"
               aria-label="Close star catalog"
               onClick={onClose}
@@ -273,15 +279,15 @@ export const StarCatalog = ({ embedded = false, onClose, onSelect }: StarCatalog
           </div>
         ) : null}
         <button
-          className="surprise-journey"
+          className={cx("surprise-journey")}
           type="button"
           disabled={surpriseState === "loading"}
           onClick={takeMeSomewhere}
         >
-          <span className="surprise-symbol" aria-hidden="true">
+          <span className={cx("surprise-symbol")} aria-hidden="true">
             ✦
           </span>
-          <span className="surprise-copy">
+          <span className={cx("surprise-copy")}>
             <small>TAKE ME SOMEWHERE</small>
             <strong>
               {surpriseState === "loading"
@@ -291,18 +297,18 @@ export const StarCatalog = ({ embedded = false, onClose, onSelect }: StarCatalog
                   : "Jump to a random stellar destination"}
             </strong>
           </span>
-          <span className="surprise-action">
+          <span className={cx("surprise-action")}>
             {surpriseState === "loading" ? "SCANNING" : "SURPRISE ME"}{" "}
             <span aria-hidden="true">↗</span>
           </span>
         </button>
-        <div className="discovery-intro">
+        <div className={cx("discovery-intro")}>
           <span>
             {portalView === "collections" ? "CURATED JOURNEYS" : "EXPLORE BY STELLAR FAMILY"}
           </span>
           <small>Large targets are designed for gaze, pointer, touch, or mouse</small>
         </div>
-        <div className="discovery-tabs" {...tabs.tabListProps}>
+        <div className={cx("discovery-tabs")} {...tabs.tabListProps}>
           <button {...tabs.tabProps("collections")} onClick={() => setPortalView("collections")}>
             Curated collections
           </button>
@@ -311,11 +317,13 @@ export const StarCatalog = ({ embedded = false, onClose, onSelect }: StarCatalog
           </button>
         </div>
         {portalView === "collections" ? (
-          <div className="collection-grid" {...tabs.panelProps("collections")}>
+          <div className={cx("collection-grid")} {...tabs.panelProps("collections")}>
             {collections.map((collection) => (
               <button
                 key={collection.id}
-                className={`collection-card${activeCategory === collection.id ? " active" : ""}`}
+                className={cx(
+                  `collection-card${activeCategory === collection.id ? " active" : ""}`,
+                )}
                 type="button"
                 aria-pressed={activeCategory === collection.id}
                 onClick={() => {
@@ -323,24 +331,24 @@ export const StarCatalog = ({ embedded = false, onClose, onSelect }: StarCatalog
                   setActiveCategory(collection.id);
                 }}
               >
-                <span className="collection-index">{collection.index}</span>
-                <span className="collection-copy">
+                <span className={cx("collection-index")}>{collection.index}</span>
+                <span className={cx("collection-copy")}>
                   <small>{collection.tag}</small>
                   <strong>{collection.label}</strong>
                   <span>{collection.note}</span>
                 </span>
-                <span className="collection-launch" aria-hidden="true">
+                <span className={cx("collection-launch")} aria-hidden="true">
                   EXPLORE ↗
                 </span>
               </button>
             ))}
           </div>
         ) : (
-          <div className="discovery-grid" {...tabs.panelProps("categories")}>
+          <div className={cx("discovery-grid")} {...tabs.panelProps("categories")}>
             {categories.map((category) => (
               <button
                 key={category.id}
-                className={`discovery-card${activeCategory === category.id ? " active" : ""}`}
+                className={cx(`discovery-card${activeCategory === category.id ? " active" : ""}`)}
                 type="button"
                 aria-pressed={activeCategory === category.id}
                 onClick={() => {
@@ -348,25 +356,25 @@ export const StarCatalog = ({ embedded = false, onClose, onSelect }: StarCatalog
                   setActiveCategory(category.id);
                 }}
               >
-                <span className="discovery-icon" aria-hidden="true">
+                <span className={cx("discovery-icon")} aria-hidden="true">
                   {category.icon}
                 </span>
                 <span>
                   <strong>{category.label}</strong>
                   <small>{category.note}</small>
                 </span>
-                <span className="discovery-arrow" aria-hidden="true">
+                <span className={cx("discovery-arrow")} aria-hidden="true">
                   ↗
                 </span>
               </button>
             ))}
           </div>
         )}
-        <div className="discovery-divider">
+        <div className={cx("discovery-divider")}>
           <span>OR SEARCH BY NAME</span>
         </div>
-        <div className="catalog-search">
-          <span className="star-search-mark" aria-hidden="true">
+        <div className={cx("catalog-search")}>
+          <span className={cx("star-search-mark")} aria-hidden="true">
             ✦
           </span>
           <input
@@ -384,13 +392,13 @@ export const StarCatalog = ({ embedded = false, onClose, onSelect }: StarCatalog
             aria-controls="star-search-results"
             aria-describedby="star-catalog-status"
           />
-          <span className="search-key">ESC</span>
+          <span className={cx("search-key")}>ESC</span>
         </div>
-        <div className="catalog-meta">
+        <div className={cx("catalog-meta")}>
           <p id="star-catalog-status" role="status">
             {status}
           </p>
-          <div className="catalog-view-toggle" role="group" aria-label="Star result layout">
+          <div className={cx("catalog-view-toggle")} role="group" aria-label="Star result layout">
             <button
               type="button"
               aria-pressed={resultView === "gallery"}
@@ -409,7 +417,7 @@ export const StarCatalog = ({ embedded = false, onClose, onSelect }: StarCatalog
         </div>
         {suggestion && (
           <button
-            className="did-you-mean"
+            className={cx("did-you-mean")}
             type="button"
             onClick={() => {
               setSuggestion(null);
@@ -421,17 +429,17 @@ export const StarCatalog = ({ embedded = false, onClose, onSelect }: StarCatalog
             <span aria-hidden="true">↗</span>
           </button>
         )}
-        <ol id="star-search-results" className={`catalog-results ${resultView}-view`}>
+        <ol id="star-search-results" className={cx(`catalog-results ${resultView}-view`)}>
           {searchState === "loading" && (
-            <li className="catalog-loading">
+            <li className={cx("catalog-loading")}>
               <span /> Resolving stellar data
             </li>
           )}
           {searchState === "error" && (
-            <li className="catalog-empty">SIMBAD search could not be completed.</li>
+            <li className={cx("catalog-empty")}>SIMBAD search could not be completed.</li>
           )}
           {searchState === "ready" && stars.length === 0 && (
-            <li className="catalog-empty">
+            <li className={cx("catalog-empty")}>
               No stellar object matched that name or its nearest aliases.
             </li>
           )}

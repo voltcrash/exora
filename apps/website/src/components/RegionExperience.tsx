@@ -6,6 +6,10 @@ import { findSolarStar } from "../solar-system.ts";
 import type { TravelPhase } from "../travel-transition.ts";
 import { FrameRateSignal } from "./FrameRateSignal.tsx";
 import { MissionControl } from "./MissionControl.tsx";
+import sharedStyles from "./ExperienceShared.module.css";
+import { bindStyles } from "../styles/bind-styles.ts";
+
+const cx = bindStyles(sharedStyles);
 
 interface RegionExperienceProps {
   chromeHidden: boolean;
@@ -75,43 +79,53 @@ export const RegionExperience = ({
 
   return (
     <div
-      className={`experience-shell region-experience scene-${sceneState} ${travelling ? "travelling" : ""} ${chromeHidden ? "chrome-hidden" : ""}`}
+      className={cx(
+        `experience-shell region-experience scene-${sceneState} ${travelling ? "travelling" : ""} ${chromeHidden ? "chrome-hidden" : ""}`,
+      )}
     >
-      <div className="space-haze" aria-hidden="true" />
-      <div className="viewport-grid" aria-hidden="true" />
-      <header className="topbar">
-        <a className="brand" href="/" aria-label="Exora home">
-          <span className="brand-mark" aria-hidden="true" />
-          <span className="brand-copy">
+      <div className={cx("space-haze")} aria-hidden="true" />
+      <div className={cx("viewport-grid")} aria-hidden="true" />
+      <header className={cx("topbar")} data-testid="topbar">
+        <a className={cx("brand")} href="/" aria-label="Exora home">
+          <span className={cx("brand-mark")} aria-hidden="true" />
+          <span className={cx("brand-copy")}>
             <strong>EXORA</strong>
             <small>UNIVERSE OBSERVATORY</small>
           </span>
         </a>
       </header>
-      <main className="hud">
-        <section className="world-intro" aria-labelledby="world-name">
-          <p className="eyebrow">
+      <main className={cx("hud")} data-testid="hud">
+        <section
+          className={cx("world-intro")}
+          data-testid="world-intro"
+          aria-labelledby="world-name"
+        >
+          <p className={cx("eyebrow")}>
             <span>SOLAR SYSTEM REGION</span>
             <span>{evidenceLabel}</span>
           </p>
           <h1 id="world-name">{region.name}</h1>
-          <div className="world-tags" aria-label="Region evidence classification">
+          <div className={cx("world-tags")} aria-label="Region evidence classification">
             <span>{evidenceLabel}</span>
             <span>STATISTICAL VISUALIZATION</span>
             <span>NON-LINEAR SCALE WHERE LABELLED</span>
           </div>
-          <p className="world-summary">{region.summary}</p>
-          <p className="visual-note region-visual-note">
+          <p className={cx("world-summary")}>{region.summary}</p>
+          <p className={cx("visual-note region-visual-note")}>
             <span aria-hidden="true" /> {region.disclosure.toUpperCase()}
           </p>
-          <p className="region-scale-note">{region.scaleNote}</p>
-          <p className="region-identifiers" aria-label="Permanent anchor identifiers">
+          <p className={cx("region-scale-note")}>{region.scaleNote}</p>
+          <p className={cx("region-identifiers")} aria-label="Permanent anchor identifiers">
             <strong>ANCHOR SPK {region.anchorSpkId}</strong>
             <span>NAIF {region.anchorNaifId}</span>
           </p>
         </section>
-        <aside className="telemetry region-telemetry" aria-label="Region data">
-          <div className="telemetry-heading">
+        <aside
+          className={cx("telemetry region-telemetry")}
+          data-testid="telemetry"
+          aria-label="Region data"
+        >
+          <div className={cx("telemetry-heading")}>
             <span>
               <small>NASA / JPL · REGIONAL MODEL</small>Scale and evidence
             </span>
@@ -128,32 +142,32 @@ export const RegionExperience = ({
             </div>
             <div>
               <dt>Evidence</dt>
-              <dd className="region-evidence-value">{evidenceLabel}</dd>
+              <dd className={cx("region-evidence-value")}>{evidenceLabel}</dd>
             </div>
             <div>
               <dt>Particles</dt>
-              <dd className="region-evidence-value">SAMPLED</dd>
+              <dd className={cx("region-evidence-value")}>SAMPLED</dd>
             </div>
           </dl>
-          <div className="telemetry-detail host-system-detail">
+          <div className={cx("telemetry-detail host-system-detail")}>
             <span>DIRECT PARENT</span>
-            <button className="system-jump" type="button" onClick={openParent}>
+            <button className={cx("system-jump")} type="button" onClick={openParent}>
               <span aria-hidden="true">☀</span>
               <strong>{region.parent}</strong>
               <small>VISIT PARENT ↗</small>
             </button>
           </div>
-          <div className="telemetry-detail scientific-disclosure">
+          <div className={cx("telemetry-detail scientific-disclosure")}>
             <span>VISUALIZATION STATUS</span>
             <strong>{evidenceLabel}</strong>
             <small>{region.disclosure}</small>
           </div>
-          <div className="telemetry-detail scientific-disclosure">
+          <div className={cx("telemetry-detail scientific-disclosure")}>
             <span>SCALE LIMITS</span>
             <strong>{region.scaleNote}</strong>
             <small>{region.distanceAu.note}</small>
           </div>
-          <div className="telemetry-detail region-sources">
+          <div className={cx("telemetry-detail region-sources")}>
             <span>AUTHORITATIVE DATASETS</span>
             {region.sources.map((source) => (
               <p key={source.datasetId}>
@@ -164,7 +178,7 @@ export const RegionExperience = ({
               </p>
             ))}
           </div>
-          <p className="source-note">
+          <p className={cx("source-note")}>
             ANCHOR NAIF / SPK {region.anchorNaifId} · RETRIEVED 2026-08-23
           </p>
         </aside>
@@ -181,8 +195,8 @@ export const RegionExperience = ({
         xr={{ host, status: xrStatus }}
       />
       {sceneState === "loading" ? (
-        <div className="loading-screen" role="status">
-          <div className="loading-orbit" aria-hidden="true">
+        <div className={cx("loading-screen")} role="status">
+          <div className={cx("loading-orbit")} aria-hidden="true">
             <span />
           </div>
           <p>BUILDING REGIONAL SCALE MODEL</p>

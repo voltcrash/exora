@@ -17,6 +17,10 @@ import type { TravelPhase } from "../travel-transition.ts";
 import { FrameRateSignal } from "./FrameRateSignal.tsx";
 import { MissionControl } from "./MissionControl.tsx";
 import { MobileSheet } from "./MobileSheet.tsx";
+import sharedStyles from "./ExperienceShared.module.css";
+import { bindStyles } from "../styles/bind-styles.ts";
+
+const cx = bindStyles(sharedStyles);
 
 interface SystemExperienceProps {
   chromeHidden: boolean;
@@ -198,43 +202,49 @@ export const SystemExperience = ({
 
   return (
     <div
-      className={`experience-shell system-experience ${settled ? "scene-ready" : ""} ${sceneState === "error" ? "scene-error" : ""} ${travelling ? "travelling" : ""} ${chromeHidden ? "chrome-hidden" : ""}`}
+      className={cx(
+        `experience-shell system-experience ${settled ? "scene-ready" : ""} ${sceneState === "error" ? "scene-error" : ""} ${travelling ? "travelling" : ""} ${chromeHidden ? "chrome-hidden" : ""}`,
+      )}
     >
-      <div className="space-haze" aria-hidden="true" />
-      <div className="viewport-grid" aria-hidden="true" />
+      <div className={cx("space-haze")} aria-hidden="true" />
+      <div className={cx("viewport-grid")} aria-hidden="true" />
 
-      <header className="topbar">
-        <a className="brand" href="/" aria-label="Exora home">
-          <span className="brand-mark" aria-hidden="true" />
-          <span className="brand-copy">
+      <header className={cx("topbar")} data-testid="topbar">
+        <a className={cx("brand")} href="/" aria-label="Exora home">
+          <span className={cx("brand-mark")} aria-hidden="true" />
+          <span className={cx("brand-copy")}>
             <strong>EXORA</strong>
             <small>UNIVERSE OBSERVATORY</small>
           </span>
         </a>
       </header>
 
-      <main className="hud">
-        <section className="world-intro" aria-labelledby="system-name">
-          <p className="eyebrow">
+      <main className={cx("hud")} data-testid="hud">
+        <section
+          className={cx("world-intro")}
+          data-testid="world-intro"
+          aria-labelledby="system-name"
+        >
+          <p className={cx("eyebrow")}>
             <span>{solar ? "HOME SYSTEM" : "CONFIRMED SYSTEM"}</span>
             <span>
               {planets.length} KNOWN WORLD{planets.length === 1 ? "" : "S"}
             </span>
           </p>
           <h1 id="system-name">{hostStar}</h1>
-          <div className="world-tags" aria-label="System classification">
+          <div className={cx("world-tags")} aria-label="System classification">
             <span>ORBITAL DIORAMA</span>
             <span>
               {drawn.length} ORBIT{drawn.length === 1 ? "" : "S"} DRAWN
             </span>
             <span>{solar ? "NASA/JPL" : "NASA ARCHIVE"}</span>
           </div>
-          <p className="world-summary">
+          <p className={cx("world-summary")}>
             {solar
               ? "Every planet in our Solar System, placed on its measured orbit and turning on its own clock. Select a world to cross the system, or the Sun at the centre to stand at our star."
               : `Every confirmed world of ${hostStar}, on the orbit the archive measured for it and turning at its own measured period. Select a world to travel to it, or the star at the centre to stand at the star itself.`}
           </p>
-          <p className="visual-note">
+          <p className={cx("visual-note")}>
             <span aria-hidden="true" />{" "}
             {ephemeris
               ? "BODY POSITIONS: JPL HORIZONS · ORBIT TRACKS: SIMPLIFIED CATALOG"
@@ -242,13 +252,13 @@ export const SystemExperience = ({
           </p>
 
           {solar ? (
-            <section className="ephemeris-control" aria-labelledby="ephemeris-title">
-              <div className="ephemeris-heading">
+            <section className={cx("ephemeris-control")} aria-labelledby="ephemeris-title">
+              <div className={cx("ephemeris-heading")}>
                 <span>
                   <small>POSITION MODE</small>
                   <h2 id="ephemeris-title">Live ephemeris</h2>
                 </span>
-                <strong className={ephemeris?.meta.stale ? "stale" : undefined} role="status">
+                <strong className={cx(ephemeris?.meta.stale ? "stale" : undefined)} role="status">
                   {ephemerisRequest === "loading"
                     ? "CONTACTING JPL…"
                     : ephemerisRequest === "error"
@@ -262,7 +272,7 @@ export const SystemExperience = ({
                             : "SIMPLIFIED CATALOG"}
                 </strong>
               </div>
-              <div className="ephemeris-time-row">
+              <div className={cx("ephemeris-time-row")}>
                 <label>
                   <span>LOCAL DATE &amp; TIME</span>
                   <input
@@ -296,7 +306,7 @@ export const SystemExperience = ({
                   NOW
                 </button>
               </div>
-              <div className="ephemeris-playback" aria-label="Ephemeris playback controls">
+              <div className={cx("ephemeris-playback")} aria-label="Ephemeris playback controls">
                 <button
                   type="button"
                   disabled={!ephemeris}
@@ -354,21 +364,24 @@ export const SystemExperience = ({
             </section>
           ) : null}
 
-          <section className="known-worlds" aria-labelledby="system-worlds-title">
+          <section className={cx("known-worlds")} aria-labelledby="system-worlds-title">
             <div>
               <p>THIS SYSTEM</p>
               <h2 id="system-worlds-title">Worlds in the diorama</h2>
             </div>
             {sceneState === "loading" ? <small role="status">PLACING ORBITS…</small> : null}
             {drawn.length > 0 ? (
-              <div className="known-world-list">
+              <div className={cx("known-world-list")}>
                 {drawn.map((orbit) => (
                   <button
                     key={orbit.planet.id}
                     type="button"
                     onClick={() => onSelectPlanet(orbit.planet, cached)}
                   >
-                    <span className={`known-world-orb ${orbit.planet.kind}`} aria-hidden="true" />
+                    <span
+                      className={cx(`known-world-orb ${orbit.planet.kind}`)}
+                      aria-hidden="true"
+                    />
                     <span>
                       <strong>{orbit.planet.name}</strong>
                       <small>
@@ -378,7 +391,7 @@ export const SystemExperience = ({
                           : `${formatNumber(orbit.elements.periodDays, 1)} d`}{" "}
                         · VISIT ↗
                       </small>
-                      <small className="orbit-provenance">
+                      <small className={cx("orbit-provenance")}>
                         {elementProvenance(orbit.elements)}
                       </small>
                     </span>
@@ -387,7 +400,7 @@ export const SystemExperience = ({
               </div>
             ) : null}
             {unplaced.length > 0 ? (
-              <small className="orbit-unplaced" role="status">
+              <small className={cx("orbit-unplaced")} role="status">
                 NOT PLACED · {unplaced.map(({ name }) => name).join(", ")} · NO MEASURED ORBIT SIZE
                 AND NO PERIOD TO DERIVE ONE FROM
               </small>
@@ -395,15 +408,19 @@ export const SystemExperience = ({
           </section>
         </section>
 
-        <aside className="telemetry" aria-label="System layout and observed data">
-          <div className="telemetry-heading">
+        <aside
+          className={cx("telemetry")}
+          data-testid="telemetry"
+          aria-label="System layout and observed data"
+        >
+          <div className={cx("telemetry-heading")}>
             <span>
               <small>DIORAMA SCALE</small>
               What the picture compressed
             </span>
             <FrameRateSignal fps={fps} />
           </div>
-          <dl className="system-scale">
+          <dl className={cx("system-scale")}>
             <div>
               <dt>Orbit radii</dt>
               <dd>{layout ? orbitMappingLabel(layout) : "—"}</dd>
@@ -417,14 +434,14 @@ export const SystemExperience = ({
               <dd>{layout ? timeScaleLabel(layout) : "—"}</dd>
             </div>
           </dl>
-          <p className="visual-note scale-note">
+          <p className={cx("visual-note scale-note")}>
             <span aria-hidden="true" /> RADII ARE LOGARITHMIC, NOT LINEAR. BODIES ARE DRAWN FAR
             LARGER THAN THEIR ORBITS TO SCALE.
           </p>
-          <div className="telemetry-detail host-system-detail">
+          <div className={cx("telemetry-detail host-system-detail")}>
             <span>HOST STAR</span>
             <button
-              className="system-jump"
+              className={cx("system-jump")}
               type="button"
               disabled={starJumpState === "loading"}
               onClick={() => void openHostStar()}
@@ -439,12 +456,12 @@ export const SystemExperience = ({
                 : "RESOLVING RADIUS"}
             </small>
             {starJumpState === "error" ? (
-              <small className="system-jump-error" role="status">
+              <small className={cx("system-jump-error")} role="status">
                 SIMBAD could not resolve this host name.
               </small>
             ) : null}
           </div>
-          <div className="telemetry-detail">
+          <div className={cx("telemetry-detail")}>
             <span>ORBITAL PHASE</span>
             <strong>{ephemeris ? "JPL HORIZONS" : "NOT MEASURED"}</strong>
             <small>
@@ -455,7 +472,7 @@ export const SystemExperience = ({
                 : "No catalog records where a world is on its orbit. Starting positions are seeded from each planet’s identifier."}
             </small>
           </div>
-          <p className="source-note">
+          <p className={cx("source-note")}>
             {ephemeris
               ? `NASA/JPL Horizons API ${ephemeris.meta.sourceVersion} · ${ephemeris.meta.cached ? "SERVER CACHE" : "FRESH RESPONSE"}`
               : `NASA Exoplanet Archive · pscomppars · ${result.planets[0]?.source.retrievedOn ?? "unsynchronized"}`}
@@ -463,9 +480,9 @@ export const SystemExperience = ({
         </aside>
       </main>
 
-      <div className="mobile-orbit-action">
+      <div className={cx("mobile-orbit-action")}>
         <button
-          className="mobile-scene-action"
+          className={cx("mobile-scene-action")}
           type="button"
           onClick={() => setOrbitMenuOpen(true)}
         >
@@ -484,7 +501,7 @@ export const SystemExperience = ({
         onClose={() => setOrbitMenuOpen(false)}
       >
         {solar ? (
-          <section className="mobile-ephemeris" aria-labelledby="mobile-ephemeris-title">
+          <section className={cx("mobile-ephemeris")} aria-labelledby="mobile-ephemeris-title">
             <div>
               <span>
                 <small>POSITION MODE</small>
@@ -518,7 +535,7 @@ export const SystemExperience = ({
                 }}
               />
             </label>
-            <div className="mobile-ephemeris-actions">
+            <div className={cx("mobile-ephemeris-actions")}>
               <button
                 type="button"
                 disabled={ephemerisRequest === "loading"}
@@ -537,7 +554,7 @@ export const SystemExperience = ({
         ) : null}
 
         <button
-          className="system-jump mobile-host-jump"
+          className={cx("system-jump mobile-host-jump")}
           type="button"
           disabled={starJumpState === "loading"}
           onClick={() => {
@@ -550,10 +567,10 @@ export const SystemExperience = ({
           <small>{starJumpState === "loading" ? "RESOLVING…" : "STAND AT THE STAR ↗"}</small>
         </button>
 
-        <section className="mobile-orbit-worlds" aria-labelledby="mobile-orbit-worlds-title">
+        <section className={cx("mobile-orbit-worlds")} aria-labelledby="mobile-orbit-worlds-title">
           <h3 id="mobile-orbit-worlds-title">Worlds in the diorama</h3>
           {drawn.length > 0 ? (
-            <div className="known-world-list">
+            <div className={cx("known-world-list")}>
               {drawn.map((orbit) => (
                 <button
                   key={orbit.planet.id}
@@ -563,7 +580,7 @@ export const SystemExperience = ({
                     onSelectPlanet(orbit.planet, cached);
                   }}
                 >
-                  <span className={`known-world-orb ${orbit.planet.kind}`} aria-hidden="true" />
+                  <span className={cx(`known-world-orb ${orbit.planet.kind}`)} aria-hidden="true" />
                   <span>
                     <strong>{orbit.planet.name}</strong>
                     <small>
@@ -596,8 +613,8 @@ export const SystemExperience = ({
         xr={{ host, status: xrStatus }}
       />
 
-      <div className="loading-screen" role="status">
-        <div className="loading-orbit" aria-hidden="true">
+      <div className={cx("loading-screen")} role="status">
+        <div className={cx("loading-orbit")} aria-hidden="true">
           <span />
         </div>
         <p>PLACING ORBITS</p>

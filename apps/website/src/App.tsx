@@ -26,6 +26,10 @@ import { togglesDiscoverShortcut } from "./discover-shortcut.ts";
 import { TRAVEL_CROSS_MS, TRAVEL_REVEAL_MS, type TravelPhase } from "./travel-transition.ts";
 import { useSceneHost } from "./use-scene-host.ts";
 import type { SolarRegionProfile } from "./solar-regions.ts";
+import sharedStyles from "./components/ExperienceShared.module.css";
+import { bindStyles } from "./styles/bind-styles.ts";
+
+const cx = bindStyles(sharedStyles);
 
 const DiscoverScreen = lazy(() =>
   import("./components/DiscoverScreen.tsx").then((module) => ({ default: module.DiscoverScreen })),
@@ -399,7 +403,7 @@ export const App = () => {
         tabIndex={0}
       />
       <div
-        className={`travel-veil ${travelPhase === "crossing" ? "crossing" : ""}`}
+        className={cx(`travel-veil ${travelPhase === "crossing" ? "crossing" : ""}`)}
         aria-hidden="true"
         style={
           {
@@ -430,8 +434,8 @@ export const App = () => {
         />
       ) : null}
       {!activeObject ? (
-        <div className="loading-screen initial-loading" role="status">
-          <div className="loading-orbit" aria-hidden="true">
+        <div className={cx("loading-screen initial-loading")} role="status">
+          <div className={cx("loading-orbit")} aria-hidden="true">
             <span />
           </div>
           <p>CONTACTING OBSERVATORIES</p>

@@ -2,6 +2,11 @@ import type { ExoplanetProfile, StarProfile } from "@exora/contracts";
 import { deriveStarRecipe } from "@exora/worldgen";
 import type { CSSProperties } from "react";
 import type { BlackHoleProfile } from "../black-holes.ts";
+import sharedStyles from "./ExperienceShared.module.css";
+import catalogStyles from "./CatalogShared.module.css";
+import { bindStyles } from "../styles/bind-styles.ts";
+
+const cx = bindStyles(sharedStyles, catalogStyles);
 
 type VisualStyle = CSSProperties & Record<`--${string}`, string>;
 
@@ -35,13 +40,13 @@ export const PlanetCatalogVisual = ({ planet }: { planet: ExoplanetProfile }) =>
 
   return (
     <span
-      className={`catalog-visual planet-catalog-visual ${planet.kind}`}
+      className={cx(`catalog-visual planet-catalog-visual ${planet.kind}`)}
       style={style}
       aria-hidden="true"
     >
-      <span className="catalog-orbit" />
-      <span className="catalog-planet-sphere" />
-      <span className="catalog-visual-glint" />
+      <span className={cx("catalog-orbit")} />
+      <span className={cx("catalog-planet-sphere")} />
+      <span className={cx("catalog-visual-glint")} />
     </span>
   );
 };
@@ -58,9 +63,9 @@ export const StarCatalogVisual = ({ star }: { star: StarProfile }) => {
   };
 
   return (
-    <span className="catalog-visual star-catalog-visual" style={style} aria-hidden="true">
-      <span className="catalog-star-rays" />
-      <span className="catalog-star-core" />
+    <span className={cx("catalog-visual star-catalog-visual")} style={style} aria-hidden="true">
+      <span className={cx("catalog-star-rays")} />
+      <span className={cx("catalog-star-core")} />
     </span>
   );
 };
@@ -73,12 +78,16 @@ export const BlackHoleCatalogVisual = ({ blackHole }: { blackHole: BlackHoleProf
   };
 
   return (
-    <span className="catalog-visual black-hole-catalog-visual" style={style} aria-hidden="true">
-      <span className="black-hole-catalog-jet" />
-      <span className="black-hole-catalog-disk rear" />
-      <span className="black-hole-catalog-shadow" />
-      <span className="black-hole-catalog-ring" />
-      <span className="black-hole-catalog-disk front" />
+    <span
+      className={cx("catalog-visual black-hole-catalog-visual")}
+      style={style}
+      aria-hidden="true"
+    >
+      <span className={cx("black-hole-catalog-jet")} />
+      <span className={cx("black-hole-catalog-disk rear")} />
+      <span className={cx("black-hole-catalog-shadow")} />
+      <span className={cx("black-hole-catalog-ring")} />
+      <span className={cx("black-hole-catalog-disk front")} />
     </span>
   );
 };

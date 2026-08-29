@@ -11,6 +11,10 @@ import { SURFACE_TRANSITION_MS, type TravelPhase } from "../travel-transition.ts
 import { FrameRateSignal } from "./FrameRateSignal.tsx";
 import { MissionControl } from "./MissionControl.tsx";
 import { MobileSheet } from "./MobileSheet.tsx";
+import sharedStyles from "./ExperienceShared.module.css";
+import { bindStyles } from "../styles/bind-styles.ts";
+
+const cx = bindStyles(sharedStyles);
 
 interface PlanetExperienceProps {
   chromeHidden: boolean;
@@ -223,26 +227,32 @@ export const PlanetExperience = ({
 
   return (
     <div
-      className={`experience-shell view-${viewMode} ${subsystemActive ? "subsystem-experience" : ""} ${settled ? "scene-ready" : ""} ${sceneState === "error" ? "scene-error" : ""} ${travelling ? "travelling" : ""} ${chromeHidden ? "chrome-hidden" : ""}`}
+      className={cx(
+        `experience-shell view-${viewMode} ${subsystemActive ? "subsystem-experience" : ""} ${settled ? "scene-ready" : ""} ${sceneState === "error" ? "scene-error" : ""} ${travelling ? "travelling" : ""} ${chromeHidden ? "chrome-hidden" : ""}`,
+      )}
       style={{ "--surface-transition": `${SURFACE_TRANSITION_MS}ms` } as CSSProperties}
     >
-      <div className="space-haze" aria-hidden="true" />
-      <div className="viewport-grid" aria-hidden="true" />
-      <div className="surface-veil" aria-hidden="true" />
+      <div className={cx("space-haze")} aria-hidden="true" />
+      <div className={cx("viewport-grid")} aria-hidden="true" />
+      <div className={cx("surface-veil")} aria-hidden="true" />
 
-      <header className="topbar">
-        <a className="brand" href="/" aria-label="Exora home">
-          <span className="brand-mark" aria-hidden="true" />
-          <span className="brand-copy">
+      <header className={cx("topbar")} data-testid="topbar">
+        <a className={cx("brand")} href="/" aria-label="Exora home">
+          <span className={cx("brand-mark")} aria-hidden="true" />
+          <span className={cx("brand-copy")}>
             <strong>EXORA</strong>
             <small>UNIVERSE OBSERVATORY</small>
           </span>
         </a>
       </header>
 
-      <main className="hud">
-        <section className="world-intro" aria-labelledby="world-name">
-          <p className="eyebrow">
+      <main className={cx("hud")} data-testid="hud">
+        <section
+          className={cx("world-intro")}
+          data-testid="world-intro"
+          aria-labelledby="world-name"
+        >
+          <p className={cx("eyebrow")}>
             <span>
               {result.mode === "custom"
                 ? "GENERATED WORLD"
@@ -253,7 +263,7 @@ export const PlanetExperience = ({
             <span>{solar ? planet.solarSystem?.bodyType : planet.kind.replace("-", " ")}</span>
           </p>
           <h1 id="world-name">{formatPlanetName(planet.name)}</h1>
-          <div className="world-tags" aria-label="World classification">
+          <div className={cx("world-tags")} aria-label="World classification">
             <span>{recipe.classification}</span>
             <span>
               {observation.equilibriumTemperatureKelvin === null
@@ -262,8 +272,10 @@ export const PlanetExperience = ({
             </span>
             <span>{observation.discoveryMethod}</span>
           </div>
-          <p className="world-summary">{solar ? planet.solarSystem?.summary : recipe.summary}</p>
-          <p className="visual-note">
+          <p className={cx("world-summary")}>
+            {solar ? planet.solarSystem?.summary : recipe.summary}
+          </p>
+          <p className={cx("visual-note")}>
             <span aria-hidden="true" />{" "}
             {subsystemActive
               ? "JPL MEAN ORBITS · LOG-COMPRESSED DISTANCE · BODY SIZES EXAGGERATED"
@@ -286,10 +298,11 @@ export const PlanetExperience = ({
         </section>
 
         <aside
-          className="telemetry"
+          className={cx("telemetry")}
+          data-testid="telemetry"
           aria-label={result.mode === "custom" ? "Custom planet data" : "Observed planet data"}
         >
-          <div className="telemetry-heading">
+          <div className={cx("telemetry-heading")}>
             <span>
               <small>
                 {result.mode === "custom" ? "WORLD FORGE" : solar ? "NASA/JPL" : "NASA ARCHIVE"}
@@ -303,10 +316,10 @@ export const PlanetExperience = ({
             <FrameRateSignal fps={fps} />
           </div>
           {subsystem ? (
-            <div className="telemetry-detail host-system-detail subsystem-switch-detail">
+            <div className={cx("telemetry-detail host-system-detail subsystem-switch-detail")}>
               <span>PLANETARY SUBSYSTEM</span>
               <button
-                className="system-jump subsystem-jump"
+                className={cx("system-jump subsystem-jump")}
                 type="button"
                 aria-pressed={subsystemActive}
                 onClick={() => setSceneMode(subsystemActive ? "world" : "subsystem")}
@@ -329,7 +342,7 @@ export const PlanetExperience = ({
           ) : null}
           {subsystemActive && subsystem ? (
             <>
-              <div className="telemetry-detail subsystem-science-detail">
+              <div className={cx("telemetry-detail subsystem-science-detail")}>
                 <span>ORBIT EVIDENCE</span>
                 <strong>MEASURED</strong>
                 <small>
@@ -337,7 +350,7 @@ export const PlanetExperience = ({
                   retrograde direction.
                 </small>
               </div>
-              <div className="telemetry-detail subsystem-science-detail">
+              <div className={cx("telemetry-detail subsystem-science-detail")}>
                 <span>TRANSIENT LAYERS</span>
                 <strong>SIMULATED</strong>
                 <small>
@@ -345,12 +358,12 @@ export const PlanetExperience = ({
                   explanatory visualizations.
                 </small>
               </div>
-              <div className="telemetry-detail subsystem-science-detail">
+              <div className={cx("telemetry-detail subsystem-science-detail")}>
                 <span>MINOR MOONS</span>
                 <strong>UNRESOLVED SURFACES</strong>
                 <small>Neutral silhouettes only; no surface geography has been invented.</small>
               </div>
-              <div className="telemetry-detail subsystem-members">
+              <div className={cx("telemetry-detail subsystem-members")}>
                 <span>SELECTED MOONS · MEAN ELEMENTS</span>
                 <ul>
                   {subsystem.moons.map((candidate) => {
@@ -384,7 +397,7 @@ export const PlanetExperience = ({
                   })}
                 </ul>
               </div>
-              <div className="telemetry-detail subsystem-resonances">
+              <div className={cx("telemetry-detail subsystem-resonances")}>
                 <span>MAJOR RESONANCES</span>
                 {subsystem.resonances.length ? (
                   subsystem.resonances.map((resonance) => (
@@ -397,7 +410,7 @@ export const PlanetExperience = ({
                   <small>No principal resonance authored for this view.</small>
                 )}
               </div>
-              <div className="telemetry-detail subsystem-layer-key">
+              <div className={cx("telemetry-detail subsystem-layer-key")}>
                 <span>VISIBLE SYSTEM LAYERS</span>
                 <ul>
                   {subsystem.rings.map((ring) => (
@@ -467,14 +480,14 @@ export const PlanetExperience = ({
               </dd>
             </div>
           </dl>
-          <div className="telemetry-detail host-system-detail">
+          <div className={cx("telemetry-detail host-system-detail")}>
             <span>HOST SYSTEM</span>
             {result.mode === "custom" ? (
               <strong>USER DEFINED</strong>
             ) : (
               <>
                 <button
-                  className="system-jump"
+                  className={cx("system-jump")}
                   type="button"
                   disabled={hostJumpState === "loading"}
                   onClick={() => void openHostStar()}
@@ -484,7 +497,7 @@ export const PlanetExperience = ({
                   <small>{hostJumpState === "loading" ? "RESOLVING…" : "VISIT STAR ↗"}</small>
                 </button>
                 <button
-                  className="system-jump diorama-jump"
+                  className={cx("system-jump diorama-jump")}
                   type="button"
                   disabled={systemJumpState === "loading"}
                   onClick={() => void openHostSystem()}
@@ -507,20 +520,20 @@ export const PlanetExperience = ({
                 : ` · ${formatNumber(observation.hostRadiusSolar, 2)} R☉`}
             </small>
             {hostJumpState === "error" ? (
-              <small className="system-jump-error" role="status">
+              <small className={cx("system-jump-error")} role="status">
                 SIMBAD could not resolve this host name.
               </small>
             ) : null}
             {systemJumpState === "error" ? (
-              <small className="system-jump-error" role="status">
+              <small className={cx("system-jump-error")} role="status">
                 The archive links no placeable orbits to this host.
               </small>
             ) : null}
           </div>
           {isMoon && solarIdentity.parent ? (
-            <div className="telemetry-detail host-system-detail">
+            <div className={cx("telemetry-detail host-system-detail")}>
               <span>PRIMARY BODY</span>
-              <button className="system-jump" type="button" onClick={openPrimaryBody}>
+              <button className={cx("system-jump")} type="button" onClick={openPrimaryBody}>
                 <span aria-hidden="true">◉</span>
                 <strong>{solarIdentity.parent}</strong>
                 <small>VISIT PRIMARY ↗</small>
@@ -532,7 +545,7 @@ export const PlanetExperience = ({
             </div>
           ) : null}
           {solarIdentity ? (
-            <div className="telemetry-detail">
+            <div className={cx("telemetry-detail")}>
               <span>PERMANENT IDENTIFIER</span>
               <strong>
                 {solarIdentity.spkId
@@ -546,27 +559,27 @@ export const PlanetExperience = ({
             </div>
           ) : null}
           {solarIdentity?.surfaceNote ? (
-            <div className="telemetry-detail scientific-disclosure">
+            <div className={cx("telemetry-detail scientific-disclosure")}>
               <span>SURFACE EVIDENCE</span>
               <strong>{solarIdentity.surfaceStatus?.toUpperCase()}</strong>
               <small>{solarIdentity.surfaceNote}</small>
             </div>
           ) : null}
-          <div className="telemetry-detail">
+          <div className={cx("telemetry-detail")}>
             <span>ATMOSPHERE MODEL</span>
             <strong>{recipe.atmosphere.label.split(" · ")[0]}</strong>
             <small>Exora inference · {recipe.confidence} confidence</small>
           </div>
-          <p className="source-note">
+          <p className={cx("source-note")}>
             {planet.source.archive} · {planet.source.table} · {planet.source.retrievedOn}
           </p>
         </aside>
 
         {subsystem || result.mode !== "custom" ? (
-          <div className="mobile-scene-actions mobile-scene-actions-two">
+          <div className={cx("mobile-scene-actions mobile-scene-actions-two")}>
             {subsystem ? (
               <button
-                className="mobile-scene-action"
+                className={cx("mobile-scene-action")}
                 type="button"
                 aria-pressed={subsystemActive}
                 onClick={() => {
@@ -583,7 +596,7 @@ export const PlanetExperience = ({
             ) : null}
             {result.mode !== "custom" && !subsystemActive ? (
               <button
-                className="mobile-scene-action"
+                className={cx("mobile-scene-action")}
                 type="button"
                 disabled={systemJumpState === "loading"}
                 onClick={() => void openHostSystem()}
@@ -597,7 +610,7 @@ export const PlanetExperience = ({
             ) : null}
             {subsystemActive ? (
               <button
-                className="mobile-scene-action"
+                className={cx("mobile-scene-action")}
                 type="button"
                 onClick={() => setOrbitMenuOpen(true)}
               >
@@ -619,10 +632,10 @@ export const PlanetExperience = ({
           open={orbitMenuOpen}
           onClose={() => setOrbitMenuOpen(false)}
         >
-          <p className="mobile-orbit-note">
+          <p className={cx("mobile-orbit-note")}>
             JPL mean orbits · log-compressed distance · body sizes exaggerated
           </p>
-          <div className="mobile-orbit-groups">
+          <div className={cx("mobile-orbit-groups")}>
             <section>
               <h3>{subsystem.moons.length} selected moons</h3>
               <ul>
@@ -684,8 +697,8 @@ export const PlanetExperience = ({
         xr={{ host, status: xrStatus }}
       />
 
-      <div className="loading-screen" role="status">
-        <div className="loading-orbit" aria-hidden="true">
+      <div className={cx("loading-screen")} role="status">
+        <div className={cx("loading-orbit")} aria-hidden="true">
           <span />
         </div>
         <p>CALCULATING WORLD</p>

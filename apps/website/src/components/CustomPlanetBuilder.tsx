@@ -10,6 +10,12 @@ import {
 } from "@exora/worldgen";
 import { useEffect, useRef, useState } from "react";
 import { useTabList } from "../use-tab-list.ts";
+import sharedStyles from "./ExperienceShared.module.css";
+import catalogStyles from "./CatalogShared.module.css";
+import builderStyles from "./CustomPlanetBuilder.module.css";
+import { bindStyles } from "../styles/bind-styles.ts";
+
+const cx = bindStyles(sharedStyles, catalogStyles, builderStyles);
 
 type ForgeMode = "planet" | "star";
 
@@ -84,7 +90,7 @@ const RangeControl = ({
   value,
   valueLabel,
 }: RangeControlProps) => (
-  <label className="parameter-control">
+  <label className={cx("parameter-control")}>
     <span>
       {label}
       <output>{valueLabel}</output>
@@ -172,7 +178,9 @@ export const WorldForge = ({
   return (
     <dialog
       ref={dialogRef}
-      className={`planet-builder${embedded ? " embedded-forge" : ""}`}
+      className={cx(`planet-builder${embedded ? " embedded-forge" : ""}`)}
+      data-testid="planet-builder"
+      data-embedded={embedded}
       open={embedded || undefined}
       role={embedded ? "region" : undefined}
       aria-label={embedded ? "World Forge" : undefined}
@@ -184,6 +192,7 @@ export const WorldForge = ({
       }}
     >
       <form
+        data-testid="planet-builder-form"
         onSubmit={(event) => {
           event.preventDefault();
           if (mode === "planet") onGeneratePlanet(generateCustomWorld(parameters));
@@ -191,13 +200,13 @@ export const WorldForge = ({
         }}
       >
         {!embedded ? (
-          <div className="builder-header">
+          <div className={cx("builder-header")}>
             <div>
               <p>EXORA WORLD FORGE · CELESTIAL SYNTHESIS</p>
               <h2 id="builder-title">Design a celestial object</h2>
             </div>
             <button
-              className="catalog-close"
+              className={cx("catalog-close")}
               type="button"
               aria-label="Close world forge"
               onClick={onClose}
@@ -207,13 +216,13 @@ export const WorldForge = ({
           </div>
         ) : null}
 
-        <div className="forge-tabs" {...tabs.tabListProps}>
+        <div className={cx("forge-tabs")} data-style-role="forge-tabs" {...tabs.tabListProps}>
           <button
             {...tabs.tabProps("planet")}
-            className={mode === "planet" ? "active" : ""}
+            className={cx(mode === "planet" ? "active" : "")}
             onClick={() => setMode("planet")}
           >
-            <span className="catalog-radar" aria-hidden="true" />
+            <span className={cx("catalog-radar")} aria-hidden="true" />
             <span>
               <small>PLANET MAKER</small>
               <strong>BUILD A WORLD</strong>
@@ -221,10 +230,10 @@ export const WorldForge = ({
           </button>
           <button
             {...tabs.tabProps("star")}
-            className={mode === "star" ? "active" : ""}
+            className={cx(mode === "star" ? "active" : "")}
             onClick={() => setMode("star")}
           >
-            <span className="star-symbol" aria-hidden="true">
+            <span className={cx("star-symbol")} aria-hidden="true">
               ✦
             </span>
             <span>
@@ -235,8 +244,12 @@ export const WorldForge = ({
         </div>
 
         {mode === "planet" ? (
-          <div className="builder-body" {...tabs.panelProps("planet")}>
-            <section className="builder-identity" aria-label="World identity">
+          <div
+            className={cx("builder-body")}
+            data-style-role="builder-body"
+            {...tabs.panelProps("planet")}
+          >
+            <section className={cx("builder-identity")} aria-label="World identity">
               <label>
                 <span>WORLD NAME</span>
                 <input
@@ -262,7 +275,7 @@ export const WorldForge = ({
               </label>
               <label>
                 <span>PRIMARY PALETTE</span>
-                <span className="color-input">
+                <span className={cx("color-input")}>
                   <input
                     type="color"
                     value={toHex(parameters.baseColor)}
@@ -273,7 +286,7 @@ export const WorldForge = ({
               </label>
               <label>
                 <span>GENERATION SEED</span>
-                <span className="seed-input">
+                <span className={cx("seed-input")}>
                   <input
                     type="number"
                     min={0}
@@ -291,7 +304,7 @@ export const WorldForge = ({
               </label>
             </section>
 
-            <section className="builder-parameters" aria-label="World parameters">
+            <section className={cx("builder-parameters")} aria-label="World parameters">
               <RangeControl
                 label="Planet scale"
                 value={parameters.radius}
@@ -329,7 +342,7 @@ export const WorldForge = ({
                   onChange={(value) => update("water", value)}
                 />
               ) : null}
-              <label className="toggle-control">
+              <label className={cx("toggle-control")}>
                 <span>
                   Ring system
                   <small>{parameters.rings ? "ENABLED" : "DISABLED"}</small>
@@ -355,8 +368,12 @@ export const WorldForge = ({
             </section>
           </div>
         ) : (
-          <div className="builder-body star-builder-body" {...tabs.panelProps("star")}>
-            <section className="builder-identity" aria-label="Star identity">
+          <div
+            className={cx("builder-body star-builder-body")}
+            data-style-role="builder-body"
+            {...tabs.panelProps("star")}
+          >
+            <section className={cx("builder-identity")} aria-label="Star identity">
               <label>
                 <span>STAR NAME</span>
                 <input
@@ -383,9 +400,9 @@ export const WorldForge = ({
                   <option value="neutron-star">Neutron star</option>
                 </select>
               </label>
-              <div className="stellar-preview" aria-label="Derived spectral class">
+              <div className={cx("stellar-preview")} aria-label="Derived spectral class">
                 <span
-                  className="preview-star"
+                  className={cx("preview-star")}
                   aria-hidden="true"
                   style={{
                     background: stellarColor(starParameters.temperatureKelvin),
@@ -399,7 +416,7 @@ export const WorldForge = ({
               </div>
               <label>
                 <span>GENERATION SEED</span>
-                <span className="seed-input">
+                <span className={cx("seed-input")}>
                   <input
                     type="number"
                     min={0}
@@ -417,7 +434,7 @@ export const WorldForge = ({
               </label>
             </section>
 
-            <section className="builder-parameters" aria-label="Star parameters">
+            <section className={cx("builder-parameters")} aria-label="Star parameters">
               <RangeControl
                 label="Temperature"
                 min={2_000}
@@ -449,13 +466,13 @@ export const WorldForge = ({
           </div>
         )}
 
-        <footer className="builder-footer">
+        <footer className={cx("builder-footer")}>
           <p>
             <span aria-hidden="true" /> The generated URL includes this versioned recipe (Worldgen v
             {WORLDGEN_VERSION}), so it reloads and can be shared.
           </p>
-          <button className="generate-world" type="submit">
-            <span className="button-orbit" aria-hidden="true" />
+          <button className={cx("generate-world")} type="submit">
+            <span className={cx("button-orbit")} aria-hidden="true" />
             <span>
               <small>COMPILE PARAMETERS</small>
               <strong>GENERATE {mode === "planet" ? "PLANET" : "STAR"}</strong>

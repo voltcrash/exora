@@ -60,7 +60,7 @@ const starMarkup = (): string =>
   );
 
 const deckButtons = (markup: string): string[] => {
-  const start = markup.indexOf('class="control-deck"');
+  const start = markup.indexOf('data-testid="control-deck"');
   expect(start).toBeGreaterThan(-1);
   const deck = markup.slice(start, markup.indexOf("</footer>", start));
   return [...deck.matchAll(/<button[^>]*>/g)].map(([tag]) => tag);
@@ -73,10 +73,10 @@ test("the world view gathers every control onto one named deck", () => {
   const markup = planetMarkup();
 
   expect(deckNames(markup)).toEqual(["Open Discover", "Hide the interface", "XR: NOT AVAILABLE"]);
-  expect(markup).toContain('<kbd class="shortcut-icon" aria-label="Backspace or Delete">⌫</kbd>');
-  expect(markup).toContain('<kbd class="shortcut-icon" aria-label="Tab">⇥</kbd>');
-  expect(markup).toContain('class="discover-trigger-icon"');
-  expect(markup).toContain('class="clear-view-icon"');
+  expect(markup).toContain('data-testid="discover-shortcut"');
+  expect(markup).toContain('data-testid="clear-view-shortcut"');
+  expect(markup).toContain('data-testid="discover-trigger-icon"');
+  expect(markup).toContain('data-testid="clear-view-icon"');
   expect(markup).toContain("<small>XR</small><strong>NOT AVAILABLE</strong>");
 
   const header = markup.slice(markup.indexOf("<header"), markup.indexOf("</header>"));
@@ -113,7 +113,7 @@ test.each([
 
   expect(markup).toContain(`<strong>${copy}</strong>`);
   expect(markup).toContain("<small>XR</small>");
-  expect(markup).toContain('class="immersive-mode-icon"');
+  expect(markup).toContain('data-testid="immersive-mode-icon"');
   expect(markup).not.toContain("disabled");
 });
 
@@ -130,7 +130,7 @@ test("the unavailable immersive control reports its XR state", () => {
   );
 
   expect(markup).toContain("<small>XR</small><strong>NOT AVAILABLE</strong>");
-  expect(markup).toContain('class="immersive-mode-icon"');
+  expect(markup).toContain('data-testid="immersive-mode-icon"');
   expect(markup).toContain("disabled");
 });
 

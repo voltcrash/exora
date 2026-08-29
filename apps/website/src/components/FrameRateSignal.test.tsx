@@ -5,8 +5,8 @@ import { FrameRateSignal } from "./FrameRateSignal.tsx";
 test("keeps the signal bars beside a finite frame-rate reading", () => {
   const markup = renderToStaticMarkup(<FrameRateSignal fps="51" />);
 
-  expect(markup).toContain('class="frame-rate-reading"');
-  expect(markup).toMatch(/class="signal-bars"[^>]*>.*<\/span><strong>51<\/strong>/);
+  expect(markup).toContain('data-testid="frame-rate-reading"');
+  expect(markup).toMatch(/data-testid="signal-bars"[^>]*>.*<\/span><strong>51<\/strong>/);
   expect(markup).toContain("<small>FPS</small>");
   expect(markup).not.toContain("DESKTOP");
   expect(markup).not.toContain("MOBILE");

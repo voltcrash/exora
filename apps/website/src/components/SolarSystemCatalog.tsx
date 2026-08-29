@@ -3,6 +3,11 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import type { SolarRegionProfile } from "../solar-regions.ts";
 import { SOLAR_SYSTEM_REGIONS } from "../solar-regions.ts";
 import { SOLAR_SYSTEM_CATALOG_GROUPS, SOLAR_SYSTEM_MOONS } from "../solar-system.ts";
+import sharedStyles from "./ExperienceShared.module.css";
+import catalogStyles from "./CatalogShared.module.css";
+import { bindStyles } from "../styles/bind-styles.ts";
+
+const cx = bindStyles(sharedStyles, catalogStyles);
 
 interface SolarSystemCatalogProps {
   embedded?: boolean;
@@ -69,7 +74,8 @@ export const SolarSystemCatalog = ({
   return (
     <dialog
       ref={dialogRef}
-      className={`planet-catalog solar-system-catalog${embedded ? " embedded-catalog" : ""}`}
+      className={cx(`planet-catalog solar-system-catalog${embedded ? " embedded-catalog" : ""}`)}
+      data-embedded={embedded}
       open={embedded || undefined}
       role={embedded ? "region" : undefined}
       aria-label={embedded ? "Solar System catalog" : undefined}
@@ -80,15 +86,15 @@ export const SolarSystemCatalog = ({
         if (!embedded && event.target === dialogRef.current) onClose();
       }}
     >
-      <div className="catalog-scroll-region">
+      <div className={cx("catalog-scroll-region")} data-style-role="catalog-scroll-region">
         {!embedded ? (
-          <div className="catalog-header">
+          <div className={cx("catalog-header")}>
             <div>
               <p>HOME COORDINATES · NASA/JPL SOLAR SYSTEM DYNAMICS</p>
               <h2 id="solar-system-title">It’s time to go home</h2>
             </div>
             <button
-              className="catalog-close"
+              className={cx("catalog-close")}
               type="button"
               aria-label="Close Solar System catalog"
               onClick={onClose}
@@ -97,7 +103,7 @@ export const SolarSystemCatalog = ({
             </button>
           </div>
         ) : null}
-        <div className="solar-system-hero">
+        <div className={cx("solar-system-hero")}>
           <span>THE SOLAR SYSTEM</span>
           <strong>Known worlds. Real surfaces. Our cosmic address.</strong>
           <small>
@@ -105,10 +111,10 @@ export const SolarSystemCatalog = ({
             mapped moons
           </small>
         </div>
-        <div className="solar-catalog-tools" role="search">
+        <div className={cx("solar-catalog-tools")} role="search">
           <label>
             <span>SEARCH HOME SYSTEM</span>
-            <span className="solar-search-field">
+            <span className={cx("solar-search-field")}>
               <input
                 type="search"
                 value={query}
@@ -117,10 +123,10 @@ export const SolarSystemCatalog = ({
               />
             </span>
           </label>
-          <div className="solar-catalog-filters" aria-label="Filter Solar System catalog">
+          <div className={cx("solar-catalog-filters")} aria-label="Filter Solar System catalog">
             {(["all", "planets", "dwarfs", "moons", "regions"] as const).map((option) => (
               <button
-                className={filter === option ? "active" : ""}
+                className={cx(filter === option ? "active" : "")}
                 key={option}
                 type="button"
                 onClick={() => setFilter(option)}
@@ -131,9 +137,9 @@ export const SolarSystemCatalog = ({
           </div>
         </div>
         {visibleGroups.map((group) => (
-          <section className="solar-catalog-section" key={group.label}>
+          <section className={cx("solar-catalog-section")} key={group.label}>
             <h3>{group.label}</h3>
-            <ol className="solar-body-grid">
+            <ol className={cx("solar-body-grid")}>
               {group.entries.map((entry) => {
                 const identity = entry.profile.solarSystem;
                 return (
@@ -146,7 +152,9 @@ export const SolarSystemCatalog = ({
                       }}
                     >
                       <span
-                        className={`solar-body-portrait${identity?.texture ? " mapped" : ""} solar-${entry.profile.name.toLocaleLowerCase().replaceAll(" ", "-")}`}
+                        className={cx(
+                          `solar-body-portrait${identity?.texture ? " mapped" : ""} solar-${entry.profile.name.toLocaleLowerCase().replaceAll(" ", "-")}`,
+                        )}
                         style={
                           identity?.texture
                             ? { backgroundImage: `url(${identity.texture.path})` }
@@ -154,7 +162,7 @@ export const SolarSystemCatalog = ({
                         }
                         aria-hidden="true"
                       />
-                      <span className="solar-body-copy">
+                      <span className={cx("solar-body-copy")}>
                         <small>
                           {identity?.bodyType.toUpperCase()}
                           {identity?.parent ? ` · ${identity.parent}` : ""}
@@ -162,7 +170,11 @@ export const SolarSystemCatalog = ({
                         <strong>{entry.profile.name}</strong>
                         <span>{identity?.summary}</span>
                         {identity?.surfaceStatus ? (
-                          <em className={`science-status science-status-${identity.surfaceStatus}`}>
+                          <em
+                            className={cx(
+                              `science-status science-status-${identity.surfaceStatus}`,
+                            )}
+                          >
                             {identity.surfaceStatus === "mapped"
                               ? "MEASURED MISSION SURFACE"
                               : identity.surfaceStatus === "modeled"
@@ -171,7 +183,7 @@ export const SolarSystemCatalog = ({
                           </em>
                         ) : null}
                       </span>
-                      <span className="solar-body-meta">
+                      <span className={cx("solar-body-meta")}>
                         <small>
                           {identity?.spkId ? `SPK ${identity.spkId}` : `NAIF ${identity?.naifId}`}
                         </small>
@@ -185,27 +197,29 @@ export const SolarSystemCatalog = ({
           </section>
         ))}
         {visibleRegions.length > 0 ? (
-          <section className="solar-catalog-section" key="solar-system-regions">
+          <section className={cx("solar-catalog-section")} key="solar-system-regions">
             <h3>Regions · statistical populations and measured boundaries</h3>
-            <ol className="solar-body-grid">
+            <ol className={cx("solar-body-grid")}>
               {visibleRegions.map((region) => (
                 <li key={region.id}>
                   <button type="button" onClick={() => onSelectRegion(region)}>
                     <span
-                      className={`solar-body-portrait region-portrait region-portrait-${region.kind}`}
+                      className={cx(
+                        `solar-body-portrait region-portrait region-portrait-${region.kind}`,
+                      )}
                       aria-hidden="true"
                     >
                       ◎
                     </span>
-                    <span className="solar-body-copy">
+                    <span className={cx("solar-body-copy")}>
                       <small>REGION · {region.parent}</small>
                       <strong>{region.name}</strong>
                       <span>{region.summary}</span>
-                      <em className={`science-status science-status-${region.evidence}`}>
+                      <em className={cx(`science-status science-status-${region.evidence}`)}>
                         {region.evidence.replaceAll("-", " ").toUpperCase()} · SAMPLED VISUALIZATION
                       </em>
                     </span>
-                    <span className="solar-body-meta">
+                    <span className={cx("solar-body-meta")}>
                       <small>ANCHOR NAIF {region.anchorNaifId}</small>
                       <strong>EXPLORE ↗</strong>
                     </span>
@@ -216,7 +230,7 @@ export const SolarSystemCatalog = ({
           </section>
         ) : null}
         {visibleGroups.length === 0 && visibleRegions.length === 0 ? (
-          <p className="solar-catalog-empty" role="status">
+          <p className={cx("solar-catalog-empty")} role="status">
             NO HOME-SYSTEM OBJECTS MATCH THIS FILTER
           </p>
         ) : null}

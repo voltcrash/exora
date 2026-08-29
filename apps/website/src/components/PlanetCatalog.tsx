@@ -16,6 +16,11 @@ import {
   type PhysicalPlanetFilters,
 } from "../search-discovery.ts";
 import { PlanetCatalogVisual } from "./CatalogVisual.tsx";
+import sharedStyles from "./ExperienceShared.module.css";
+import catalogStyles from "./CatalogShared.module.css";
+import { bindStyles } from "../styles/bind-styles.ts";
+
+const cx = bindStyles(sharedStyles, catalogStyles);
 
 interface PlanetCatalogProps {
   embedded?: boolean;
@@ -124,30 +129,30 @@ const PlanetResult = memo(
     return (
       <li>
         <button
-          className="catalog-result"
+          className={cx("catalog-result")}
           type="button"
           disabled={!supported}
           onClick={() => onSelect(planet, cached)}
         >
-          <span className="result-preview">
+          <span className={cx("result-preview")}>
             <PlanetCatalogVisual planet={planet} />
           </span>
-          <span className="result-marker" aria-hidden="true" />
-          <span className="result-identity">
+          <span className={cx("result-marker")} aria-hidden="true" />
+          <span className={cx("result-identity")}>
             <strong>{planet.name}</strong>
             <small>
               {planet.hostStar} · {planet.observation.discoveryMethod}
             </small>
-            <span className="result-trait">{planetNotableTrait(planet)}</span>
+            <span className={cx("result-trait")}>{planetNotableTrait(planet)}</span>
           </span>
-          <span className="result-metrics">
+          <span className={cx("result-metrics")}>
             <small>{planetKindLabel(planet)}</small>
             <strong>
               {formatNumber(planet.observation.distanceParsecs, 1)} PC ·{" "}
               {temperature === null ? "TEMP UNKNOWN" : `${formatNumber(temperature, 0)} K`}
             </strong>
           </span>
-          <span className="result-state">{supported ? "EXPLORE" : "RENDERER PENDING"}</span>
+          <span className={cx("result-state")}>{supported ? "EXPLORE" : "RENDERER PENDING"}</span>
         </button>
       </li>
     );
@@ -344,7 +349,9 @@ export const PlanetCatalog = ({ embedded = false, onClose, onSelect }: PlanetCat
     <dialog
       ref={dialogRef}
       id="planet-catalog"
-      className={`planet-catalog${embedded ? " embedded-catalog" : ""}`}
+      className={cx(`planet-catalog${embedded ? " embedded-catalog" : ""}`)}
+      data-testid="planet-catalog"
+      data-embedded={embedded}
       open={embedded || undefined}
       role={embedded ? "region" : undefined}
       aria-label={embedded ? "Exoplanet catalog" : undefined}
@@ -355,15 +362,19 @@ export const PlanetCatalog = ({ embedded = false, onClose, onSelect }: PlanetCat
         if (!embedded && event.target === dialogRef.current) onClose();
       }}
     >
-      <div className="catalog-scroll-region">
+      <div
+        className={cx("catalog-scroll-region")}
+        data-testid="catalog-scroll-region"
+        data-style-role="catalog-scroll-region"
+      >
         {!embedded ? (
-          <div className="catalog-header">
+          <div className={cx("catalog-header")}>
             <div>
               <p>DISCOVERY PORTAL · NASA EXOPLANET ARCHIVE</p>
               <h2 id="catalog-title">Choose a world to discover</h2>
             </div>
             <button
-              className="catalog-close"
+              className={cx("catalog-close")}
               type="button"
               aria-label="Close planet catalog"
               onClick={onClose}
@@ -373,15 +384,15 @@ export const PlanetCatalog = ({ embedded = false, onClose, onSelect }: PlanetCat
           </div>
         ) : null}
         <button
-          className="surprise-journey"
+          className={cx("surprise-journey")}
           type="button"
           disabled={surpriseState === "loading"}
           onClick={takeMeSomewhere}
         >
-          <span className="surprise-symbol" aria-hidden="true">
+          <span className={cx("surprise-symbol")} aria-hidden="true">
             ✦
           </span>
-          <span className="surprise-copy">
+          <span className={cx("surprise-copy")}>
             <small>TAKE ME SOMEWHERE</small>
             <strong>
               {surpriseState === "loading"
@@ -391,12 +402,12 @@ export const PlanetCatalog = ({ embedded = false, onClose, onSelect }: PlanetCat
                   : "Jump to a random confirmed world"}
             </strong>
           </span>
-          <span className="surprise-action">
+          <span className={cx("surprise-action")}>
             {surpriseState === "loading" ? "SCANNING" : "SURPRISE ME"}{" "}
             <span aria-hidden="true">↗</span>
           </span>
         </button>
-        <div className="discovery-intro">
+        <div className={cx("discovery-intro")}>
           <span>
             {portalView === "collections"
               ? "CURATED JOURNEYS"
@@ -406,7 +417,7 @@ export const PlanetCatalog = ({ embedded = false, onClose, onSelect }: PlanetCat
           </span>
           <small>Large targets are designed for gaze, pointer, touch, or mouse</small>
         </div>
-        <div className="discovery-tabs" {...tabs.tabListProps}>
+        <div className={cx("discovery-tabs")} {...tabs.tabListProps}>
           <button {...tabs.tabProps("collections")} onClick={() => selectPortalView("collections")}>
             Curated collections
           </button>
@@ -418,11 +429,13 @@ export const PlanetCatalog = ({ embedded = false, onClose, onSelect }: PlanetCat
           </button>
         </div>
         {portalView === "collections" ? (
-          <div className="collection-grid" {...tabs.panelProps("collections")}>
+          <div className={cx("collection-grid")} {...tabs.panelProps("collections")}>
             {collections.map((collection) => (
               <button
                 key={collection.id}
-                className={`collection-card${activeCategory === collection.id ? " active" : ""}`}
+                className={cx(
+                  `collection-card${activeCategory === collection.id ? " active" : ""}`,
+                )}
                 type="button"
                 aria-pressed={activeCategory === collection.id}
                 onClick={() => {
@@ -430,24 +443,24 @@ export const PlanetCatalog = ({ embedded = false, onClose, onSelect }: PlanetCat
                   setActiveCategory(collection.id);
                 }}
               >
-                <span className="collection-index">{collection.index}</span>
-                <span className="collection-copy">
+                <span className={cx("collection-index")}>{collection.index}</span>
+                <span className={cx("collection-copy")}>
                   <small>{collection.tag}</small>
                   <strong>{collection.label}</strong>
                   <span>{collection.note}</span>
                 </span>
-                <span className="collection-launch" aria-hidden="true">
+                <span className={cx("collection-launch")} aria-hidden="true">
                   EXPLORE ↗
                 </span>
               </button>
             ))}
           </div>
         ) : portalView === "categories" ? (
-          <div className="discovery-grid" {...tabs.panelProps("categories")}>
+          <div className={cx("discovery-grid")} {...tabs.panelProps("categories")}>
             {categories.map((category) => (
               <button
                 key={category.id}
-                className={`discovery-card${activeCategory === category.id ? " active" : ""}`}
+                className={cx(`discovery-card${activeCategory === category.id ? " active" : ""}`)}
                 type="button"
                 aria-pressed={activeCategory === category.id}
                 onClick={() => {
@@ -455,22 +468,22 @@ export const PlanetCatalog = ({ embedded = false, onClose, onSelect }: PlanetCat
                   setActiveCategory(category.id);
                 }}
               >
-                <span className="discovery-icon" aria-hidden="true">
+                <span className={cx("discovery-icon")} aria-hidden="true">
                   {category.icon}
                 </span>
                 <span>
                   <strong>{category.label}</strong>
                   <small>{category.note}</small>
                 </span>
-                <span className="discovery-arrow" aria-hidden="true">
+                <span className={cx("discovery-arrow")} aria-hidden="true">
                   ↗
                 </span>
               </button>
             ))}
           </div>
         ) : (
-          <section className="physical-console" {...tabs.panelProps("filters")}>
-            <div className="physical-console-heading">
+          <section className={cx("physical-console")} {...tabs.panelProps("filters")}>
+            <div className={cx("physical-console-heading")}>
               <span>
                 <small>LIVE PLANET FIELD</small>
                 <strong>Shape the observatory signal</strong>
@@ -482,18 +495,18 @@ export const PlanetCatalog = ({ embedded = false, onClose, onSelect }: PlanetCat
                 RESET CONSOLE
               </button>
             </div>
-            <div className="physical-axis-grid">
+            <div className={cx("physical-axis-grid")}>
               {physicalAxes.map((axis) => {
                 const value = physicalFilters[axis.key];
                 return (
-                  <label key={axis.key} className="physical-axis">
+                  <label key={axis.key} className={cx("physical-axis")}>
                     <span>
                       <strong>{axis.name}</strong>
                       <small aria-live="polite">
                         {axisPositionLabel(value, axis.low, axis.high)}
                       </small>
                     </span>
-                    <span className="physical-axis-labels" aria-hidden="true">
+                    <span className={cx("physical-axis-labels")} aria-hidden="true">
                       <small>{axis.low}</small>
                       <small>{axis.high}</small>
                     </span>
@@ -515,7 +528,7 @@ export const PlanetCatalog = ({ embedded = false, onClose, onSelect }: PlanetCat
                 );
               })}
             </div>
-            <div className="physical-toggles">
+            <div className={cx("physical-toggles")}>
               <label>
                 <input
                   type="checkbox"
@@ -549,12 +562,12 @@ export const PlanetCatalog = ({ embedded = false, onClose, onSelect }: PlanetCat
             </div>
           </section>
         )}
-        <div className="discovery-divider">
+        <div className={cx("discovery-divider")}>
           <span>{portalView === "filters" ? "VISIBLE PLANET FIELD" : "OR SEARCH BY NAME"}</span>
         </div>
         {portalView !== "filters" ? (
-          <div className="catalog-search">
-            <span className="search-reticle" aria-hidden="true" />
+          <div className={cx("catalog-search")}>
+            <span className={cx("search-reticle")} aria-hidden="true" />
             <input
               ref={inputRef}
               type="search"
@@ -570,14 +583,14 @@ export const PlanetCatalog = ({ embedded = false, onClose, onSelect }: PlanetCat
               aria-controls="planet-search-results"
               aria-describedby="catalog-status"
             />
-            <span className="search-key">ESC</span>
+            <span className={cx("search-key")}>ESC</span>
           </div>
         ) : null}
-        <div className="catalog-meta">
+        <div className={cx("catalog-meta")}>
           <p id="catalog-status" role="status">
             {status}
           </p>
-          <div className="catalog-view-toggle" role="group" aria-label="Planet result layout">
+          <div className={cx("catalog-view-toggle")} role="group" aria-label="Planet result layout">
             <button
               type="button"
               aria-pressed={resultView === "gallery"}
@@ -596,7 +609,7 @@ export const PlanetCatalog = ({ embedded = false, onClose, onSelect }: PlanetCat
         </div>
         {suggestion && (
           <button
-            className="did-you-mean"
+            className={cx("did-you-mean")}
             type="button"
             onClick={() => {
               setSuggestion(null);
@@ -608,17 +621,21 @@ export const PlanetCatalog = ({ embedded = false, onClose, onSelect }: PlanetCat
             <span aria-hidden="true">↗</span>
           </button>
         )}
-        <ol id="planet-search-results" className={`catalog-results ${resultView}-view`}>
+        <ol
+          id="planet-search-results"
+          className={cx(`catalog-results ${resultView}-view`)}
+          data-testid="catalog-results"
+        >
           {searchState === "loading" && (
-            <li className="catalog-loading">
+            <li className={cx("catalog-loading")}>
               <span /> Resolving confirmed worlds
             </li>
           )}
           {searchState === "error" && (
-            <li className="catalog-empty">NASA search could not be completed.</li>
+            <li className={cx("catalog-empty")}>NASA search could not be completed.</li>
           )}
           {searchState === "ready" && visiblePlanets.length === 0 && (
-            <li className="catalog-empty">
+            <li className={cx("catalog-empty")}>
               {portalView === "filters"
                 ? "No sampled worlds match this console configuration. Widen one or more controls."
                 : "No confirmed planets matched this signal or its nearest aliases."}

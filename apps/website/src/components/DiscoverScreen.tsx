@@ -9,6 +9,7 @@ import { PlanetCatalog } from "./PlanetCatalog.tsx";
 import { SolarSystemCatalog } from "./SolarSystemCatalog.tsx";
 import { StarCatalog } from "./StarCatalog.tsx";
 import styles from "./DiscoverScreen.module.css";
+import sharedStyles from "./ExperienceShared.module.css";
 
 export type DiscoverSection = "solar" | "worlds" | "stars" | "black-holes" | "forge";
 
@@ -190,7 +191,11 @@ export const DiscoverScreen = ({
           aria-label="Open Solar System"
           onClick={() => setSection("solar")}
         >
-          <span className="brand-mark" aria-hidden="true" />
+          <span
+            className={sharedStyles["brand-mark"]}
+            data-style-role="brand-mark"
+            aria-hidden="true"
+          />
           <span>
             <strong>EXORA</strong>
             <small>DISCOVER</small>

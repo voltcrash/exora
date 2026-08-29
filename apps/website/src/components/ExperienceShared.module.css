@@ -1,0 +1,2817 @@
+.space-haze,
+.viewport-grid,
+.surface-veil {
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+}
+
+.surface-veil {
+  z-index: 1;
+  background: #020405;
+  visibility: hidden;
+  opacity: 0;
+}
+
+/*
+ * The dark a descent passes through.
+ *
+ * It used to hold at three quarters and fade in over its own timing, while the world it was
+ * covering for changed in the very first frame of the move — so the swap happened in plain sight
+ * and the dark arrived afterwards, to cover something that had already been seen. It is now one
+ * timeline, run from `travel-transition.ts` alongside the camera: full dark across the middle,
+ * which is exactly where the scene hands over from one half of the world to the other.
+ */
+.view-transition .surface-veil {
+  visibility: visible;
+  animation: surface-dip var(--surface-transition, 760ms) linear both;
+}
+
+/*
+ * Full dark across the whole middle, rather than only at the instant of the swap.
+ *
+ * The scene keeps its own clock and hands the world over at the halfway mark; this timeline is
+ * started by a React commit, which lands a frame or two later. That gap is nothing on a machine
+ * drawing sixty frames a second and a fifth of a second on one drawing three, so the dark is held
+ * wide enough that the swap is covered either way.
+ */
+@keyframes surface-dip {
+  0% {
+    opacity: 0;
+  }
+  28%,
+  72% {
+    opacity: 1;
+  }
+  100% {
+    opacity: 0;
+  }
+}
+
+/*
+ * The dark a jump crosses in.
+ *
+ * The flight itself is flown by the camera — the world being left is watched receding, and the
+ * destination is fallen in toward — so this covers only the moment between them, where the scene's
+ * contents are swapped and the frame loop stalls for as long as that takes. It darkens quickly
+ * into the swap and clears more slowly out of it, so the jump ends on the new world rather than on
+ * a curtain going up. Both durations are set from `travel-transition.ts`, which is also what the
+ * renderer times the flight by; the fallbacks here are only for a frame rendered before React has
+ * put the properties on the element.
+ */
+.travel-veil {
+  position: fixed;
+  z-index: 9;
+  inset: 0;
+  background: #010203;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity var(--travel-reveal, 300ms) ease-out;
+}
+
+.travel-veil.crossing {
+  opacity: 1;
+  transition: opacity var(--travel-cross, 190ms) ease-in;
+}
+
+.view-surface .topbar > *,
+.view-surface .hud > *,
+.view-surface .mission-control > * {
+  opacity: 0.34;
+  pointer-events: auto;
+  transition: opacity 240ms ease;
+}
+
+.view-surface .topbar > *:hover,
+.view-surface .hud > *:hover,
+.view-surface .mission-control > *:hover {
+  opacity: 1;
+}
+
+.space-haze {
+  background:
+    radial-gradient(circle at 53% 45%, transparent 21%, rgb(0 0 0 / 8%) 54%, rgb(0 0 0 / 62%) 112%),
+    linear-gradient(
+      90deg,
+      rgb(1 4 5 / 72%) 0%,
+      transparent 29%,
+      transparent 71%,
+      rgb(1 4 5 / 64%) 100%
+    );
+}
+
+.viewport-grid {
+  opacity: 0.06;
+  transition:
+    opacity 360ms ease,
+    visibility 360ms ease;
+  background-image:
+    linear-gradient(rgb(180 235 239 / 18%) 1px, transparent 1px),
+    linear-gradient(90deg, rgb(180 235 239 / 18%) 1px, transparent 1px);
+  background-size: 96px 96px;
+  mask-image: radial-gradient(circle at 50% 45%, #000, transparent 72%);
+}
+
+.topbar,
+.hud,
+.mission-control {
+  position: fixed;
+  z-index: 2;
+  pointer-events: none;
+  transition:
+    opacity 220ms ease,
+    visibility 220ms ease;
+}
+
+/*
+ * The panels read the world they are over, so they go with it when a jump flies away from it and
+ * come back with whatever the flight lands on. Hidden rather than merely transparent: every
+ * control in here sets its own `pointer-events`, and a faded-out button is still a button.
+ */
+.travelling .topbar,
+.travelling .hud,
+.travelling .mission-control {
+  visibility: hidden;
+  opacity: 0;
+}
+
+/*
+ * A cleared view: every panel, readout and control put away at once, leaving the world and the
+ * space around it. Hidden the same way travel hides them, and for the same reason — a faded-out
+ * button is still a button, and this state has nothing that should still be clickable.
+ *
+ * The grid over the canvas goes too. It is decoration rather than a control, but it is drawn in
+ * the interface's own hand, and a view is not cleared while it is still ruled.
+ */
+.chrome-hidden .topbar,
+.chrome-hidden .hud,
+.chrome-hidden .mission-control,
+.chrome-hidden .viewport-grid {
+  visibility: hidden;
+  opacity: 0;
+}
+
+/* The identity mark and nothing else: everything a view can be told is on the deck below. */
+.topbar {
+  top: 22px;
+  left: 24px;
+  right: 24px;
+  display: flex;
+  align-items: center;
+}
+
+.brand {
+  width: max-content;
+  display: inline-flex;
+  align-items: center;
+  gap: 12px;
+  color: var(--ink);
+  text-decoration: none;
+  pointer-events: auto;
+}
+
+.brand-mark {
+  width: 36px;
+  height: 36px;
+  flex: 0 0 auto;
+  background: url("/exora-orbit.svg") center / contain no-repeat;
+  filter: drop-shadow(0 0 8px rgb(139 230 234 / 24%));
+}
+
+.brand-copy {
+  display: grid;
+  gap: 2px;
+}
+
+.brand-copy strong {
+  font-size: 14px;
+  font-weight: 600;
+  letter-spacing: 0.26em;
+}
+
+.brand-copy small {
+  color: var(--faint);
+  font-family: var(--mono);
+  font-size: 7px;
+  letter-spacing: 0.12em;
+}
+
+/*
+ * The deck's leading control, and the only one on it that goes somewhere else. It keeps a lit
+ * surface for that reason: the way out of the current view stays the first thing found.
+ */
+.discover-trigger {
+  min-width: 184px;
+  min-height: 46px;
+  display: grid;
+  grid-template-columns: 30px 1fr auto;
+  align-items: center;
+  gap: 10px;
+  padding: 6px 8px 6px 10px;
+  border: 1px solid rgb(139 230 234 / 32%);
+  border-radius: 13px;
+  color: var(--ink);
+  background: linear-gradient(112deg, rgb(139 230 234 / 15%), rgb(139 230 234 / 3%) 64%);
+  cursor: pointer;
+  text-align: left;
+  transition:
+    border-color 160ms ease,
+    background 160ms ease;
+}
+
+.discover-trigger:hover {
+  border-color: rgb(139 230 234 / 64%);
+  background: linear-gradient(112deg, rgb(139 230 234 / 24%), rgb(139 230 234 / 7%) 64%);
+}
+
+.discover-trigger-mark {
+  width: 28px;
+  height: 28px;
+  display: grid;
+  place-items: center;
+  border: 1px solid rgb(139 230 234 / 42%);
+  border-radius: 50%;
+  box-shadow: inset 0 0 14px rgb(139 230 234 / 8%);
+}
+
+.discover-trigger-icon {
+  width: 22px;
+  height: 22px;
+  fill: none;
+  stroke: currentcolor;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  stroke-width: 1.35;
+}
+
+.discover-trigger-copy {
+  display: grid;
+  gap: 2px;
+}
+
+.discover-trigger-copy small {
+  color: #668087;
+  font-family: var(--mono);
+  font-size: 7px;
+  letter-spacing: 0.12em;
+}
+
+.discover-trigger-copy strong {
+  color: #e8f8f9;
+  font-size: 9px;
+  font-weight: 600;
+  letter-spacing: 0.2em;
+}
+
+.discover-trigger kbd {
+  min-width: 26px;
+  padding: 4px;
+  border: 1px solid rgb(139 230 234 / 18%);
+  border-radius: 7px;
+  color: #81979c;
+  text-align: center;
+}
+
+/* macOS key symbols share one readable face even though their surrounding controls differ. */
+.control-deck .shortcut-icon {
+  font-family: sans-serif;
+  font-size: 15px;
+  line-height: 1;
+}
+
+.star-symbol,
+.star-search-mark {
+  color: #ffc96f;
+  font-size: 19px;
+  line-height: 1;
+  text-align: center;
+  text-shadow: 0 0 12px rgb(255 190 80 / 78%);
+}
+.search-key {
+  min-width: 24px;
+  padding: 4px;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  color: var(--muted);
+  font-family: var(--mono);
+  font-size: 8px;
+  text-align: center;
+}
+
+.catalog-radar {
+  width: 22px;
+  height: 22px;
+  border: 1px solid rgb(139 230 234 / 48%);
+  border-radius: 50%;
+  position: relative;
+}
+
+.catalog-radar::before,
+.catalog-radar::after {
+  content: "";
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  background: rgb(139 230 234 / 45%);
+  transform: translate(-50%, -50%);
+}
+
+.catalog-radar::before {
+  width: 1px;
+  height: 100%;
+}
+
+.catalog-radar::after {
+  width: 100%;
+  height: 1px;
+}
+
+.hud {
+  inset: 86px 0 112px;
+  display: grid;
+  grid-template-columns: minmax(280px, 380px) 1fr minmax(250px, 292px);
+  align-items: center;
+  gap: 28px;
+  padding: 26px 34px;
+}
+
+.world-intro {
+  grid-column: 1;
+  align-self: end;
+  padding-bottom: 20px;
+  text-shadow: 0 2px 28px rgb(0 0 0 / 92%);
+}
+
+/*
+ * The Sun and system views can carry a complete catalog in this column.
+ *
+ * The viewport itself deliberately never scrolls because wheel gestures over the canvas zoom the
+ * scene. Bound these two long introductions to their HUD row instead, then make that surface own
+ * vertical gestures. Short introductions retain the shared bottom alignment; long ones become a
+ * contained scroller whose last world stays above the mission controls.
+ */
+.star-experience .world-intro,
+.system-experience .world-intro {
+  max-height: 100%;
+  overflow-x: hidden;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  pointer-events: auto;
+  scrollbar-color: rgb(139 230 234 / 28%) transparent;
+  scrollbar-gutter: stable;
+  scrollbar-width: thin;
+  touch-action: pan-y;
+}
+
+.eyebrow {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  margin: 0 0 14px;
+  color: var(--cyan);
+  font-family: var(--mono);
+  font-size: 8px;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+}
+
+.eyebrow span:first-child::before {
+  content: "";
+  display: inline-block;
+  width: 18px;
+  height: 1px;
+  margin: 0 8px 3px 0;
+  background: var(--cyan);
+}
+
+.eyebrow span:last-child {
+  padding-left: 9px;
+  border-left: 1px solid var(--line);
+  color: var(--muted);
+}
+
+h1 {
+  max-width: 390px;
+  margin: 0;
+  color: var(--ink);
+  font-size: clamp(48px, 5.5vw, 82px);
+  font-weight: 400;
+  line-height: 0.92;
+  letter-spacing: -0.07em;
+  text-wrap: balance;
+  text-transform: uppercase;
+}
+
+h1 em {
+  color: var(--accent);
+  font-style: normal;
+  font-weight: 400;
+}
+
+.world-tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 7px;
+  margin: 19px 0 16px;
+}
+
+.world-tags span {
+  padding: 6px 8px;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  color: #bdc9cd;
+  background: rgb(7 11 13 / 48%);
+  font-family: var(--mono);
+  font-size: 7px;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.world-tags span:first-child {
+  border-color: rgb(255 107 50 / 28%);
+  color: #ffc0a7;
+  background: var(--accent-soft);
+}
+
+.world-summary {
+  max-width: 350px;
+  margin: 0;
+  color: #aab6ba;
+  font-size: 12px;
+  line-height: 1.7;
+}
+
+.visual-note {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 16px 0 0;
+  color: var(--faint);
+  font-family: var(--mono);
+  font-size: 7px;
+  letter-spacing: 0.08em;
+}
+
+.visual-note span {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--accent);
+  box-shadow: 0 0 10px rgb(255 107 50 / 55%);
+}
+
+.telemetry {
+  grid-column: 3;
+  width: 100%;
+  padding: 18px;
+  border: 1px solid var(--line);
+  border-radius: 18px;
+  background: linear-gradient(145deg, rgb(24 45 49 / 16%), transparent 45%), var(--panel);
+  backdrop-filter: blur(22px);
+  box-shadow: 0 18px 70px rgb(0 0 0 / 30%);
+}
+
+.subsystem-experience .telemetry {
+  max-height: calc(100vh - 190px);
+  overflow-y: auto;
+  pointer-events: auto;
+  scrollbar-color: rgb(139 230 234 / 28%) transparent;
+}
+
+.subsystem-experience .world-intro {
+  width: min(520px, 45vw);
+}
+
+.subsystem-experience .visual-note {
+  color: rgb(139 230 234 / 72%);
+}
+
+.subsystem-experience .visual-note span {
+  background: var(--cyan);
+  box-shadow: 0 0 12px rgb(139 230 234 / 55%);
+}
+
+.subsystem-switch-detail {
+  padding-top: 2px;
+}
+
+.subsystem-jump {
+  border-color: rgb(139 230 234 / 30%);
+  color: #dffafa;
+  background: rgb(139 230 234 / 6%);
+}
+
+.subsystem-jump > span,
+.subsystem-jump small {
+  color: var(--cyan);
+}
+
+.subsystem-jump strong {
+  color: #e4fbfc;
+}
+
+.subsystem-jump:hover,
+.subsystem-jump:focus-visible,
+.subsystem-jump[aria-pressed="true"] {
+  border-color: rgb(139 230 234 / 62%);
+  background: rgb(139 230 234 / 11%);
+}
+
+.subsystem-science-detail {
+  border-left: 2px solid rgb(139 230 234 / 34%);
+  padding-left: 10px;
+}
+
+.subsystem-science-detail strong {
+  color: var(--cyan);
+}
+
+.subsystem-science-detail small {
+  line-height: 1.55;
+  text-transform: none;
+}
+
+.subsystem-members,
+.subsystem-resonances,
+.subsystem-layer-key {
+  grid-template-columns: 1fr;
+}
+
+.subsystem-members ul {
+  grid-column: 1 / -1;
+  display: grid;
+  gap: 5px;
+  margin: 7px 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+.subsystem-members li {
+  display: grid;
+  gap: 3px;
+  padding: 6px 0;
+  border-top: 1px solid rgb(229 244 247 / 7%);
+}
+
+.subsystem-members li > span,
+.subsystem-members li > button {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.subsystem-members li > button {
+  padding: 0;
+  border: 0;
+  color: inherit;
+  background: transparent;
+  cursor: pointer;
+  text-align: left;
+}
+
+.subsystem-members li strong {
+  color: #e6f2f3;
+  font-size: 8px;
+  font-weight: 500;
+  text-transform: uppercase;
+}
+
+.subsystem-members li > small,
+.subsystem-members li > span small,
+.subsystem-members li > button small {
+  color: var(--faint);
+  font: 6px/1.45 var(--mono);
+}
+
+.subsystem-members li > span small,
+.subsystem-members li > button small {
+  color: var(--cyan);
+}
+
+.subsystem-resonances p {
+  grid-column: 1 / -1;
+  display: grid;
+  grid-template-columns: 42px 1fr;
+  gap: 7px;
+  margin: 5px 0 0;
+}
+
+.subsystem-resonances p strong {
+  color: #f1c469;
+}
+
+.subsystem-resonances p small {
+  grid-column: auto;
+}
+
+.subsystem-layer-key ul {
+  grid-column: 1 / -1;
+  display: grid;
+  gap: 5px;
+  margin: 7px 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+.subsystem-layer-key li {
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+  padding-top: 5px;
+  border-top: 1px solid rgb(229 244 247 / 7%);
+}
+
+.subsystem-layer-key li strong {
+  color: #dcebed;
+  font: 500 7px/1.4 var(--mono);
+}
+
+.subsystem-layer-key li small {
+  grid-column: auto;
+  color: var(--cyan);
+  text-align: right;
+}
+
+.region-experience .eyebrow span,
+.region-experience .telemetry-heading small,
+.region-experience .telemetry dd small,
+.region-identifiers strong {
+  color: #78c9ed;
+}
+
+.region-telemetry {
+  max-height: calc(100vh - 190px);
+  overflow-y: auto;
+  pointer-events: auto;
+  scrollbar-color: rgb(120 201 237 / 28%) transparent;
+}
+
+.region-identifiers {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+  margin: 9px 0 0;
+  color: rgb(220 230 231 / 52%);
+  font: 8px/1.4 var(--mono);
+  letter-spacing: 0.08em;
+}
+
+.region-identifiers strong {
+  font-weight: 500;
+}
+
+.region-experience .world-summary {
+  max-width: 610px;
+}
+
+.region-visual-note {
+  max-width: 660px;
+  color: rgb(148 210 237 / 74%);
+}
+
+.region-visual-note span {
+  background: #78c9ed;
+  box-shadow: 0 0 12px rgb(120 201 237 / 50%);
+}
+
+.region-scale-note {
+  max-width: 620px;
+  margin: 13px 0 0;
+  color: rgb(220 230 231 / 48%);
+  font: 7px/1.55 var(--mono);
+  letter-spacing: 0.1em;
+}
+
+.region-evidence-value {
+  max-width: 120px;
+  color: #78c9ed;
+  font-size: 10px !important;
+  line-height: 1.3 !important;
+}
+
+.region-sources p {
+  display: grid;
+  grid-column: 1 / -1;
+  gap: 3px;
+  margin: 7px 0 0;
+}
+
+.region-portrait {
+  display: grid;
+  place-items: center;
+  color: #78c9ed;
+  background:
+    radial-gradient(circle, transparent 23%, rgb(98 183 226 / 28%) 25% 28%, transparent 31%),
+    radial-gradient(
+      ellipse at center,
+      transparent 42%,
+      rgb(98 183 226 / 20%) 44% 48%,
+      transparent 50%
+    );
+  font-size: 31px;
+  text-shadow: 0 0 18px rgb(98 183 226 / 80%);
+}
+
+.region-portrait-oort-shell {
+  background:
+    radial-gradient(
+      circle,
+      #ffd78a 0 2%,
+      transparent 3% 35%,
+      rgb(109 166 244 / 18%) 52% 55%,
+      transparent 73%
+    ),
+    radial-gradient(circle, rgb(109 166 244 / 8%), transparent 67%);
+}
+
+.solar-body-copy .science-status-modeled-inferred,
+.solar-body-copy .science-status-measured-boundary,
+.solar-body-copy .science-status-statistical-population {
+  border-color: rgb(120 201 237 / 26%);
+  color: #78c9ed;
+}
+
+.telemetry-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding-bottom: 16px;
+}
+
+.telemetry-heading > span:first-child {
+  display: grid;
+  gap: 4px;
+  color: #dce8ea;
+  font-size: 12px;
+  font-weight: 500;
+}
+
+.telemetry-heading small {
+  color: var(--cyan);
+  font-family: var(--mono);
+  font-size: 7px;
+  letter-spacing: 0.1em;
+}
+
+/*
+ * THE SIGNAL — four bars in the archive heading, reading the renderer they used to only decorate.
+ *
+ * They were drawn as a signal meter and measured nothing, while the number they are the meter for
+ * sat on the control deck below spending deck width on a figure nobody travels anywhere by. The
+ * two cost less together than either did apart: bars and count share a row above their caption,
+ * close enough to read as one value.
+ */
+.frame-rate-signal {
+  flex: 0 0 auto;
+}
+
+.signal-bars {
+  height: 13px;
+  display: flex;
+  align-items: end;
+  gap: 2px;
+  color: var(--cyan);
+}
+
+/* A world being drawn at under two fifths of a display's rate is not a reading to state calmly in
+   the panel's own colour, so the meter takes the colour the interface warns in. */
+.signal-bars[data-strength="1"],
+.signal-bars[data-strength="2"] {
+  color: var(--accent);
+}
+
+.signal-bars i {
+  width: 2px;
+  background: currentcolor;
+  /* Unlit rather than absent: the height of the meter is part of what it says, and a bar that
+     disappears takes the scale with it. */
+  opacity: 0.22;
+  transition:
+    opacity 320ms ease,
+    background 320ms ease;
+}
+
+.signal-bars[data-strength="1"] i:nth-child(-n + 1),
+.signal-bars[data-strength="2"] i:nth-child(-n + 2),
+.signal-bars[data-strength="3"] i:nth-child(-n + 3),
+.signal-bars[data-strength="4"] i:nth-child(-n + 4) {
+  opacity: 1;
+}
+
+.signal-bars i:nth-child(1) {
+  height: 4px;
+}
+.signal-bars i:nth-child(2) {
+  height: 7px;
+}
+.signal-bars i:nth-child(3) {
+  height: 10px;
+}
+.signal-bars i:nth-child(4) {
+  height: 13px;
+}
+
+.frame-rate-count {
+  display: grid;
+  justify-items: end;
+  gap: 1px;
+}
+
+.frame-rate-reading {
+  display: flex;
+  align-items: flex-start;
+  gap: 5px;
+}
+
+.frame-rate-reading strong {
+  color: #e0e8ea;
+  font-family: var(--mono);
+  font-size: 13px;
+  font-weight: 500;
+  line-height: 1;
+}
+
+/*
+ * Kept after the rules above so it wins the ties: every `small` in this heading is otherwise the
+ * archive eyebrow, in cyan or in whatever colour the view themes that eyebrow. The unit under the
+ * count is a footnote to a number, not a second label for the panel.
+ */
+.telemetry-heading .frame-rate-count small {
+  color: var(--faint);
+  font-family: var(--mono);
+  font-size: 7px;
+  letter-spacing: 0.04em;
+  white-space: nowrap;
+}
+
+.telemetry dl {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+  margin: 0 0 10px;
+}
+
+.telemetry dl div {
+  min-height: 70px;
+  padding: 11px;
+  border: 1px solid rgb(229 244 247 / 8%);
+  border-radius: 12px;
+  background: rgb(255 255 255 / 2%);
+}
+
+.telemetry dt,
+.telemetry-detail span {
+  color: var(--faint);
+  font-family: var(--mono);
+  font-size: 7px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.telemetry dd {
+  margin: 8px 0 0;
+  color: #edf4f5;
+  font-family: var(--mono);
+  font-size: 20px;
+  font-weight: 400;
+}
+
+.telemetry dd small {
+  color: var(--cyan);
+  font-size: 8px;
+}
+
+.telemetry-detail {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 4px 10px;
+  padding: 11px 2px;
+  border-bottom: 1px solid var(--line);
+}
+
+.telemetry-detail strong {
+  max-width: 150px;
+  overflow: hidden;
+  color: #dce6e8;
+  font-size: 9px;
+  font-weight: 500;
+  text-overflow: ellipsis;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+
+.telemetry-detail small {
+  grid-column: 1 / -1;
+  color: var(--faint);
+  font-family: var(--mono);
+  font-size: 7px;
+  text-transform: uppercase;
+}
+
+.host-system-detail {
+  grid-template-columns: 1fr;
+}
+
+.system-jump {
+  min-height: 52px;
+  display: grid;
+  grid-template-columns: 30px minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 9px;
+  margin-top: 4px;
+  padding: 8px 10px;
+  border: 1px solid rgb(255 198 98 / 22%);
+  border-radius: 11px;
+  color: #fff0cf;
+  background: rgb(255 190 80 / 5%);
+  cursor: pointer;
+  pointer-events: auto;
+  text-align: left;
+}
+
+.system-jump > span {
+  color: #ffc96f;
+  font-size: 22px;
+  text-align: center;
+  text-shadow: 0 0 14px rgb(255 177 67 / 70%);
+}
+
+.system-jump strong {
+  max-width: none;
+  color: #fff0cf;
+  font-family: var(--mono);
+  font-size: 9px;
+}
+
+.system-jump small {
+  grid-column: auto;
+  color: #ffc96f;
+  white-space: nowrap;
+}
+
+.system-jump:hover,
+.system-jump:focus-visible {
+  border-color: rgb(255 198 98 / 56%);
+  background: rgb(255 190 80 / 10%);
+}
+
+.system-jump:focus-visible,
+.known-world-list button:focus-visible {
+  outline: 2px solid #ffc96f;
+  outline-offset: 2px;
+}
+
+.system-jump-error {
+  color: #ff9c79 !important;
+}
+
+.known-worlds {
+  width: min(360px, 100%);
+  display: grid;
+  gap: 9px;
+  margin-top: 18px;
+}
+
+.known-worlds > div:first-child {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.known-worlds p,
+.known-worlds h2 {
+  margin: 0;
+}
+
+.known-worlds p,
+.known-worlds > small,
+.known-world-list small {
+  color: var(--faint);
+  font-family: var(--mono);
+  font-size: 7px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.known-worlds h2 {
+  color: #fff0cf;
+  font-size: 13px;
+  font-weight: 500;
+  text-transform: uppercase;
+}
+
+.known-world-list {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 7px;
+}
+
+.known-world-list button {
+  min-height: 58px;
+  display: grid;
+  grid-template-columns: 25px minmax(0, 1fr);
+  align-items: center;
+  gap: 9px;
+  padding: 8px;
+  border: 1px solid rgb(255 198 98 / 18%);
+  border-radius: 11px;
+  color: #dce6e8;
+  background: rgb(7 11 13 / 58%);
+  cursor: pointer;
+  pointer-events: auto;
+  text-align: left;
+}
+
+.known-world-list button:hover {
+  border-color: rgb(255 198 98 / 48%);
+  background: rgb(255 190 80 / 8%);
+}
+
+.known-world-list button > span:last-child {
+  min-width: 0;
+  display: grid;
+  gap: 4px;
+}
+
+.known-world-list strong {
+  overflow: hidden;
+  font-size: 9px;
+  font-weight: 500;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.known-world-orb {
+  width: 23px;
+  height: 23px;
+  border-radius: 50%;
+  background: radial-gradient(circle at 32% 28%, #c8f0e6, #447b79 48%, #14272a 76%);
+  box-shadow: 0 0 12px rgb(139 230 234 / 18%);
+}
+
+.known-world-orb.gas-giant {
+  background: repeating-linear-gradient(8deg, #d9b37c 0 4px, #7d533d 5px 8px);
+}
+
+.known-world-orb.ice-giant {
+  background: radial-gradient(circle at 32% 28%, #d8f6ff, #5798bb 52%, #1d3957 78%);
+}
+
+/* These controls replace scene-obscuring content on phones and are intentionally absent from the
+   desktop composition, where the HUD has room for the full archive panels. */
+.mobile-scene-actions,
+.mobile-orbit-action,
+.mobile-sheet {
+  display: none;
+}
+
+.source-note {
+  margin: 11px 2px 0;
+  color: #465258;
+  font-family: var(--mono);
+  font-size: 6px;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+}
+
+.source-note a {
+  color: inherit;
+  text-decoration: none;
+}
+
+.source-note a:hover,
+.source-note a:focus-visible {
+  color: var(--cyan);
+}
+
+/*
+ * MISSION CONTROL — one compact navigation deck at the top right.
+ *
+ * Discover, the gesture legend, the frame-rate readout, the clear-view switch and the immersive
+ * entry each used to hold a corner of their own. Four corners means four places to look and four
+ * panels floating over the world; one place means one. The deck owns the whole panel treatment —
+ * border, blur, shadow — and what sits inside it is now only what can be pressed: three controls,
+ * flat until hovered, reading as one instrument rather than three adjacent cards.
+ *
+ * The legend and the renderer's alert are not pressable and no longer look it. The controls sit
+ * beside the identity mark like the opposite end of a conventional top bar; the ordinary
+ * instruction line is independently anchored at the bottom edge of the viewport.
+ */
+.mission-control {
+  top: 22px;
+  right: 24px;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 10px;
+}
+
+.control-deck {
+  max-width: 100%;
+  display: flex;
+  align-items: stretch;
+  gap: 7px;
+  padding: 6px;
+  border: 1px solid var(--line);
+  border-radius: 19px;
+  background: rgb(8 13 15 / 82%);
+  backdrop-filter: blur(22px);
+  box-shadow:
+    0 18px 46px rgb(0 0 0 / 42%),
+    inset 0 1px 0 rgb(229 244 247 / 7%);
+  pointer-events: auto;
+}
+
+.deck-group {
+  display: flex;
+  align-items: stretch;
+}
+
+/*
+ * The way to put the interface away and be left with the sky.
+ *
+ * It advertises Tab with a `<kbd>` the way Discover advertises Backspace. Desktop clears this
+ * button with everything else and uses that key to restore the interface; mobile keeps the compact
+ * button itself as the touch-accessible way back. See `.chrome-hidden`.
+ */
+.clear-view,
+.enter-vr {
+  min-height: 46px;
+  align-items: center;
+  border: 1px solid transparent;
+  border-radius: 13px;
+  background: rgb(229 244 247 / 4%);
+  cursor: pointer;
+  text-align: left;
+  transition:
+    border-color 160ms ease,
+    background 160ms ease;
+}
+
+.clear-view {
+  display: grid;
+  grid-template-columns: 24px 1fr auto;
+  gap: 9px;
+  padding: 6px 8px 6px 10px;
+  color: #dfeaec;
+}
+
+.clear-view:hover {
+  border-color: rgb(139 230 234 / 45%);
+  background: rgb(139 230 234 / 11%);
+}
+
+.clear-view > span:nth-child(2) {
+  display: grid;
+  gap: 2px;
+}
+
+.clear-view small,
+.enter-vr small {
+  color: var(--faint);
+  font-family: var(--mono);
+  font-size: 7px;
+  letter-spacing: 0.08em;
+}
+
+.clear-view strong {
+  color: #c8d4d7;
+  font-size: 9px;
+  font-weight: 500;
+}
+
+.clear-view kbd {
+  min-width: 26px;
+  padding: 4px;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  color: var(--muted);
+  text-align: center;
+}
+
+.clear-view-icon {
+  width: 26px;
+  height: 26px;
+  overflow: visible;
+  fill: none;
+  stroke: currentcolor;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  stroke-width: 1.25;
+  opacity: 0.78;
+}
+
+.clear-view-icon .eye-slash {
+  stroke-width: 1.7;
+}
+
+/*
+ * Takes the legend's line when a world fails to build: a renderer that produced nothing has no
+ * gestures worth advertising. The deck stays under it, because the way out of a world that would
+ * not assemble is travelling to one that will.
+ *
+ * Nothing else says so: the loading card stands down as soon as the attempt settles either way,
+ * and the page-level recovery screens answer for the renderer itself, not for one scene that
+ * could not be assembled on it.
+ */
+.scene-alert {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin: 0;
+  padding: 8px 13px;
+  border: 1px solid rgb(255 107 50 / 32%);
+  border-radius: 13px;
+  background: rgb(20 10 6 / 82%);
+  backdrop-filter: blur(18px);
+  color: #c8d4d7;
+  font-family: var(--mono);
+  font-size: 9px;
+  letter-spacing: 0.06em;
+}
+
+.scene-alert::before {
+  content: "";
+  width: 6px;
+  height: 6px;
+  flex: 0 0 auto;
+  border-radius: 50%;
+  background: var(--accent);
+  box-shadow: 0 0 12px rgb(255 107 50 / 70%);
+}
+
+/*
+ * THE LEGEND — every gesture this scene answers to, on one bottom-centred line.
+ *
+ * It was a cell on the deck, boxed and ruled like the controls beside it, which is what made a
+ * caption look pressable. Off the surface it can be what it is: a line of small copy along the
+ * lower edge, quiet enough to be read past and now free to sit lower without the deck beneath it.
+ *
+ * The seams between the gestures go with the box. Copy is divided by punctuation, so a middot
+ * does the work a hairline was doing, and the line wraps rather than reflowing the deck under it.
+ */
+.interaction-hint {
+  position: fixed;
+  bottom: 20px;
+  left: 50%;
+  width: max-content;
+  max-width: calc(100vw - 32px);
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  justify-content: center;
+  column-gap: 9px;
+  row-gap: 4px;
+  transform: translateX(-50%);
+  /* Read over whatever the world is doing underneath, which at a terminator or over an ice cap
+     is not dark. The shadow is what keeps 8px of copy legible without a panel to sit on. */
+  text-shadow: 0 1px 12px rgb(0 0 0 / 92%);
+}
+
+.interaction-hint > span {
+  display: flex;
+  align-items: baseline;
+  gap: 5px;
+  white-space: nowrap;
+}
+
+.interaction-hint > span + span::before {
+  content: "·";
+  color: rgb(229 244 247 / 26%);
+}
+
+.interaction-hint kbd {
+  color: #dbe6e8;
+  font-family: var(--mono);
+  font-size: 9px;
+  font-weight: 500;
+  letter-spacing: 0.06em;
+}
+
+.interaction-hint small {
+  color: rgb(220 230 231 / 58%);
+  font-family: var(--mono);
+  font-size: 8px;
+  letter-spacing: 0.08em;
+}
+
+.enter-vr {
+  min-width: 0;
+  display: grid;
+  grid-template-columns: 26px max-content;
+  gap: 8px;
+  padding: 6px 10px;
+  color: #f2f9fa;
+}
+
+/* Lit only when there is a headset to enter: an unreachable session is a readout, not an offer. */
+.enter-vr:not(:disabled) {
+  border-color: rgb(139 230 234 / 45%);
+  background: rgb(139 230 234 / 12%);
+}
+
+.enter-vr:not(:disabled):hover {
+  border-color: var(--cyan);
+  background: rgb(139 230 234 / 19%);
+}
+
+.enter-vr:disabled {
+  color: #778388;
+  cursor: default;
+}
+
+.enter-vr > span:nth-child(2) {
+  display: grid;
+  gap: 2px;
+}
+
+.enter-vr strong {
+  font-size: 9px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+}
+
+.immersive-mode-icon {
+  width: 28px;
+  height: 26px;
+  overflow: visible;
+  fill: none;
+  stroke: currentcolor;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  stroke-width: 1.3;
+  opacity: 0.82;
+}
+
+.immersive-mode-icon .visor-highlight {
+  opacity: 0.56;
+}
+.catalog-close:focus-visible,
+.catalog-result:focus-visible,
+.clear-view:focus-visible,
+.enter-vr:focus-visible,
+.generate-world:focus-visible,
+.planet-builder input:focus-visible,
+.star-experience .space-haze {
+  background:
+    radial-gradient(circle at 50% 48%, rgb(255 150 45 / 4%), transparent 26%),
+    radial-gradient(
+      circle at 53% 45%,
+      transparent 20%,
+      rgb(0 0 0 / 11%) 56%,
+      rgb(0 0 0 / 68%) 112%
+    ),
+    linear-gradient(
+      90deg,
+      rgb(1 3 5 / 76%) 0%,
+      transparent 30%,
+      transparent 70%,
+      rgb(1 3 5 / 68%) 100%
+    );
+}
+
+.star-experience .world-tags span:first-child {
+  border-color: rgb(255 198 98 / 30%);
+  color: #ffdda4;
+  background: rgb(255 187 71 / 10%);
+}
+
+.star-experience .visual-note span {
+  background: #ffc96f;
+  box-shadow: 0 0 10px rgb(255 190 80 / 65%);
+}
+
+.black-hole-experience .space-haze {
+  background:
+    radial-gradient(circle at 50% 48%, rgb(149 89 225 / 7%), transparent 23%),
+    radial-gradient(
+      circle at 52% 47%,
+      transparent 17%,
+      rgb(0 0 0 / 18%) 48%,
+      rgb(0 0 0 / 78%) 112%
+    ),
+    linear-gradient(
+      90deg,
+      rgb(1 1 4 / 84%) 0%,
+      transparent 31%,
+      transparent 69%,
+      rgb(1 1 4 / 78%) 100%
+    );
+}
+
+.black-hole-experience .world-intro {
+  max-height: 100%;
+  overflow-x: hidden;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  pointer-events: auto;
+  scrollbar-color: rgb(190 155 255 / 28%) transparent;
+  scrollbar-width: thin;
+}
+
+/* Long catalog names must fit inside the intro column: hidden horizontal overflow keeps the
+   scrollable HUD clean, so an oversized heading would otherwise lose the end of its first word. */
+.black-hole-experience h1 {
+  font-size: clamp(48px, 4.4vw, 64px);
+}
+
+.black-hole-experience .eyebrow,
+.black-hole-experience .telemetry-heading small,
+.black-hole-experience .telemetry dd small {
+  color: #c7a8ff;
+}
+
+.black-hole-experience .eyebrow span:first-child::before {
+  background: #c7a8ff;
+}
+
+.black-hole-experience .world-tags span:first-child {
+  border-color: rgb(190 155 255 / 32%);
+  color: #decaff;
+  background: rgb(149 89 225 / 10%);
+}
+
+.black-hole-experience .world-summary {
+  max-width: 410px;
+}
+
+.black-hole-visual-note {
+  max-width: 470px;
+  color: rgb(199 168 255 / 66%);
+  line-height: 1.55;
+}
+
+.black-hole-visual-note span {
+  flex: none;
+  background: #b48aff;
+  box-shadow: 0 0 12px rgb(180 138 255 / 70%);
+}
+
+.black-hole-telemetry {
+  border-color: rgb(190 155 255 / 16%);
+  background: linear-gradient(145deg, rgb(68 42 105 / 18%), transparent 45%), var(--panel);
+}
+
+.black-hole-telemetry dl {
+  grid-template-columns: 1fr;
+}
+
+.black-hole-telemetry dl div {
+  min-height: 68px;
+}
+
+.black-hole-telemetry dd {
+  font-size: 14px;
+}
+
+.black-hole-science-detail {
+  border-left: 2px solid rgb(190 155 255 / 34%);
+  padding-left: 10px;
+}
+
+.black-hole-science-detail strong {
+  color: #cfb5ff;
+}
+
+.black-hole-science-detail small {
+  line-height: 1.55;
+  text-transform: none;
+}
+
+.black-hole-experience .source-note a:hover,
+.black-hole-experience .source-note a:focus-visible {
+  color: #c7a8ff;
+}
+
+.black-hole-loading {
+  border-color: rgb(190 155 255 / 18%);
+}
+
+.black-hole-loading span {
+  background: #c7a8ff;
+  box-shadow: 0 0 12px #b48aff;
+}
+
+/*
+ * The system diorama.
+ *
+ * It reads in the cyan of the orbit guides rather than the star view's gold, because the subject
+ * is the set of orbits rather than the light at the middle of them. The one structural difference
+ * from the other two views is the scale panel: a diorama has compressed two scales and picked a
+ * clock rate to fit a system into a room, and none of that is a fact about the system, so it is
+ * given the same standing on the page as the measurements rather than left for the picture to
+ * imply.
+ */
+.system-experience .world-tags span:first-child {
+  border-color: rgb(139 230 234 / 30%);
+  color: #b7f2f6;
+  background: rgb(94 214 220 / 10%);
+}
+
+.system-experience .visual-note span {
+  background: var(--cyan);
+  box-shadow: 0 0 10px rgb(139 230 234 / 65%);
+}
+
+.system-experience .known-worlds h2 {
+  color: #d3f5f8;
+}
+
+.system-experience .known-world-list {
+  grid-template-columns: minmax(0, 1fr);
+}
+
+.system-experience .known-world-list button {
+  border-color: rgb(139 230 234 / 18%);
+}
+
+.system-experience .known-world-list button:hover {
+  border-color: rgb(139 230 234 / 48%);
+  background: rgb(94 214 220 / 8%);
+}
+
+.ephemeris-control {
+  width: min(390px, 100%);
+  display: grid;
+  gap: 9px;
+  margin-top: 14px;
+  padding: 11px;
+  border: 1px solid rgb(139 230 234 / 22%);
+  border-radius: 13px;
+  background: rgb(4 14 18 / 72%);
+  backdrop-filter: blur(14px);
+  pointer-events: auto;
+}
+
+.ephemeris-heading,
+.ephemeris-time-row,
+.ephemeris-playback {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+}
+
+.ephemeris-heading {
+  justify-content: space-between;
+}
+
+.ephemeris-heading span {
+  display: grid;
+  gap: 2px;
+}
+
+.ephemeris-heading small,
+.ephemeris-time-row label > span,
+.ephemeris-playback label > span {
+  color: var(--faint);
+  font: 6px/1.2 var(--mono);
+  letter-spacing: 0.09em;
+}
+
+.ephemeris-heading h2 {
+  margin: 0;
+  color: #d3f5f8;
+  font-size: 13px;
+  font-weight: 500;
+  text-transform: uppercase;
+}
+
+.ephemeris-heading strong {
+  padding: 4px 6px;
+  border: 1px solid rgb(139 230 234 / 25%);
+  border-radius: 999px;
+  color: var(--cyan);
+  font: 6px/1 var(--mono);
+  letter-spacing: 0.07em;
+}
+
+.ephemeris-heading strong.stale {
+  border-color: rgb(255 156 121 / 36%);
+  color: #ffb08e;
+}
+
+.ephemeris-time-row {
+  align-items: end;
+}
+
+.ephemeris-time-row label {
+  min-width: 0;
+  flex: 1;
+  display: grid;
+  gap: 4px;
+}
+
+.ephemeris-time-row input,
+.ephemeris-playback select,
+.ephemeris-time-row button,
+.ephemeris-playback button {
+  min-height: 30px;
+  border: 1px solid rgb(139 230 234 / 25%);
+  border-radius: 8px;
+  color: #dff9fb;
+  background: rgb(8 24 28 / 88%);
+  font: 7px/1 var(--mono);
+}
+
+.ephemeris-time-row input,
+.ephemeris-playback select {
+  min-width: 0;
+  padding: 6px 7px;
+  color-scheme: dark;
+}
+
+.ephemeris-time-row button,
+.ephemeris-playback button {
+  padding: 6px 8px;
+  cursor: pointer;
+}
+
+.ephemeris-time-row button:hover,
+.ephemeris-time-row button:focus-visible,
+.ephemeris-playback button:hover,
+.ephemeris-playback button:focus-visible,
+.ephemeris-playback button[aria-pressed="true"] {
+  border-color: rgb(139 230 234 / 62%);
+  color: white;
+  background: rgb(75 177 184 / 20%);
+}
+
+.ephemeris-time-row button:disabled,
+.ephemeris-playback button:disabled {
+  opacity: 0.38;
+  cursor: default;
+}
+
+.ephemeris-playback {
+  flex-wrap: wrap;
+}
+
+.ephemeris-playback label {
+  display: grid;
+  grid-template-columns: auto 58px;
+  align-items: center;
+  gap: 5px;
+}
+
+.ephemeris-control > p {
+  margin: 0;
+  color: #729398;
+  font: 6px/1.45 var(--mono);
+  letter-spacing: 0.055em;
+}
+
+/* One long, unpunctuated line per world naming exactly what had to be assumed to draw its orbit. */
+.orbit-provenance {
+  overflow: hidden;
+  color: #6f8f95 !important;
+  font-size: 6px !important;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.orbit-unplaced {
+  padding: 7px 9px;
+  border: 1px solid rgb(255 156 121 / 22%);
+  border-radius: 9px;
+  color: #ffb08e !important;
+  background: rgb(255 120 80 / 6%);
+  line-height: 1.5;
+}
+
+/* The scale readouts are prose, not quantities, so they drop the big numeric face `dd` carries. */
+.telemetry dl.system-scale {
+  grid-template-columns: minmax(0, 1fr);
+}
+
+.system-scale div {
+  min-height: 0;
+}
+
+/*
+ * Wrapped rather than ellipsized, unlike every other value in the telemetry panel.
+ *
+ * These three lines are the only reason the diorama can be read at all — a truncated "LOG ·
+ * 0.015-..." tells a phone reader that something was compressed while withholding what. Two short
+ * lines are worth more than one tidy one here.
+ */
+.system-scale dd {
+  font-size: 11px;
+  letter-spacing: 0.02em;
+  line-height: 1.45;
+  overflow-wrap: anywhere;
+  white-space: normal;
+}
+
+.scale-note {
+  margin: 0 2px 12px;
+  line-height: 1.5;
+}
+
+.diorama-jump {
+  border-color: rgb(139 230 234 / 22%) !important;
+}
+
+.diorama-jump:hover,
+.diorama-jump:focus-visible {
+  border-color: rgb(139 230 234 / 52%) !important;
+  background: rgb(94 214 220 / 8%) !important;
+}
+
+.recovery-screen {
+  position: fixed;
+  z-index: 100;
+  inset: 0;
+  display: grid;
+  place-content: center;
+  justify-items: center;
+  padding: 28px;
+  color: var(--text);
+  background: radial-gradient(circle at 50% 42%, rgb(28 67 70 / 30%), transparent 30%), #030506;
+  text-align: center;
+}
+
+.recovery-screen p,
+.recovery-screen small,
+.recovery-screen button {
+  font-family: var(--mono);
+  letter-spacing: 0.14em;
+}
+
+.recovery-screen p {
+  margin: 22px 0 8px;
+  color: var(--cyan);
+  font-size: 8px;
+}
+
+.recovery-screen h1 {
+  margin: 0;
+  font-size: clamp(24px, 4vw, 46px);
+  font-weight: 300;
+  letter-spacing: 0.04em;
+}
+
+.recovery-screen small {
+  max-width: 520px;
+  margin-top: 12px;
+  color: var(--faint);
+  font-size: 8px;
+  line-height: 1.7;
+}
+
+.recovery-screen button {
+  margin-top: 24px;
+  padding: 12px 18px;
+  border: 1px solid rgb(139 230 234 / 42%);
+  border-radius: 999px;
+  color: var(--cyan);
+  background: rgb(8 20 22 / 86%);
+  font-size: 8px;
+  cursor: pointer;
+}
+
+.recovery-screen button:hover,
+.recovery-screen button:focus-visible {
+  border-color: var(--cyan);
+  outline: none;
+  box-shadow: 0 0 28px rgb(139 230 234 / 18%);
+}
+
+.recovery-orbit {
+  width: 70px;
+  height: 70px;
+  border: 1px solid rgb(139 230 234 / 35%);
+  border-radius: 50%;
+  position: relative;
+  animation: loading-spin 2.4s linear infinite;
+}
+
+.recovery-orbit::before,
+.recovery-orbit::after {
+  content: "";
+  position: absolute;
+  border-radius: 50%;
+}
+
+.recovery-orbit::before {
+  inset: 9px;
+  border: 1px dashed rgb(139 230 234 / 26%);
+}
+
+.recovery-orbit::after {
+  width: 8px;
+  height: 8px;
+  top: 7px;
+  left: 30px;
+  background: var(--cyan);
+  box-shadow: 0 0 14px var(--cyan);
+}
+
+.loading-screen {
+  position: fixed;
+  z-index: 10;
+  inset: 0;
+  display: grid;
+  place-content: center;
+  place-items: center;
+  pointer-events: none;
+  background: #030506;
+  transition:
+    opacity 220ms ease-out,
+    visibility 0s linear 220ms;
+}
+
+.scene-ready .loading-screen {
+  visibility: hidden;
+  opacity: 0;
+}
+
+.loading-screen p {
+  margin: 20px 0 7px;
+  font-family: var(--mono);
+  font-size: 9px;
+  letter-spacing: 0.18em;
+}
+
+.loading-screen small {
+  color: var(--faint);
+  font-family: var(--mono);
+  font-size: 7px;
+  letter-spacing: 0.1em;
+}
+
+.loading-orbit {
+  width: 58px;
+  height: 58px;
+  border: 1px solid rgb(139 230 234 / 20%);
+  border-radius: 50%;
+  position: relative;
+  animation: loading-spin 2s linear infinite;
+  will-change: transform;
+}
+
+.loading-orbit::before {
+  content: "";
+  position: absolute;
+  inset: 7px;
+  border: 1px dashed rgb(139 230 234 / 28%);
+  border-radius: 50%;
+}
+
+.loading-orbit::after {
+  content: "";
+  position: absolute;
+  width: 7px;
+  height: 7px;
+  top: 5px;
+  left: 7px;
+  border-radius: 50%;
+  background: var(--accent);
+  box-shadow: 0 0 12px var(--accent);
+}
+
+@keyframes pulse {
+  0%,
+  100% {
+    opacity: 0.35;
+  }
+  50% {
+    opacity: 1;
+  }
+}
+
+@keyframes loading-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@keyframes catalog-in {
+  from {
+    opacity: 0;
+    transform: translateY(10px) scale(0.985);
+  }
+}
+
+@media (max-width: 960px) {
+  .topbar {
+    top: 16px;
+    right: 16px;
+    left: 16px;
+    grid-template-columns: 1fr auto;
+  }
+
+  .hud {
+    inset: 72px 0 96px;
+    grid-template-columns: 1fr 230px;
+    align-items: end;
+    padding: 22px 18px;
+  }
+
+  .telemetry {
+    grid-column: 2;
+    padding: 14px;
+  }
+
+  .telemetry-detail,
+  .source-note {
+    display: none;
+  }
+
+  .mission-control {
+    top: 16px;
+    right: 16px;
+  }
+
+  /* The line a narrow screen can most afford to lose: every gesture it names belongs to a
+     keyboard or a pointer, and the screens this width down are worked with a thumb. */
+  .interaction-hint {
+    display: none;
+  }
+
+  .physical-axis-grid {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 760px) {
+  .black-hole-catalog-hero {
+    grid-template-columns: 1fr;
+    gap: 12px;
+    margin-inline: 18px;
+  }
+
+  .black-hole-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    padding-inline: 18px;
+  }
+
+  .black-hole-method-note {
+    margin-inline: 18px;
+  }
+
+  .builder-body {
+    grid-template-columns: 1fr;
+  }
+
+  .builder-identity {
+    grid-template-columns: 1fr 1fr;
+  }
+}
+
+@media (max-width: 640px) {
+  /* Orbit scenes belong to the canvas. Their catalogs and controls now live in a top-layer sheet,
+     leaving only one compact entry point over the rendering. */
+  .system-experience .hud,
+  .subsystem-experience .hud > .world-intro,
+  .subsystem-experience .hud > .telemetry {
+    display: none;
+  }
+
+  .ephemeris-time-row {
+    display: grid;
+    grid-template-columns: 1fr auto;
+  }
+
+  .ephemeris-time-row label {
+    grid-column: 1 / -1;
+  }
+
+  .solar-catalog-tools {
+    grid-template-columns: 1fr;
+    margin-inline: 18px;
+  }
+
+  .solar-catalog-filters {
+    justify-content: start;
+  }
+
+  .solar-search-field {
+    grid-template-columns: 1fr;
+  }
+
+  .brand-copy small {
+    display: none;
+  }
+
+  .solar-body-grid {
+    grid-template-columns: 1fr;
+    padding-inline: 18px;
+  }
+
+  .planet-builder {
+    width: calc(100vw - 16px);
+    max-height: calc(100vh - 16px);
+    border-radius: 18px;
+  }
+
+  .builder-header {
+    min-height: 90px;
+    padding: 18px;
+  }
+
+  .forge-tabs {
+    padding: 10px 18px;
+  }
+
+  .forge-tabs button {
+    min-height: 48px;
+    padding: 7px 10px;
+  }
+
+  .forge-tabs .catalog-radar,
+  .forge-tabs .star-symbol {
+    display: none;
+  }
+
+  .forge-tabs button {
+    grid-template-columns: 1fr;
+  }
+
+  .builder-body {
+    gap: 20px;
+    padding: 18px;
+  }
+
+  .builder-identity,
+  .builder-parameters {
+    grid-template-columns: 1fr;
+  }
+
+  .builder-footer {
+    align-items: stretch;
+    flex-direction: column;
+    padding: 16px 18px 18px;
+  }
+
+  .generate-world {
+    width: 100%;
+  }
+
+  .hud {
+    display: block;
+    padding: 22px 16px;
+  }
+
+  .world-intro {
+    width: min(78%, 330px);
+    padding-top: 18px;
+  }
+
+  .eyebrow span:last-child,
+  .world-summary,
+  .visual-note {
+    display: none;
+  }
+
+  h1 {
+    font-size: clamp(45px, 15vw, 70px);
+  }
+
+  .world-tags span:first-child {
+    display: none;
+  }
+
+  .telemetry {
+    position: absolute;
+    right: 16px;
+    bottom: 12px;
+    width: 168px;
+    padding: 11px;
+    border-radius: 15px;
+  }
+
+  .star-experience .telemetry,
+  .experience-shell:not(.subsystem-experience) .hud:has(.mobile-scene-actions-two) .telemetry {
+    bottom: 130px;
+  }
+
+  .star-experience .known-worlds {
+    display: none;
+  }
+
+  .mobile-scene-actions,
+  .mobile-orbit-action {
+    position: absolute;
+    z-index: 5;
+    right: 16px;
+    bottom: 12px;
+    width: 168px;
+    display: grid;
+    gap: 6px;
+    pointer-events: auto;
+  }
+
+  .subsystem-experience .mobile-scene-actions {
+    position: fixed;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    width: min(344px, calc(100vw - 32px));
+  }
+
+  .mobile-scene-action {
+    min-height: 50px;
+    display: grid;
+    grid-template-columns: 24px minmax(0, 1fr);
+    align-items: center;
+    gap: 7px;
+    padding: 8px 9px;
+    border: 1px solid rgb(139 230 234 / 26%);
+    border-radius: 12px;
+    color: var(--cyan);
+    background: rgb(6 15 18 / 88%);
+    backdrop-filter: blur(16px);
+    cursor: pointer;
+    text-align: left;
+  }
+
+  .mobile-scene-action:hover,
+  .mobile-scene-action:focus-visible {
+    border-color: rgb(139 230 234 / 58%);
+    background: rgb(10 28 31 / 92%);
+  }
+
+  .mobile-scene-action > span:first-child {
+    font-size: 19px;
+    text-align: center;
+  }
+
+  .mobile-scene-action > span:last-child {
+    min-width: 0;
+    display: grid;
+    gap: 2px;
+  }
+
+  .mobile-scene-action strong {
+    overflow: hidden;
+    color: #e6f7f8;
+    font-size: 8px;
+    font-weight: 500;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .mobile-scene-action small {
+    overflow: hidden;
+    color: var(--cyan);
+    font: 6px var(--mono);
+    letter-spacing: 0.04em;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .mobile-sheet[open] {
+    position: fixed;
+    z-index: 30;
+    inset: 0;
+    width: 100vw;
+    max-width: none;
+    height: 100dvh;
+    max-height: none;
+    margin: 0;
+    padding: 12px;
+    border: 0;
+    display: grid;
+    align-items: end;
+    color: var(--ink);
+    background: transparent;
+  }
+
+  .mobile-sheet::backdrop {
+    background: rgb(0 3 4 / 72%);
+    backdrop-filter: blur(5px);
+  }
+
+  .mobile-sheet > section {
+    max-height: calc(100dvh - 24px);
+    display: grid;
+    grid-template-rows: auto minmax(0, 1fr);
+    overflow: hidden;
+    border: 1px solid rgb(139 230 234 / 24%);
+    border-radius: 20px;
+    background:
+      radial-gradient(circle at 90% 0%, rgb(60 142 147 / 12%), transparent 32%), rgb(5 10 12 / 97%);
+    box-shadow: 0 24px 80px rgb(0 0 0 / 70%);
+  }
+
+  .mobile-sheet > section > header {
+    min-height: 70px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 16px;
+    padding: 15px 16px;
+    border-bottom: 1px solid var(--line);
+  }
+
+  .mobile-sheet > section > header > span {
+    display: grid;
+    gap: 4px;
+  }
+
+  .mobile-sheet > section > header small {
+    color: var(--cyan);
+    font: 7px var(--mono);
+    letter-spacing: 0.1em;
+  }
+
+  .mobile-sheet > section > header h2 {
+    margin: 0;
+    font-size: 17px;
+    font-weight: 500;
+    text-transform: uppercase;
+  }
+
+  .mobile-sheet > section > header button {
+    width: 40px;
+    height: 40px;
+    border: 1px solid var(--line);
+    border-radius: 50%;
+    color: var(--muted);
+    background: rgb(255 255 255 / 3%);
+    font-size: 24px;
+  }
+
+  .mobile-sheet-body {
+    display: grid;
+    align-content: start;
+    gap: 14px;
+    overflow-y: auto;
+    overscroll-behavior: contain;
+    padding: 14px;
+  }
+
+  .mobile-sheet .known-world-list {
+    grid-template-columns: 1fr;
+  }
+
+  .mobile-sheet .known-world-list button {
+    min-height: 64px;
+  }
+
+  .mobile-sheet-body > small,
+  .mobile-orbit-note {
+    margin: 0;
+    color: var(--faint);
+    font: 7px/1.6 var(--mono);
+    letter-spacing: 0.07em;
+    text-transform: uppercase;
+  }
+
+  .mobile-orbit-groups,
+  .mobile-orbit-groups section,
+  .mobile-orbit-groups ul {
+    display: grid;
+    gap: 8px;
+  }
+
+  .mobile-orbit-groups h3,
+  .mobile-orbit-worlds h3,
+  .mobile-ephemeris h3 {
+    margin: 0;
+    color: #e8f5f6;
+    font-size: 11px;
+    font-weight: 500;
+    text-transform: uppercase;
+  }
+
+  .mobile-orbit-groups ul {
+    margin: 0;
+    padding: 0;
+    list-style: none;
+  }
+
+  .mobile-orbit-groups li {
+    display: grid;
+    gap: 3px;
+    padding: 10px;
+    border: 1px solid var(--line);
+    border-radius: 10px;
+  }
+
+  .mobile-orbit-groups li strong {
+    font-size: 9px;
+    font-weight: 500;
+  }
+
+  .mobile-orbit-groups li small {
+    color: var(--faint);
+    font: 7px/1.5 var(--mono);
+  }
+
+  .mobile-ephemeris {
+    display: grid;
+    gap: 10px;
+    padding: 12px;
+    border: 1px solid rgb(139 230 234 / 18%);
+    border-radius: 12px;
+  }
+
+  .mobile-ephemeris > div:first-child {
+    display: flex;
+    align-items: end;
+    justify-content: space-between;
+    gap: 10px;
+  }
+
+  .mobile-ephemeris small,
+  .mobile-ephemeris > div:first-child > strong,
+  .mobile-ephemeris label > span {
+    color: var(--cyan);
+    font: 6px var(--mono);
+    letter-spacing: 0.07em;
+  }
+
+  .mobile-ephemeris label {
+    display: grid;
+    gap: 5px;
+  }
+
+  .mobile-ephemeris input,
+  .mobile-ephemeris-actions button {
+    min-height: 42px;
+    border: 1px solid rgb(139 230 234 / 22%);
+    border-radius: 9px;
+    color: #dce9eb;
+    background: rgb(139 230 234 / 4%);
+    font: 8px var(--mono);
+  }
+
+  .mobile-ephemeris input {
+    padding: 8px;
+  }
+
+  .mobile-ephemeris-actions {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 6px;
+  }
+
+  .mobile-host-jump {
+    width: 100%;
+  }
+
+  .mobile-orbit-worlds {
+    display: grid;
+    gap: 9px;
+  }
+
+  .telemetry-heading {
+    padding-bottom: 9px;
+  }
+
+  .telemetry-heading > span:first-child {
+    font-size: 10px;
+  }
+
+  .telemetry dl {
+    gap: 5px;
+    margin: 0;
+  }
+
+  .telemetry dl div {
+    min-height: 54px;
+    padding: 8px;
+  }
+
+  .telemetry dd {
+    margin-top: 5px;
+    font-size: 15px;
+  }
+
+  .control-deck {
+    gap: 5px;
+    padding: 5px;
+    border-radius: 16px;
+  }
+
+  .scene-alert {
+    padding: 8px 11px;
+    font-size: 8px;
+  }
+
+  .enter-vr {
+    min-width: 0;
+  }
+
+  .planet-catalog {
+    width: calc(100vw - 16px);
+    max-height: calc(100vh - 16px);
+    border-radius: 18px;
+  }
+
+  .discovery-intro {
+    padding: 17px 16px 11px;
+  }
+
+  .surprise-journey {
+    width: calc(100% - 32px);
+    min-height: 74px;
+    grid-template-columns: 38px 1fr;
+    gap: 11px;
+    margin: 14px 16px 0;
+    padding: 12px;
+  }
+
+  .surprise-symbol {
+    width: 38px;
+    height: 38px;
+  }
+
+  .surprise-action {
+    display: none;
+  }
+
+  .discovery-tabs {
+    flex-wrap: wrap;
+    padding: 0 16px 10px;
+  }
+
+  .discovery-tabs button {
+    min-height: 42px;
+    flex: 1 1 30%;
+  }
+
+  .physical-console {
+    margin: 0 16px;
+    padding: 14px;
+  }
+
+  .physical-console-heading {
+    align-items: end;
+  }
+
+  .physical-console-heading button {
+    min-height: 44px;
+  }
+
+  .physical-axis-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .physical-axis {
+    grid-template-columns: minmax(100px, 0.65fr) minmax(140px, 1fr);
+    align-items: center;
+  }
+
+  .physical-axis > span:first-child {
+    grid-row: 1 / 3;
+  }
+
+  .physical-toggles {
+    grid-template-columns: 1fr;
+  }
+
+  .collection-grid {
+    grid-template-columns: 1fr;
+    gap: 8px;
+    padding: 0 16px;
+  }
+
+  .collection-card {
+    min-height: 82px;
+    grid-template-columns: 28px 1fr auto;
+    gap: 10px;
+    padding: 14px;
+  }
+
+  .collection-copy > span {
+    display: none;
+  }
+
+  .discovery-intro small {
+    display: none;
+  }
+
+  .discovery-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 8px;
+    padding: 0 16px;
+  }
+
+  .discovery-card {
+    min-height: 88px;
+    grid-template-columns: 34px 1fr;
+    gap: 9px;
+    padding: 12px;
+  }
+
+  .discovery-icon {
+    width: 34px;
+    height: 34px;
+    font-size: 15px;
+  }
+
+  .discovery-arrow,
+  .discovery-card small {
+    display: none;
+  }
+
+  .discovery-divider {
+    margin: 16px 16px 0;
+  }
+
+  .catalog-header {
+    min-height: 90px;
+    padding: 18px;
+  }
+
+  .catalog-search {
+    margin: 15px 16px 0;
+  }
+
+  .catalog-meta {
+    padding: 11px 17px 13px;
+  }
+
+  .did-you-mean {
+    margin: -3px 16px 12px;
+  }
+
+  .catalog-view-toggle button {
+    min-height: 34px;
+    padding: 0 10px;
+  }
+
+  .catalog-meta span,
+  .result-metrics {
+    display: none;
+  }
+
+  .catalog-results {
+    padding: 0 16px 16px;
+  }
+
+  .catalog-results.gallery-view {
+    max-height: 430px;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 8px;
+  }
+
+  .gallery-view .catalog-result {
+    min-height: 238px;
+    grid-template-rows: 128px auto auto;
+    padding: 8px;
+  }
+
+  .gallery-view .result-identity strong {
+    font-size: 10px;
+  }
+
+  .catalog-visual {
+    height: 128px;
+  }
+
+  .catalog-planet-sphere {
+    width: 84px;
+    height: 84px;
+  }
+
+  .catalog-star-core {
+    width: calc(var(--star-size) * 0.72);
+    height: calc(var(--star-size) * 0.72);
+  }
+
+  .catalog-orbit {
+    width: 108px;
+    height: 108px;
+  }
+
+  .catalog-star-rays {
+    width: 142px;
+    height: 142px;
+  }
+
+  .catalog-orbit {
+    height: 36px;
+  }
+
+  .catalog-visual-glint {
+    top: 23px;
+    left: calc(50% - 27px);
+  }
+
+  .star-catalog-visual .catalog-visual-glint {
+    top: 27px;
+  }
+
+  .catalog-result {
+    grid-template-columns: 9px minmax(120px, 1fr) 72px;
+    gap: 10px;
+  }
+
+  .list-view .catalog-result {
+    grid-template-columns: 44px minmax(110px, 1fr) 64px;
+  }
+
+  .list-view .result-marker {
+    display: none;
+  }
+
+  .list-view .catalog-visual {
+    width: 40px;
+    height: 40px;
+  }
+
+  .list-view .catalog-planet-sphere {
+    width: 27px;
+    height: 27px;
+  }
+
+  .list-view .catalog-star-core {
+    width: calc(var(--star-size) * 0.25);
+    height: calc(var(--star-size) * 0.25);
+  }
+
+  .list-view .catalog-orbit {
+    width: 34px;
+    height: 34px;
+  }
+
+  .list-view .catalog-star-rays {
+    width: 46px;
+    height: 46px;
+  }
+}
+
+@media (max-height: 690px) {
+  .world-summary,
+  .visual-note,
+  .telemetry-detail:last-of-type {
+    display: none;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .loading-orbit,
+  .recovery-orbit {
+    animation: none;
+  }
+  .catalog-result,
+  .discovery-card,
+  .collection-card,
+  .surprise-journey,
+  .clear-view,
+  .enter-vr,
+  .signal-bars i,
+  .loading-screen,
+  .viewport-grid,
+  .surface-veil,
+  .travel-veil,
+  .topbar,
+  .hud,
+  .mission-control {
+    transition: none;
+  }
+}
+
+/*
+ * A touch screen has no Tab key, so clear view remains a compact toggle there. Once pressed, its
+ * parent panel comes back alone: every other control stays out of the canvas until this button is
+ * pressed again. Travel still wins, so the restore control cannot float over a world change.
+ */
+@media (max-width: 760px), (pointer: coarse) and (hover: none) {
+  .chrome-hidden:not(.travelling) .mission-control {
+    visibility: visible;
+    opacity: 1;
+  }
+
+  .chrome-hidden .mission-control > :not(.control-deck),
+  .chrome-hidden .control-deck > :not(.deck-utility) {
+    display: none;
+  }
+
+  .chrome-hidden .control-deck {
+    padding: 0;
+    border: 0;
+    background: none;
+    backdrop-filter: none;
+    box-shadow: none;
+  }
+
+  .chrome-hidden .clear-view {
+    border-color: rgb(139 230 234 / 45%);
+    background: rgb(8 22 25 / 82%);
+    backdrop-filter: blur(16px);
+  }
+}
+
+/*
+ * Where that leaves Discover holding the deck alone — a touch device on a view with no immersive
+ * entry — the deck stands down and lets the one control be the control. A tray drawn around a
+ * single button is a border around a border.
+ */
+@media (pointer: coarse) and (hover: none) {
+  .control-deck:not(:has(.enter-vr)) {
+    padding: 0;
+    border: 0;
+    background: none;
+    backdrop-filter: none;
+    box-shadow: none;
+  }
+}
+
+/* A region's evidence warning is part of the scientific content, not decorative desktop copy.
+   Keep it on phones even though ordinary world summaries are hidden to protect canvas space. */
+@media (max-width: 640px) {
+  .region-experience .region-visual-note {
+    display: block;
+    max-width: 290px;
+    margin-top: 12px;
+    font-size: 6px;
+    line-height: 1.5;
+  }
+
+  .black-hole-experience .black-hole-visual-note {
+    display: block;
+    max-width: 260px;
+    margin-top: 11px;
+    font-size: 5px;
+    line-height: 1.5;
+  }
+
+  .black-hole-experience h1 {
+    font-size: clamp(30px, 9.2vw, 50px);
+    letter-spacing: -0.075em;
+  }
+}
+
+/*
+ * The deck holds its controls on one line, so a narrowing screen is answered by giving each of
+ * them up in turn rather than by wrapping — a control centre that reflows into two rows stops
+ * reading as one instrument. Kept after the legacy responsive rules so this ladder is what wins.
+ *
+ * The order is what a visitor can most afford to lose first: the clear-view copy (its Tab chip
+ * still says what the button does), then the gesture legend at 960px above, and only then the
+ * copy on Discover and the immersive entry. Every mark left behind is aria-hidden, so each of
+ * these buttons resolves by name at these widths only because it carries an aria-label —
+ * removing those leaves the deck unnamed on a phone.
+ */
+@media (max-width: 1080px) {
+  .clear-view {
+    min-width: 46px;
+    width: 46px;
+    grid-template-columns: 1fr;
+    place-items: center;
+    padding: 8px;
+  }
+
+  .clear-view > span:nth-child(2),
+  .clear-view kbd {
+    display: none;
+  }
+}
+
+@media (max-width: 760px) {
+  .discover-trigger {
+    min-width: 148px;
+  }
+}
+
+@media (max-width: 520px) {
+  .black-hole-catalog-hero {
+    margin: 8px 12px 12px;
+    padding: 16px;
+  }
+
+  .black-hole-catalog-hero h2 {
+    font-size: 19px;
+  }
+
+  .black-hole-catalog-hero > p {
+    font-size: 8px;
+  }
+
+  .black-hole-grid {
+    grid-template-columns: 1fr;
+    padding: 0 12px 14px;
+  }
+
+  .black-hole-card .black-hole-catalog-visual {
+    height: 148px;
+  }
+
+  .black-hole-method-note {
+    margin-inline: 12px;
+  }
+
+  .discover-trigger {
+    min-width: 46px;
+    width: 46px;
+    grid-template-columns: 1fr;
+    place-items: center;
+    padding: 6px;
+  }
+
+  .discover-trigger-copy,
+  .discover-trigger kbd {
+    display: none;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .discover-trigger {
+    transition: none;
+  }
+}

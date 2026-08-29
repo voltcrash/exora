@@ -9,6 +9,10 @@ import type { SceneHost, XrStatus } from "../scene-host.ts";
 import type { TravelPhase } from "../travel-transition.ts";
 import { FrameRateSignal } from "./FrameRateSignal.tsx";
 import { MissionControl } from "./MissionControl.tsx";
+import sharedStyles from "./ExperienceShared.module.css";
+import { bindStyles } from "../styles/bind-styles.ts";
+
+const cx = bindStyles(sharedStyles);
 
 interface BlackHoleExperienceProps {
   blackHole: BlackHoleProfile;
@@ -101,44 +105,54 @@ export const BlackHoleExperience = ({
 
   return (
     <div
-      className={`experience-shell black-hole-experience ${settled ? "scene-ready" : ""} ${sceneState === "error" ? "scene-error" : ""} ${travelling ? "travelling" : ""} ${chromeHidden ? "chrome-hidden" : ""}`}
+      className={cx(
+        `experience-shell black-hole-experience ${settled ? "scene-ready" : ""} ${sceneState === "error" ? "scene-error" : ""} ${travelling ? "travelling" : ""} ${chromeHidden ? "chrome-hidden" : ""}`,
+      )}
     >
-      <div className="space-haze" aria-hidden="true" />
-      <div className="viewport-grid" aria-hidden="true" />
+      <div className={cx("space-haze")} aria-hidden="true" />
+      <div className={cx("viewport-grid")} aria-hidden="true" />
 
-      <header className="topbar">
-        <a className="brand" href="/" aria-label="Exora home">
-          <span className="brand-mark" aria-hidden="true" />
-          <span className="brand-copy">
+      <header className={cx("topbar")} data-testid="topbar">
+        <a className={cx("brand")} href="/" aria-label="Exora home">
+          <span className={cx("brand-mark")} aria-hidden="true" />
+          <span className={cx("brand-copy")}>
             <strong>EXORA</strong>
             <small>UNIVERSE OBSERVATORY</small>
           </span>
         </a>
       </header>
 
-      <main className="hud">
-        <section className="world-intro" aria-labelledby="black-hole-name">
-          <p className="eyebrow">
+      <main className={cx("hud")} data-testid="hud">
+        <section
+          className={cx("world-intro")}
+          data-testid="world-intro"
+          aria-labelledby="black-hole-name"
+        >
+          <p className={cx("eyebrow")}>
             <span>OBSERVED BLACK HOLE</span>
             <span>{blackHoleKindLabel(blackHole)}</span>
           </p>
           <h1 id="black-hole-name">
             <BlackHoleName name={blackHole.name} />
           </h1>
-          <div className="world-tags">
+          <div className={cx("world-tags")}>
             <span>{blackHole.milestone}</span>
             <span>{blackHole.host}</span>
             <span>{blackHole.constellation}</span>
           </div>
-          <p className="world-summary">{blackHole.observation.summary}</p>
-          <p className="visual-note black-hole-visual-note">
+          <p className={cx("world-summary")}>{blackHole.observation.summary}</p>
+          <p className={cx("visual-note black-hole-visual-note")}>
             <span aria-hidden="true" /> INTERPRETIVE GRAVITATIONAL-LENSING MODEL · NOT TELESCOPE
             IMAGERY
           </p>
         </section>
 
-        <aside className="telemetry black-hole-telemetry" aria-label="Observed black hole data">
-          <div className="telemetry-heading">
+        <aside
+          className={cx("telemetry black-hole-telemetry")}
+          data-testid="telemetry"
+          aria-label="Observed black hole data"
+        >
+          <div className={cx("telemetry-heading")}>
             <span>
               <small>{blackHole.source.archive}</small>
               Measured horizon record
@@ -163,7 +177,7 @@ export const BlackHoleExperience = ({
               <dd>{blackHole.observation.accretion.toUpperCase()}</dd>
             </div>
           </dl>
-          <div className="telemetry-detail">
+          <div className={cx("telemetry-detail")}>
             <span>CATALOG IDENTITY</span>
             <strong>{blackHole.catalogDesignation}</strong>
             <small>
@@ -172,7 +186,7 @@ export const BlackHoleExperience = ({
                 : `${blackHole.kind.replaceAll("-", " ")} · ${blackHole.host}`}
             </small>
           </div>
-          <div className="telemetry-detail black-hole-science-detail">
+          <div className={cx("telemetry-detail black-hole-science-detail")}>
             <span>MODEL DISCLOSURE</span>
             <strong>READABLE SCALE · OBSERVED MASS</strong>
             <small>
@@ -180,7 +194,7 @@ export const BlackHoleExperience = ({
               Disk brightness, tilt and motion are illustrative.
             </small>
           </div>
-          <p className="source-note">
+          <p className={cx("source-note")}>
             <a href={blackHole.source.url} target="_blank" rel="noreferrer">
               {blackHole.source.title} ↗
             </a>{" "}
@@ -201,8 +215,8 @@ export const BlackHoleExperience = ({
         xr={{ host, status: xrStatus }}
       />
 
-      <div className="loading-screen" role="status">
-        <div className="loading-orbit black-hole-loading" aria-hidden="true">
+      <div className={cx("loading-screen")} role="status">
+        <div className={cx("loading-orbit black-hole-loading")} aria-hidden="true">
           <span />
         </div>
         <p>MODELING SPACETIME</p>

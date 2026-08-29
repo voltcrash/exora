@@ -3,7 +3,8 @@ import { SpeedInsights } from "@vercel/speed-insights/react";
 import { createRoot } from "react-dom/client";
 import { App } from "./App.tsx";
 import { ApplicationErrorBoundary } from "./components/ApplicationErrorBoundary.tsx";
-import "./style.css";
+import "./styles/tokens.css";
+import "./styles/globals.css";
 
 const WEB_FONT_STYLESHEET =
   "https://fonts.googleapis.com/css2?family=Exo+2:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap";

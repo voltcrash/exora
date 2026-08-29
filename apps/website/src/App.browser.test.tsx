@@ -5,7 +5,8 @@ import { afterEach, beforeEach, expect, test, vi } from "vite-plus/test";
 import { App } from "./App.tsx";
 import { acquireSceneHost } from "./scene-host.ts";
 import { featuredPlanet } from "./planet-profile.ts";
-import "./style.css";
+import "./styles/tokens.css";
+import "./styles/globals.css";
 
 const fetchBundledAsset = globalThis.fetch.bind(globalThis);
 
@@ -424,9 +425,7 @@ test("a deep link to a system resolves to the diorama, and says what it compress
       .element(page.getByLabelText("Interactive visualization of the Kepler-90 system"))
       .toBeVisible();
     await expect.element(page.getByRole("button", { name: /Orbit controls/ })).toBeVisible();
-    expect(getComputedStyle(document.querySelector(".system-experience .hud")!).display).toBe(
-      "none",
-    );
+    expect(getComputedStyle(document.querySelector('[data-testid="hud"]')!).display).toBe("none");
     return;
   }
 
@@ -587,12 +586,12 @@ test("a Solar System planet switches into its dedicated parent-centered subsyste
   await userEvent.click(subsystem);
 
   if (window.innerWidth <= 640) {
-    expect(
-      getComputedStyle(document.querySelector(".subsystem-experience .world-intro")!).display,
-    ).toBe("none");
-    expect(
-      getComputedStyle(document.querySelector(".subsystem-experience .telemetry")!).display,
-    ).toBe("none");
+    expect(getComputedStyle(document.querySelector('[data-testid="world-intro"]')!).display).toBe(
+      "none",
+    );
+    expect(getComputedStyle(document.querySelector('[data-testid="telemetry"]')!).display).toBe(
+      "none",
+    );
     await userEvent.click(page.getByRole("button", { name: /Orbit guide/ }));
     await expect
       .element(
@@ -669,7 +668,7 @@ test("the Sun's complete world list scrolls inside its left panel", async () => 
   if (window.innerWidth <= 640) {
     await userEvent.click(page.getByRole("button", { name: /Known worlds/ }));
     await expect.element(page.getByRole("heading", { name: "Known worlds" })).toBeVisible();
-    const sheet = document.querySelector<HTMLElement>(".mobile-sheet-body");
+    const sheet = document.querySelector<HTMLElement>('[data-testid="mobile-sheet-body"]');
     expect(sheet).not.toBeNull();
     expect(getComputedStyle(sheet!).overflowY).toBe("auto");
     await expect.element(page.getByRole("button", { name: /Makemake/ })).toBeVisible();
@@ -683,7 +682,7 @@ test("the Sun's complete world list scrolls inside its left panel", async () => 
   await expect.element(telemetry).toHaveTextContent("25.38 D SIDEREAL");
   await expect.element(telemetry).toHaveTextContent(/AXIAL TILT 7.25°/);
   await expect.element(page.getByRole("heading", { name: "Known worlds" })).toBeVisible();
-  const intro = document.querySelector<HTMLElement>(".star-experience .world-intro");
+  const intro = document.querySelector<HTMLElement>('[data-testid="world-intro"]');
   expect(intro).not.toBeNull();
   expect(getComputedStyle(intro!).overflowY).toBe("auto");
   expect(getComputedStyle(intro!).overscrollBehaviorY).toBe("contain");
@@ -703,7 +702,7 @@ test("the Solar System's complete object list scrolls inside its left panel", as
     await expect
       .element(page.getByRole("heading", { name: "Worlds in the diorama" }))
       .toBeVisible();
-    const sheet = document.querySelector<HTMLElement>(".mobile-sheet-body");
+    const sheet = document.querySelector<HTMLElement>('[data-testid="mobile-sheet-body"]');
     expect(sheet).not.toBeNull();
     expect(getComputedStyle(sheet!).overflowY).toBe("auto");
     await expect.element(page.getByRole("button", { name: /Makemake/ })).toBeVisible();
@@ -712,7 +711,7 @@ test("the Solar System's complete object list scrolls inside its left panel", as
 
   await expect.element(page.getByRole("heading", { name: "Worlds in the diorama" })).toBeVisible();
   await expect.element(page.getByRole("button", { name: /Makemake/ })).toBeVisible();
-  const intro = document.querySelector<HTMLElement>(".system-experience .world-intro");
+  const intro = document.querySelector<HTMLElement>('[data-testid="world-intro"]');
   expect(intro).not.toBeNull();
   expect(getComputedStyle(intro!).overflowY).toBe("auto");
   expect(getComputedStyle(intro!).overscrollBehaviorY).toBe("contain");
@@ -842,7 +841,8 @@ test("Tab toggles the interface away and back, and only on the main screen", asy
   const clearView = page.getByRole("button", { name: "Hide the interface" });
   await expect.element(clearView).toBeVisible();
 
-  const panels = [".topbar", ".hud", ".mission-control"].map((selector) => {
+  const panels = ["topbar", "hud", "mission-control"].map((testId) => {
+    const selector = `[data-testid="${testId}"]`;
     const panel = document.querySelector<HTMLElement>(selector);
     expect(panel, selector).not.toBeNull();
     return { panel: panel!, selector };
@@ -850,7 +850,8 @@ test("Tab toggles the interface away and back, and only on the main screen", asy
   const mobile = window.innerWidth <= 760;
   const expectCleared = async (): Promise<void> => {
     for (const { panel, selector } of panels) {
-      if (mobile && selector === ".mission-control") await expect.element(panel).toBeVisible();
+      if (mobile && selector === '[data-testid="mission-control"]')
+        await expect.element(panel).toBeVisible();
       else await expect.element(panel).not.toBeVisible();
     }
   };
@@ -895,14 +896,14 @@ test("terrain view fades every interface region and reveals the hovered one", as
   await page.elementLocator(canvas!).hover();
 
   const regions = document.querySelectorAll<HTMLElement>(
-    ".topbar > *, .hud > *, .mission-control > *",
+    '[data-testid="topbar"] > *, [data-testid="hud"] > *, [data-testid="mission-control"] > *',
   );
   expect(regions.length).toBeGreaterThan(2);
   for (const region of regions) {
     await expect.poll(() => getComputedStyle(region).opacity).toBe("0.34");
   }
 
-  const hoveredRegion = document.querySelector<HTMLElement>(".world-intro");
+  const hoveredRegion = document.querySelector<HTMLElement>('[data-testid="world-intro"]');
   expect(hoveredRegion).not.toBeNull();
   await page.elementLocator(hoveredRegion!).hover();
 
@@ -977,19 +978,25 @@ test("Discover uses one scrolling surface without a viewport blur", async () => 
   await expect.element(page.getByRole("heading", { level: 1 })).toBeVisible();
 
   await openDiscoverSection("Exoplanets");
-  const catalog = document.querySelector<HTMLDialogElement>(".planet-catalog");
-  const catalogScroller = catalog?.querySelector<HTMLElement>(".catalog-scroll-region");
+  const catalog = document.querySelector<HTMLDialogElement>('[data-testid="planet-catalog"]');
+  const catalogScroller = catalog?.querySelector<HTMLElement>(
+    '[data-testid="catalog-scroll-region"]',
+  );
   const discoverStage = document.querySelector<HTMLElement>('[data-testid="discover-stage"]');
   expect(getComputedStyle(catalog!).overflowY).toBe("visible");
   expect(getComputedStyle(discoverStage!).overflowY).toBe("auto");
   expect(getComputedStyle(catalogScroller!).overflowY).toBe("visible");
-  expect(getComputedStyle(document.querySelector(".catalog-results")!).overflowY).toBe("visible");
+  expect(
+    getComputedStyle(document.querySelector('[data-testid="catalog-results"]')!).overflowY,
+  ).toBe("visible");
   expect(getComputedStyle(catalog!, "::backdrop").backdropFilter).toBe("none");
 
   await userEvent.click(page.getByRole("button", { name: "Close Discover" }));
   await openDiscoverSection("World Forge");
-  const forge = document.querySelector<HTMLDialogElement>(".planet-builder");
-  const forgeScroller = forge?.querySelector<HTMLFormElement>("form");
+  const forge = document.querySelector<HTMLDialogElement>('[data-testid="planet-builder"]');
+  const forgeScroller = forge?.querySelector<HTMLFormElement>(
+    '[data-testid="planet-builder-form"]',
+  );
   expect(getComputedStyle(forge!).overflowY).toBe("visible");
   expect(getComputedStyle(forgeScroller!).overflowY).toBe("visible");
   expect(getComputedStyle(forge!, "::backdrop").backdropFilter).toBe("none");
@@ -1011,10 +1018,14 @@ test("the navigation deck keeps an even gap between every control", async () => 
   await expect.element(page.getByRole("heading", { level: 1 })).toBeVisible();
 
   const discover = document
-    .querySelector<HTMLElement>(".discover-trigger")!
+    .querySelector<HTMLElement>('[data-testid="discover-trigger"]')!
     .getBoundingClientRect();
-  const clearView = document.querySelector<HTMLElement>(".clear-view")!.getBoundingClientRect();
-  const xr = document.querySelector<HTMLElement>(".enter-vr")!.getBoundingClientRect();
+  const clearView = document
+    .querySelector<HTMLElement>('[data-testid="clear-view"]')!
+    .getBoundingClientRect();
+  const xr = document
+    .querySelector<HTMLElement>('[data-testid="enter-vr"]')!
+    .getBoundingClientRect();
   const firstGap = clearView.left - discover.right;
   const secondGap = xr.left - clearView.right;
 

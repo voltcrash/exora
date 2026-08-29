@@ -1,3 +1,7 @@
+import sharedStyles from "./ExperienceShared.module.css";
+import { bindStyles } from "../styles/bind-styles.ts";
+
+const cx = bindStyles(sharedStyles);
 interface RecoveryScreenProps {
   action: string;
   detail: string;
@@ -14,11 +18,11 @@ export const RecoveryScreen = ({
   pending = false,
 }: RecoveryScreenProps) => (
   <div
-    className="recovery-screen"
+    className={cx("recovery-screen")}
     role={pending ? "status" : "alert"}
     aria-live={pending ? "polite" : "assertive"}
   >
-    <div className="recovery-orbit" aria-hidden="true">
+    <div className={cx("recovery-orbit")} aria-hidden="true">
       <span />
     </div>
     <p>OBSERVATORY INTERRUPTED</p>

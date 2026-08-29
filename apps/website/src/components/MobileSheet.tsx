@@ -1,4 +1,8 @@
 import { useEffect, useRef, type ReactNode } from "react";
+import sharedStyles from "./ExperienceShared.module.css";
+import { bindStyles } from "../styles/bind-styles.ts";
+
+const cx = bindStyles(sharedStyles);
 
 interface MobileSheetProps {
   children: ReactNode;
@@ -20,7 +24,7 @@ export const MobileSheet = ({ children, eyebrow, onClose, open, title }: MobileS
 
   return (
     <dialog
-      className="mobile-sheet"
+      className={cx("mobile-sheet")}
       ref={dialogRef}
       onCancel={(event) => {
         event.preventDefault();
@@ -40,7 +44,9 @@ export const MobileSheet = ({ children, eyebrow, onClose, open, title }: MobileS
             ×
           </button>
         </header>
-        <div className="mobile-sheet-body">{children}</div>
+        <div className={cx("mobile-sheet-body")} data-testid="mobile-sheet-body">
+          {children}
+        </div>
       </section>
     </dialog>
   );
