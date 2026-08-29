@@ -367,3 +367,83 @@
 .generate-world > span:last-child {
   color: var(--accent);
 }
+
+@media (max-width: 760px) {
+  .planet-builder {
+    width: calc(100vw - 20px);
+    max-width: 100%;
+    border-radius: 18px;
+  }
+
+  .builder-header {
+    min-height: 82px;
+    padding: 18px 16px;
+  }
+
+  .builder-header h2 {
+    font-size: 25px;
+  }
+
+  .forge-tabs {
+    padding: 10px 14px;
+  }
+
+  .forge-tabs button {
+    min-width: 0;
+    grid-template-columns: 20px minmax(0, 1fr);
+    gap: 8px;
+    padding-inline: 10px;
+  }
+
+  .builder-body {
+    grid-template-columns: 1fr;
+    gap: 18px;
+    padding: 18px 14px 22px;
+  }
+
+  .builder-identity {
+    padding: 16px;
+  }
+
+  .builder-parameters {
+    grid-template-columns: 1fr;
+    gap: 20px;
+    padding: 4px 2px;
+  }
+
+  .builder-identity input[type="text"],
+  .builder-identity input[type="number"],
+  .builder-identity select {
+    font-size: 16px;
+  }
+
+  .builder-footer {
+    align-items: stretch;
+    flex-direction: column;
+    padding: 16px 14px;
+  }
+
+  .generate-world {
+    width: 100%;
+    min-width: 0;
+  }
+}
+
+@media (max-width: 520px) {
+  .forge-tabs button {
+    grid-template-columns: 1fr;
+  }
+
+  .forge-tabs button > span:first-child {
+    display: none;
+  }
+
+  .seed-input {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .seed-input button {
+    width: 100%;
+  }
+}

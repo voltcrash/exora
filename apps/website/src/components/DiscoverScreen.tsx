@@ -145,6 +145,7 @@ export const DiscoverScreen = ({
   const [section, setSection] = useState<DiscoverSection>(initialSection);
   const closeRef = useRef<HTMLButtonElement>(null);
   const dialogRef = useRef<HTMLDialogElement>(null);
+  const stageRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     const dialog = dialogRef.current;
@@ -164,6 +165,10 @@ export const DiscoverScreen = ({
       previousFocus?.focus();
     };
   }, [onClose]);
+
+  useEffect(() => {
+    stageRef.current?.scrollTo({ top: 0 });
+  }, [section]);
 
   const copy = sectionCopy[section];
 
@@ -230,7 +235,7 @@ export const DiscoverScreen = ({
         </p>
       </aside>
 
-      <div className={styles["discover-stage"]} data-testid="discover-stage">
+      <div ref={stageRef} className={styles["discover-stage"]} data-testid="discover-stage">
         <header className={styles["discover-header"]}>
           <div>
             <p>{copy.eyebrow}</p>

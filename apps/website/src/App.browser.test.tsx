@@ -969,6 +969,40 @@ test("Discover uses one scrolling surface without a viewport blur", async () => 
   expect(getComputedStyle(forge!, "::backdrop").backdropFilter).toBe("none");
 });
 
+test("Discover resets its scroll position when changing sections", async () => {
+  stubArchive();
+  mountApp();
+  await expect.element(page.getByRole("heading", { level: 1 })).toBeVisible();
+
+  await openDiscoverSection("Exoplanets");
+  const discoverStage = document.querySelector<HTMLElement>('[data-testid="discover-stage"]')!;
+  discoverStage.scrollTop = 500;
+  expect(discoverStage.scrollTop).toBeGreaterThan(0);
+
+  await userEvent.click(page.getByRole("button", { name: /Stars/ }).first());
+  await expect.poll(() => discoverStage.scrollTop).toBe(0);
+});
+
+test("Discover content fits the mobile viewport in every section", async () => {
+  if (window.innerWidth > 760) return;
+
+  stubArchive();
+  mountApp();
+  await openDiscoverSection("Exoplanets");
+
+  for (const section of [
+    "Exoplanets",
+    "Stars",
+    "Solar System",
+    "Black Holes",
+    "World Forge",
+  ] as const) {
+    await userEvent.click(page.getByRole("button", { name: new RegExp(section) }).first());
+    const stage = document.querySelector<HTMLElement>('[data-testid="discover-stage"]')!;
+    expect(stage.scrollWidth).toBeLessThanOrEqual(stage.clientWidth);
+  }
+});
+
 test("nothing overflows the viewport horizontally", async () => {
   stubArchive();
   mountApp();

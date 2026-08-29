@@ -1740,3 +1740,296 @@
   background: var(--cyan);
   animation: pulse 1s ease-in-out infinite;
 }
+
+@media (max-width: 760px) {
+  .planet-catalog {
+    width: calc(100vw - 20px);
+    max-width: 100%;
+    border-radius: 18px;
+  }
+
+  .catalog-header {
+    min-height: 82px;
+    padding: 18px 16px;
+  }
+
+  .catalog-header h2 {
+    font-size: 25px;
+  }
+
+  .discovery-intro {
+    align-items: flex-start;
+    padding: 15px 14px 10px;
+  }
+
+  .discovery-intro small {
+    max-width: 48%;
+    text-align: right;
+  }
+
+  .discovery-tabs {
+    gap: 6px;
+    padding: 0 14px 10px;
+    overflow-x: auto;
+    scrollbar-width: none;
+  }
+
+  .discovery-tabs::-webkit-scrollbar {
+    display: none;
+  }
+
+  .discovery-tabs button {
+    min-height: 36px;
+    flex: 1 0 auto;
+    padding-inline: 12px;
+  }
+
+  .collection-grid,
+  .discovery-grid {
+    grid-template-columns: 1fr;
+    padding-inline: 14px;
+  }
+
+  .collection-card {
+    grid-template-columns: 24px minmax(0, 1fr) auto;
+    padding: 12px;
+  }
+
+  .collection-copy > span {
+    max-width: none;
+  }
+
+  .discovery-card {
+    min-height: 92px;
+    padding: 13px;
+  }
+
+  .physical-console,
+  .black-hole-catalog-hero,
+  .solar-system-hero {
+    margin-inline: 14px;
+  }
+
+  .physical-console {
+    padding: 14px;
+  }
+
+  .physical-console-heading {
+    align-items: flex-start;
+  }
+
+  .physical-axis-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .physical-axis > span:first-child {
+    min-height: 0;
+  }
+
+  .physical-toggles {
+    grid-template-columns: 1fr;
+  }
+
+  .discovery-divider {
+    margin-inline: 14px;
+  }
+
+  .surprise-journey {
+    width: calc(100% - 28px);
+    grid-template-columns: 40px minmax(0, 1fr) auto;
+    gap: 11px;
+    margin-inline: 14px;
+    padding: 12px;
+  }
+
+  .surprise-symbol {
+    width: 40px;
+    height: 40px;
+  }
+
+  .catalog-search {
+    grid-template-columns: 22px minmax(0, 1fr);
+    gap: 10px;
+    margin: 18px 14px 0;
+    padding-inline: 12px;
+  }
+
+  .catalog-search input {
+    height: 52px;
+    font-size: 16px;
+  }
+
+  .catalog-search kbd {
+    display: none;
+  }
+
+  .catalog-meta {
+    align-items: center;
+    gap: 10px;
+    padding: 11px 14px 14px;
+  }
+
+  .catalog-meta p {
+    min-width: 0;
+    line-height: 1.45;
+  }
+
+  .did-you-mean {
+    margin-inline: 14px;
+  }
+
+  .catalog-results {
+    padding: 0 14px 20px;
+  }
+
+  .catalog-results.gallery-view {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .gallery-view .catalog-result {
+    min-height: 262px;
+    grid-template-rows: 148px auto auto;
+  }
+
+  .gallery-view .catalog-visual {
+    height: 148px;
+  }
+
+  .list-view .catalog-result {
+    grid-template-areas:
+      "preview identity"
+      "preview metrics"
+      "state state";
+    grid-template-columns: 58px minmax(0, 1fr);
+    gap: 7px 12px;
+    padding: 10px;
+  }
+
+  .list-view .result-preview {
+    grid-area: preview;
+  }
+
+  .list-view .result-marker,
+  .catalog-result > .result-marker {
+    display: none;
+  }
+
+  .list-view .catalog-result .result-identity {
+    grid-area: identity;
+  }
+
+  .list-view .catalog-result .result-metrics {
+    grid-area: metrics;
+  }
+
+  .list-view .catalog-result .result-state {
+    grid-area: state;
+    justify-self: start;
+    padding-left: 70px;
+  }
+
+  .black-hole-catalog-hero {
+    grid-template-columns: 1fr;
+    gap: 12px;
+    padding: 18px;
+  }
+
+  .black-hole-grid {
+    grid-template-columns: 1fr;
+    padding: 0 14px 18px;
+  }
+
+  .black-hole-method-note {
+    margin-inline: 14px;
+  }
+
+  .solar-catalog-tools {
+    grid-template-columns: 1fr;
+    align-items: stretch;
+    margin-inline: 14px;
+  }
+
+  .solar-catalog-filters {
+    justify-content: flex-start;
+  }
+
+  .solar-catalog-section > h3 {
+    margin-inline: 14px;
+  }
+
+  .solar-body-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    padding: 0 14px 20px;
+  }
+
+  .solar-body-grid button {
+    min-height: 255px;
+    grid-template-rows: 128px 1fr auto;
+    padding: 12px;
+  }
+
+  .solar-body-portrait {
+    width: 112px;
+    height: 112px;
+  }
+}
+
+@media (max-width: 520px) {
+  .collection-card {
+    grid-template-columns: 22px minmax(0, 1fr);
+  }
+
+  .collection-launch {
+    grid-column: 2;
+    justify-self: start;
+  }
+
+  .physical-console-heading {
+    display: grid;
+  }
+
+  .physical-console-heading button {
+    width: 100%;
+  }
+
+  .surprise-journey {
+    grid-template-columns: 38px minmax(0, 1fr);
+  }
+
+  .surprise-action {
+    grid-column: 2;
+  }
+
+  .catalog-meta {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .catalog-view-toggle {
+    align-self: flex-end;
+  }
+
+  .catalog-results.gallery-view,
+  .solar-body-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .gallery-view .catalog-result {
+    min-height: 286px;
+    grid-template-rows: 174px auto auto;
+  }
+
+  .gallery-view .catalog-visual {
+    height: 174px;
+  }
+
+  .solar-body-grid button {
+    min-height: 270px;
+    grid-template-rows: 145px 1fr auto;
+  }
+
+  .solar-body-portrait {
+    width: 132px;
+    height: 132px;
+  }
+}
