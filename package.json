@@ -8,17 +8,13 @@
     "quality:assets": "node scripts/check-asset-provenance.mjs",
     "quality:lighthouse": "vp run website#quality:lighthouse",
     "dev": "vp run --parallel --filter website --filter @exora/api dev",
-    "dev:vercel": "vercel dev",
     "dev:api": "vp run @exora/api#dev",
     "dev:web": "vp run website#dev",
-    "deploy": "vercel",
-    "deploy:prod": "vercel --prod",
     "prepare": "vp config"
   },
   "devDependencies": {
     "@types/node": "catalog:",
     "typescript": "catalog:",
-    "vercel": "catalog:",
     "vite": "catalog:",
     "vite-plus": "catalog:"
   },

@@ -85,6 +85,13 @@ GET /api/stars/:name
 
 `vp dev` and `vp build` always invoke Vite's built-in commands. Use `vp run dev` in this repository so both applications start.
 
+Local development uses the website's Vite server and its `/api` proxy rather than Vercel CLI
+emulation. The API deployment bundle is produced and validated by its workspace build:
+
+```sh
+vp run @exora/api#build
+```
+
 ### Immersive mode
 
 WebXR requires a secure context. Localhost works for desktop development, but testing from a Quest on the local network needs HTTPS or a deployed origin.
@@ -103,6 +110,19 @@ packages/worldgen    Deterministic data-to-world recipe engine
 `packages/worldgen` is the only place a catalog row becomes an appearance, so the API and browser renderer describe an object the same way. Texture provenance and licensing for the close-range detail maps are recorded in [THIRD_PARTY_ASSETS.md](THIRD_PARTY_ASSETS.md).
 
 ## Current deployment architecture
+
+Vercel's Git integration is the supported deployment workflow. Push a branch or open a pull
+request to create a Preview deployment, and merge to `main` to create the Production deployment.
+Vercel reads the committed `vercel.json`, which keeps the website and API build, function bundle,
+region, rewrites, and response headers under version control.
+
+The repository does not install Vercel CLI. If a deployment must be started manually, use the
+latest CLI as a one-off command instead of adding it to the workspace:
+
+```sh
+pnpm dlx vercel@latest         # Preview
+pnpm dlx vercel@latest --prod  # Production
+```
 
 The website builds to static output served from Vercel's edge, and the Hono application is bundled into a single Vercel Function pinned to `sin1`. A rewrite sends every `/api/*` path to that one function, which keeps routing inside Hono rather than splitting it across per-route handlers.
 

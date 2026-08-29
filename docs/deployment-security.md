@@ -4,6 +4,17 @@ Exora's Vercel deployment applies one global response policy in `vercel.json`. I
 compatible with the browser features the renderer actually uses rather than aiming for an empty
 allowlist that would disable the experience.
 
+## Deployment workflow
+
+Normal Preview and Production deployments are created by Vercel's Git integration from pull
+requests and `main`, respectively. The committed `vercel.json` remains the source of truth for the
+build command, static output, function bundle, region, rewrites, and headers.
+
+Local development uses `vp run dev`; it does not require Vercel CLI. To validate the deployable API
+bundle without deploying, run `vp run @exora/api#build`. For an exceptional manual deployment, run
+`pnpm dlx vercel@latest` for Preview or `pnpm dlx vercel@latest --prod` for Production. Do not add
+Vercel CLI back to the workspace dependencies.
+
 ## Browser policy decisions
 
 - `Content-Security-Policy` defaults resources to the deployment origin. Variant Launch's early
