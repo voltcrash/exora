@@ -383,7 +383,7 @@ export const PlanetCatalog = ({ embedded = false, onClose, onSelect }: PlanetCat
             </button>
           </div>
         ) : null}
-        <div className={cx("catalog-search")}>
+        <div className={cx("catalog-search")} data-style-role="catalog-search">
           <span className={cx("search-reticle")} aria-hidden="true" />
           <input
             ref={inputRef}

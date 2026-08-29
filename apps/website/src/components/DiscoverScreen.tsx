@@ -107,7 +107,7 @@ const DiscoverIcon = ({ section }: { section: DiscoverSection }) => (
 const sectionCopy: Record<DiscoverSection, { eyebrow: string; title: string; summary: string }> = {
   solar: {
     eyebrow: "NASA / JPL HOME SYSTEM",
-    title: "Start close to home.",
+    title: "Close to home.",
     summary: "Search measured worlds and dynamic regions across our home system.",
   },
   worlds: {

@@ -622,7 +622,7 @@ export const WorldForge = ({
           </div>
         )}
 
-        <footer className={cx("builder-footer")}>
+        <footer className={cx("builder-footer")} data-style-role="builder-footer">
           <p>
             <span aria-hidden="true" /> The generated URL includes this versioned recipe (Worldgen v
             {WORLDGEN_VERSION}), so it reloads and can be shared.

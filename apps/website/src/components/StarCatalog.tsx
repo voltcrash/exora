@@ -278,7 +278,7 @@ export const StarCatalog = ({ embedded = false, onClose, onSelect }: StarCatalog
             </button>
           </div>
         ) : null}
-        <div className={cx("catalog-search")}>
+        <div className={cx("catalog-search")} data-style-role="catalog-search">
           <span className={cx("star-search-mark")} aria-hidden="true">
             ✦
           </span>

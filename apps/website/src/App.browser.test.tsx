@@ -1092,10 +1092,12 @@ test("Discover uses one scrolling surface without a viewport blur", async () => 
   const catalogScroller = catalog?.querySelector<HTMLElement>(
     '[data-testid="catalog-scroll-region"]',
   );
+  const catalogSearch = catalog?.querySelector<HTMLElement>('[data-style-role="catalog-search"]');
   const discoverStage = document.querySelector<HTMLElement>('[data-testid="discover-stage"]');
   expect(getComputedStyle(catalog!).overflowY).toBe("visible");
   expect(getComputedStyle(discoverStage!).overflowY).toBe("auto");
   expect(getComputedStyle(catalogScroller!).overflowY).toBe("visible");
+  expect(getComputedStyle(catalogSearch!).marginBottom).toBe("12px");
   expect(
     getComputedStyle(document.querySelector('[data-testid="catalog-results"]')!).overflowY,
   ).toBe("visible");
@@ -1107,8 +1109,16 @@ test("Discover uses one scrolling surface without a viewport blur", async () => 
   const forgeScroller = forge?.querySelector<HTMLFormElement>(
     '[data-testid="planet-builder-form"]',
   );
+  const forgeTabs = forge?.querySelector<HTMLElement>('[data-style-role="forge-tabs"]');
+  const forgeBody = forge?.querySelector<HTMLElement>('[data-style-role="builder-body"]');
+  const forgeFooter = forge?.querySelector<HTMLElement>('[data-style-role="builder-footer"]');
   expect(getComputedStyle(forge!).overflowY).toBe("visible");
   expect(getComputedStyle(forgeScroller!).overflowY).toBe("visible");
+  expect(getComputedStyle(forgeTabs!).borderBottomWidth).toBe("0px");
+  expect(getComputedStyle(forgeBody!).borderTopWidth).toBe("1px");
+  expect(getComputedStyle(forgeBody!).borderBottomWidth).toBe("0px");
+  expect(getComputedStyle(forgeFooter!).borderTopWidth).toBe("0px");
+  expect(getComputedStyle(forgeFooter!).borderBottomWidth).toBe("1px");
   expect(getComputedStyle(forge!, "::backdrop").backdropFilter).toBe("none");
 });
 
