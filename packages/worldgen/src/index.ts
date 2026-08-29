@@ -1,5 +1,8 @@
 import type { ExoplanetProfile, StarKind, StarProfile } from "@exora/contracts";
 
+export { generateProceduralBlackHoles } from "./procedural-black-holes.ts";
+export type { ProceduralBlackHoleOptions } from "./procedural-black-holes.ts";
+
 // Bump when deterministic recipe output changes.
 export const WORLDGEN_VERSION = 4;
 
