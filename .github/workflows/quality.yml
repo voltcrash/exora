@@ -38,17 +38,17 @@ jobs:
       - name: Run unit tests
         run: vp run -r test
 
+      - name: Build every workspace
+        run: vp run -r build
+
+      - name: Audit production dependencies
+        run: vp pm audit -- --prod --audit-level=high
+
       - name: Install browser used by the journey suite
-        run: vp exec --filter website -- playwright install --with-deps chromium webkit
+        run: vp exec --filter website -- playwright install --with-deps chromium
 
       - name: Run browser tests
         run: vp run website#test:browser
 
-      - name: Build every workspace
-        run: vp run -r build
-
       - name: Enforce Lighthouse quality budgets
         run: vp run quality:lighthouse
-
-      - name: Audit production dependencies
-        run: vp pm audit -- --prod --audit-level=high

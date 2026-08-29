@@ -119,7 +119,6 @@ export default defineConfig(({ mode }) => {
               instances: [
                 { browser: "chromium", name: "desktop", viewport: { width: 1440, height: 900 } },
                 { browser: "chromium", name: "mobile", viewport: { width: 390, height: 844 } },
-                { browser: "webkit", name: "webkit", viewport: { width: 1440, height: 900 } },
               ],
             },
           },

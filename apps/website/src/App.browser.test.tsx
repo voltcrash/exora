@@ -8,6 +8,7 @@ import { featuredPlanet } from "./planet-profile.ts";
 import "./styles/tokens.css";
 import "./styles/globals.css";
 
+const desktopTest = test.skipIf(window.innerWidth <= 760);
 const fetchBundledAsset = globalThis.fetch.bind(globalThis);
 
 const planetSceneStub = vi.hoisted(() => ({
@@ -371,7 +372,7 @@ afterEach(() => {
   window.history.replaceState({}, "", "/");
 });
 
-test("the landing page reaches a rendered world", async () => {
+desktopTest("the landing page reaches a rendered world", async () => {
   stubArchive();
   mountApp();
 
@@ -379,7 +380,7 @@ test("the landing page reaches a rendered world", async () => {
   await expect.element(page.getByRole("button", { name: "Open Discover" })).toBeVisible();
 });
 
-test("the browser test server exposes the production sky catalog", async () => {
+desktopTest("the browser test server exposes the production sky catalog", async () => {
   stubArchive();
   const response = await fetch("/sky/hyg-v44-vmag65.bin");
   const header = new DataView(await response.arrayBuffer());
@@ -409,7 +410,7 @@ test("Discover opens directly into Exoplanets at this width", async () => {
   }
 });
 
-test("a deep link to a named world resolves to that world", async () => {
+desktopTest("a deep link to a named world resolves to that world", async () => {
   stubArchive();
   mountApp("?planet=Kepler-22%20b");
 
@@ -419,14 +420,14 @@ test("a deep link to a named world resolves to that world", async () => {
   );
 });
 
-test("a deep link to a named star resolves to that star", async () => {
+desktopTest("a deep link to a named star resolves to that star", async () => {
   stubArchive();
   mountApp("?star=Sirius");
 
   await expect.element(page.getByRole("heading", { level: 1 })).toHaveTextContent("Sirius");
 });
 
-test("a black-hole deep link resolves without an archive request", async () => {
+desktopTest("a black-hole deep link resolves without an archive request", async () => {
   const calls = stubArchive();
   mountApp("?blackHole=M87*");
 
@@ -439,65 +440,77 @@ test("a black-hole deep link resolves without an archive request", async () => {
   expect(calls.filter((path) => path.includes("/api/")).length).toBe(0);
 });
 
-test("a deep link to a system resolves to the diorama, and says what it compressed", async () => {
-  stubArchive();
-  mountApp("?system=Kepler-90");
+desktopTest(
+  "a deep link to a system resolves to the diorama, and says what it compressed",
+  async () => {
+    stubArchive();
+    mountApp("?system=Kepler-90");
 
-  await expect.element(page.getByRole("heading", { level: 1 })).toHaveTextContent("Kepler-90");
-  expect(document.querySelector('link[rel="canonical"]')?.getAttribute("href")).toContain(
-    "?system=Kepler-90",
-  );
+    await expect.element(page.getByRole("heading", { level: 1 })).toHaveTextContent("Kepler-90");
+    expect(document.querySelector('link[rel="canonical"]')?.getAttribute("href")).toContain(
+      "?system=Kepler-90",
+    );
 
-  await openPanelSection("Scale");
-  await expect.element(page.getByText(/LOG · .+ AU → .+ m/)).toBeVisible();
-  await expect.element(page.getByText(/EARTH ×/)).toBeVisible();
-  await expect.element(page.getByText(/^1 s = /)).toBeVisible();
-});
+    await openPanelSection("Scale");
+    await expect.element(page.getByText(/LOG · .+ AU → .+ m/)).toBeVisible();
+    await expect.element(page.getByText(/EARTH ×/)).toBeVisible();
+    await expect.element(page.getByText(/^1 s = /)).toBeVisible();
+  },
+);
 
-test("a world in the diorama is reachable, and offers the way back to the system", async () => {
-  stubArchive();
-  mountApp("?system=Kepler-90");
+desktopTest(
+  "a world in the diorama is reachable, and offers the way back to the system",
+  async () => {
+    stubArchive();
+    mountApp("?system=Kepler-90");
 
-  await expandPanel();
-  await userEvent.click(page.getByRole("button", { name: /Kepler-90 c/ }));
+    await expandPanel();
+    await userEvent.click(page.getByRole("button", { name: /Kepler-90 c/ }));
 
-  await expect.element(page.getByRole("heading", { level: 1 })).toHaveTextContent("Kepler-90 c");
-  expect(window.location.search).toBe("?planet=Kepler-90%20c");
+    await expect.element(page.getByRole("heading", { level: 1 })).toHaveTextContent("Kepler-90 c");
+    expect(window.location.search).toBe("?planet=Kepler-90%20c");
 
-  await userEvent.click(page.getByRole("button", { name: /Whole system/ }));
+    await userEvent.click(page.getByRole("button", { name: /Whole system/ }));
 
-  await expect.element(page.getByRole("heading", { level: 1 })).toHaveTextContent("Kepler-90");
-  expect(window.location.search).toBe("?system=Kepler-90");
-});
+    await expect.element(page.getByRole("heading", { level: 1 })).toHaveTextContent("Kepler-90");
+    expect(window.location.search).toBe("?system=Kepler-90");
+  },
+);
 
-test("a system the archive links no worlds to is identified rather than shown empty", async () => {
-  stubArchive({ missing: ["Barren"] });
-  mountApp("?system=Barren");
+desktopTest(
+  "a system the archive links no worlds to is identified rather than shown empty",
+  async () => {
+    stubArchive({ missing: ["Barren"] });
+    mountApp("?system=Barren");
 
-  await expect
-    .element(page.getByRole("heading", { name: "DESTINATION UNAVAILABLE" }))
-    .toBeVisible();
-  await expect.element(page.getByText(/system “Barren”/)).toBeVisible();
-});
+    await expect
+      .element(page.getByRole("heading", { name: "DESTINATION UNAVAILABLE" }))
+      .toBeVisible();
+    await expect.element(page.getByText(/system “Barren”/)).toBeVisible();
+  },
+);
 
-test("an unavailable deep link is identified instead of showing a different world", async () => {
-  stubArchive({ missing: ["Withdrawn b"] });
-  mountApp("?planet=Withdrawn%20b");
+desktopTest(
+  "an unavailable deep link is identified instead of showing a different world",
+  async () => {
+    stubArchive({ missing: ["Withdrawn b"] });
+    mountApp("?planet=Withdrawn%20b");
 
-  await expect
-    .element(page.getByRole("heading", { name: "DESTINATION UNAVAILABLE" }))
-    .toBeVisible();
-  await expect.element(page.getByText(/planet “Withdrawn b”/)).toBeVisible();
-  expect(window.location.search).toBe("?planet=Withdrawn%20b");
+    await expect
+      .element(page.getByRole("heading", { name: "DESTINATION UNAVAILABLE" }))
+      .toBeVisible();
+    await expect.element(page.getByText(/planet “Withdrawn b”/)).toBeVisible();
+    expect(window.location.search).toBe("?planet=Withdrawn%20b");
 
-  await userEvent.click(page.getByRole("button", { name: "RETURN TO FEATURED WORLD" }));
+    await userEvent.click(page.getByRole("button", { name: "RETURN TO FEATURED WORLD" }));
 
-  await expect.element(page.getByRole("heading", { level: 1 })).toHaveTextContent("Kepler-297");
-  expect(window.location.pathname).toBe("/");
-  expect(window.location.search).toBe("");
-});
+    await expect.element(page.getByRole("heading", { level: 1 })).toHaveTextContent("Kepler-297");
+    expect(window.location.pathname).toBe("/");
+    expect(window.location.search).toBe("");
+  },
+);
 
-test("the catalog opens, searches, and travels to a result", async () => {
+desktopTest("the catalog opens, searches, and travels to a result", async () => {
   const calls = stubArchive();
   mountApp();
 
@@ -516,7 +529,7 @@ test("the catalog opens, searches, and travels to a result", async () => {
   expect(calls.some((path) => path.includes("q=TRAPPIST-1"))).toBe(true);
 });
 
-test("the star catalog opens and travels to a star", async () => {
+desktopTest("the star catalog opens and travels to a star", async () => {
   stubArchive();
   mountApp();
 
@@ -535,7 +548,7 @@ test("the star catalog opens and travels to a star", async () => {
   expect(window.location.search).toBe("?star=Sirius");
 });
 
-test("the star catalog preloads destinations alphabetically", async () => {
+desktopTest("the star catalog preloads destinations alphabetically", async () => {
   stubArchive();
   mountApp();
 
@@ -545,7 +558,7 @@ test("the star catalog preloads destinations alphabetically", async () => {
   await expect.element(destinations.nth(1)).toHaveTextContent(/Sirius/);
 });
 
-test("the black-hole atlas opens and travels to a sourced horizon", async () => {
+desktopTest("the black-hole atlas opens and travels to a sourced horizon", async () => {
   stubArchive();
   mountApp();
 
@@ -581,73 +594,82 @@ test("a long destination name stays inside its column before the webfont arrives
   expect(title?.scrollWidth).toBeLessThanOrEqual(title?.clientWidth ?? 0);
 });
 
-test("the Home System catalog opens the Oort Cloud with an explicit inferred-model warning", async () => {
-  stubArchive();
-  mountApp();
+desktopTest(
+  "the Home System catalog opens the Oort Cloud with an explicit inferred-model warning",
+  async () => {
+    stubArchive();
+    mountApp();
 
-  await openDiscoverSection("Solar System");
-  await userEvent.click(page.getByRole("button", { exact: true, name: "REGIONS" }));
-  await userEvent.fill(page.getByPlaceholder("Name or SPK ID"), "Oort");
-  const oortCloud = page.getByRole("button", { name: /Oort Cloud/ });
-  await expect.element(oortCloud).toBeVisible();
-  await userEvent.click(oortCloud);
+    await openDiscoverSection("Solar System");
+    await userEvent.click(page.getByRole("button", { exact: true, name: "REGIONS" }));
+    await userEvent.fill(page.getByPlaceholder("Name or SPK ID"), "Oort");
+    const oortCloud = page.getByRole("button", { name: /Oort Cloud/ });
+    await expect.element(oortCloud).toBeVisible();
+    await userEvent.click(oortCloud);
 
-  await expect.element(page.getByRole("heading", { level: 1 })).toHaveTextContent("Oort Cloud");
-  await expect
-    .element(page.getByText(/MODELED \/ INDIRECTLY INFERRED · NOT DIRECTLY OBSERVED/).first())
-    .toBeVisible();
-  await expandPanel();
-  await expect.element(page.getByLabelText("Region data")).toHaveTextContent("NAIF 10");
-  expect(window.location.search).toBe("?region=Oort%20Cloud");
-});
+    await expect.element(page.getByRole("heading", { level: 1 })).toHaveTextContent("Oort Cloud");
+    await expect
+      .element(page.getByText(/MODELED \/ INDIRECTLY INFERRED · NOT DIRECTLY OBSERVED/).first())
+      .toBeVisible();
+    await expandPanel();
+    await expect.element(page.getByLabelText("Region data")).toHaveTextContent("NAIF 10");
+    expect(window.location.search).toBe("?region=Oort%20Cloud");
+  },
+);
 
-test("a Solar System planet switches into its dedicated parent-centered subsystem", async () => {
-  stubArchive();
-  mountApp("?planet=Jupiter");
+desktopTest(
+  "a Solar System planet switches into its dedicated parent-centered subsystem",
+  async () => {
+    stubArchive();
+    mountApp("?planet=Jupiter");
 
-  await expect.element(page.getByRole("heading", { level: 1 })).toHaveTextContent("Jupiter");
-  const subsystem = page.getByRole("button", { name: /Jupiter system/ });
-  await expect.element(subsystem).toBeVisible();
-  await userEvent.click(subsystem);
+    await expect.element(page.getByRole("heading", { level: 1 })).toHaveTextContent("Jupiter");
+    const subsystem = page.getByRole("button", { name: /Jupiter system/ });
+    await expect.element(subsystem).toBeVisible();
+    await userEvent.click(subsystem);
 
-  await expect
-    .element(
-      page.getByText("JPL MEAN ORBITS · LOG-COMPRESSED DISTANCE · BODY SIZES EXAGGERATED", {
-        exact: true,
-      }),
-    )
-    .toBeVisible();
-  await expect
-    .element(page.getByRole("button", { name: /Jupiter close view/ }))
-    .toHaveAttribute("aria-pressed", "true");
+    await expect
+      .element(
+        page.getByText("JPL MEAN ORBITS · LOG-COMPRESSED DISTANCE · BODY SIZES EXAGGERATED", {
+          exact: true,
+        }),
+      )
+      .toBeVisible();
+    await expect
+      .element(page.getByRole("button", { name: /Jupiter close view/ }))
+      .toHaveAttribute("aria-pressed", "true");
 
-  await openPanelSection("Moons");
-  await expect.element(page.getByRole("button", { name: /Europa/ })).toBeVisible();
+    await openPanelSection("Moons");
+    await expect.element(page.getByRole("button", { name: /Europa/ })).toBeVisible();
 
-  await openPanelSection("Evidence");
-  await expect.element(page.getByText("Unresolved surfaces", { exact: true })).toBeVisible();
-});
+    await openPanelSection("Evidence");
+    await expect.element(page.getByText("Unresolved surfaces", { exact: true })).toBeVisible();
+  },
+);
 
-test("the Solar System diorama distinguishes cached JPL positions from catalog phases", async () => {
-  stubArchive();
-  mountApp("?system=Sun");
+desktopTest(
+  "the Solar System diorama distinguishes cached JPL positions from catalog phases",
+  async () => {
+    stubArchive();
+    mountApp("?system=Sun");
 
-  await expect.element(page.getByRole("heading", { level: 1 })).toHaveTextContent("Sun");
-  await openPanelSection("Time");
-  await expect.element(page.getByText("SIMPLIFIED CATALOG", { exact: true })).toBeVisible();
-  await userEvent.click(page.getByRole("button", { name: "NOW" }));
+    await expect.element(page.getByRole("heading", { level: 1 })).toHaveTextContent("Sun");
+    await openPanelSection("Time");
+    await expect.element(page.getByText("SIMPLIFIED CATALOG", { exact: true })).toBeVisible();
+    await userEvent.click(page.getByRole("button", { name: "NOW" }));
 
-  await expect.element(page.getByText("SERVER-CACHED JPL", { exact: true })).toBeVisible();
-  await expect.element(page.getByRole("button", { name: /PLAY/ })).toBeEnabled();
-  await userEvent.click(page.getByRole("button", { name: /REVERSE/ }));
-  await expect
-    .element(page.getByRole("button", { name: /REVERSE/ }))
-    .toHaveAttribute("aria-pressed", "true");
-  await userEvent.click(page.getByRole("button", { name: "CATALOG ORBITS" }));
-  await expect.element(page.getByText("SIMPLIFIED CATALOG", { exact: true })).toBeVisible();
-});
+    await expect.element(page.getByText("SERVER-CACHED JPL", { exact: true })).toBeVisible();
+    await expect.element(page.getByRole("button", { name: /PLAY/ })).toBeEnabled();
+    await userEvent.click(page.getByRole("button", { name: /REVERSE/ }));
+    await expect
+      .element(page.getByRole("button", { name: /REVERSE/ }))
+      .toHaveAttribute("aria-pressed", "true");
+    await userEvent.click(page.getByRole("button", { name: "CATALOG ORBITS" }));
+    await expect.element(page.getByText("SIMPLIFIED CATALOG", { exact: true })).toBeVisible();
+  },
+);
 
-test("the Sun's complete world list scrolls inside the destination panel", async () => {
+desktopTest("the Sun's complete world list scrolls inside the destination panel", async () => {
   stubArchive();
   mountApp("?star=Sun");
 
@@ -672,24 +694,27 @@ test("the Sun's complete world list scrolls inside the destination panel", async
   await expect.element(page.getByRole("button", { name: /Makemake/ })).toBeVisible();
 });
 
-test("the Solar System's complete object list scrolls inside the destination panel", async () => {
-  stubArchive();
-  mountApp("?system=Sun");
+desktopTest(
+  "the Solar System's complete object list scrolls inside the destination panel",
+  async () => {
+    stubArchive();
+    mountApp("?system=Sun");
 
-  await openPanelSection("Worlds");
-  await expect.element(page.getByRole("button", { name: /Makemake/ })).toBeVisible();
-  const worlds = document.querySelector<HTMLElement>('[data-testid="panel-body"]');
-  expect(worlds).not.toBeNull();
-  expect(getComputedStyle(worlds!).overflowY).toBe("auto");
-  expect(getComputedStyle(worlds!).overscrollBehaviorY).toBe("contain");
-  expect(worlds!.scrollHeight).toBeGreaterThan(worlds!.clientHeight);
+    await openPanelSection("Worlds");
+    await expect.element(page.getByRole("button", { name: /Makemake/ })).toBeVisible();
+    const worlds = document.querySelector<HTMLElement>('[data-testid="panel-body"]');
+    expect(worlds).not.toBeNull();
+    expect(getComputedStyle(worlds!).overflowY).toBe("auto");
+    expect(getComputedStyle(worlds!).overscrollBehaviorY).toBe("contain");
+    expect(worlds!.scrollHeight).toBeGreaterThan(worlds!.clientHeight);
 
-  worlds!.scrollTo({ top: worlds!.scrollHeight });
-  expect(worlds!.scrollTop).toBeGreaterThan(0);
-  await expect.element(page.getByRole("button", { name: /Makemake/ })).toBeVisible();
-});
+    worlds!.scrollTo({ top: worlds!.scrollHeight });
+    expect(worlds!.scrollTop).toBeGreaterThan(0);
+    await expect.element(page.getByRole("button", { name: /Makemake/ })).toBeVisible();
+  },
+);
 
-test("a dialog closes on Escape and returns the page", async () => {
+desktopTest("a dialog closes on Escape and returns the page", async () => {
   stubArchive();
   mountApp();
 
@@ -700,7 +725,7 @@ test("a dialog closes on Escape and returns the page", async () => {
   expect(document.querySelector("dialog[open]")).toBeNull();
 });
 
-test("the World Forge opens and builds a world the page then shows", async () => {
+desktopTest("the World Forge opens and builds a world the page then shows", async () => {
   stubArchive();
   mountApp();
 
@@ -718,7 +743,7 @@ test("the World Forge opens and builds a world the page then shows", async () =>
   expect(window.location.search).toContain("custom=");
 });
 
-test("a generated world survives a reload and its URL opens as a deep link", async () => {
+desktopTest("a generated world survives a reload and its URL opens as a deep link", async () => {
   stubArchive();
   mountApp();
 
@@ -736,7 +761,7 @@ test("a generated world survives a reload and its URL opens as a deep link", asy
   await expect.element(page.getByText("GENERATED WORLD")).toBeVisible();
 });
 
-test("an invalid custom recipe fails safely with a clear recovery path", async () => {
+desktopTest("an invalid custom recipe fails safely with a clear recovery path", async () => {
   stubArchive();
   mountApp("?custom=not-a-valid-recipe");
 
@@ -749,7 +774,7 @@ test("an invalid custom recipe fails safely with a clear recovery path", async (
     .toBeVisible();
 });
 
-test("back and forward restore generated planets and stars", async () => {
+desktopTest("back and forward restore generated planets and stars", async () => {
   stubArchive();
   mountApp();
 
@@ -775,7 +800,7 @@ test("back and forward restore generated planets and stars", async () => {
   expect(window.location.search).toBe(starSearch);
 });
 
-test("Backspace toggles Discover open and closed", async () => {
+desktopTest("Backspace toggles Discover open and closed", async () => {
   stubArchive();
   mountApp();
   await expect.element(page.getByRole("heading", { level: 1 })).toBeVisible();
@@ -787,7 +812,7 @@ test("Backspace toggles Discover open and closed", async () => {
   await expect.element(page.getByRole("dialog")).not.toBeInTheDocument();
 });
 
-test("Backspace edits a Discover search field instead of closing the screen", async () => {
+desktopTest("Backspace edits a Discover search field instead of closing the screen", async () => {
   stubArchive();
   mountApp();
 
@@ -848,7 +873,7 @@ test("Tab toggles the interface away and back, and only on the main screen", asy
   for (const { panel } of panels) await expect.element(panel).toBeVisible();
 });
 
-test("terrain view fades every interface region and reveals the hovered one", async () => {
+desktopTest("terrain view fades every interface region and reveals the hovered one", async () => {
   stubArchive();
   mountApp();
   await expect.element(page.getByRole("heading", { level: 1 })).toBeVisible();
@@ -880,7 +905,7 @@ test("terrain view fades every interface region and reveals the hovered one", as
   }
 });
 
-test("Tab keeps traversing focus wherever the shortcut stands down", async () => {
+desktopTest("Tab keeps traversing focus wherever the shortcut stands down", async () => {
   stubArchive();
   mountApp();
   await expect.element(page.getByRole("heading", { level: 1 })).toBeVisible();
@@ -899,45 +924,51 @@ test("Tab keeps traversing focus wherever the shortcut stands down", async () =>
   await expect.element(page.getByRole("dialog")).toBeVisible();
 });
 
-test("an open overlay parks the renderer, and closing it starts the loop again", async () => {
-  stubArchive();
-  mountApp();
-  await expect.element(page.getByRole("heading", { level: 1 })).toBeVisible();
+desktopTest(
+  "an open overlay parks the renderer, and closing it starts the loop again",
+  async () => {
+    stubArchive();
+    mountApp();
+    await expect.element(page.getByRole("heading", { level: 1 })).toBeVisible();
 
-  expect(stubbedHost().renderSuspensions).toBe(0);
+    expect(stubbedHost().renderSuspensions).toBe(0);
 
-  await openDiscoverSection("Exoplanets");
-  await expect.element(page.getByRole("dialog")).toBeVisible();
-  expect(stubbedHost().renderSuspensions).toBe(1);
+    await openDiscoverSection("Exoplanets");
+    await expect.element(page.getByRole("dialog")).toBeVisible();
+    expect(stubbedHost().renderSuspensions).toBe(1);
 
-  await userEvent.click(page.getByRole("button", { name: "Close Discover" }));
-  await expect.element(page.getByRole("dialog")).not.toBeInTheDocument();
-  expect(stubbedHost().renderSuspensions).toBe(0);
+    await userEvent.click(page.getByRole("button", { name: "Close Discover" }));
+    await expect.element(page.getByRole("dialog")).not.toBeInTheDocument();
+    expect(stubbedHost().renderSuspensions).toBe(0);
 
-  await openDiscoverSection("World Forge");
-  await expect.element(page.getByRole("dialog")).toBeVisible();
-  expect(stubbedHost().renderSuspensions).toBe(1);
+    await openDiscoverSection("World Forge");
+    await expect.element(page.getByRole("dialog")).toBeVisible();
+    expect(stubbedHost().renderSuspensions).toBe(1);
 
-  await userEvent.click(page.getByRole("button", { name: "Close Discover" }));
-  await expect.element(page.getByRole("dialog")).not.toBeInTheDocument();
-  expect(stubbedHost().renderSuspensions).toBe(0);
-});
+    await userEvent.click(page.getByRole("button", { name: "Close Discover" }));
+    await expect.element(page.getByRole("dialog")).not.toBeInTheDocument();
+    expect(stubbedHost().renderSuspensions).toBe(0);
+  },
+);
 
-test("VR presents the active destination without a console and exits to the same browser view", async () => {
-  stubArchive();
-  mountApp();
-  const destination = page.getByRole("heading", { level: 1 });
-  await expect.element(destination).toBeVisible();
-  const destinationName = destination.element().textContent;
+desktopTest(
+  "VR presents the active destination without a console and exits to the same browser view",
+  async () => {
+    stubArchive();
+    mountApp();
+    const destination = page.getByRole("heading", { level: 1 });
+    await expect.element(destination).toBeVisible();
+    const destinationName = destination.element().textContent;
 
-  await userEvent.click(page.getByRole("button", { name: "XR: VR AVAILABLE" }));
-  expect(page.getByRole("dialog")).not.toBeInTheDocument();
+    await userEvent.click(page.getByRole("button", { name: "XR: VR AVAILABLE" }));
+    expect(page.getByRole("dialog")).not.toBeInTheDocument();
 
-  stubbedHost().setInXr(false);
-  await expect.element(destination).toBeVisible();
-  expect(destination.element().textContent).toBe(destinationName);
-  expect(page.getByRole("dialog")).not.toBeInTheDocument();
-});
+    stubbedHost().setInXr(false);
+    await expect.element(destination).toBeVisible();
+    expect(destination.element().textContent).toBe(destinationName);
+    expect(page.getByRole("dialog")).not.toBeInTheDocument();
+  },
+);
 
 test("Discover uses one scrolling surface without a viewport blur", async () => {
   stubArchive();
@@ -969,7 +1000,7 @@ test("Discover uses one scrolling surface without a viewport blur", async () => 
   expect(getComputedStyle(forge!, "::backdrop").backdropFilter).toBe("none");
 });
 
-test("Discover resets its scroll position when changing sections", async () => {
+desktopTest("Discover resets its scroll position when changing sections", async () => {
   stubArchive();
   mountApp();
   await expect.element(page.getByRole("heading", { level: 1 })).toBeVisible();

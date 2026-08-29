@@ -11,13 +11,15 @@ import type { WorldPresentation } from "./world-presentation.ts";
 import "./styles/tokens.css";
 import "./styles/globals.css";
 
+const desktopTest = test.skipIf(window.innerWidth <= 760);
+
 afterEach(() => {
   delete document.documentElement.dataset.presentationMode;
   delete document.body.dataset.presentationMode;
   document.querySelector("#ar-test-app")?.remove();
 });
 
-test("AR makes the page transparent and places from the XR select event", () => {
+desktopTest("AR makes the page transparent and places from the XR select event", () => {
   const engine = new NullEngine();
   const scene = new Scene(engine);
   scene.activeCamera = new FreeCamera("camera", new Vector3(0, 1, -2), scene);

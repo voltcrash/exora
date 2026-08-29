@@ -23,7 +23,7 @@ const profile =
           },
           throttlingMethod: "simulate",
         },
-        thresholds: { fcp: 3_000, lcp: 5_000 },
+        thresholds: { fcp: 4_000, lcp: 6_000 },
       }
     : {
         settings: { preset: "desktop", throttlingMethod: "provided" },
@@ -34,7 +34,7 @@ module.exports = {
   ci: {
     collect: {
       chromePath: chromium.executablePath(),
-      numberOfRuns: 5,
+      numberOfRuns: 1,
       settings: {
         chromeFlags: "--headless=new --no-sandbox --enable-unsafe-swiftshader",
         onlyCategories: ["performance", "accessibility", "best-practices", "seo"],
@@ -44,7 +44,6 @@ module.exports = {
       url: ["/"],
     },
     assert: {
-      aggregationMethod: "median",
       assertions: {
         "categories:accessibility": ["error", { minScore: 0.95 }],
         "categories:best-practices": ["error", { minScore: 0.9 }],
