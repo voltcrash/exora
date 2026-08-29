@@ -11,7 +11,8 @@
     "preview": "vp preview",
     "quality:lighthouse": "lhci autorun && LIGHTHOUSE_PROFILE=mobile lhci autorun",
     "test": "vp test --project unit",
-    "test:browser": "vp test --project browser"
+    "test:browser:desktop": "BROWSER_PROFILE=desktop vp test --project browser",
+    "test:browser:full": "BROWSER_PROFILE=full vp test --project browser"
   },
   "dependencies": {
     "@babylonjs/core": "catalog:",

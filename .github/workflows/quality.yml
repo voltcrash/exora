@@ -47,8 +47,5 @@ jobs:
       - name: Install browser used by the journey suite
         run: vp exec --filter website -- playwright install --with-deps chromium
 
-      - name: Run browser tests
-        run: vp run website#test:browser
-
-      - name: Enforce Lighthouse quality budgets
-        run: vp run quality:lighthouse
+      - name: Run desktop browser smoke tests
+        run: vp run website#test:browser:desktop

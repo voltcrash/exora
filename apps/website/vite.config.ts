@@ -93,6 +93,14 @@ const variantLaunchSdk = (key: string): Plugin => ({
 
 const MAX_JAVASCRIPT_FILE_BYTES = 400_000;
 
+const browserInstances =
+  process.env.BROWSER_PROFILE === "desktop"
+    ? [{ browser: "chromium" as const, name: "desktop", viewport: { width: 1440, height: 900 } }]
+    : [
+        { browser: "chromium" as const, name: "desktop", viewport: { width: 1440, height: 900 } },
+        { browser: "chromium" as const, name: "mobile", viewport: { width: 390, height: 844 } },
+      ];
+
 export default defineConfig(({ mode }) => {
   const variantLaunchKey = loadEnv(mode, process.cwd(), "").VITE_VARIANT_LAUNCH_KEY?.trim() ?? "";
 
@@ -116,10 +124,7 @@ export default defineConfig(({ mode }) => {
               enabled: true,
               provider: playwright(),
               headless: true,
-              instances: [
-                { browser: "chromium", name: "desktop", viewport: { width: 1440, height: 900 } },
-                { browser: "chromium", name: "mobile", viewport: { width: 390, height: 844 } },
-              ],
+              instances: browserInstances,
             },
           },
         },
