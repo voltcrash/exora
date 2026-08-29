@@ -8,6 +8,7 @@ import { BlackHoleCatalog } from "./BlackHoleCatalog.tsx";
 import { PlanetCatalog } from "./PlanetCatalog.tsx";
 import { SolarSystemCatalog } from "./SolarSystemCatalog.tsx";
 import { StarCatalog } from "./StarCatalog.tsx";
+import styles from "./DiscoverScreen.module.css";
 
 export type DiscoverSection = "solar" | "worlds" | "stars" | "black-holes" | "forge";
 
@@ -62,12 +63,17 @@ const sections: readonly {
 ] as const;
 
 const DiscoverIcon = ({ section }: { section: DiscoverSection }) => (
-  <svg className="discover-nav-icon" data-icon={section} viewBox="0 0 32 32" aria-hidden="true">
+  <svg
+    className={styles["discover-nav-icon"]}
+    data-icon={section}
+    viewBox="0 0 32 32"
+    aria-hidden="true"
+  >
     {section === "solar" ? (
       <>
         <circle cx="16" cy="16" r="4" />
         <ellipse cx="16" cy="16" rx="12" ry="6.5" />
-        <circle className="icon-fill" cx="26" cy="14" r="1.8" />
+        <circle className={styles["icon-fill"]} cx="26" cy="14" r="1.8" />
       </>
     ) : section === "worlds" ? (
       <>
@@ -82,7 +88,7 @@ const DiscoverIcon = ({ section }: { section: DiscoverSection }) => (
       </>
     ) : section === "black-holes" ? (
       <>
-        <circle className="icon-fill" cx="16" cy="16" r="5" />
+        <circle className={styles["icon-fill"]} cx="16" cy="16" r="5" />
         <ellipse cx="16" cy="16" rx="13" ry="7" transform="rotate(-18 16 16)" />
         <path d="M4.5 21c6-3 17.5-6.5 23-10" />
       </>
@@ -163,22 +169,23 @@ export const DiscoverScreen = ({
   return (
     <dialog
       ref={dialogRef}
-      className={`discover-screen discover-section-${section}`}
+      className={styles["discover-screen"]}
+      data-state={section}
       aria-labelledby="discover-title"
       onCancel={(event) => {
         event.preventDefault();
         onClose();
       }}
     >
-      <div className="discover-sky" aria-hidden="true">
+      <div className={styles["discover-sky"]} aria-hidden="true">
         <span />
         <span />
         <span />
       </div>
 
-      <aside className="discover-rail">
+      <aside className={styles["discover-rail"]}>
         <button
-          className="discover-home"
+          className={styles["discover-home"]}
           type="button"
           aria-label="Open Solar System"
           onClick={() => setSection("solar")}
@@ -190,21 +197,21 @@ export const DiscoverScreen = ({
           </span>
         </button>
 
-        <nav className="discover-nav" aria-label="Discover destinations">
+        <nav className={styles["discover-nav"]} aria-label="Discover destinations">
           {sections.map((item, index) => (
             <button
-              className={`discover-nav-item ${item.accent}`}
+              className={`${styles["discover-nav-item"]} ${styles[item.accent]}`}
               key={item.id}
               type="button"
               aria-label={`${item.label} · ${item.source}`}
               aria-current={section === item.id ? "page" : undefined}
               onClick={() => setSection(item.id)}
             >
-              <span className="discover-nav-index">0{index + 1}</span>
-              <span className="discover-nav-glyph" aria-hidden="true">
+              <span className={styles["discover-nav-index"]}>0{index + 1}</span>
+              <span className={styles["discover-nav-glyph"]} aria-hidden="true">
                 <DiscoverIcon section={item.id} />
               </span>
-              <span className="discover-nav-copy">
+              <span className={styles["discover-nav-copy"]} data-testid="discover-nav-copy">
                 <strong>{item.label}</strong>
                 <small>{item.source}</small>
               </span>
@@ -212,14 +219,14 @@ export const DiscoverScreen = ({
           ))}
         </nav>
 
-        <p className="discover-rail-note">
+        <p className={styles["discover-rail-note"]}>
           <span aria-hidden="true" />
           LIVE OBSERVATORY
         </p>
       </aside>
 
-      <div className="discover-stage">
-        <header className="discover-header">
+      <div className={styles["discover-stage"]} data-testid="discover-stage">
+        <header className={styles["discover-header"]}>
           <div>
             <p>{copy.eyebrow}</p>
             <h1 id="discover-title">{copy.title}</h1>
@@ -227,7 +234,7 @@ export const DiscoverScreen = ({
           </div>
           <button
             ref={closeRef}
-            className="discover-close"
+            className={styles["discover-close"]}
             type="button"
             aria-label="Close Discover"
             onClick={onClose}
@@ -238,8 +245,8 @@ export const DiscoverScreen = ({
           </button>
         </header>
 
-        <main className="discover-main">
-          <div className="discover-workspace" aria-live="polite">
+        <main className={styles["discover-main"]}>
+          <div className={styles["discover-workspace"]} aria-live="polite">
             {section === "solar" ? (
               <SolarSystemCatalog
                 embedded

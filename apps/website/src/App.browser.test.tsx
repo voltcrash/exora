@@ -379,7 +379,7 @@ test("Discover opens directly into Exoplanets at this width", async () => {
       await expect.element(button).toBeVisible();
     }
     const visibleLabels = Array.from(
-      document.querySelectorAll<HTMLElement>(".discover-nav-copy"),
+      document.querySelectorAll<HTMLElement>('[data-testid="discover-nav-copy"]'),
     ).filter((label) => getComputedStyle(label).display !== "none");
     expect(visibleLabels).toHaveLength(5);
   }
@@ -979,7 +979,7 @@ test("Discover uses one scrolling surface without a viewport blur", async () => 
   await openDiscoverSection("Exoplanets");
   const catalog = document.querySelector<HTMLDialogElement>(".planet-catalog");
   const catalogScroller = catalog?.querySelector<HTMLElement>(".catalog-scroll-region");
-  const discoverStage = document.querySelector<HTMLElement>(".discover-stage");
+  const discoverStage = document.querySelector<HTMLElement>('[data-testid="discover-stage"]');
   expect(getComputedStyle(catalog!).overflowY).toBe("visible");
   expect(getComputedStyle(discoverStage!).overflowY).toBe("auto");
   expect(getComputedStyle(catalogScroller!).overflowY).toBe("visible");

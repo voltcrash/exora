@@ -1,0 +1,633 @@
+/* DISCOVER — the full-screen directory shared by every destination. */
+.discover-screen {
+  position: fixed;
+  z-index: 20;
+  inset: 0;
+  width: 100vw;
+  max-width: none;
+  height: 100dvh;
+  max-height: none;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  display: grid;
+  grid-template-columns: 248px minmax(0, 1fr);
+  overflow: hidden;
+  color: #eef8f8;
+  background:
+    radial-gradient(circle at 78% 18%, rgb(58 126 130 / 13%), transparent 28%),
+    radial-gradient(circle at 28% 95%, rgb(255 126 55 / 7%), transparent 31%), #040708;
+  isolation: isolate;
+  animation: discover-enter 260ms cubic-bezier(0.2, 0.8, 0.2, 1) both;
+}
+
+.discover-screen::backdrop {
+  background: #040708;
+}
+
+.discover-sky {
+  position: absolute;
+  z-index: -1;
+  inset: 0;
+  overflow: hidden;
+  pointer-events: none;
+  opacity: 0.72;
+  background-image:
+    radial-gradient(circle at 11% 16%, rgb(229 255 255 / 70%) 0 1px, transparent 1.5px),
+    radial-gradient(circle at 72% 9%, rgb(229 255 255 / 45%) 0 1px, transparent 1.5px),
+    radial-gradient(circle at 86% 64%, rgb(255 205 132 / 45%) 0 1px, transparent 1.5px),
+    radial-gradient(circle at 39% 76%, rgb(229 255 255 / 38%) 0 1px, transparent 1.5px);
+  background-size:
+    241px 223px,
+    317px 283px,
+    263px 337px,
+    389px 307px;
+}
+
+.discover-sky > span {
+  position: absolute;
+  border: 1px solid rgb(139 230 234 / 8%);
+  border-radius: 50%;
+}
+
+.discover-sky > span:nth-child(1) {
+  width: 540px;
+  height: 540px;
+  top: -360px;
+  right: 6%;
+}
+
+.discover-sky > span:nth-child(2) {
+  width: 880px;
+  height: 880px;
+  right: -560px;
+  bottom: -580px;
+}
+
+.discover-sky > span:nth-child(3) {
+  width: 340px;
+  height: 340px;
+  bottom: -220px;
+  left: 18%;
+  border-color: rgb(255 144 78 / 7%);
+}
+
+.discover-rail {
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  padding: 26px 18px 20px;
+  border-right: 1px solid rgb(215 243 245 / 10%);
+  background: linear-gradient(180deg, rgb(7 13 15 / 94%), rgb(4 8 9 / 86%));
+  box-shadow: 24px 0 70px rgb(0 0 0 / 16%);
+}
+
+.discover-home {
+  min-height: 58px;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 8px 9px;
+  border: 1px solid transparent;
+  border-radius: 15px;
+  color: inherit;
+  background: transparent;
+  cursor: pointer;
+  text-align: left;
+}
+
+.discover-home :global(.brand-mark) {
+  width: 38px;
+  height: 38px;
+}
+
+.discover-home > span:last-child {
+  display: grid;
+  gap: 3px;
+}
+
+.discover-home strong {
+  font-size: 13px;
+  letter-spacing: 0.25em;
+}
+
+.discover-home small {
+  color: #688087;
+  font-family: var(--mono);
+  font-size: 7px;
+  letter-spacing: 0.18em;
+}
+
+.discover-nav {
+  display: grid;
+  gap: 8px;
+  margin-top: clamp(32px, 8vh, 82px);
+}
+
+.discover-nav-item {
+  min-height: 74px;
+  display: grid;
+  grid-template-columns: 22px 34px 1fr;
+  align-items: center;
+  gap: 9px;
+  position: relative;
+  padding: 10px 12px 10px 8px;
+  overflow: hidden;
+  border: 1px solid transparent;
+  border-radius: 16px;
+  color: #b9c7ca;
+  background: transparent;
+  cursor: pointer;
+  text-align: left;
+  transition:
+    color 160ms ease,
+    border-color 160ms ease,
+    background 160ms ease,
+    transform 160ms ease;
+}
+
+.discover-nav-item::before {
+  content: "";
+  position: absolute;
+  top: 12px;
+  bottom: 12px;
+  left: 0;
+  width: 2px;
+  border-radius: 2px;
+  background: currentcolor;
+  opacity: 0;
+  transform: scaleY(0.35);
+  transition:
+    opacity 160ms ease,
+    transform 160ms ease;
+}
+
+.discover-nav-item:hover,
+.discover-nav-item[aria-current="page"] {
+  border-color: rgb(220 244 246 / 11%);
+  background: rgb(234 251 252 / 5%);
+  transform: translateX(2px);
+}
+
+.discover-nav-item[aria-current="page"]::before {
+  opacity: 1;
+  transform: scaleY(1);
+}
+
+.discover-nav-item.amber {
+  color: #ffae64;
+}
+
+.discover-nav-item.cyan {
+  color: #8be6ea;
+}
+
+.discover-nav-item.gold {
+  color: #ffd07e;
+}
+
+.discover-nav-item.coral {
+  color: #ff8354;
+}
+
+.discover-nav-item.violet {
+  color: #c7a8ff;
+}
+
+.discover-nav-index {
+  color: #45565b;
+  font-family: var(--mono);
+  font-size: 7px;
+  letter-spacing: 0.08em;
+}
+
+.discover-nav-glyph {
+  width: 34px;
+  height: 34px;
+  display: grid;
+  place-items: center;
+  border: 1px solid currentcolor;
+  border-radius: 50%;
+  box-shadow: inset 0 0 16px color-mix(in srgb, currentcolor 9%, transparent);
+}
+
+.discover-nav-icon {
+  width: 24px;
+  height: 24px;
+  overflow: visible;
+  fill: none;
+  stroke: currentcolor;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  stroke-width: 1.35;
+  vector-effect: non-scaling-stroke;
+}
+
+.discover-nav-icon .icon-fill {
+  fill: currentcolor;
+  stroke: none;
+}
+
+.discover-nav-copy {
+  min-width: 0;
+  display: grid;
+  gap: 3px;
+}
+
+.discover-nav-copy strong {
+  color: #edf6f7;
+  font-size: 10px;
+  font-weight: 500;
+  letter-spacing: 0.04em;
+}
+
+.discover-nav-copy small {
+  overflow: hidden;
+  color: #53666b;
+  font-family: var(--mono);
+  font-size: 6px;
+  letter-spacing: 0.1em;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.discover-rail-note {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: auto 8px 0;
+  color: #506268;
+  font-family: var(--mono);
+  font-size: 6px;
+  letter-spacing: 0.14em;
+}
+
+.discover-rail-note span {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: #67d5bd;
+  box-shadow: 0 0 10px rgb(103 213 189 / 75%);
+}
+
+.discover-stage {
+  min-width: 0;
+  min-height: 0;
+  overflow-x: hidden;
+  overflow-y: auto;
+  scrollbar-color: rgb(139 230 234 / 25%) transparent;
+}
+
+.discover-header {
+  min-height: 134px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 24px;
+  padding: 24px clamp(24px, 4vw, 62px);
+  border-bottom: 1px solid rgb(215 243 245 / 9%);
+  background: linear-gradient(180deg, rgb(5 10 11 / 78%), rgb(5 10 11 / 32%));
+}
+
+.discover-header > div {
+  max-width: 730px;
+}
+
+.discover-header p,
+.discover-header h1,
+.discover-header > div > span {
+  margin: 0;
+}
+
+.discover-header p {
+  margin-bottom: 8px;
+  color: var(--cyan);
+  font-family: var(--mono);
+  font-size: 7px;
+  letter-spacing: 0.18em;
+}
+
+.discover-header h1 {
+  font-size: clamp(27px, 3.1vw, 47px);
+  font-weight: 500;
+  letter-spacing: -0.035em;
+  line-height: 1;
+}
+
+.discover-header > div > span {
+  display: block;
+  max-width: 620px;
+  margin-top: 10px;
+  color: #788b90;
+  font-size: 11px;
+  line-height: 1.55;
+}
+
+.discover-close {
+  min-width: 170px;
+  min-height: 48px;
+  display: grid;
+  grid-template-columns: 1fr auto auto;
+  align-items: center;
+  gap: 9px;
+  padding: 7px 8px 7px 14px;
+  border: 1px solid rgb(215 243 245 / 14%);
+  border-radius: 14px;
+  color: #8fa3a7;
+  background: rgb(8 14 16 / 72%);
+  cursor: pointer;
+  font-family: var(--mono);
+  font-size: 7px;
+  letter-spacing: 0.1em;
+  transition:
+    color 160ms ease,
+    border-color 160ms ease,
+    background 160ms ease;
+}
+
+.discover-close:hover {
+  border-color: rgb(139 230 234 / 34%);
+  color: #e3f7f8;
+  background: rgb(13 24 27 / 84%);
+}
+
+.discover-close kbd {
+  padding: 4px 5px;
+  border: 1px solid rgb(215 243 245 / 12%);
+  border-radius: 6px;
+  color: #6e8287;
+  font-family: var(--mono);
+  font-size: 7px;
+}
+
+.discover-close i {
+  width: 30px;
+  height: 30px;
+  display: grid;
+  place-items: center;
+  border-radius: 9px;
+  color: #d9edef;
+  background: rgb(215 243 245 / 7%);
+  font-family: var(--mono);
+  font-size: 17px;
+  font-style: normal;
+}
+
+.discover-main {
+  min-height: 0;
+  overflow: visible;
+}
+
+.discover-workspace {
+  min-height: 0;
+  overflow: visible;
+}
+
+.discover-workspace :global(.embedded-catalog),
+.discover-workspace :global(.embedded-forge) {
+  position: static;
+  inset: auto;
+  width: 100%;
+  height: auto;
+  max-height: none;
+  margin: 0;
+  padding: 0;
+  overflow: visible;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none;
+  animation: discover-content-in 220ms ease-out both;
+}
+
+.discover-workspace :global(.embedded-catalog .catalog-scroll-region),
+.discover-workspace :global(.embedded-forge) form {
+  height: auto;
+  max-height: none;
+  padding-top: 8px;
+  overflow: visible;
+}
+
+.discover-workspace :global(.embedded-catalog .catalog-scroll-region) {
+  contain: layout;
+}
+
+.discover-workspace :global(.embedded-forge) form {
+  padding-inline: clamp(12px, 2vw, 28px);
+}
+
+.discover-workspace :global(.embedded-forge .forge-tabs) {
+  margin-top: 12px;
+}
+
+.discover-workspace :global(.embedded-forge .builder-body) {
+  border: 1px solid rgb(215 243 245 / 8%);
+  border-radius: 18px;
+  background: rgb(8 14 16 / 52%);
+}
+
+:global(.discover-trigger):focus-visible,
+.discover-home:focus-visible,
+.discover-nav-item:focus-visible,
+.discover-close:focus-visible {
+  outline: 2px solid var(--cyan);
+  outline-offset: 3px;
+}
+
+@keyframes discover-enter {
+  from {
+    opacity: 0;
+    transform: scale(1.008);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+@keyframes discover-content-in {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@media (max-width: 760px) {
+  .discover-screen {
+    grid-template-columns: 1fr;
+    grid-template-rows: auto minmax(0, 1fr);
+  }
+
+  .discover-rail {
+    display: grid;
+    grid-template-columns: auto minmax(0, 1fr);
+    gap: 10px;
+    padding: 8px 10px;
+    border-right: 0;
+    border-bottom: 1px solid rgb(215 243 245 / 10%);
+  }
+
+  .discover-home {
+    min-height: 48px;
+    padding: 5px;
+  }
+
+  .discover-home :global(.brand-mark) {
+    width: 32px;
+    height: 32px;
+  }
+
+  .discover-home > span:last-child,
+  .discover-rail-note,
+  .discover-nav-index,
+  .discover-nav-copy small {
+    display: none;
+  }
+
+  .discover-nav {
+    grid-template-columns: repeat(5, minmax(0, 1fr));
+    gap: 5px;
+    margin: 0;
+  }
+
+  .discover-nav-item {
+    min-height: 48px;
+    grid-template-columns: 1fr;
+    grid-template-rows: 26px auto;
+    place-items: center;
+    gap: 2px;
+    padding: 5px 4px 4px;
+    border-radius: 12px;
+  }
+
+  .discover-nav-item::before {
+    inset: auto 9px 0;
+    width: auto;
+    height: 2px;
+    transform: scaleX(0.35);
+  }
+
+  .discover-nav-item[aria-current="page"]::before {
+    transform: scaleX(1);
+  }
+
+  .discover-nav-item:hover,
+  .discover-nav-item[aria-current="page"] {
+    transform: none;
+  }
+
+  .discover-nav-glyph {
+    width: 26px;
+    height: 26px;
+    border: 0;
+    box-shadow: none;
+  }
+
+  .discover-nav-icon {
+    width: 25px;
+    height: 25px;
+    filter: drop-shadow(0 0 6px color-mix(in srgb, currentcolor 30%, transparent));
+  }
+
+  .discover-nav-copy {
+    display: block;
+    width: 100%;
+    text-align: center;
+  }
+
+  .discover-nav-copy strong {
+    display: block;
+    overflow: hidden;
+    font-family: var(--mono);
+    font-size: 6.5px;
+    letter-spacing: 0.02em;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .discover-header {
+    min-height: 104px;
+    padding: 16px 18px;
+  }
+
+  .discover-header h1 {
+    font-size: 25px;
+  }
+
+  .discover-header > div > span {
+    max-width: 440px;
+    margin-top: 7px;
+    font-size: 9px;
+  }
+
+  .discover-close {
+    min-width: 46px;
+    width: 46px;
+    grid-template-columns: 1fr;
+    padding: 7px;
+  }
+
+  .discover-close > span,
+  .discover-close kbd {
+    display: none;
+  }
+
+  .discover-close i {
+    width: 30px;
+    height: 30px;
+  }
+}
+
+@media (max-width: 520px) {
+  .discover-rail {
+    grid-template-columns: 34px minmax(0, 1fr);
+    padding-inline: 8px;
+  }
+
+  .discover-home {
+    min-width: 34px;
+  }
+
+  .discover-nav-item {
+    padding-inline: 3px;
+  }
+
+  .discover-header {
+    min-height: 92px;
+    padding: 13px 14px;
+  }
+
+  .discover-header p {
+    margin-bottom: 5px;
+    font-size: 6px;
+  }
+
+  .discover-header h1 {
+    font-size: 21px;
+  }
+
+  .discover-header > div > span {
+    display: none;
+  }
+
+  .discover-workspace :global(.embedded-forge) form {
+    padding-inline: 8px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .discover-screen,
+  .discover-workspace :global(.embedded-catalog),
+  .discover-workspace :global(.embedded-forge) {
+    animation: none;
+  }
+
+  .discover-nav-item,
+  :global(.discover-trigger) {
+    transition: none;
+  }
+}
