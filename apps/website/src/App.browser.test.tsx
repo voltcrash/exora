@@ -322,10 +322,13 @@ const stubArchive = ({ missing = [] as string[] } = {}) => {
     }
 
     if (url.pathname === "/api/stars" || url.pathname === "/api/stars/featured") {
+      const altair = { ...sirius, catalogName: "NAME Altair", id: "altair", name: "Altair" };
       const data =
         url.pathname === "/api/stars/featured"
-          ? [sirius, { ...sirius, catalogName: "NAME Altair", id: "altair", name: "Altair" }]
-          : [sirius];
+          ? [sirius, altair]
+          : url.searchParams.get("browse") === "catalog"
+            ? [altair, sirius]
+            : [sirius];
       return Response.json({
         data,
         meta: {
@@ -969,17 +972,14 @@ test("Tab toggles the interface away and back, and only on the main screen", asy
   const mobile = window.innerWidth <= 760;
   const expectCleared = async (): Promise<void> => {
     for (const { panel, selector } of panels) {
-      if (mobile && selector === '[data-testid="mission-control"]')
-        await expect.element(panel).toBeVisible();
+      if (selector === '[data-testid="mission-control"]') await expect.element(panel).toBeVisible();
       else await expect.element(panel).not.toBeVisible();
     }
+    await expect.element(page.getByRole("button", { name: "Show the interface" })).toBeVisible();
   };
 
   await userEvent.click(clearView);
   await expectCleared();
-  if (mobile) {
-    await expect.element(page.getByRole("button", { name: "Show the interface" })).toBeVisible();
-  }
 
   await userEvent.keyboard("{Backspace}");
   await expect.element(page.getByRole("dialog")).toBeVisible();
