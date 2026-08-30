@@ -12,6 +12,10 @@
   },
   "rewrites": [
     {
+      "source": "/favicon.svg",
+      "destination": "/exora-orbit.svg"
+    },
+    {
       "source": "/api/:path*",
       "destination": "/api"
     }
