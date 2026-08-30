@@ -1,5 +1,6 @@
 import { expect, test } from "vite-plus/test";
 import {
+  browseStars,
   discoverRandomPlanet,
   discoverRandomStar,
   loadBlackHoleByName,
@@ -190,7 +191,7 @@ test("loads a SIMBAD star's planets through NASA's aliases service", async () =>
 test("loads a broad field for local physical filtering", async () => {
   const result = await loadPlanetFilterPool({
     fetcher: async (input) => {
-      expect(input).toBe("/api/planets?browse=physical-controls&limit=120");
+      expect(input).toBe("/api/planets?browse=physical-controls&limit=60");
       return Response.json({
         data: [featuredPlanet],
         meta: {
@@ -203,7 +204,28 @@ test("loads a broad field for local physical filtering", async () => {
     },
   });
 
-  expect(result).toMatchObject({ planets: [{ id: featuredPlanet.id }] });
+  expect(result).toMatchObject({ nextCursor: null, planets: [{ id: featuredPlanet.id }] });
+});
+
+test("requests the next planet page from the archive cursor", async () => {
+  const result = await loadPlanetFilterPool({
+    cursor: "Kepler-11 b",
+    fetcher: async (input) => {
+      expect(input).toBe("/api/planets?browse=physical-controls&limit=60&cursor=Kepler-11%20b");
+      return Response.json({
+        data: [featuredPlanet],
+        meta: {
+          cached: false,
+          count: 1,
+          nextCursor: "Kepler-12 b",
+          query: "physical-controls",
+          source: "NASA Exoplanet Archive",
+        },
+      });
+    },
+  });
+
+  expect(result.nextCursor).toBe("Kepler-12 b");
 });
 
 test("loads validated Solar System vectors only through Exora's API", async () => {
@@ -384,4 +406,28 @@ test("a catalog request the caller cancels reports the cancellation, not the dea
 
   controller.abort();
   expect(await settled).toBe("AbortError");
+});
+
+test("browses the stellar catalog page by page", async () => {
+  const result = await browseStars({
+    cursor: "NAME Altair",
+    fetcher: async (input) => {
+      expect(input).toBe("/api/stars?browse=catalog&limit=24&cursor=NAME%20Altair");
+      return Response.json({
+        data: [starPayload.data],
+        meta: {
+          cached: false,
+          count: 1,
+          nextCursor: "NAME Antares",
+          query: "catalog",
+          source: "SIMBAD",
+        },
+      });
+    },
+  });
+
+  expect(result).toMatchObject({
+    nextCursor: "NAME Antares",
+    stars: [{ id: starPayload.data.id }],
+  });
 });

@@ -1,10 +1,12 @@
 import type { StarProfile } from "@exora/contracts";
-import { memo, useEffect, useRef, useState } from "react";
-import { discoverRandomStar, discoverStars, searchStars } from "../api-client.ts";
+import { memo, useCallback, useEffect, useRef, useState } from "react";
+import { browseStars, discoverRandomStar, discoverStars, searchStars } from "../api-client.ts";
 import { formatNumber } from "../planet-utils.tsx";
 import { starKindLabel } from "../star-utils.ts";
 import { starNotableTrait, suggestStarName } from "../search-discovery.ts";
 import { useTabList } from "../use-tab-list.ts";
+import { appendUniqueById } from "../catalog-pagination.ts";
+import { useInfiniteScroll } from "../use-infinite-scroll.ts";
 import { StarCatalogVisual } from "./CatalogVisual.tsx";
 import sharedStyles from "./ExperienceShared.module.css";
 import catalogStyles from "./CatalogShared.module.css";
@@ -105,8 +107,11 @@ export const StarCatalog = ({ embedded = false, onClose, onSelect }: StarCatalog
   const dialogRef = useRef<HTMLDialogElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
   const surpriseControllerRef = useRef<AbortController | null>(null);
+  const pageControllerRef = useRef<AbortController | null>(null);
   const [query, setQuery] = useState("");
   const [stars, setStars] = useState<StarProfile[]>([]);
+  const [nextCursor, setNextCursor] = useState<string | null>(null);
+  const [loadingMore, setLoadingMore] = useState(false);
   const [cached, setCached] = useState(false);
   const [searchState, setSearchState] = useState<SearchState>("loading");
   const [activeCategory, setActiveCategory] = useState<string | null>(null);
@@ -121,11 +126,17 @@ export const StarCatalog = ({ embedded = false, onClose, onSelect }: StarCatalog
 
     return () => {
       surpriseControllerRef.current?.abort();
+      pageControllerRef.current?.abort();
       dialog?.close();
     };
   }, [embedded]);
 
   useEffect(() => {
+    pageControllerRef.current?.abort();
+    pageControllerRef.current = null;
+    setLoadingMore(false);
+    setNextCursor(null);
+
     if (activeCategory) {
       setSuggestion(null);
       const controller = new AbortController();
@@ -149,17 +160,11 @@ export const StarCatalog = ({ embedded = false, onClose, onSelect }: StarCatalog
       setSuggestion(null);
       const controller = new AbortController();
       setSearchState("loading");
-      void searchStars("", { signal: controller.signal })
+      void browseStars({ signal: controller.signal })
         .then((result) => {
           if (controller.signal.aborted) return;
-          setStars(
-            result.stars.toSorted((left, right) =>
-              left.name.localeCompare(right.name, undefined, {
-                numeric: true,
-                sensitivity: "base",
-              }),
-            ),
-          );
+          setStars(result.stars);
+          setNextCursor(result.nextCursor);
           setCached(result.cached);
           setSearchState("ready");
         })
@@ -204,6 +209,35 @@ export const StarCatalog = ({ embedded = false, onClose, onSelect }: StarCatalog
     };
   }, [activeCategory, query]);
 
+  const loadMore = useCallback((): void => {
+    if (!nextCursor || pageControllerRef.current) return;
+
+    const controller = new AbortController();
+    pageControllerRef.current = controller;
+    setLoadingMore(true);
+    void browseStars({ cursor: nextCursor, signal: controller.signal })
+      .then((result) => {
+        if (controller.signal.aborted) return;
+        setStars((current) => appendUniqueById(current, result.stars));
+        setNextCursor(result.nextCursor);
+      })
+      .catch((error: unknown) => {
+        if (controller.signal.aborted) return;
+        console.error(error);
+        setNextCursor(null);
+      })
+      .finally(() => {
+        if (pageControllerRef.current !== controller) return;
+        pageControllerRef.current = null;
+        setLoadingMore(false);
+      });
+  }, [nextCursor]);
+
+  const sentinelRef = useInfiniteScroll<HTMLLIElement>({
+    enabled: searchState === "ready" && nextCursor !== null && !loadingMore,
+    onLoadMore: loadMore,
+  });
+
   const activeLabel = [...collections, ...categories].find(
     (category) => category.id === activeCategory,
   )?.label;
@@ -244,7 +278,7 @@ export const StarCatalog = ({ embedded = false, onClose, onSelect }: StarCatalog
             : "Loading the alphabetical stellar catalog…"
         : searchState === "error"
           ? "The SIMBAD signal is unavailable. Try again shortly."
-          : `${stars.length} stellar ${stars.length === 1 ? "destination" : "destinations"}${suggestion ? ` for suggested signal ${suggestion}` : activeLabel ? ` in ${activeLabel}` : " · alphabetical catalog"}${cached ? " · cached result" : ""}.`;
+          : `${stars.length} stellar ${stars.length === 1 ? "destination" : "destinations"}${suggestion ? ` for suggested signal ${suggestion}` : activeLabel ? ` in ${activeLabel}` : " · alphabetical catalog"}${nextCursor ? " · scroll for more" : ""}${cached ? " · cached result" : ""}.`;
 
   return (
     <dialog
@@ -432,6 +466,16 @@ export const StarCatalog = ({ embedded = false, onClose, onSelect }: StarCatalog
             stars.map((star) => (
               <StarResult key={star.id} cached={cached} onSelect={onSelect} star={star} />
             ))}
+          {searchState === "ready" && nextCursor !== null && (
+            <li
+              ref={sentinelRef}
+              className={cx("catalog-loading")}
+              data-testid="star-catalog-load-more"
+              aria-live="polite"
+            >
+              <span /> {loadingMore ? "Loading more stars" : "Scroll for more stars"}
+            </li>
+          )}
         </ol>
       </div>
     </dialog>

@@ -191,3 +191,31 @@ test("coalesces identical SIMBAD queries while the first request is unresolved",
   expect(secondResult.value[0]?.name).toBe("Sirius");
   expect(requests).toBe(1);
 });
+
+test("pages the named-star catalog with a keyset cursor", async () => {
+  let requestedQuery = "";
+  const repository = new SimbadStarRepository({
+    fetcher: async (input) => {
+      const href =
+        typeof input === "string" ? input : input instanceof URL ? input.href : input.url;
+      requestedQuery = new URL(href).searchParams.get("query") ?? "";
+      return Response.json({ data: Array.from({ length: 6 }, () => siriusRow), metadata });
+    },
+  });
+
+  const result = await repository.browse(6, "NAME Altair");
+
+  expect(requestedQuery).toContain("i.id like 'NAME %'");
+  expect(requestedQuery).toContain("i.id > 'NAME Altair'");
+  expect(requestedQuery).toContain("order by matched_id");
+  expect(result.value).toHaveLength(6);
+  expect(result.nextCursor).toBe("NAME Sirius");
+});
+
+test("ends stellar paging once a page is not full", async () => {
+  const repository = new SimbadStarRepository({
+    fetcher: async () => Response.json({ data: [siriusRow], metadata }),
+  });
+
+  expect((await repository.browse(24)).nextCursor).toBeNull();
+});

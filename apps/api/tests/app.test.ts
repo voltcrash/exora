@@ -42,7 +42,7 @@ const planet: ExoplanetProfile = {
 };
 
 const repository: PlanetRepository = {
-  browse: async () => ({ cached: true, value: [planet] }),
+  browse: async () => ({ cached: true, nextCursor: null, value: [planet] }),
   discover: async () => ({ cached: true, value: [planet] }),
   findByName: async () => ({ cached: false, value: planet }),
   findByHost: async () => ({ cached: true, value: [planet] }),
@@ -75,6 +75,7 @@ const star: StarProfile = {
 };
 
 const starRepository: StarRepository = {
+  browse: async () => ({ cached: true, nextCursor: null, value: [star] }),
   discover: async () => ({ cached: true, value: [star] }),
   featured: async () => ({ cached: true, value: [star] }),
   findByName: async () => ({ cached: false, value: star }),
@@ -308,6 +309,18 @@ test("returns a broad planet field for physical controls", async () => {
   });
   expect(response.headers.get("Cache-Control")).toBe("public, max-age=60");
   expect(response.headers.get("CDN-Cache-Control")).toContain("stale-if-error=86400");
+});
+
+test("browses the stellar catalog with cursor metadata", async () => {
+  const response = await createApp({ starRepository }).request(
+    "/api/stars?browse=catalog&limit=24&cursor=NAME%20Altair",
+  );
+
+  expect(response.status).toBe(200);
+  expect(await response.json()).toMatchObject({
+    data: [{ id: "alf-cma" }],
+    meta: { count: 1, nextCursor: null, query: "catalog" },
+  });
 });
 
 test("returns category-driven planet and star discovery results", async () => {

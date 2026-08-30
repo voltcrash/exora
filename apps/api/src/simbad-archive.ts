@@ -2,7 +2,7 @@ import { starProfileSchema, type StarKind, type StarProfile } from "@exora/contr
 import { z } from "zod";
 import { createArchiveCache, createRequestCoalescer } from "./archive-cache.ts";
 import { UpstreamError } from "./errors.ts";
-import type { RepositoryResult } from "./nasa-archive.ts";
+import type { RepositoryPage, RepositoryResult } from "./nasa-archive.ts";
 
 const SIMBAD_TAP_ENDPOINT = "https://simbad.cds.unistra.fr/simbad/sim-tap/sync";
 const FEATURED_NAMES = [
@@ -91,6 +91,7 @@ const simbadPayloadSchema = z.object({
 const expectedSimbadColumns = new Set(Object.keys(simbadStarRowSchema.shape));
 
 export interface StarRepository {
+  browse(limit: number, cursor?: string): Promise<RepositoryPage<StarProfile[]>>;
   discover(
     category: StarDiscoveryCategory,
     limit: number,
@@ -196,6 +197,9 @@ const stringOrNull = (value: unknown): string | null =>
   typeof value === "string" && value.trim() ? value.trim() : null;
 
 const escapeAdqlLiteral = (value: string): string => value.replaceAll("'", "''");
+
+const BROWSE_WHERE =
+  "i.id like 'NAME %' and b.sp_type is not null and b.plx_value is not null and b.ra is not null";
 
 const titleCase = (value: string): string =>
   value.replaceAll(
@@ -372,12 +376,19 @@ export const normalizeSimbadStar = (
   };
 };
 
+interface StarQueryResult extends RepositoryResult<StarProfile[]> {
+  cursor: string | null;
+  rowCount: number;
+}
+
+type CachedStarQuery = Omit<StarQueryResult, "cached">;
+
 export class SimbadStarRepository implements StarRepository {
-  readonly #cache = createArchiveCache<StarProfile[]>();
+  readonly #cache = createArchiveCache<CachedStarQuery>();
   readonly #cacheTtlMs: number;
   readonly #fetcher: Fetcher;
   readonly #now: () => number;
-  readonly #requests = createRequestCoalescer<RepositoryResult<StarProfile[]>>();
+  readonly #requests = createRequestCoalescer<StarQueryResult>();
   readonly #timeoutMs: number;
 
   constructor(options: SimbadStarRepositoryOptions = {}) {
@@ -397,6 +408,21 @@ export class SimbadStarRepository implements StarRepository {
     return this.#query(
       `select distinct top ${safeLimit} ${columns} from basic as b left outer join allfluxes as f on b.oid=f.oidref left outer join ids as a on b.oid=a.oidref left outer join mesDiameter as d on b.oid=d.oidref and d.mespos=1 left outer join mesFe_h as h on b.oid=h.oidref and h.mespos=1 where ${filter.where} order by ${filter.order}`,
     );
+  }
+
+  async browse(limit: number, cursor?: string): Promise<RepositoryPage<StarProfile[]>> {
+    const safeLimit = Math.max(6, Math.min(Math.trunc(limit), 48));
+    const after = cursor?.trim().slice(0, 100);
+    const keyset = after ? ` and i.id > '${escapeAdqlLiteral(after)}'` : "";
+    const result = await this.#query(
+      `select distinct top ${safeLimit} ${STAR_COLUMNS} ${STAR_FROM} where ${BROWSE_WHERE}${keyset} order by matched_id`,
+    );
+
+    return {
+      cached: result.cached,
+      value: result.value,
+      nextCursor: result.rowCount === safeLimit ? result.cursor : null,
+    };
   }
 
   featured(): Promise<RepositoryResult<StarProfile[]>> {
@@ -432,10 +458,10 @@ export class SimbadStarRepository implements StarRepository {
     };
   }
 
-  async #query(adql: string): Promise<RepositoryResult<StarProfile[]>> {
+  async #query(adql: string): Promise<StarQueryResult> {
     const requestTime = this.#now();
     const cached = this.#cache.get(adql, requestTime);
-    if (cached) return { cached: true, value: cached };
+    if (cached) return { ...cached, cached: true };
 
     return this.#requests.run(adql, async () => {
       const url = new URL(SIMBAD_TAP_ENDPOINT);
@@ -467,6 +493,9 @@ export class SimbadStarRepository implements StarRepository {
           throw new SimbadArchiveError("SIMBAD TAP returned unexpected result columns.");
         }
         const retrievedOn = new Date(requestTime).toISOString().slice(0, 10);
+        const matchedIdColumn = columns.indexOf("matched_id");
+        const lastRow = payload.data.data.at(-1);
+        const lastMatchedId = lastRow?.[matchedIdColumn];
         const stars = payload.data.data
           .map((values) => {
             if (values.length !== columns.length) {
@@ -483,8 +512,13 @@ export class SimbadStarRepository implements StarRepository {
           .filter((star): star is StarProfile => star !== null)
           .map((star) => starProfileSchema.parse(star));
 
-        this.#cache.set(adql, stars, requestTime + this.#cacheTtlMs);
-        return { cached: false, value: stars };
+        const outcome: CachedStarQuery = {
+          cursor: typeof lastMatchedId === "string" ? lastMatchedId : null,
+          rowCount: payload.data.data.length,
+          value: stars,
+        };
+        this.#cache.set(adql, outcome, requestTime + this.#cacheTtlMs);
+        return { ...outcome, cached: false };
       } catch (error) {
         if (error instanceof SimbadArchiveError) throw error;
         throw new SimbadArchiveError("SIMBAD TAP request failed.", { cause: error });

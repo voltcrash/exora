@@ -140,9 +140,14 @@ const requestedLimit = (context: Context, fallback: number): number => {
   return Number.isFinite(parsed) ? parsed : fallback;
 };
 
+const requestedCursor = (context: Context): string | undefined => {
+  const cursor = context.req.query("cursor")?.trim();
+  return cursor && cursor.length <= MAX_NAME_LENGTH ? cursor : undefined;
+};
+
 const planetCollection = (
   context: Context,
-  result: RepositoryResult<ExoplanetProfile[]>,
+  result: RepositoryResult<ExoplanetProfile[]> & { nextCursor?: string | null },
   query: string,
   cachePolicy: CachePolicy,
 ): Response => {
@@ -153,6 +158,7 @@ const planetCollection = (
       meta: {
         cached: result.cached,
         count: result.value.length,
+        nextCursor: result.nextCursor ?? null,
         query,
         source: "NASA Exoplanet Archive",
       },
@@ -162,7 +168,7 @@ const planetCollection = (
 
 const starCollection = (
   context: Context,
-  result: RepositoryResult<StarProfile[]>,
+  result: RepositoryResult<StarProfile[]> & { nextCursor?: string | null },
   query: string,
   cachePolicy: CachePolicy,
 ): Response => {
@@ -170,7 +176,13 @@ const starCollection = (
   return context.json(
     starSearchResponseSchema.parse({
       data: result.value,
-      meta: { cached: result.cached, count: result.value.length, query, source: "SIMBAD" },
+      meta: {
+        cached: result.cached,
+        count: result.value.length,
+        nextCursor: result.nextCursor ?? null,
+        query,
+        source: "SIMBAD",
+      },
     }),
   );
 };
@@ -380,7 +392,7 @@ export const createApp = ({
     const browse = context.req.query("browse")?.trim() ?? "";
 
     if (browse === "physical-controls") {
-      const result = await repository.browse(requestedLimit(context, 120));
+      const result = await repository.browse(requestedLimit(context, 60), requestedCursor(context));
       return planetCollection(context, result, "physical-controls", CACHE_POLICY.catalog);
     }
 
@@ -468,6 +480,16 @@ export const createApp = ({
   app.get("/api/stars", async (context) => {
     const query = context.req.query("q")?.trim() ?? "";
     const category = context.req.query("category")?.trim() ?? "";
+    const browse = context.req.query("browse")?.trim() ?? "";
+
+    if (browse === "catalog") {
+      const result = await starRepository.browse(
+        requestedLimit(context, 24),
+        requestedCursor(context),
+      );
+      return starCollection(context, result, "catalog", CACHE_POLICY.catalog);
+    }
+
     if (category) {
       if (!STAR_DISCOVERY_CATEGORIES.has(category as StarDiscoveryCategory)) {
         return context.json(

@@ -172,8 +172,26 @@ test("bounds the physical-control browsing field", async () => {
   const query = new URL(requestedUrl).searchParams.get("query");
 
   expect(result.value).toHaveLength(1);
+  expect(result.nextCursor).toBeNull();
   expect(query).toContain("top 120");
   expect(query).toContain("sy_dist is not null");
+});
+
+test("pages the browsing field with a keyset cursor", async () => {
+  let requestedUrl = "";
+  const repository = new NasaPlanetRepository({
+    fetcher: async (input) => {
+      requestedUrl =
+        typeof input === "string" ? input : input instanceof URL ? input.href : input.url;
+      return Response.json(Array.from({ length: 12 }, () => nasaRow));
+    },
+  });
+
+  const result = await repository.browse(12, "Kepler-11 b");
+  const query = new URL(requestedUrl).searchParams.get("query");
+
+  expect(query).toContain("pl_name > 'Kepler-11 b'");
+  expect(result.nextCursor).toBe(result.value.at(-1)?.name);
 });
 
 test("resolves a planet by name whatever casing the caller used", async () => {

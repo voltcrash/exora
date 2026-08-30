@@ -97,8 +97,12 @@ export interface RepositoryResult<T> {
   value: T;
 }
 
+export interface RepositoryPage<T> extends RepositoryResult<T> {
+  nextCursor: string | null;
+}
+
 export interface PlanetRepository {
-  browse(limit: number): Promise<RepositoryResult<ExoplanetProfile[]>>;
+  browse(limit: number, cursor?: string): Promise<RepositoryPage<ExoplanetProfile[]>>;
   discover(
     category: PlanetDiscoveryCategory,
     limit: number,
@@ -206,6 +210,9 @@ export const normalizeNasaPlanet = (
 const escapeAdqlLiteral = (value: string): string =>
   value.replaceAll("%", "").replaceAll("_", "").replaceAll("'", "''");
 
+// Keyset cursors are compared, not pattern matched, so wildcards stay intact.
+const escapeAdqlCursor = (value: string): string => value.replaceAll("'", "''");
+
 export class NasaPlanetRepository implements PlanetRepository {
   readonly #cache = createArchiveCache<ExoplanetProfile[]>();
   readonly #cacheTtlMs: number;
@@ -221,11 +228,18 @@ export class NasaPlanetRepository implements PlanetRepository {
     this.#timeoutMs = options.timeoutMs ?? 10_000;
   }
 
-  browse(limit: number): Promise<RepositoryResult<ExoplanetProfile[]>> {
-    const safeLimit = Math.max(24, Math.min(Math.trunc(limit), 120));
-    return this.#query(
-      `select top ${safeLimit} ${NASA_COLUMNS} from pscomppars where sy_dist is not null and pl_eqt is not null and (pl_rade is not null or pl_radj is not null) order by pl_name`,
+  async browse(limit: number, cursor?: string): Promise<RepositoryPage<ExoplanetProfile[]>> {
+    const safeLimit = Math.max(12, Math.min(Math.trunc(limit), 120));
+    const after = cursor?.trim().slice(0, 100);
+    const keyset = after ? ` and pl_name > '${escapeAdqlCursor(after)}'` : "";
+    const result = await this.#query(
+      `select top ${safeLimit} ${NASA_COLUMNS} from pscomppars where sy_dist is not null and pl_eqt is not null and (pl_rade is not null or pl_radj is not null)${keyset} order by pl_name`,
     );
+
+    return {
+      ...result,
+      nextCursor: result.value.length === safeLimit ? (result.value.at(-1)?.name ?? null) : null,
+    };
   }
 
   discover(

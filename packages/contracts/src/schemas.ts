@@ -118,6 +118,7 @@ export const planetSearchResponseSchema = z.strictObject({
   data: z.array(exoplanetProfileSchema),
   meta: planetMetadataSchema.extend({
     count: z.number().int().nonnegative(),
+    nextCursor: z.string().nullable().default(null),
     query: z.string(),
   }),
 });
@@ -207,6 +208,7 @@ export const starSearchResponseSchema = z.strictObject({
   data: z.array(starProfileSchema),
   meta: starMetadataSchema.extend({
     count: z.number().int().nonnegative(),
+    nextCursor: z.string().nullable().default(null),
     query: z.string(),
   }),
 });

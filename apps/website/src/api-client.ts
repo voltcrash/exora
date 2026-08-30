@@ -9,6 +9,7 @@ import {
   type StarProfile,
   type StarResponse,
 } from "@exora/contracts";
+import { appendUniqueById } from "./catalog-pagination.ts";
 import { requestDeadline } from "./request-deadline.ts";
 
 type Fetcher = (input: string | URL | Request, init?: RequestInit) => Promise<Response>;
@@ -23,6 +24,11 @@ const EPHEMERIS_TIMEOUT_MS = 20_000;
 interface CollectionOptions {
   fetcher?: Fetcher;
   signal?: AbortSignal;
+}
+
+interface PageOptions extends CollectionOptions {
+  cursor?: string | null;
+  limit?: number;
 }
 
 type ContractModule = typeof import("@exora/contracts");
@@ -79,7 +85,13 @@ const requestPlanetCollection = (
     PLANET_COLLECTION_TIMEOUT_MS,
     subject,
     responseSchema.PlanetSearch,
-  ).then(({ data, meta }) => ({ cached: meta.cached, planets: data, query: meta.query }));
+  ).then(({ data, meta }) => ({
+    cached: meta.cached,
+    nextCursor: meta.nextCursor,
+    // Archive rows can collapse onto one slug ("TWA 27b" and "TWA 27 b").
+    planets: appendUniqueById([], data),
+    query: meta.query,
+  }));
 
 const requestStarCollection = (
   path: string,
@@ -92,7 +104,12 @@ const requestStarCollection = (
     STAR_COLLECTION_TIMEOUT_MS,
     subject,
     responseSchema.StarSearch,
-  ).then(({ data, meta }) => ({ cached: meta.cached, query: meta.query, stars: data }));
+  ).then(({ data, meta }) => ({
+    cached: meta.cached,
+    nextCursor: meta.nextCursor,
+    query: meta.query,
+    stars: appendUniqueById([], data),
+  }));
 
 export interface PlanetLoadResult {
   cached: boolean;
@@ -102,6 +119,7 @@ export interface PlanetLoadResult {
 
 export interface PlanetSearchResult {
   cached: boolean;
+  nextCursor: string | null;
   planets: ExoplanetProfile[];
   query: string;
 }
@@ -114,6 +132,7 @@ export interface StarLoadResult {
 
 export interface StarSearchResult {
   cached: boolean;
+  nextCursor: string | null;
   query: string;
   stars: StarProfile[];
 }
@@ -254,7 +273,7 @@ export const searchPlanets = async (
 ): Promise<PlanetSearchResult> => {
   const normalizedQuery = query.trim();
   if (normalizedQuery.length < 1) {
-    return { cached: false, planets: [], query: normalizedQuery };
+    return { cached: false, nextCursor: null, planets: [], query: normalizedQuery };
   }
 
   return requestPlanetCollection(
@@ -294,13 +313,32 @@ export const loadPlanetsForStar = async (
     "Stellar system discovery",
   );
 
-export const loadPlanetFilterPool = async (
-  options: CollectionOptions = {},
-): Promise<PlanetSearchResult> =>
+const PLANET_PAGE_SIZE = 60;
+const STAR_PAGE_SIZE = 24;
+
+const pageQuery = (limit: number, cursor?: string | null): string =>
+  `&limit=${limit}${cursor ? `&cursor=${encodeURIComponent(cursor)}` : ""}`;
+
+export const loadPlanetFilterPool = async ({
+  cursor,
+  limit = PLANET_PAGE_SIZE,
+  ...options
+}: PageOptions = {}): Promise<PlanetSearchResult> =>
   requestPlanetCollection(
-    "/api/planets?browse=physical-controls&limit=120",
+    `/api/planets?browse=physical-controls${pageQuery(limit, cursor)}`,
     options,
     "Planet discovery",
+  );
+
+export const browseStars = async ({
+  cursor,
+  limit = STAR_PAGE_SIZE,
+  ...options
+}: PageOptions = {}): Promise<StarSearchResult> =>
+  requestStarCollection(
+    `/api/stars?browse=catalog${pageQuery(limit, cursor)}`,
+    options,
+    "Star catalog",
   );
 
 const PLANET_SURPRISE_CATEGORIES = [

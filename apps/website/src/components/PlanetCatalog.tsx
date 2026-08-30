@@ -15,6 +15,8 @@ import {
   suggestPlanetName,
   type PhysicalPlanetFilters,
 } from "../search-discovery.ts";
+import { appendUniqueById } from "../catalog-pagination.ts";
+import { useInfiniteScroll } from "../use-infinite-scroll.ts";
 import { PlanetCatalogVisual } from "./CatalogVisual.tsx";
 import sharedStyles from "./ExperienceShared.module.css";
 import catalogStyles from "./CatalogShared.module.css";
@@ -163,8 +165,11 @@ export const PlanetCatalog = ({ embedded = false, onClose, onSelect }: PlanetCat
   const dialogRef = useRef<HTMLDialogElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
   const surpriseControllerRef = useRef<AbortController | null>(null);
+  const pageControllerRef = useRef<AbortController | null>(null);
   const [query, setQuery] = useState("");
   const [planets, setPlanets] = useState<ExoplanetProfile[]>([]);
+  const [nextCursor, setNextCursor] = useState<string | null>(null);
+  const [loadingMore, setLoadingMore] = useState(false);
   const [cached, setCached] = useState(false);
   const [searchState, setSearchState] = useState<SearchState>("loading");
   const [activeCategory, setActiveCategory] = useState<string | null>(null);
@@ -182,11 +187,17 @@ export const PlanetCatalog = ({ embedded = false, onClose, onSelect }: PlanetCat
 
     return () => {
       surpriseControllerRef.current?.abort();
+      pageControllerRef.current?.abort();
       dialog?.close();
     };
   }, [embedded]);
 
   useEffect(() => {
+    pageControllerRef.current?.abort();
+    pageControllerRef.current = null;
+    setLoadingMore(false);
+    setNextCursor(null);
+
     const normalizedQuery = query.trim();
     if (portalView === "filters" && normalizedQuery.length < 1) {
       setSuggestion(null);
@@ -196,6 +207,7 @@ export const PlanetCatalog = ({ embedded = false, onClose, onSelect }: PlanetCat
         .then((result) => {
           if (controller.signal.aborted) return;
           setPlanets(result.planets);
+          setNextCursor(result.nextCursor);
           setCached(result.cached);
           setSearchState("ready");
         })
@@ -233,14 +245,8 @@ export const PlanetCatalog = ({ embedded = false, onClose, onSelect }: PlanetCat
       void loadPlanetFilterPool({ signal: controller.signal })
         .then((result) => {
           if (controller.signal.aborted) return;
-          setPlanets(
-            result.planets.toSorted((left, right) =>
-              left.name.localeCompare(right.name, undefined, {
-                numeric: true,
-                sensitivity: "base",
-              }),
-            ),
-          );
+          setPlanets(result.planets);
+          setNextCursor(result.nextCursor);
           setCached(result.cached);
           setSearchState("ready");
         })
@@ -285,6 +291,35 @@ export const PlanetCatalog = ({ embedded = false, onClose, onSelect }: PlanetCat
       controller.abort();
     };
   }, [activeCategory, portalView, query]);
+
+  const loadMore = useCallback((): void => {
+    if (!nextCursor || pageControllerRef.current) return;
+
+    const controller = new AbortController();
+    pageControllerRef.current = controller;
+    setLoadingMore(true);
+    void loadPlanetFilterPool({ cursor: nextCursor, signal: controller.signal })
+      .then((result) => {
+        if (controller.signal.aborted) return;
+        setPlanets((current) => appendUniqueById(current, result.planets));
+        setNextCursor(result.nextCursor);
+      })
+      .catch((error: unknown) => {
+        if (controller.signal.aborted) return;
+        console.error(error);
+        setNextCursor(null);
+      })
+      .finally(() => {
+        if (pageControllerRef.current !== controller) return;
+        pageControllerRef.current = null;
+        setLoadingMore(false);
+      });
+  }, [nextCursor]);
+
+  const sentinelRef = useInfiniteScroll<HTMLLIElement>({
+    enabled: searchState === "ready" && nextCursor !== null && !loadingMore,
+    onLoadMore: loadMore,
+  });
 
   const settledFilters = useDeferredValue(physicalFilters);
   const visiblePlanets = useMemo(
@@ -343,7 +378,7 @@ export const PlanetCatalog = ({ embedded = false, onClose, onSelect }: PlanetCat
               : "Loading the alphabetical planet catalog…"
         : searchState === "error"
           ? "The archive signal is unavailable. Try again shortly."
-          : `${visiblePlanets.length} confirmed ${visiblePlanets.length === 1 ? "world" : "worlds"} visible${portalView === "filters" ? ` from ${planets.length} sampled systems` : suggestion ? ` for suggested signal ${suggestion}` : activeLabel ? ` in ${activeLabel}` : " · alphabetical catalog"}${cached ? " · cached result" : ""}.`;
+          : `${visiblePlanets.length} confirmed ${visiblePlanets.length === 1 ? "world" : "worlds"} visible${portalView === "filters" ? ` from ${planets.length} sampled systems` : suggestion ? ` for suggested signal ${suggestion}` : activeLabel ? ` in ${activeLabel}` : " · alphabetical catalog"}${nextCursor ? " · scroll for more" : ""}${cached ? " · cached result" : ""}.`;
 
   return (
     <dialog
@@ -628,6 +663,16 @@ export const PlanetCatalog = ({ embedded = false, onClose, onSelect }: PlanetCat
             visiblePlanets.map((planet) => (
               <PlanetResult key={planet.id} cached={cached} onSelect={onSelect} planet={planet} />
             ))}
+          {searchState === "ready" && nextCursor !== null && (
+            <li
+              ref={sentinelRef}
+              className={cx("catalog-loading")}
+              data-testid="catalog-load-more"
+              aria-live="polite"
+            >
+              <span /> {loadingMore ? "Loading more worlds" : "Scroll for more worlds"}
+            </li>
+          )}
         </ol>
       </div>
     </dialog>
