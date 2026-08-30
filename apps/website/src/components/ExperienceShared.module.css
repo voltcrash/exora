@@ -1332,34 +1332,45 @@
 }
 
 /*
- * A touch screen has no Tab key, so clear view remains a compact toggle there. Once pressed, its
- * parent panel comes back alone: every other control stays out of the canvas until this button is
- * pressed again. Travel still wins, so the restore control cannot float over a world change.
+ * A cleared view keeps one way back that does not depend on a keyboard: the clear-view switch
+ * itself, alone over the world. Its parent panel comes back with it and nothing else does — every
+ * other control stays out of the canvas until the button is pressed again. Compact everywhere in
+ * this state, down to the icon: the way back should read as a mark on the sky, not a panel, and
+ * Tab still restores the view for anyone with a keyboard. Travel still wins, so the restore
+ * control cannot float over a world change.
  */
-@media (max-width: 760px), (pointer: coarse) and (hover: none) {
-  .chrome-hidden:not(.travelling) .mission-control {
-    visibility: visible;
-    opacity: 1;
-  }
+.chrome-hidden:not(.travelling) .mission-control {
+  visibility: visible;
+  opacity: 1;
+}
 
-  .chrome-hidden .mission-control > :not(.control-deck),
-  .chrome-hidden .control-deck > :not(.deck-utility) {
-    display: none;
-  }
+.chrome-hidden .mission-control > :not(.control-deck),
+.chrome-hidden .control-deck > :not(.deck-utility) {
+  display: none;
+}
 
-  .chrome-hidden .control-deck {
-    padding: 0;
-    border: 0;
-    background: none;
-    backdrop-filter: none;
-    box-shadow: none;
-  }
+.chrome-hidden .control-deck {
+  padding: 0;
+  border: 0;
+  background: none;
+  backdrop-filter: none;
+  box-shadow: none;
+}
 
-  .chrome-hidden .clear-view {
-    border-color: rgb(139 230 234 / 45%);
-    background: rgb(8 22 25 / 82%);
-    backdrop-filter: blur(16px);
-  }
+.chrome-hidden .clear-view {
+  min-width: 46px;
+  width: 46px;
+  grid-template-columns: 1fr;
+  place-items: center;
+  padding: 8px;
+  border-color: rgb(139 230 234 / 45%);
+  background: rgb(8 22 25 / 82%);
+  backdrop-filter: blur(16px);
+}
+
+.chrome-hidden .clear-view > span:nth-child(2),
+.chrome-hidden .clear-view kbd {
+  display: none;
 }
 
 /*
