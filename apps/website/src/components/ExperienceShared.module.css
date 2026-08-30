@@ -896,6 +896,18 @@
   letter-spacing: 0.1em;
 }
 
+/* The copy is withheld rather than drawn in the platform sans and re-drawn once IBM Plex Mono lands. */
+.loading-screen p,
+.loading-screen small {
+  opacity: 0;
+  transition: opacity 200ms ease-out;
+}
+
+.type-settled p,
+.type-settled small {
+  opacity: 1;
+}
+
 .loading-orbit {
   width: 58px;
   height: 58px;

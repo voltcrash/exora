@@ -332,7 +332,10 @@ export const StarExperience = ({
         xr={{ host, status: xrStatus }}
       />
 
-      <div className={cx("loading-screen")} role="status">
+      <div
+        className={cx(`loading-screen ${typographySettled ? "type-settled" : ""}`)}
+        role="status"
+      >
         <div className={cx("loading-orbit")} aria-hidden="true">
           <span />
         </div>

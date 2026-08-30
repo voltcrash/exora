@@ -194,7 +194,10 @@ export const RegionExperience = ({
         xr={{ host, status: xrStatus }}
       />
       {sceneState !== "error" && (sceneState === "loading" || !typographySettled) ? (
-        <div className={cx("loading-screen")} role="status">
+        <div
+          className={cx(`loading-screen ${typographySettled ? "type-settled" : ""}`)}
+          role="status"
+        >
           <div className={cx("loading-orbit")} aria-hidden="true">
             <span />
           </div>

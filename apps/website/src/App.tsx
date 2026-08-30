@@ -28,6 +28,7 @@ import { togglesClearView } from "./clear-view-shortcut.ts";
 import { togglesDiscoverShortcut } from "./discover-shortcut.ts";
 import { TRAVEL_CROSS_MS, TRAVEL_REVEAL_MS, type TravelPhase } from "./travel-transition.ts";
 import { useSceneHost } from "./use-scene-host.ts";
+import { useTypographySettled } from "./use-typography-settled.ts";
 import type { SolarRegionProfile } from "./solar-regions.ts";
 import sharedStyles from "./components/ExperienceShared.module.css";
 import { bindStyles } from "./styles/bind-styles.ts";
@@ -201,6 +202,7 @@ export const App = () => {
     restart: restartSceneHost,
     status: sceneHostStatus,
   } = useSceneHost(canvas);
+  const typographySettled = useTypographySettled();
   const [discoverOpen, setDiscoverOpen] = useState(false);
   const [activeObject, setActiveObject] = useState<ActiveObject | null>(() => {
     const parameters = new URLSearchParams(window.location.search);
@@ -466,7 +468,12 @@ export const App = () => {
         />
       ) : null}
       {!activeObject ? (
-        <div className={cx("loading-screen initial-loading")} role="status">
+        <div
+          className={cx(
+            `loading-screen initial-loading ${typographySettled ? "type-settled" : ""}`,
+          )}
+          role="status"
+        >
           <div className={cx("loading-orbit")} aria-hidden="true">
             <span />
           </div>
