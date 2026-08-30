@@ -573,7 +573,7 @@ desktopTest(
 
     await userEvent.click(page.getByRole("button", { name: "RETURN TO FEATURED WORLD" }));
 
-    await expect.element(page.getByRole("heading", { level: 1 })).toHaveTextContent("Kepler-297");
+    await expect.element(page.getByRole("heading", { level: 1 })).toHaveTextContent("GJ 674");
     expect(window.location.pathname).toBe("/");
     expect(window.location.search).toBe("");
   },

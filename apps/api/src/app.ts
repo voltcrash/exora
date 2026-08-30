@@ -430,7 +430,7 @@ export const createApp = ({
   });
 
   app.get("/api/planets/featured", async (context) => {
-    const result = await repository.findByName("Kepler-297 b");
+    const result = await repository.findByName("GJ 674 b");
 
     if (!result.value) {
       return context.json(apiError("NOT_FOUND", "Featured planet was not found."), 404);

@@ -74,7 +74,7 @@ The site serves on <http://localhost:5173> and the API on <http://localhost:8787
 GET /api/health
 GET /api/planets?q=kepler&limit=12
 GET /api/planets?category=ocean-candidates&limit=12
-GET /api/planets?host=Kepler-297
+GET /api/planets?host=GJ%20674
 GET /api/planets/featured
 GET /api/planets/:name
 GET /api/stars?q=sirius&limit=12
