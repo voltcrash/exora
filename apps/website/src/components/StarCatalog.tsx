@@ -278,7 +278,7 @@ export const StarCatalog = ({ embedded = false, onClose, onSelect }: StarCatalog
             : "Loading the alphabetical stellar catalog…"
         : searchState === "error"
           ? "The SIMBAD signal is unavailable. Try again shortly."
-          : `${stars.length} stellar ${stars.length === 1 ? "destination" : "destinations"}${suggestion ? ` for suggested signal ${suggestion}` : activeLabel ? ` in ${activeLabel}` : " · alphabetical catalog"}${nextCursor ? " · scroll for more" : ""}${cached ? " · cached result" : ""}.`;
+          : "";
 
   return (
     <dialog
@@ -411,9 +411,11 @@ export const StarCatalog = ({ embedded = false, onClose, onSelect }: StarCatalog
           </div>
         )}
         <div className={cx("catalog-meta")}>
-          <p id="star-catalog-status" role="status">
-            {status}
-          </p>
+          {status ? (
+            <p id="star-catalog-status" role="status">
+              {status}
+            </p>
+          ) : null}
           <div className={cx("catalog-view-toggle")} role="group" aria-label="Star result layout">
             <button
               type="button"

@@ -378,7 +378,7 @@ export const PlanetCatalog = ({ embedded = false, onClose, onSelect }: PlanetCat
               : "Loading the alphabetical planet catalog…"
         : searchState === "error"
           ? "The archive signal is unavailable. Try again shortly."
-          : `${visiblePlanets.length} confirmed ${visiblePlanets.length === 1 ? "world" : "worlds"} visible${portalView === "filters" ? ` from ${planets.length} sampled systems` : suggestion ? ` for suggested signal ${suggestion}` : activeLabel ? ` in ${activeLabel}` : " · alphabetical catalog"}${nextCursor ? " · scroll for more" : ""}${cached ? " · cached result" : ""}.`;
+          : "";
 
   return (
     <dialog
@@ -602,9 +602,11 @@ export const PlanetCatalog = ({ embedded = false, onClose, onSelect }: PlanetCat
           </section>
         )}
         <div className={cx("catalog-meta")}>
-          <p id="catalog-status" role="status">
-            {status}
-          </p>
+          {status ? (
+            <p id="catalog-status" role="status">
+              {status}
+            </p>
+          ) : null}
           <div className={cx("catalog-view-toggle")} role="group" aria-label="Planet result layout">
             <button
               type="button"

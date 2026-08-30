@@ -2,7 +2,6 @@ import {
   generateCustomBlackHole,
   generateCustomStar,
   generateCustomWorld,
-  WORLDGEN_VERSION,
   type CustomBlackHole,
   type CustomBlackHoleParameters,
   type CustomPlanetParameters,
@@ -623,10 +622,6 @@ export const WorldForge = ({
         )}
 
         <footer className={cx("builder-footer")} data-style-role="builder-footer">
-          <p>
-            <span aria-hidden="true" /> The generated URL includes this versioned recipe (Worldgen v
-            {WORLDGEN_VERSION}), so it reloads and can be shared.
-          </p>
           <button className={cx("generate-world")} type="submit">
             <span className={cx("button-orbit")} aria-hidden="true" />
             <span>

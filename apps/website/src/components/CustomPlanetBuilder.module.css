@@ -119,8 +119,7 @@
 }
 
 .builder-header p,
-.builder-header h2,
-.builder-footer p {
+.builder-header h2 {
   margin: 0;
 }
 
@@ -368,32 +367,11 @@
   min-height: 82px;
   display: flex;
   align-items: center;
-  justify-content: space-between;
+  justify-content: flex-end;
   gap: 22px;
   padding: 14px 28px;
   border-top: 1px solid var(--line);
   background: rgb(0 0 0 / 16%);
-}
-
-.builder-footer p {
-  display: flex;
-  align-items: center;
-  gap: 9px;
-  color: var(--faint);
-  font-family: var(--mono);
-  font-size: 7px;
-  letter-spacing: 0.04em;
-  line-height: 1.5;
-  text-transform: uppercase;
-}
-
-.builder-footer p span {
-  width: 6px;
-  height: 6px;
-  flex: 0 0 auto;
-  border-radius: 50%;
-  background: var(--accent);
-  box-shadow: 0 0 10px rgb(158 230 47 / 55%);
 }
 
 .generate-world {

@@ -87,7 +87,6 @@ export const BlackHoleCatalog = ({
   const [query, setQuery] = useState("");
   const [observed, setObserved] = useState<readonly BlackHoleProfile[]>([]);
   const [archiveState, setArchiveState] = useState<ArchiveState>("loading");
-  const [stale, setStale] = useState(false);
   const [activeCategory, setActiveCategory] = useState<string | null>(null);
   const [portalView, setPortalView] = useState<PortalView>("collections");
   const [resultView, setResultView] = useState<"gallery" | "list">("gallery");
@@ -104,7 +103,6 @@ export const BlackHoleCatalog = ({
       .then((result) => {
         if (controller.signal.aborted) return;
         setObserved(result.blackHoles);
-        setStale(result.stale);
         setArchiveState("ready");
       })
       .catch((error: unknown) => {
@@ -132,10 +130,6 @@ export const BlackHoleCatalog = ({
     values: PORTAL_VIEWS,
   });
 
-  const activeLabel = [...BLACK_HOLE_COLLECTIONS, ...BLACK_HOLE_CATEGORIES].find(
-    (entry) => entry.id === activeCategory,
-  )?.label;
-
   const takeMeSomewhere = (): void => {
     const pool = records.length > 0 ? records : catalog;
     const destination = pool[Math.floor(Math.random() * pool.length)];
@@ -145,15 +139,9 @@ export const BlackHoleCatalog = ({
   const status =
     archiveState === "loading"
       ? "Loading observed horizons from the compact-object archive…"
-      : `${records.length} observed ${records.length === 1 ? "horizon" : "horizons"}${
-          query.trim() ? ` matching “${query.trim()}”` : activeLabel ? ` in ${activeLabel}` : ""
-        }${
-          archiveState === "featured-only"
-            ? " · archive unreachable, showing curated horizons"
-            : stale
-              ? " · cached archive snapshot"
-              : ""
-        }.`;
+      : archiveState === "featured-only"
+        ? "Archive unreachable, showing curated horizons."
+        : "";
 
   return (
     <dialog
@@ -279,9 +267,11 @@ export const BlackHoleCatalog = ({
         )}
 
         <div className={cx("catalog-meta")}>
-          <p id="black-hole-catalog-status" role="status">
-            {status}
-          </p>
+          {status ? (
+            <p id="black-hole-catalog-status" role="status">
+              {status}
+            </p>
+          ) : null}
           <div
             className={cx("catalog-view-toggle")}
             role="group"

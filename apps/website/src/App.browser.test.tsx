@@ -844,10 +844,6 @@ desktopTest("the World Forge opens and builds a world the page then shows", asyn
   await expect
     .element(page.getByRole("heading", { name: "Make the next discovery." }))
     .toBeVisible();
-  await expect
-    .element(page.getByText(/generated URL includes this versioned recipe/i))
-    .toBeVisible();
-
   await userEvent.click(page.getByRole("button", { name: /GENERATE/i }).first());
 
   await expect.element(page.getByText("GENERATED WORLD")).toBeVisible();

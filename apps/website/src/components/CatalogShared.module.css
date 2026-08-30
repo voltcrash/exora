@@ -1062,6 +1062,7 @@
 
 .catalog-view-toggle {
   display: flex;
+  margin-inline-start: auto;
   gap: 5px;
   padding: 3px;
   border: 1px solid var(--line);
