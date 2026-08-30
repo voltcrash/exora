@@ -89,15 +89,12 @@
 }
 
 .space-haze {
-  background:
-    radial-gradient(circle at 53% 45%, transparent 21%, rgb(0 0 0 / 8%) 54%, rgb(0 0 0 / 62%) 112%),
-    linear-gradient(
-      90deg,
-      rgb(1 4 5 / 72%) 0%,
-      transparent 29%,
-      transparent 71%,
-      rgb(1 4 5 / 64%) 100%
-    );
+  background: radial-gradient(
+    circle at 53% 45%,
+    transparent 21%,
+    rgb(0 0 0 / 8%) 54%,
+    rgb(0 0 0 / 62%) 112%
+  );
 }
 
 .viewport-grid {
@@ -740,37 +737,13 @@
 .star-experience .space-haze {
   background:
     radial-gradient(circle at 50% 48%, rgb(255 150 45 / 4%), transparent 26%),
-    radial-gradient(
-      circle at 53% 45%,
-      transparent 20%,
-      rgb(0 0 0 / 11%) 56%,
-      rgb(0 0 0 / 68%) 112%
-    ),
-    linear-gradient(
-      90deg,
-      rgb(1 3 5 / 76%) 0%,
-      transparent 30%,
-      transparent 70%,
-      rgb(1 3 5 / 68%) 100%
-    );
+    radial-gradient(circle at 53% 45%, transparent 20%, rgb(0 0 0 / 11%) 56%, rgb(0 0 0 / 68%) 112%);
 }
 
 .black-hole-experience .space-haze {
   background:
     radial-gradient(circle at 50% 48%, rgb(149 89 225 / 7%), transparent 23%),
-    radial-gradient(
-      circle at 52% 47%,
-      transparent 17%,
-      rgb(0 0 0 / 18%) 48%,
-      rgb(0 0 0 / 78%) 112%
-    ),
-    linear-gradient(
-      90deg,
-      rgb(1 1 4 / 84%) 0%,
-      transparent 31%,
-      transparent 69%,
-      rgb(1 1 4 / 78%) 100%
-    );
+    radial-gradient(circle at 52% 47%, transparent 17%, rgb(0 0 0 / 18%) 48%, rgb(0 0 0 / 78%) 112%);
 }
 
 .black-hole-loading {
