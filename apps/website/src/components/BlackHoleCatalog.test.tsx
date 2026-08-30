@@ -1,28 +1,25 @@
-import { generateProceduralBlackHoles } from "@exora/worldgen";
 import { renderToStaticMarkup } from "react-dom/server";
 import { expect, test, vi } from "vite-plus/test";
-import { BLACK_HOLES } from "../black-holes.ts";
-import { BlackHoleCard } from "./BlackHoleCatalog.tsx";
+import { BLACK_HOLES, findBlackHole } from "../black-holes.ts";
+import { BlackHoleResult } from "./BlackHoleCatalog.tsx";
 
-test("observed cards carry an OBSERVED badge and their real source link", () => {
+test("a result carries its catalog identity, family, status and measured mass", () => {
   const markup = renderToStaticMarkup(
-    <BlackHoleCard blackHole={BLACK_HOLES[0]!} index={0} onSelect={vi.fn()} />,
+    <BlackHoleResult blackHole={BLACK_HOLES[0]!} onSelect={vi.fn()} />,
   );
 
-  expect(markup).toContain("OBSERVED");
-  expect(markup).toContain('href="https://www.nasa.gov/');
+  expect(markup).toContain("Sagittarius A*");
+  expect(markup).toContain("Sgr A*");
+  expect(markup).toContain("SUPERMASSIVE · CONFIRMED");
+  expect(markup).toContain("4.3 million M☉");
 });
 
-test("procedural cards are labeled and never render a source link", () => {
-  const synthetic = generateProceduralBlackHoles({ count: 1, seed: 42 })[0]!;
+test("an imaged horizon says so rather than repeating its milestone", () => {
   const markup = renderToStaticMarkup(
-    <BlackHoleCard blackHole={synthetic} index={0} onSelect={vi.fn()} />,
+    <BlackHoleResult blackHole={findBlackHole("M87*")!} onSelect={vi.fn()} />,
   );
 
-  expect(markup).toContain("PROCEDURAL");
-  expect(markup).toContain("EXORA SYNTHETIC 0001");
-  expect(markup).not.toContain("href=");
-  expect(markup).not.toContain("OBSERVED");
+  expect(markup).toContain("Directly imaged horizon");
 });
 
 test("an observed candidate with unknown mass renders an honest unavailable state", () => {
@@ -31,11 +28,10 @@ test("an observed candidate with unknown mass renders an honest unavailable stat
     massSolar: null,
     status: "candidate" as const,
   };
-  const markup = renderToStaticMarkup(
-    <BlackHoleCard blackHole={candidate} index={0} onSelect={vi.fn()} />,
-  );
+  const markup = renderToStaticMarkup(<BlackHoleResult blackHole={candidate} onSelect={vi.fn()} />);
 
   expect(markup).toContain("Mass unavailable");
+  expect(markup).toContain("CANDIDATE");
   expect(markup).not.toContain("NaN");
   expect(markup).not.toContain("undefined");
 });

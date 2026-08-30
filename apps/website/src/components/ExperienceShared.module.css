@@ -986,17 +986,6 @@
 }
 
 @media (max-width: 760px) {
-  .black-hole-catalog-hero {
-    grid-template-columns: 1fr;
-    gap: 12px;
-    margin-inline: 18px;
-  }
-
-  .black-hole-grid {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-    padding-inline: 18px;
-  }
-
   .black-hole-method-note {
     margin-inline: 18px;
   }
@@ -1421,28 +1410,6 @@
 }
 
 @media (max-width: 520px) {
-  .black-hole-catalog-hero {
-    margin: 8px 12px 12px;
-    padding: 16px;
-  }
-
-  .black-hole-catalog-hero h2 {
-    font-size: 19px;
-  }
-
-  .black-hole-catalog-hero > p {
-    font-size: 8px;
-  }
-
-  .black-hole-grid {
-    grid-template-columns: 1fr;
-    padding: 0 12px 14px;
-  }
-
-  .black-hole-card .black-hole-catalog-visual {
-    height: 148px;
-  }
-
   .black-hole-method-note {
     margin-inline: 12px;
   }

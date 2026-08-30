@@ -1,25 +1,35 @@
-import { generateProceduralBlackHoles } from "@exora/worldgen";
-import { useEffect, useRef, useState } from "react";
+import { memo, useEffect, useMemo, useRef, useState } from "react";
 import { loadObservedBlackHoles } from "../api-client.ts";
 import {
   BLACK_HOLES,
+  BLACK_HOLE_CATEGORIES,
+  BLACK_HOLE_COLLECTIONS,
   blackHoleKindLabel,
+  blackHoleNotableTrait,
+  collectBlackHoles,
   formatBlackHoleMass,
+  mergeBlackHoles,
+  searchBlackHoles,
   type BlackHoleProfile,
 } from "../black-holes.ts";
 import { bindStyles } from "../styles/bind-styles.ts";
+import { useTabList } from "../use-tab-list.ts";
 import catalogStyles from "./CatalogShared.module.css";
 import { BlackHoleCatalogVisual } from "./CatalogVisual.tsx";
 import sharedStyles from "./ExperienceShared.module.css";
 
 const cx = bindStyles(sharedStyles, catalogStyles);
-type AtlasView = "featured" | "observed" | "procedural";
 
 interface BlackHoleCatalogProps {
   embedded?: boolean;
   onClose: () => void;
   onSelect: (blackHole: BlackHoleProfile) => void;
 }
+
+type ArchiveState = "loading" | "ready" | "featured-only";
+type PortalView = "collections" | "categories";
+
+const PORTAL_VIEWS: readonly PortalView[] = ["collections", "categories"];
 
 const formatDistance = (blackHole: BlackHoleProfile): string => {
   if (blackHole.distanceLightYears === null) {
@@ -35,64 +45,38 @@ const formatDistance = (blackHole: BlackHoleProfile): string => {
   return `${blackHole.distanceLightYears.toLocaleString("en-US", { maximumFractionDigits: 0 })} LY`;
 };
 
-export const BlackHoleCard = ({
-  blackHole,
-  index,
-  onSelect,
-}: {
-  blackHole: BlackHoleProfile;
-  index: number;
-  onSelect: (blackHole: BlackHoleProfile) => void;
-}) => (
-  <article className={cx("black-hole-card")}>
-    <button type="button" onClick={() => onSelect(blackHole)}>
-      <BlackHoleCatalogVisual blackHole={blackHole} />
-      <span className={cx("black-hole-card-index")}>{String(index + 1).padStart(2, "0")}</span>
-      <span className={cx("black-hole-card-copy")}>
-        <small>{blackHole.milestone}</small>
-        <strong>{blackHole.name}</strong>
-        <span>
-          {blackHoleKindLabel(blackHole)} · {blackHole.host}
+export const BlackHoleResult = memo(
+  ({
+    blackHole,
+    onSelect,
+  }: {
+    blackHole: BlackHoleProfile;
+    onSelect: (blackHole: BlackHoleProfile) => void;
+  }) => (
+    <li>
+      <button className={cx("catalog-result")} type="button" onClick={() => onSelect(blackHole)}>
+        <span className={cx("result-preview")}>
+          <BlackHoleCatalogVisual blackHole={blackHole} />
         </span>
-      </span>
-      <span className={cx("black-hole-provenance")}>
-        {blackHole.provenance === "observed" ? "OBSERVED" : "PROCEDURAL"} ·{" "}
-        {blackHole.status.toUpperCase()}
-      </span>
-      <span className={cx("black-hole-card-metrics")}>
-        <span>{formatBlackHoleMass(blackHole.massSolar)}</span>
-        <span>{formatDistance(blackHole)}</span>
-      </span>
-      <span className={cx("black-hole-card-action")}>CROSS THE HORIZON ↗</span>
-    </button>
-    {blackHole.provenance === "observed" && blackHole.source.url ? (
-      <a href={blackHole.source.url} target="_blank" rel="noreferrer">
-        SOURCE · {blackHole.source.archive} · {blackHole.source.retrievedOn} ↗
-      </a>
-    ) : null}
-  </article>
+        <span className={cx("result-marker black-hole-result-marker")} aria-hidden="true" />
+        <span className={cx("result-identity")}>
+          <strong>{blackHole.name}</strong>
+          <small>
+            {blackHole.catalogDesignation} · {blackHole.host}
+          </small>
+          <span className={cx("result-trait")}>{blackHoleNotableTrait(blackHole)}</span>
+        </span>
+        <span className={cx("result-metrics")}>
+          <small>
+            {blackHoleKindLabel(blackHole).toUpperCase()} · {blackHole.status.toUpperCase()}
+          </small>
+          <strong>{formatBlackHoleMass(blackHole.massSolar)}</strong>
+        </span>
+        <span className={cx("result-state")}>{formatDistance(blackHole)} · EXPLORE</span>
+      </button>
+    </li>
+  ),
 );
-
-const viewCopy: Record<AtlasView, { eyebrow: string; summary: string; title: string }> = {
-  featured: {
-    eyebrow: "THE HORIZON FIVE",
-    summary:
-      "Five celebrated real black holes. Measurements remain observational; each live scene is an interpretive gravitational-lensing visualization.",
-    title: "Where light loses the way out.",
-  },
-  observed: {
-    eyebrow: "BLACKCAT · CDS/VIZIER",
-    summary:
-      "Cataloged stellar-mass X-ray binaries. Dynamical systems are marked confirmed; other transients remain candidates and may have no reliable mass.",
-    title: "Observed systems, honestly labeled.",
-  },
-  procedural: {
-    eyebrow: "EXORA CUSTOM GENERATOR",
-    summary:
-      "Deterministic synthetic parameter sets for exploration. These are not astronomical discoveries and their values are not telescope measurements.",
-    title: "Invent a horizon, not a discovery.",
-  },
-};
 
 export const BlackHoleCatalog = ({
   embedded = false,
@@ -100,17 +84,13 @@ export const BlackHoleCatalog = ({
   onSelect,
 }: BlackHoleCatalogProps) => {
   const dialogRef = useRef<HTMLDialogElement>(null);
-  const [view, setView] = useState<AtlasView>("featured");
-  const [observed, setObserved] = useState<BlackHoleProfile[]>([]);
-  const [observedState, setObservedState] = useState<"idle" | "loading" | "ready" | "error">(
-    "idle",
-  );
-  const [observedStale, setObservedStale] = useState(false);
-  const [seed, setSeed] = useState(42);
-  const [count, setCount] = useState(8);
-  const [procedural, setProcedural] = useState(() =>
-    generateProceduralBlackHoles({ count: 8, seed: 42 }),
-  );
+  const [query, setQuery] = useState("");
+  const [observed, setObserved] = useState<readonly BlackHoleProfile[]>([]);
+  const [archiveState, setArchiveState] = useState<ArchiveState>("loading");
+  const [stale, setStale] = useState(false);
+  const [activeCategory, setActiveCategory] = useState<string | null>(null);
+  const [portalView, setPortalView] = useState<PortalView>("collections");
+  const [resultView, setResultView] = useState<"gallery" | "list">("gallery");
 
   useEffect(() => {
     const dialog = dialogRef.current;
@@ -119,37 +99,61 @@ export const BlackHoleCatalog = ({
   }, [embedded]);
 
   useEffect(() => {
-    if (view !== "observed" || observedState !== "idle") return;
     const controller = new AbortController();
-    setObservedState("loading");
     void loadObservedBlackHoles(50, { signal: controller.signal })
       .then((result) => {
+        if (controller.signal.aborted) return;
         setObserved(result.blackHoles);
-        setObservedStale(result.stale);
-        setObservedState("ready");
+        setStale(result.stale);
+        setArchiveState("ready");
       })
-      .catch(() => {
-        setObservedState(controller.signal.aborted ? "idle" : "error");
+      .catch((error: unknown) => {
+        if (controller.signal.aborted) return;
+        console.error(error);
+        setArchiveState("featured-only");
       });
     return () => controller.abort();
-  }, [view]);
+  }, []);
 
-  const records = view === "featured" ? BLACK_HOLES : view === "observed" ? observed : procedural;
-  const copy = viewCopy[view];
-  const generate = (): void => {
-    const safeCount = Math.max(1, Math.min(Math.trunc(count), 100));
-    const safeSeed = Number.isFinite(seed) ? Math.trunc(seed) : 42;
-    setCount(safeCount);
-    setSeed(safeSeed);
-    setProcedural(generateProceduralBlackHoles({ count: safeCount, seed: safeSeed }));
+  const catalog = useMemo(() => mergeBlackHoles(BLACK_HOLES, observed), [observed]);
+  const records = useMemo(
+    () =>
+      activeCategory
+        ? collectBlackHoles(searchBlackHoles(catalog, query), activeCategory)
+        : searchBlackHoles(catalog, query),
+    [activeCategory, catalog, query],
+  );
+
+  const tabs = useTabList({
+    label: "Black hole discovery views",
+    list: "black-hole-discovery",
+    onSelect: setPortalView,
+    value: portalView,
+    values: PORTAL_VIEWS,
+  });
+
+  const activeLabel = [...BLACK_HOLE_COLLECTIONS, ...BLACK_HOLE_CATEGORIES].find(
+    (entry) => entry.id === activeCategory,
+  )?.label;
+
+  const takeMeSomewhere = (): void => {
+    const pool = records.length > 0 ? records : catalog;
+    const destination = pool[Math.floor(Math.random() * pool.length)];
+    if (destination) onSelect(destination);
   };
-  const generateMore = (): void => {
-    const safeSeed = Number.isFinite(seed) ? Math.trunc(seed) : 42;
-    const nextCount = Math.min((Number.isFinite(count) ? Math.trunc(count) : 8) + 8, 100);
-    setCount(nextCount);
-    setSeed(safeSeed);
-    setProcedural(generateProceduralBlackHoles({ count: nextCount, seed: safeSeed }));
-  };
+
+  const status =
+    archiveState === "loading"
+      ? "Loading observed horizons from the compact-object archive…"
+      : `${records.length} observed ${records.length === 1 ? "horizon" : "horizons"}${
+          query.trim() ? ` matching “${query.trim()}”` : activeLabel ? ` in ${activeLabel}` : ""
+        }${
+          archiveState === "featured-only"
+            ? " · archive unreachable, showing curated horizons"
+            : stale
+              ? " · cached archive snapshot"
+              : ""
+        }.`;
 
   return (
     <dialog
@@ -170,7 +174,7 @@ export const BlackHoleCatalog = ({
         {!embedded ? (
           <div className={cx("catalog-header")}>
             <div>
-              <p>HYBRID BLACK-HOLE ATLAS</p>
+              <p>DISCOVERY PORTAL · COMPACT OBJECT ATLAS</p>
               <h2 id="black-hole-catalog-title">Choose an event horizon</h2>
             </div>
             <button
@@ -184,105 +188,145 @@ export const BlackHoleCatalog = ({
           </div>
         ) : null}
 
-        <div className={cx("black-hole-tabs")} role="tablist" aria-label="Black hole sources">
-          {(["featured", "observed", "procedural"] as const).map((tab) => (
-            <button
-              id={`black-hole-tab-${tab}`}
-              key={tab}
-              type="button"
-              role="tab"
-              aria-controls={`black-hole-panel-${tab}`}
-              aria-selected={view === tab}
-              tabIndex={view === tab ? 0 : -1}
-              onClick={() => setView(tab)}
-            >
-              {tab.toUpperCase()}
-            </button>
-          ))}
+        <div className={cx("catalog-search")} data-style-role="catalog-search">
+          <span className={cx("black-hole-search-mark")} aria-hidden="true" />
+          <input
+            type="search"
+            value={query}
+            onChange={(event) => {
+              setActiveCategory(null);
+              setQuery(event.target.value);
+            }}
+            placeholder="Type a name, catalog ID, or host galaxy"
+            autoComplete="off"
+            aria-controls="black-hole-search-results"
+            aria-describedby="black-hole-catalog-status"
+          />
+          <button className={cx("random-world")} type="button" onClick={takeMeSomewhere}>
+            <span aria-hidden="true">✦</span>
+            Random horizon
+          </button>
         </div>
 
         {!embedded ? (
-          <section
-            className={cx("black-hole-catalog-hero")}
-            aria-labelledby="black-hole-atlas-title"
-          >
-            <div>
-              <p>{copy.eyebrow}</p>
-              <h2 id="black-hole-atlas-title">{copy.title}</h2>
-            </div>
-            <p>{copy.summary}</p>
-          </section>
-        ) : null}
-
-        {view === "procedural" ? (
-          <div className={cx("black-hole-generator-controls")}>
-            <label>
-              Seed
-              <input
-                aria-label="Procedural seed"
-                type="number"
-                value={seed}
-                onChange={(event) => setSeed(event.currentTarget.valueAsNumber)}
-              />
-            </label>
-            <label>
-              Count
-              <input
-                aria-label="Procedural count"
-                type="number"
-                min="1"
-                max="100"
-                value={count}
-                onChange={(event) => setCount(event.currentTarget.valueAsNumber)}
-              />
-            </label>
-            <button type="button" onClick={generate}>
-              GENERATE
-            </button>
-            <button type="button" onClick={generateMore}>
-              GENERATE MORE
-            </button>
+          <div className={cx("discovery-intro")}>
+            <span>
+              {portalView === "collections" ? "CURATED JOURNEYS" : "EXPLORE BY HORIZON FAMILY"}
+            </span>
+            <small>Every record here is an observed system, not a synthetic one</small>
           </div>
         ) : null}
 
-        <div
-          id={`black-hole-panel-${view}`}
-          role="tabpanel"
-          aria-labelledby={`black-hole-tab-${view}`}
-        >
-          {view === "observed" && observedState === "loading" ? (
-            <p className={cx("black-hole-catalog-state")} role="status">
-              LOADING BLACKCAT OBSERVATIONS…
-            </p>
-          ) : null}
-          {view === "observed" && observedState === "error" ? (
-            <p className={cx("black-hole-catalog-state")} role="alert">
-              THE OBSERVED CATALOG COULD NOT BE LOADED.
-            </p>
-          ) : null}
-          {view === "observed" && observedState === "ready" && observed.length === 0 ? (
-            <p className={cx("black-hole-catalog-state")}>NO OBSERVED RECORDS ARE AVAILABLE.</p>
-          ) : null}
-          {view === "observed" && observedStale ? (
-            <p className={cx("black-hole-catalog-state")}>
-              USING A CACHED OR CHECKED-IN BLACKCAT SNAPSHOT.
-            </p>
-          ) : null}
-          {records.length > 0 ? (
-            <ol className={cx("black-hole-grid")}>
-              {records.map((blackHole, index) => (
-                <li key={blackHole.id}>
-                  <BlackHoleCard blackHole={blackHole} index={index} onSelect={onSelect} />
-                </li>
-              ))}
-            </ol>
-          ) : null}
+        <div className={cx("discovery-tabs")} {...tabs.tabListProps}>
+          <button {...tabs.tabProps("collections")} onClick={() => setPortalView("collections")}>
+            Curated collections
+          </button>
+          <button {...tabs.tabProps("categories")} onClick={() => setPortalView("categories")}>
+            Horizon types
+          </button>
         </div>
 
+        {portalView === "collections" ? (
+          <div className={cx("collection-grid")} {...tabs.panelProps("collections")}>
+            {BLACK_HOLE_COLLECTIONS.map((collection) => (
+              <button
+                key={collection.id}
+                className={cx(
+                  `collection-card${activeCategory === collection.id ? " active" : ""}`,
+                )}
+                type="button"
+                aria-pressed={activeCategory === collection.id}
+                onClick={() => {
+                  setQuery("");
+                  setActiveCategory(activeCategory === collection.id ? null : collection.id);
+                }}
+              >
+                <span className={cx("collection-index")}>{collection.index}</span>
+                <span className={cx("collection-copy")}>
+                  <small>{collection.tag}</small>
+                  <strong>{collection.label}</strong>
+                  <span>{collection.note}</span>
+                </span>
+                <span className={cx("collection-launch")} aria-hidden="true">
+                  EXPLORE ↗
+                </span>
+              </button>
+            ))}
+          </div>
+        ) : (
+          <div className={cx("discovery-grid")} {...tabs.panelProps("categories")}>
+            {BLACK_HOLE_CATEGORIES.map((category) => (
+              <button
+                key={category.id}
+                className={cx(`discovery-card${activeCategory === category.id ? " active" : ""}`)}
+                type="button"
+                aria-pressed={activeCategory === category.id}
+                onClick={() => {
+                  setQuery("");
+                  setActiveCategory(activeCategory === category.id ? null : category.id);
+                }}
+              >
+                <span className={cx("discovery-icon")} aria-hidden="true">
+                  {category.icon}
+                </span>
+                <span>
+                  <strong>{category.label}</strong>
+                  <small>{category.note}</small>
+                </span>
+                <span className={cx("discovery-arrow")} aria-hidden="true">
+                  ↗
+                </span>
+              </button>
+            ))}
+          </div>
+        )}
+
+        <div className={cx("catalog-meta")}>
+          <p id="black-hole-catalog-status" role="status">
+            {status}
+          </p>
+          <div
+            className={cx("catalog-view-toggle")}
+            role="group"
+            aria-label="Black hole result layout"
+          >
+            <button
+              type="button"
+              aria-pressed={resultView === "gallery"}
+              onClick={() => setResultView("gallery")}
+            >
+              ▦ Gallery
+            </button>
+            <button
+              type="button"
+              aria-pressed={resultView === "list"}
+              onClick={() => setResultView("list")}
+            >
+              ☰ List
+            </button>
+          </div>
+        </div>
+
+        <ol id="black-hole-search-results" className={cx(`catalog-results ${resultView}-view`)}>
+          {archiveState === "loading" && records.length === 0 && (
+            <li className={cx("catalog-loading")}>
+              <span /> Resolving observed horizons
+            </li>
+          )}
+          {archiveState !== "loading" && records.length === 0 && (
+            <li className={cx("catalog-empty")}>
+              No observed black hole matched that name or family.
+            </li>
+          )}
+          {records.map((blackHole) => (
+            <BlackHoleResult key={blackHole.id} blackHole={blackHole} onSelect={onSelect} />
+          ))}
+        </ol>
+
         <p className={cx("black-hole-method-note")}>
-          OBSERVED RECORDS RETAIN CATALOG ATTRIBUTION. PROCEDURAL RECORDS ARE SYNTHETIC EXORA
-          PARAMETER SETS, NEVER CLAIMED AS DISCOVERIES OR TELESCOPE MEASUREMENTS. LIVE SCENES REMAIN
-          INTERPRETIVE.
+          EVERY RECORD RETAINS ITS CATALOG ATTRIBUTION. MASSES AND DISTANCES ARE PUBLISHED
+          MEASUREMENTS; UNMEASURED VALUES STAY UNAVAILABLE RATHER THAN ESTIMATED. LIVE SCENES REMAIN
+          INTERPRETIVE GRAVITATIONAL-LENSING VISUALIZATIONS.
         </p>
       </div>
     </dialog>

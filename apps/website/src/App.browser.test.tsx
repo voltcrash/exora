@@ -646,27 +646,46 @@ desktopTest("the black-hole atlas opens and travels to a sourced horizon", async
   expect(window.location.search).toBe("?blackHole=Sagittarius%20A*");
 });
 
-desktopTest("the hybrid atlas separates observed candidates from procedural objects", async () => {
+desktopTest("the atlas folds archive candidates in beside the curated horizons", async () => {
   stubArchive();
   mountApp();
   await openDiscoverSection("Black Holes");
 
-  await userEvent.click(page.getByRole("tab", { name: "OBSERVED" }));
-  await expect.element(page.getByRole("button", { name: /GS 2023\+338/ })).toBeVisible();
-  await expect.element(page.getByText("OBSERVED · CANDIDATE")).toBeVisible();
-  await expect.element(page.getByText("Mass unavailable")).toBeVisible();
+  const candidate = page.getByRole("button", { name: /GS 2023\+338/ });
+  await expect.element(candidate).toBeVisible();
+  await expect.element(page.getByText("STELLAR MASS · CANDIDATE").first()).toBeVisible();
+  await expect.element(page.getByText("Mass unavailable").first()).toBeVisible();
+  await expect.element(page.getByRole("button", { name: /Sagittarius A\*/ })).toBeVisible();
+});
 
-  await userEvent.click(page.getByRole("tab", { name: "PROCEDURAL" }));
-  await expect.element(page.getByText("PROCEDURAL · SYNTHETIC").first()).toBeVisible();
-  await expect.element(page.getByRole("button", { name: /EXORA SYNTHETIC 0001/ })).toBeVisible();
-  await userEvent.click(page.getByRole("button", { name: "GENERATE MORE" }));
-  const synthetic = page.getByRole("button", { name: /EXORA SYNTHETIC 0016/ });
-  await expect.element(synthetic).toBeVisible();
-  await userEvent.click(synthetic);
-  await expect
-    .element(page.getByRole("heading", { level: 1 }))
-    .toHaveTextContent("EXORA SYNTHETIC 0016");
-  expect(window.location.search).toBe("?blackHole=exora-synthetic-42-0016");
+desktopTest("a black-hole collection narrows the atlas to its own horizons", async () => {
+  stubArchive();
+  mountApp();
+  await openDiscoverSection("Black Holes");
+  await expect.element(page.getByRole("button", { name: /GS 2023\+338/ })).toBeVisible();
+
+  await userEvent.click(page.getByRole("button", { name: /Seen with our own eyes/ }));
+  await expect.element(page.getByRole("button", { name: /M87\*/ })).toBeVisible();
+  await expect.element(page.getByRole("button", { name: /GS 2023\+338/ })).not.toBeInTheDocument();
+
+  await userEvent.click(page.getByRole("tab", { name: "Horizon types" }));
+  await userEvent.click(page.getByRole("button", { name: /Stellar mass/ }));
+  await expect.element(page.getByRole("button", { name: /Cygnus X-1/ })).toBeVisible();
+  await expect.element(page.getByRole("button", { name: /M87\*/ })).not.toBeInTheDocument();
+});
+
+desktopTest("the atlas search resolves a horizon by its catalog alias", async () => {
+  stubArchive();
+  mountApp();
+  await openDiscoverSection("Black Holes");
+
+  await userEvent.fill(page.getByPlaceholder("Type a name, catalog ID, or host galaxy"), "sgr a");
+  const destination = page.getByRole("button", { name: /Sagittarius A\*/ });
+  await expect.element(destination).toBeVisible();
+  await expect.element(page.getByRole("button", { name: /TON 618/ })).not.toBeInTheDocument();
+
+  await userEvent.click(destination);
+  await expect.element(page.getByRole("heading", { level: 1 })).toHaveTextContent("Sagittarius A*");
 });
 
 /*

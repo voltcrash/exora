@@ -1,10 +1,14 @@
 import { expect, test } from "vite-plus/test";
 import {
   BLACK_HOLES,
+  blackHoleNotableTrait,
+  collectBlackHoles,
   findBlackHole,
   findProceduralBlackHole,
   formatBlackHoleMass,
+  mergeBlackHoles,
   schwarzschildDiameterKilometers,
+  searchBlackHoles,
 } from "./black-holes.ts";
 
 test("the curated black-hole catalog contains five unique real destinations", () => {
@@ -41,4 +45,47 @@ test("reconstructs a procedural deep link from its deterministic ID", () => {
 
 test("reports unavailable rather than formatting a fake observed mass", () => {
   expect(formatBlackHoleMass(null)).toBe("Mass unavailable");
+});
+
+test("collections group the catalog by how each horizon was measured", () => {
+  const imaged = collectBlackHoles(BLACK_HOLES, "imaged-horizons");
+  expect(imaged.map(({ name }) => name)).toEqual(["M87*", "Sagittarius A*"]);
+
+  const nearest = collectBlackHoles(BLACK_HOLES, "nearest-horizons");
+  expect(nearest[0]?.name).toBe("Gaia BH1");
+
+  const heaviest = collectBlackHoles(BLACK_HOLES, "heaviest-engines");
+  expect(heaviest[0]?.name).toBe("TON 618");
+
+  expect(
+    collectBlackHoles(BLACK_HOLES, "stellar-mass").every(({ kind }) => kind === "stellar-mass"),
+  ).toBe(true);
+});
+
+test("search matches names, aliases and host galaxies without punctuation sensitivity", () => {
+  expect(searchBlackHoles(BLACK_HOLES, "sgr a*").map(({ name }) => name)).toEqual([
+    "Sagittarius A*",
+  ]);
+  expect(searchBlackHoles(BLACK_HOLES, "messier 87").map(({ name }) => name)).toEqual(["M87*"]);
+  expect(searchBlackHoles(BLACK_HOLES, "").map(({ name }) => name)).toEqual([
+    "Sagittarius A*",
+    "M87*",
+    "TON 618",
+    "Cygnus X-1",
+    "Gaia BH1",
+  ]);
+  expect(searchBlackHoles(BLACK_HOLES, "nothing here")).toEqual([]);
+});
+
+test("merging the archive over the curated five keeps one record per horizon", () => {
+  const duplicate = { ...BLACK_HOLES[0]!, id: "blackcat-sgr-a-star" };
+  const merged = mergeBlackHoles(BLACK_HOLES, [duplicate]);
+
+  expect(merged).toHaveLength(BLACK_HOLES.length);
+  expect(merged.find(({ name }) => name === "Sagittarius A*")?.id).toBe("sagittarius-a-star");
+});
+
+test("a notable trait names the observation rather than repeating the mass", () => {
+  expect(blackHoleNotableTrait(findBlackHole("Sagittarius A*")!)).toBe("Directly imaged horizon");
+  expect(blackHoleNotableTrait(findBlackHole("Cygnus X-1")!)).toBe("Feeding on a companion star");
 });

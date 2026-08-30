@@ -43,256 +43,80 @@
     radial-gradient(circle at 86% 78%, rgb(220 137 69 / 8%), transparent 32%), #07070b;
 }
 
-.black-hole-tabs,
-.black-hole-generator-controls {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 8px;
-  margin: 18px 26px 0;
-}
-
-.black-hole-tabs button,
-.black-hole-generator-controls button,
-.black-hole-generator-controls input {
-  border: 1px solid rgb(190 155 255 / 20%);
-  border-radius: 999px;
-  color: #a99bbd;
-  background: rgb(18 14 25 / 72%);
-  font: 7px var(--mono);
-  letter-spacing: 0.1em;
-}
-
-.black-hole-tabs button,
-.black-hole-generator-controls button {
-  padding: 8px 13px;
-  cursor: pointer;
-}
-
-.black-hole-tabs button[aria-selected="true"],
-.black-hole-generator-controls button:hover {
-  border-color: rgb(197 164 255 / 60%);
-  color: #f2eaff;
-  background: rgb(95 62 147 / 28%);
-}
-
-.black-hole-generator-controls {
-  align-items: end;
-  margin-top: 0;
-  margin-bottom: 18px;
-}
-
-.black-hole-generator-controls label {
-  display: grid;
-  gap: 5px;
-  color: #796e89;
-  font: 6px var(--mono);
-  letter-spacing: 0.1em;
-  text-transform: uppercase;
-}
-
-.black-hole-generator-controls input {
-  width: 90px;
-  padding: 7px 10px;
-  border-radius: 8px;
-}
-
-.black-hole-provenance {
-  grid-column: 1 / -1;
-  align-self: center;
-  justify-self: end;
-  padding: 4px 7px;
-  border: 1px solid rgb(197 164 255 / 22%);
-  border-radius: 999px;
+.black-hole-catalog .catalog-header p,
+.black-hole-catalog .result-state {
   color: #c7a8ff;
-  font: 6px var(--mono);
-  letter-spacing: 0.08em;
 }
 
-.black-hole-catalog-state {
-  margin: 12px 26px 22px;
-  padding: 18px;
-  border: 1px solid rgb(190 155 255 / 12%);
-  border-radius: 12px;
-  color: #8e879b;
-  font: 7px/1.6 var(--mono);
-  letter-spacing: 0.08em;
-  text-align: center;
+.black-hole-catalog .catalog-search:focus-within {
+  border-color: rgb(190 155 255 / 52%);
+  box-shadow: 0 0 0 3px rgb(190 155 255 / 6%);
 }
 
-.black-hole-catalog-hero {
-  display: grid;
-  grid-template-columns: minmax(260px, 0.75fr) minmax(320px, 1fr);
-  align-items: end;
-  gap: 32px;
-  margin: 18px 26px 20px;
-  padding: 22px 24px;
-  border: 1px solid rgb(190 155 255 / 16%);
-  border-radius: 18px;
-  background:
-    radial-gradient(circle at 12% 50%, rgb(190 155 255 / 10%), transparent 34%),
-    linear-gradient(120deg, rgb(76 49 118 / 10%), rgb(255 255 255 / 2%));
+.black-hole-catalog .discovery-card:hover,
+.black-hole-catalog .discovery-card.active,
+.black-hole-catalog .collection-card:hover,
+.black-hole-catalog .collection-card.active {
+  border-color: rgb(190 155 255 / 52%);
+  background: rgb(170 130 250 / 7%);
+  box-shadow: inset 0 0 28px rgb(150 105 240 / 5%);
 }
 
-.black-hole-catalog-hero p,
-.black-hole-catalog-hero h2 {
-  margin: 0;
-}
-
-.black-hole-catalog-hero > div p {
-  margin-bottom: 7px;
-  color: #b995f6;
-  font: 7px var(--mono);
-  letter-spacing: 0.16em;
-}
-
-.black-hole-catalog-hero h2 {
-  color: #f2eaff;
-  font-size: 24px;
-  font-weight: 500;
-  letter-spacing: -0.025em;
-}
-
-.black-hole-catalog-hero > p {
-  color: #8e879b;
-  font-size: 10px;
-  line-height: 1.65;
-}
-
-.black-hole-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(196px, 1fr));
-  gap: 10px;
-  margin: 0;
-  padding: 0 26px 18px;
-  list-style: none;
-}
-
-.black-hole-grid li {
-  min-width: 0;
-}
-
-.black-hole-card {
-  height: 100%;
-  display: grid;
-  grid-template-rows: 1fr auto;
-  overflow: hidden;
-  border: 1px solid rgb(220 205 246 / 11%);
-  border-radius: 17px;
-  background: linear-gradient(160deg, rgb(30 24 40 / 82%), rgb(7 8 12 / 92%));
-  transition:
-    border-color 170ms ease,
-    box-shadow 170ms ease,
-    transform 170ms ease;
-}
-
-.black-hole-card:hover {
-  border-color: rgb(190 155 255 / 36%);
-  box-shadow: 0 20px 54px rgb(0 0 0 / 32%);
-  transform: translateY(-3px);
-}
-
-.black-hole-card > button {
-  min-width: 0;
-  display: grid;
-  grid-template-columns: 28px minmax(0, 1fr);
-  gap: 12px;
-  padding: 10px 10px 12px;
-  border: 0;
-  color: inherit;
-  background: transparent;
-  cursor: pointer;
-  text-align: left;
-}
-
-.black-hole-card > button:focus-visible,
-.black-hole-card > a:focus-visible {
-  outline: 2px solid #c5a4ff;
-  outline-offset: -2px;
-}
-
-.black-hole-card .black-hole-catalog-visual {
-  grid-column: 1 / -1;
-}
-
-.black-hole-card-index {
-  color: #695c7c;
-  font: 7px var(--mono);
-  letter-spacing: 0.1em;
-}
-
-.black-hole-card-copy {
-  min-width: 0;
-  display: grid;
-  gap: 5px;
-}
-
-.black-hole-card-copy small {
-  min-height: 20px;
-  color: #ad95ce;
-  font: 6px/1.45 var(--mono);
-  letter-spacing: 0.07em;
-  text-transform: uppercase;
-}
-
-.black-hole-card-copy strong {
-  overflow: hidden;
-  color: #f3edfb;
-  font-size: 17px;
-  font-weight: 500;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.black-hole-card-copy > span,
-.black-hole-card-metrics,
-.black-hole-card-action,
-.black-hole-card > a,
-.black-hole-method-note {
-  font-family: var(--mono);
-  text-transform: uppercase;
-}
-
-.black-hole-card-copy > span {
-  overflow: hidden;
-  color: #706c7b;
-  font-size: 6px;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.black-hole-card-metrics {
-  grid-column: 1 / -1;
-  display: flex;
-  justify-content: space-between;
-  gap: 9px;
-  padding-top: 10px;
-  border-top: 1px solid rgb(220 205 246 / 8%);
-  color: #aca2ba;
-  font-size: 6px;
-}
-
-.black-hole-card-action {
-  grid-column: 1 / -1;
+.black-hole-catalog .discovery-icon,
+.black-hole-catalog .discovery-arrow,
+.black-hole-catalog .collection-index,
+.black-hole-catalog .collection-copy small,
+.black-hole-catalog .collection-launch {
   color: #c7a8ff;
-  font-size: 7px;
-  letter-spacing: 0.08em;
-  text-align: right;
 }
 
-.black-hole-card > a {
-  padding: 9px 12px 10px;
-  border-top: 1px solid rgb(220 205 246 / 8%);
-  overflow: hidden;
-  color: #6f6281;
-  font-size: 5px;
-  letter-spacing: 0.06em;
-  text-decoration: none;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+.black-hole-catalog .discovery-tabs button[aria-selected="true"] {
+  border-color: rgb(190 155 255 / 42%);
+  color: #c7a8ff;
+  background: rgb(170 130 250 / 8%);
 }
 
-.black-hole-card > a:hover {
-  color: #bba0e5;
+.black-hole-catalog .random-world {
+  border-color: rgb(190 155 255 / 32%);
+  color: #c7a8ff;
+  background: rgb(170 130 250 / 8%);
+}
+
+.black-hole-catalog .random-world:hover:not(:disabled) {
+  border-color: rgb(190 155 255 / 58%);
+  background: rgb(170 130 250 / 14%);
+}
+
+.black-hole-catalog .catalog-result:not(:disabled):hover {
+  border-color: rgb(190 155 255 / 40%);
+  background: rgb(170 130 250 / 6%);
+}
+
+.black-hole-catalog .catalog-view-toggle button[aria-pressed="true"] {
+  border-color: rgb(190 155 255 / 42%);
+  color: #c7a8ff;
+  background: rgb(170 130 250 / 10%);
+}
+
+.black-hole-catalog .result-trait {
+  color: #b198dd;
+}
+
+.black-hole-result-marker {
+  background: #c7a8ff;
+  box-shadow: 0 0 12px rgb(170 130 250 / 72%);
+}
+
+/* A horizon rather than a star: the search mark echoes the shadow-and-ring the cards draw. */
+.black-hole-search-mark {
+  width: 15px;
+  height: 15px;
+  justify-self: center;
+  border: 1.5px solid rgb(199 168 255 / 78%);
+  border-right-color: #f4ecff;
+  border-radius: 50%;
+  background: #05040a;
+  box-shadow: 0 0 10px rgb(170 130 250 / 45%);
 }
 
 .black-hole-method-note {
@@ -300,9 +124,11 @@
   padding-top: 14px;
   border-top: 1px solid rgb(220 205 246 / 8%);
   color: #5e5867;
+  font-family: var(--mono);
   font-size: 6px;
   letter-spacing: 0.08em;
   line-height: 1.65;
+  text-transform: uppercase;
 }
 
 .solar-system-catalog {
@@ -1750,6 +1576,40 @@
   top: 12px;
 }
 
+/* The horizon is drawn at gallery scale; the list row is a 52px disc, so every part of it is
+   restated small rather than transform-scaled, which would fight the disc's own tilt rotation. */
+.list-view .black-hole-catalog-disk {
+  width: 50px;
+  height: 19px;
+  border-width: 3px;
+  box-shadow: 0 0 4px hsl(var(--black-hole-hue) 95% 72% / 62%);
+}
+
+.list-view .black-hole-catalog-disk.front {
+  clip-path: inset(50% -6px -6px -6px);
+}
+
+.list-view .black-hole-catalog-shadow {
+  width: 22px;
+  height: 22px;
+  box-shadow:
+    inset 3px 0 5px rgb(39 25 58 / 28%),
+    0 0 0 1px rgb(0 0 0 / 80%),
+    0 0 8px rgb(0 0 0 / 95%);
+}
+
+.list-view .black-hole-catalog-ring {
+  width: 25px;
+  height: 25px;
+  border-width: 1px;
+  box-shadow: 0 0 5px hsl(var(--black-hole-hue) 96% 74% / 45%);
+}
+
+.list-view .black-hole-catalog-jet {
+  width: 5px;
+  height: 50px;
+}
+
 .catalog-empty,
 .catalog-loading {
   padding: 38px 18px;
@@ -1836,7 +1696,6 @@
   }
 
   .physical-console,
-  .black-hole-catalog-hero,
   .solar-system-hero {
     margin-inline: 14px;
   }
@@ -1944,17 +1803,6 @@
     grid-area: state;
     justify-self: start;
     padding-left: 70px;
-  }
-
-  .black-hole-catalog-hero {
-    grid-template-columns: 1fr;
-    gap: 12px;
-    padding: 18px;
-  }
-
-  .black-hole-grid {
-    grid-template-columns: 1fr;
-    padding: 0 14px 18px;
   }
 
   .black-hole-method-note {

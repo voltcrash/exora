@@ -123,7 +123,7 @@ const sectionCopy: Record<DiscoverSection, { eyebrow: string; title: string; sum
   "black-holes": {
     eyebrow: "NASA / EHT / ESA COMPACT OBJECT ATLAS",
     title: "Follow the light to its edge.",
-    summary: "Enter five observed black-hole systems through disclosed, data-led visualizations.",
+    summary: "Search observed horizons or browse them by curated journey and horizon family.",
   },
   forge: {
     eyebrow: "EXORA CELESTIAL SYNTHESIS",
