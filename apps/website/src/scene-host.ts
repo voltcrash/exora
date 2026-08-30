@@ -250,6 +250,7 @@ const createSceneHost = (canvas: HTMLCanvasElement): SceneHost => {
     for (const listener of travelListeners) listener(next);
   };
 
+  let hasArrivedOnce = false;
   let travelOrigin: { lower: number | null; radius: number; upper: number | null } | null = null;
   let departure: Promise<boolean> | null = null;
   let departureClaimed = false;
@@ -359,7 +360,9 @@ const createSceneHost = (canvas: HTMLCanvasElement): SceneHost => {
     departure = null;
     departureClaimed = false;
     travelOrigin = null;
-    if (isInXr) {
+    // The first world of a session has nothing to arrive from, so it opens at its resting view.
+    if (isInXr || !hasArrivedOnce) {
+      hasArrivedOnce = true;
       setTravelPhase("idle");
       return;
     }
