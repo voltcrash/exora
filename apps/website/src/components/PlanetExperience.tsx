@@ -16,6 +16,7 @@ import { formatMeasurement, formatNumber, formatPlanetName } from "../planet-uti
 import type { PlanetarySubsystem } from "../planetary-subsystems.ts";
 import type { SceneHost, XrStatus } from "../scene-host.ts";
 import { SURFACE_TRANSITION_MS, type TravelPhase } from "../travel-transition.ts";
+import { useTypographySettled } from "../use-typography-settled.ts";
 import { DestinationIdentity } from "./DestinationIdentity.tsx";
 import { DestinationPanel } from "./DestinationPanel.tsx";
 import { MissionControl } from "./MissionControl.tsx";
@@ -186,7 +187,11 @@ export const PlanetExperience = ({
   }, [planet.name, solar]);
 
   const travelling = travelPhase === "departing" || travelPhase === "crossing";
-  const settled = sceneState !== "loading" || travelPhase !== "idle";
+  const typographySettled = useTypographySettled();
+  const settled =
+    (sceneState === "ready" && typographySettled) ||
+    sceneState === "error" ||
+    travelPhase !== "idle";
 
   const openHostStar = async (): Promise<void> => {
     if (custom || hostJumpRef.current) return;

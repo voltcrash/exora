@@ -20,6 +20,7 @@ import {
 } from "../system-layout.ts";
 import type { SystemWorld } from "../system-scene.ts";
 import type { TravelPhase } from "../travel-transition.ts";
+import { useTypographySettled } from "../use-typography-settled.ts";
 import { DestinationIdentity } from "./DestinationIdentity.tsx";
 import { DestinationPanel } from "./DestinationPanel.tsx";
 import { MissionControl } from "./MissionControl.tsx";
@@ -83,7 +84,11 @@ export const SystemExperience = ({
   const { cached, hostStar, planets } = result;
   const solar = planets.length > 0 && planets.every((planet) => planet.solarSystem);
   const travelling = travelPhase === "departing" || travelPhase === "crossing";
-  const settled = sceneState !== "loading" || travelPhase !== "idle";
+  const typographySettled = useTypographySettled();
+  const settled =
+    (sceneState === "ready" && typographySettled) ||
+    sceneState === "error" ||
+    travelPhase !== "idle";
 
   const activateEphemeris = async (epoch: Date): Promise<void> => {
     if (!solar || ephemerisRequest === "loading") return;

@@ -5,6 +5,8 @@ const FACES = ["Exo 2", "IBM Plex Mono"];
 
 const ARRIVED = "exora:web-fonts-ready";
 
+let arrived = false;
+
 /*
  * The typefaces are asked for a second after the first paint, so the interface is drawn twice: once
  * in whatever sans the platform supplies, and again in Exo 2. Anything whose layout was measured
@@ -23,6 +25,7 @@ export const loadWebFonts = (): void => {
         // The stylesheet only declares the faces. WebKit settles `document.fonts.ready` before it
         // has begun fetching them, so the faces are asked for by name and waited on individually.
         const announce = (): void => {
+          arrived = true;
           window.dispatchEvent(new Event(ARRIVED));
         };
         void Promise.all(FACES.map((face) => document.fonts.load(`1em "${face}"`))).then(
@@ -34,6 +37,8 @@ export const loadWebFonts = (): void => {
     }, 1_000);
   });
 };
+
+export const webFontsArrived = (): boolean => arrived;
 
 export const onWebFontsReady = (listener: () => void): (() => void) => {
   window.addEventListener(ARRIVED, listener);

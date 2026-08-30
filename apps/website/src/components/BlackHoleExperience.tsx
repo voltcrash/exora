@@ -7,6 +7,7 @@ import {
 import type { DestinationPanelModel, PanelMetric } from "../destination-panel.ts";
 import type { SceneHost, XrStatus } from "../scene-host.ts";
 import type { TravelPhase } from "../travel-transition.ts";
+import { useTypographySettled } from "../use-typography-settled.ts";
 import { DestinationIdentity } from "./DestinationIdentity.tsx";
 import { DestinationPanel } from "./DestinationPanel.tsx";
 import { MissionControl } from "./MissionControl.tsx";
@@ -72,7 +73,11 @@ export const BlackHoleExperience = ({
   const [sceneState, setSceneState] = useState<"loading" | "ready" | "error">("loading");
   const [xrStatus, setXrStatus] = useState<XrStatus>("checking");
   const travelling = travelPhase === "departing" || travelPhase === "crossing";
-  const settled = sceneState !== "loading" || travelPhase !== "idle";
+  const typographySettled = useTypographySettled();
+  const settled =
+    (sceneState === "ready" && typographySettled) ||
+    sceneState === "error" ||
+    travelPhase !== "idle";
   const diameterKilometers = schwarzschildDiameterKilometers(blackHole);
   const massMetric: PanelMetric =
     blackHole.massSolar === null

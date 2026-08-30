@@ -5,6 +5,7 @@ import type { SceneHost, XrStatus } from "../scene-host.ts";
 import type { SolarRegionProfile } from "../solar-regions.ts";
 import { findSolarStar } from "../solar-system.ts";
 import type { TravelPhase } from "../travel-transition.ts";
+import { useTypographySettled } from "../use-typography-settled.ts";
 import { DestinationIdentity } from "./DestinationIdentity.tsx";
 import { DestinationPanel } from "./DestinationPanel.tsx";
 import { MissionControl } from "./MissionControl.tsx";
@@ -40,6 +41,7 @@ export const RegionExperience = ({
   const [xrStatus, setXrStatus] = useState<XrStatus>("checking");
   const [sceneState, setSceneState] = useState<"error" | "loading" | "ready">("loading");
   const travelling = travelPhase === "departing" || travelPhase === "crossing";
+  const typographySettled = useTypographySettled();
 
   useEffect(() => host?.onXrStatus(setXrStatus), [host]);
 
@@ -191,7 +193,7 @@ export const RegionExperience = ({
         sceneFailed={sceneState === "error"}
         xr={{ host, status: xrStatus }}
       />
-      {sceneState === "loading" ? (
+      {sceneState !== "error" && (sceneState === "loading" || !typographySettled) ? (
         <div className={cx("loading-screen")} role="status">
           <div className={cx("loading-orbit")} aria-hidden="true">
             <span />

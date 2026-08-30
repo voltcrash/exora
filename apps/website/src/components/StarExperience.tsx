@@ -14,6 +14,7 @@ import { formatNumber } from "../planet-utils.tsx";
 import type { SceneHost, XrStatus } from "../scene-host.ts";
 import { deriveStarVisual, starKindLabel, starSummary } from "../star-utils.ts";
 import type { TravelPhase } from "../travel-transition.ts";
+import { useTypographySettled } from "../use-typography-settled.ts";
 import { DestinationIdentity } from "./DestinationIdentity.tsx";
 import { DestinationPanel } from "./DestinationPanel.tsx";
 import { MissionControl } from "./MissionControl.tsx";
@@ -59,7 +60,11 @@ export const StarExperience = ({
   const custom = result.mode === "custom";
   const solar = result.mode === "solar";
   const travelling = travelPhase === "departing" || travelPhase === "crossing";
-  const settled = sceneState !== "loading" || travelPhase !== "idle";
+  const typographySettled = useTypographySettled();
+  const settled =
+    (sceneState === "ready" && typographySettled) ||
+    sceneState === "error" ||
+    travelPhase !== "idle";
 
   const dioramaHostRef = useRef(star.name);
   useEffect(() => {
