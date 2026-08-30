@@ -452,6 +452,14 @@
   white-space: nowrap;
 }
 
+/* A phone's sheet head has room for the destination and the disclosure and nothing else, and a
+   frame rate is a diagnostic rather than a reading the world is understood through. */
+@media (max-width: 860px) {
+  .frame-rate-signal {
+    display: none;
+  }
+}
+
 /*
  * MISSION CONTROL — one compact navigation deck at the top right.
  *
