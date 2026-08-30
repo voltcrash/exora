@@ -9,19 +9,22 @@
 }
 
 .planet-builder {
+  --accent: #9ee62f;
+  --accent-soft: rgb(158 230 47 / 12%);
+
   width: min(920px, calc(100vw - 32px));
   max-height: min(780px, calc(100vh - 32px));
   margin: auto;
   padding: 0;
   overflow: hidden;
-  border: 1px solid rgb(255 137 91 / 22%);
+  border: 1px solid rgb(178 235 90 / 22%);
   border-radius: 24px;
   color: var(--ink);
   background:
-    radial-gradient(circle at 16% 0, rgb(255 107 50 / 13%), transparent 38%),
+    radial-gradient(circle at 16% 0, rgb(158 230 47 / 13%), transparent 38%),
     radial-gradient(circle at 90% 28%, rgb(139 230 234 / 8%), transparent 36%), #080c0e;
   box-shadow: 0 32px 120px rgb(0 0 0 / 82%);
-  scrollbar-color: rgb(255 107 50 / 30%) transparent;
+  scrollbar-color: rgb(158 230 47 / 30%) transparent;
 }
 
 .planet-builder::backdrop {
@@ -151,9 +154,9 @@
 
 .builder-identity {
   padding: 20px;
-  border: 1px solid rgb(255 107 50 / 15%);
+  border: 1px solid rgb(158 230 47 / 15%);
   border-radius: 18px;
-  background: rgb(255 107 50 / 3%);
+  background: rgb(158 230 47 / 3%);
 }
 
 .star-builder-body .builder-identity {
@@ -390,7 +393,7 @@
   flex: 0 0 auto;
   border-radius: 50%;
   background: var(--accent);
-  box-shadow: 0 0 10px rgb(255 107 50 / 55%);
+  box-shadow: 0 0 10px rgb(158 230 47 / 55%);
 }
 
 .generate-world {
@@ -401,10 +404,10 @@
   align-items: center;
   gap: 10px;
   padding: 7px 11px;
-  border: 1px solid rgb(255 107 50 / 45%);
+  border: 1px solid rgb(158 230 47 / 45%);
   border-radius: 14px;
-  color: #fff4ef;
-  background: rgb(61 24 11 / 72%);
+  color: #f5fdec;
+  background: rgb(31 51 9 / 72%);
   cursor: pointer;
   text-align: left;
 }
@@ -415,7 +418,7 @@
 }
 
 .generate-world small {
-  color: #a96850;
+  color: #8fae5c;
   font-family: var(--mono);
   font-size: 7px;
 }
