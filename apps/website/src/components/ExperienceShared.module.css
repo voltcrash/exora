@@ -375,7 +375,7 @@
 }
 
 .signal-bars {
-  height: 13px;
+  height: 10px;
   display: flex;
   align-items: end;
   gap: 2px;
@@ -412,15 +412,15 @@
 }
 
 .signal-bars i:nth-child(2) {
-  height: 7px;
+  height: 6px;
 }
 
 .signal-bars i:nth-child(3) {
-  height: 10px;
+  height: 8px;
 }
 
 .signal-bars i:nth-child(4) {
-  height: 13px;
+  height: 10px;
 }
 
 .frame-rate-count {
@@ -431,7 +431,7 @@
 
 .frame-rate-reading {
   display: flex;
-  align-items: flex-start;
+  align-items: flex-end;
   gap: 5px;
 }
 
