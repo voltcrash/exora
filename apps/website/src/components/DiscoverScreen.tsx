@@ -226,11 +226,6 @@ export const DiscoverScreen = ({
             </button>
           ))}
         </nav>
-
-        <p className={styles["discover-rail-note"]}>
-          <span aria-hidden="true" />
-          LIVE OBSERVATORY
-        </p>
       </aside>
 
       <div ref={stageRef} className={styles["discover-stage"]} data-testid="discover-stage">

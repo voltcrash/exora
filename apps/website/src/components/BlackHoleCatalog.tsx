@@ -72,7 +72,7 @@ export const BlackHoleResult = memo(
           </small>
           <strong>{formatBlackHoleMass(blackHole.massSolar)}</strong>
         </span>
-        <span className={cx("result-state")}>{formatDistance(blackHole)} · EXPLORE</span>
+        <span className={cx("result-state")}>{formatDistance(blackHole)}</span>
       </button>
     </li>
   ),
@@ -246,9 +246,6 @@ export const BlackHoleCatalog = ({
                   <small>{collection.tag}</small>
                   <strong>{collection.label}</strong>
                   <span>{collection.note}</span>
-                </span>
-                <span className={cx("collection-launch")} aria-hidden="true">
-                  EXPLORE ↗
                 </span>
               </button>
             ))}

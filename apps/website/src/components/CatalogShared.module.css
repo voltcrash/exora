@@ -65,8 +65,7 @@
 .black-hole-catalog .discovery-icon,
 .black-hole-catalog .discovery-arrow,
 .black-hole-catalog .collection-index,
-.black-hole-catalog .collection-copy small,
-.black-hole-catalog .collection-launch {
+.black-hole-catalog .collection-copy small {
   color: #c7a8ff;
 }
 
@@ -387,13 +386,6 @@
   align-items: center;
   justify-content: space-between;
 }
-.solar-body-meta strong {
-  color: #ffab63;
-  font-family: var(--mono);
-  font-size: 7px;
-  letter-spacing: 0.09em;
-}
-
 .star-catalog .catalog-header p,
 .star-catalog .result-state {
   color: #ffc96f;
@@ -416,8 +408,7 @@
 .star-catalog .discovery-icon,
 .star-catalog .discovery-arrow,
 .star-catalog .collection-index,
-.star-catalog .collection-copy small,
-.star-catalog .collection-launch {
+.star-catalog .collection-copy small {
   color: #ffc96f;
 }
 
@@ -532,7 +523,7 @@
 .collection-card {
   min-height: 88px;
   display: grid;
-  grid-template-columns: 30px 1fr auto;
+  grid-template-columns: 30px 1fr;
   align-items: stretch;
   gap: 10px;
   padding: 12px 14px;
@@ -605,14 +596,6 @@
   font-family: var(--mono);
   font-size: 7px;
   line-height: 1.5;
-}
-
-.collection-launch {
-  align-self: end;
-  color: var(--cyan);
-  font-family: var(--mono);
-  font-size: 7px;
-  white-space: nowrap;
 }
 
 .discovery-grid {
@@ -1843,11 +1826,6 @@
 @media (max-width: 520px) {
   .collection-card {
     grid-template-columns: 22px minmax(0, 1fr);
-  }
-
-  .collection-launch {
-    grid-column: 2;
-    justify-self: start;
   }
 
   .physical-console-heading {

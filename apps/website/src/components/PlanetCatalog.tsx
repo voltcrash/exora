@@ -154,7 +154,7 @@ const PlanetResult = memo(
               {temperature === null ? "TEMP UNKNOWN" : `${formatNumber(temperature, 0)} K`}
             </strong>
           </span>
-          <span className={cx("result-state")}>{supported ? "EXPLORE" : "RENDERER PENDING"}</span>
+          {supported ? null : <span className={cx("result-state")}>RENDERER PENDING</span>}
         </button>
       </li>
     );
@@ -490,9 +490,6 @@ export const PlanetCatalog = ({ embedded = false, onClose, onSelect }: PlanetCat
                   <small>{collection.tag}</small>
                   <strong>{collection.label}</strong>
                   <span>{collection.note}</span>
-                </span>
-                <span className={cx("collection-launch")} aria-hidden="true">
-                  EXPLORE ↗
                 </span>
               </button>
             ))}

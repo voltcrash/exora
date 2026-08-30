@@ -189,7 +189,6 @@ export const SolarSystemCatalog = ({
                         <small>
                           {identity?.spkId ? `SPK ${identity.spkId}` : `NAIF ${identity?.naifId}`}
                         </small>
-                        <strong>TRAVEL ↗</strong>
                       </span>
                     </button>
                   </li>
@@ -223,7 +222,6 @@ export const SolarSystemCatalog = ({
                     </span>
                     <span className={cx("solar-body-meta")}>
                       <small>ANCHOR NAIF {region.anchorNaifId}</small>
-                      <strong>EXPLORE ↗</strong>
                     </span>
                   </button>
                 </li>

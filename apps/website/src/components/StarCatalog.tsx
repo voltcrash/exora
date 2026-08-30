@@ -96,7 +96,7 @@ const StarResult = memo(
           <strong>{star.observation.spectralType ?? "SPECTRUM UNKNOWN"}</strong>
         </span>
         <span className={cx("result-state")}>
-          {formatNumber(star.observation.distanceParsecs, 1)} PC · EXPLORE
+          {formatNumber(star.observation.distanceParsecs, 1)} PC
         </span>
       </button>
     </li>
@@ -379,9 +379,6 @@ export const StarCatalog = ({ embedded = false, onClose, onSelect }: StarCatalog
                   <small>{collection.tag}</small>
                   <strong>{collection.label}</strong>
                   <span>{collection.note}</span>
-                </span>
-                <span className={cx("collection-launch")} aria-hidden="true">
-                  EXPLORE ↗
                 </span>
               </button>
             ))}
