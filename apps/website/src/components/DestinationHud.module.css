@@ -24,10 +24,10 @@
 /* ── IDENTITY ─────────────────────────────────────────────────────────────────────────────── */
 
 .identity {
-  --tone: #0c39e5;
-  --tone-ink: #c2ccff;
-  --tone-line: rgb(12 57 229 / 58%);
-  --tone-soft: rgb(12 57 229 / 30%);
+  --tone: #204cf3;
+  --tone-ink: #c6d0ff;
+  --tone-line: rgb(32 76 243 / 58%);
+  --tone-soft: rgb(32 76 243 / 30%);
 
   grid-column: 1;
   align-self: end;
