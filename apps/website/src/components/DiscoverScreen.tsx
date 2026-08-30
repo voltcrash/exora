@@ -193,12 +193,7 @@ export const DiscoverScreen = ({
       </div>
 
       <aside className={styles["discover-rail"]}>
-        <button
-          className={styles["discover-home"]}
-          type="button"
-          aria-label="Open Solar System"
-          onClick={() => setSection("solar")}
-        >
+        <a className={styles["discover-home"]} href="/" aria-label="Exora home">
           <span
             className={sharedStyles["brand-mark"]}
             data-style-role="brand-mark"
@@ -206,9 +201,9 @@ export const DiscoverScreen = ({
           />
           <span>
             <strong>EXORA</strong>
-            <small>DISCOVER</small>
+            <small>UNIVERSE OBSERVATORY</small>
           </span>
-        </button>
+        </a>
 
         <nav className={styles["discover-nav"]} aria-label="Discover destinations">
           {sections.map((item, index) => (
