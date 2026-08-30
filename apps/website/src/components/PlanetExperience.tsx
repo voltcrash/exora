@@ -57,7 +57,7 @@ const visualNote = ({
     return "JPL MEAN ORBITS · LOG-COMPRESSED DISTANCE · BODY SIZES EXAGGERATED";
   }
   if (custom) return `SHAREABLE URL RECIPE · WORLDGEN V${WORLDGEN_VERSION}`;
-  if (!solar) return "PLAUSIBLE VISUALIZATION FROM OBSERVED DATA";
+  if (!solar) return "";
   if (solarIdentity?.surfaceStatus === "unresolved") {
     return "UNRESOLVED SURFACE · PHYSICALLY CONSTRAINED NEUTRAL VISUALIZATION";
   }

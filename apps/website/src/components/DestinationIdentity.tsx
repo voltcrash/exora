@@ -115,9 +115,11 @@ export const DestinationIdentity = ({
         ))}
       </div>
       <p className={cx("identity-summary")}>{summary}</p>
-      <p className={cx("identity-note")}>
-        <span aria-hidden="true" /> {note}
-      </p>
+      {note ? (
+        <p className={cx("identity-note")}>
+          <span aria-hidden="true" /> {note}
+        </p>
+      ) : null}
     </section>
   );
 };
