@@ -2,14 +2,13 @@
 
 Do not modify these rules or the Vite+ instructions unless explicitly asked to do so.
 
-- After each completed logical change, commit and push the changes.
-- Commit messages must follow the Conventional Commits format, be single-line only and not include descriptions
-- Never add yourself as a co-author, co-contributor, or contributor in commits or repository metadata.
+- Never commit directly to main. Unless instructed otherwise, work in worktrees, commit and push each change, and submit them via Pull Requests using gh.
+- Commits: Conventional Commits format, in plain language
+- Description: the problem in a sentence or two, then how it was fixed.
 
 - Keep comments rare and concise; use them only for non-obvious constraints, intent, or workarounds, never to narrate self-explanatory code.
 
 - pnpm is the only package manager permitted for this project.
-- Do not use npm, yarn, Bun, or any other package manager.
 - Package-management operations must go through Vite+ (`vp`) unless explicitly stated otherwise.
 - Do not invoke `pnpm` directly for normal package-management operations.
 - Do not use `npx`; use `pnpm dlx` for one-off CLI execution when necessary.
@@ -17,9 +16,9 @@ Do not modify these rules or the Vite+ instructions unless explicitly asked to d
 - Never manually edit the lockfile; dependency changes must be performed through Vite+.
 
 - Always use the latest stable version of dependencies, tools, and frameworks unless explicitly instructed otherwise.
+- Use only the latest Node.js LTS release.
 - Never downgrade, pin to an older version, or roll back a dependency to work around an error without explicit permission.
 - Resolve compatibility issues while remaining on current versions whenever possible.
-- Use only the latest Node.js LTS release.
 
 - Do not bypass Vite+ checks, disable linting/type checking, or remove tests to make validation pass.
 - Before committing, run all applicable validation checks described in the Review Checklist and resolve any failures caused by your changes.
