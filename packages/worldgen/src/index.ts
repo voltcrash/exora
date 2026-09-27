@@ -5,6 +5,17 @@ export {
   generateProceduralBlackHole,
   generateProceduralBlackHoles,
 } from "./procedural-black-holes.ts";
+export {
+  deriveHabitableZone,
+  HABITABLE_ZONE_CALIBRATED_KELVIN,
+  habitableZonePlacement,
+  isWithinHabitableZone,
+} from "./habitable-zone.ts";
+export type {
+  HabitableZone,
+  HabitableZoneInputs,
+  HabitableZonePlacement,
+} from "./habitable-zone.ts";
 export type {
   CustomBlackHole,
   CustomBlackHoleParameters,
