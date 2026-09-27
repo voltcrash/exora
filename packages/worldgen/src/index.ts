@@ -1,4 +1,10 @@
-import type { ExoplanetProfile, StarKind, StarProfile } from "@exora/contracts";
+import type {
+  ExoplanetProfile,
+  MassProvenance,
+  RadiusProvenance,
+  StarKind,
+  StarProfile,
+} from "@exora/contracts";
 
 export {
   generateCustomBlackHole,
@@ -55,8 +61,10 @@ export interface PlanetMeasuredProperties {
   hostTemperatureKelvin: number | null;
   massEarth: number | null;
   massJupiter: number | null;
+  massProvenance: MassProvenance | null;
   radiusEarth: number | null;
   radiusJupiter: number | null;
+  radiusProvenance: RadiusProvenance | null;
   semiMajorAxisAu: number | null;
 }
 
@@ -309,8 +317,10 @@ export const derivePlanetMeasuredProperties = (
   hostTemperatureKelvin: planet.observation.hostTemperatureKelvin,
   massEarth: planet.observation.massEarth,
   massJupiter: planet.observation.massJupiter,
+  massProvenance: planet.observation.massProvenance ?? null,
   radiusEarth: planet.observation.radiusEarth,
   radiusJupiter: planet.observation.radiusJupiter,
+  radiusProvenance: planet.observation.radiusProvenance ?? null,
   semiMajorAxisAu: planet.observation.semiMajorAxisAu,
 });
 
@@ -332,8 +342,14 @@ export const derivePlanetDerivedProperties = (
   const massEarthEffective =
     measured.massEarth ?? (measured.massJupiter !== null ? measured.massJupiter * 317.83 : 1);
 
+  // A density built from the archive's mass-radius relation only returns the relation's assumption.
+  const relationDerived =
+    measured.massProvenance === "estimated" || measured.radiusProvenance === "estimated";
   const bulkDensityGCm3 =
-    measured.massEarth !== null && measured.radiusEarth !== null && measured.radiusEarth > 0
+    !relationDerived &&
+    measured.massEarth !== null &&
+    measured.radiusEarth !== null &&
+    measured.radiusEarth > 0
       ? clamp((5.51 * measured.massEarth) / measured.radiusEarth ** 3, 0, 200)
       : null;
 
@@ -378,7 +394,9 @@ export const derivePlanetInferredProperties = (
     temperature,
     density,
     derived.insolationEarthRelative,
-    measured.radiusEarth ?? measured.radiusJupiter,
+    measured.radiusProvenance === "estimated"
+      ? null
+      : (measured.radiusEarth ?? measured.radiusJupiter),
   ]);
   const confidence: PlanetInferredProperties["confidence"] =
     knownInputs >= 3 ? "high" : knownInputs >= 1 ? "medium" : "low";

@@ -930,6 +930,38 @@ test("derivePlanetDerivedProperties only reports a density when both mass and ra
   expect(derivePlanetDerivedProperties(measuredRadiusOnly).bulkDensityGCm3).toBeNull();
 });
 
+test("a density read back from the archive's mass-radius relation is not reported", () => {
+  for (const provenance of [
+    { massProvenance: "estimated" as const },
+    { radiusProvenance: "estimated" as const },
+  ]) {
+    const measured = derivePlanetMeasuredProperties({
+      ...earthSizeRockyPlanet,
+      observation: { ...earthSizeRockyPlanet.observation, ...provenance },
+    });
+    expect(derivePlanetDerivedProperties(measured).bulkDensityGCm3).toBeNull();
+  }
+});
+
+test("an estimated radius does not count toward inference confidence", () => {
+  const confidenceFor = (radiusProvenance: "estimated" | "measured") => {
+    const planet = {
+      ...earthSizeRockyPlanet,
+      observation: {
+        ...earthSizeRockyPlanet.observation,
+        equilibriumTemperatureKelvin: 250,
+        massEarth: null,
+        radiusProvenance,
+      },
+    };
+    const measured = derivePlanetMeasuredProperties(planet);
+    const derived = derivePlanetDerivedProperties(measured);
+    return derivePlanetInferredProperties(planet, measured, derived, () => 0.5).confidence;
+  };
+
+  expect(confidenceFor("estimated")).not.toBe(confidenceFor("measured"));
+});
+
 test("derivePlanetInferredProperties never claims high confidence with no measured inputs", () => {
   const measured = derivePlanetMeasuredProperties(unknownIncompletePlanet);
   const derived = derivePlanetDerivedProperties(measured);
