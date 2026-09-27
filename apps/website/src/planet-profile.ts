@@ -12,6 +12,8 @@ export const featuredPlanet: ExoplanetProfile = {
     massJupiter: 0.035,
     radiusEarth: 3.33,
     massEarth: 11.09,
+    massProvenance: "minimum",
+    radiusProvenance: "estimated",
     equilibriumTemperatureKelvin: 530.8,
     orbitalEccentricity: 0.2,
     orbitalInclinationDegrees: null,
