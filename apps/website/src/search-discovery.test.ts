@@ -70,3 +70,23 @@ test("data-completeness control excludes sparsely observed worlds", () => {
     }),
   ).toEqual([featuredPlanet]);
 });
+
+test("a radius the archive calculated does not count toward being well measured", () => {
+  const withRadius = (radiusProvenance: "estimated" | "measured") => ({
+    ...featuredPlanet,
+    observation: {
+      ...featuredPlanet.observation,
+      equilibriumTemperatureKelvin: null,
+      orbitalPeriodDays: null,
+      radiusProvenance,
+    },
+  });
+  const measured = withRadius("measured");
+
+  expect(
+    filterPlanetsByPhysicalControls([withRadius("estimated"), measured], {
+      ...DEFAULT_PHYSICAL_PLANET_FILTERS,
+      wellMeasured: true,
+    }),
+  ).toEqual([measured]);
+});

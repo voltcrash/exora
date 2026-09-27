@@ -145,8 +145,12 @@ const axisMatches = (control: number, observed: number | null): boolean => {
 const measuredFieldCount = (planet: ExoplanetProfile): number => {
   const observation = planet.observation;
   return [
-    observation.radiusEarth ?? observation.radiusJupiter,
-    observation.massEarth ?? observation.massJupiter,
+    observation.radiusProvenance === "estimated"
+      ? null
+      : (observation.radiusEarth ?? observation.radiusJupiter),
+    observation.massProvenance === "estimated"
+      ? null
+      : (observation.massEarth ?? observation.massJupiter),
     observation.equilibriumTemperatureKelvin,
     observation.orbitalPeriodDays,
     observation.semiMajorAxisAu,
