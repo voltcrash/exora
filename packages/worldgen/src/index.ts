@@ -5,6 +5,8 @@ export {
   generateProceduralBlackHole,
   generateProceduralBlackHoles,
 } from "./procedural-black-holes.ts";
+export { deriveTidalLocking, TIDAL_LOCK_THRESHOLD_YEARS } from "./tidal-locking.ts";
+export type { TidalLocking } from "./tidal-locking.ts";
 export type {
   CustomBlackHole,
   CustomBlackHoleParameters,
