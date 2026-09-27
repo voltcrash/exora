@@ -23,6 +23,7 @@ import { RecoveryScreen } from "./components/RecoveryScreen.tsx";
 import { featuredPlanet } from "./planet-profile.ts";
 import { hasRenderer } from "./planet-utils.tsx";
 import { canonicalUrlForSearch } from "./canonical-url.ts";
+import { documentTitleFor } from "./document-title.ts";
 import type { BlackHoleProfile } from "./black-holes.ts";
 import { togglesClearView } from "./clear-view-shortcut.ts";
 import { togglesDiscoverShortcut } from "./discover-shortcut.ts";
@@ -425,6 +426,19 @@ export const App = () => {
               ? `the ${activeObject.result.hostStar} system`
               : activeObject.result.star.name
       : null;
+
+  const titleSubject =
+    !activeObject || (activeObject.type === "planet" && activeObject.result.mode === "fallback")
+      ? null
+      : activeObject.type === "missing"
+        ? "Destination unavailable"
+        : activeObject.type === "system"
+          ? `${activeObject.result.hostStar} system`
+          : subject;
+
+  useEffect(() => {
+    document.title = documentTitleFor(titleSubject);
+  }, [titleSubject]);
 
   return (
     <>
