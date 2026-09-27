@@ -581,7 +581,7 @@ export const PlanetCatalog = ({ embedded = false, onClose, onSelect }: PlanetCat
                 />
                 <span aria-hidden="true" />
                 <strong>Habitable-zone candidates</strong>
-                <small>Rocky · 180–330 K</small>
+                <small>Rocky · inside the star's flux limits</small>
               </label>
               <label>
                 <input
