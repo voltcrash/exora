@@ -4,7 +4,8 @@ import {
   schwarzschildDiameterKilometers,
   type BlackHoleProfile,
 } from "../black-holes.ts";
-import type { DestinationPanelModel, PanelMetric } from "../destination-panel.ts";
+import { deriveBlackHolePhysics } from "../black-hole-physics.ts";
+import { presentTabs, type DestinationPanelModel, type PanelMetric } from "../destination-panel.ts";
 import type { SceneHost, XrStatus } from "../scene-host.ts";
 import type { TravelPhase } from "../travel-transition.ts";
 import { useTypographySettled } from "../use-typography-settled.ts";
@@ -87,6 +88,7 @@ export const BlackHoleExperience = ({
     diameterKilometers === null
       ? { label: "Schwarzschild Ø", value: "Unavailable" }
       : { ...scaled(diameterKilometers, "KM"), label: "Schwarzschild Ø" };
+  const physics = deriveBlackHolePhysics(blackHole);
 
   useEffect(() => host?.onXrStatus(setXrStatus), [host]);
 
@@ -143,7 +145,7 @@ export const BlackHoleExperience = ({
       { label: "Accretion", value: blackHole.observation.accretion.toUpperCase() },
     ],
     source: blackHole.source.archive,
-    tabs: [
+    tabs: presentTabs([
       {
         blocks: [
           {
@@ -178,7 +180,12 @@ export const BlackHoleExperience = ({
         id: "record",
         label: "Record",
       },
-    ],
+      physics.length > 0 && {
+        blocks: [{ facts: physics, type: "facts" }],
+        id: "physics",
+        label: "Physics",
+      },
+    ]),
     title:
       blackHole.provenance === "observed" ? "Measured horizon record" : "Generated horizon record",
   };
