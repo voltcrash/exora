@@ -2,6 +2,7 @@ import { useState } from "react";
 import type { DestinationPanelModel, PanelBlock } from "../destination-panel.ts";
 import { useTabList } from "../use-tab-list.ts";
 import { FrameRateSignal } from "./FrameRateSignal.tsx";
+import { ShareButton } from "./ShareButton.tsx";
 import hudStyles from "./DestinationHud.module.css";
 import { bindStyles } from "../styles/bind-styles.ts";
 
@@ -127,6 +128,7 @@ export const DestinationPanel = ({ fps, model }: DestinationPanelProps) => {
           <strong>{model.title}</strong>
         </span>
         <FrameRateSignal fps={fps} />
+        <ShareButton />
         <button
           className={cx("panel-disclosure")}
           data-testid="panel-disclosure"
