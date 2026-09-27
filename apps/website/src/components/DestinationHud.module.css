@@ -839,6 +839,22 @@
     grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
   }
 
+  /* Side-by-side links are too narrow for a name and an action on one line, so the action
+     drops beneath the name instead of truncating it to its first letters. */
+  .panel-link {
+    grid-template-columns: 20px minmax(0, 1fr);
+    row-gap: 3px;
+  }
+
+  .panel-link > span {
+    grid-row: span 2;
+  }
+
+  .panel-link small {
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
   .panel-tab {
     min-height: 34px;
   }
