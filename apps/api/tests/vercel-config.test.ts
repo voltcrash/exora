@@ -55,3 +55,14 @@ test("large destination models are cached at the edge and revalidated in the bac
 
   expect(headers["cache-control"]).toBe("public, max-age=604800, stale-while-revalidate=2592000");
 });
+
+test("the service worker is always revalidated so an update reaches every visitor", async () => {
+  const path = new URL("../../../vercel.json", import.meta.url);
+  const config = JSON.parse(await readFile(path, "utf8")) as VercelConfig;
+  const workerRule = config.headers.find(({ source }) => source === "/sw.js");
+
+  expect(workerRule?.headers).toContainEqual({
+    key: "Cache-Control",
+    value: "public, max-age=0, must-revalidate",
+  });
+});
