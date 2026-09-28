@@ -18,6 +18,7 @@ import {
 import { warmDestinations } from "../destination-cache.ts";
 import type { ViewMode } from "../planet-scene.ts";
 import { readHabitableZone } from "../habitable-zone-reading.ts";
+import { readProvenance } from "../measurement-provenance.ts";
 import { derivePlanetPhysics } from "../planet-physics.ts";
 import {
   formatMeasurement,
@@ -330,6 +331,7 @@ export const PlanetExperience = ({
     ? (observation.radiusJupiter ?? observation.radiusEarth)
     : (observation.radiusEarth ?? observation.radiusJupiter);
   const localOrbitKilometers = solarIdentity?.orbitalSemiMajorAxisKilometers ?? null;
+  const provenance = readProvenance(observation);
 
   const primaryBody = isMoon ? (solarIdentity.parent ?? null) : null;
 
@@ -352,8 +354,16 @@ export const PlanetExperience = ({
     .join(" · ");
 
   const worldMetrics: readonly PanelMetric[] = [
-    { label: "Mass", unit: massUnit, value: formatMeasurement(massValue) },
-    { label: "Radius", unit: radiusUnit, value: formatMeasurement(radiusValue) },
+    {
+      label: provenance.massLabel,
+      unit: massUnit,
+      value: `${massValue === null ? "" : provenance.massPrefix}${formatMeasurement(massValue)}`,
+    },
+    {
+      label: provenance.radiusLabel,
+      unit: radiusUnit,
+      value: `${radiusValue === null ? "" : provenance.radiusPrefix}${formatMeasurement(radiusValue)}`,
+    },
     {
       label: "Orbit",
       unit: localOrbitKilometers === null ? "AU" : "KM",
@@ -386,6 +396,12 @@ export const PlanetExperience = ({
       label: "Atmosphere model",
       tone: "accent",
       value: recipe.atmosphere.label.split(" · ")[0],
+    },
+    provenance.note !== null && {
+      detail: provenance.note,
+      label: "Mass & radius",
+      tone: "gold",
+      value: provenance.summary,
     },
     habitableZone && {
       detail: habitableZone.detail,

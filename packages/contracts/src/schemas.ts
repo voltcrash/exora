@@ -58,6 +58,11 @@ export const solarSystemIdentitySchema = z.strictObject({
 
 export const planetKindSchema = z.enum(["gas-giant", "ice-giant", "rocky", "unknown"]);
 
+/** How the archive arrived at a mass: weighed, a lower bound (M sin i), or read off a relation. */
+export const massProvenanceSchema = z.enum(["measured", "minimum", "estimated"]);
+/** Whether a radius was measured or calculated by the archive from the mass. */
+export const radiusProvenanceSchema = z.enum(["measured", "estimated"]);
+
 export const exoplanetObservationSchema = z.strictObject({
   declinationDegrees: nullableFiniteNumber,
   discoveryMethod: nonEmptyString,
@@ -71,11 +76,13 @@ export const exoplanetObservationSchema = z.strictObject({
   hostTemperatureKelvin: nullableFiniteNumber,
   massEarth: nullableFiniteNumber,
   massJupiter: nullableFiniteNumber,
+  massProvenance: massProvenanceSchema.nullable().optional(),
   orbitalEccentricity: nullableFiniteNumber,
   orbitalInclinationDegrees: nullableFiniteNumber,
   orbitalPeriodDays: nullableFiniteNumber,
   radiusEarth: nullableFiniteNumber,
   radiusJupiter: nullableFiniteNumber,
+  radiusProvenance: radiusProvenanceSchema.nullable().optional(),
   rightAscensionDegrees: nullableFiniteNumber,
   semiMajorAxisAu: nullableFiniteNumber,
 });
