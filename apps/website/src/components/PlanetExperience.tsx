@@ -1,5 +1,10 @@
 import type { ExoplanetProfile, StarProfile } from "@exora/contracts";
-import { deriveWorldRecipe, WORLDGEN_VERSION, type WorldRecipe } from "@exora/worldgen";
+import {
+  deriveTidalLocking,
+  deriveWorldRecipe,
+  WORLDGEN_VERSION,
+  type WorldRecipe,
+} from "@exora/worldgen";
 import { useEffect, useMemo, useRef, useState, type CSSProperties } from "react";
 import type { PlanetLoadResult } from "../api-client.ts";
 import {
@@ -12,7 +17,15 @@ import {
 } from "../destination-panel.ts";
 import { warmDestinations } from "../destination-cache.ts";
 import type { ViewMode } from "../planet-scene.ts";
-import { formatMeasurement, formatNumber, formatPlanetName } from "../planet-utils.tsx";
+import { readHabitableZone } from "../habitable-zone-reading.ts";
+import { readProvenance } from "../measurement-provenance.ts";
+import { derivePlanetPhysics } from "../planet-physics.ts";
+import {
+  formatMeasurement,
+  formatNumber,
+  formatPlanetName,
+  formatTimescale,
+} from "../planet-utils.tsx";
 import type { PlanetarySubsystem } from "../planetary-subsystems.ts";
 import type { SceneHost, XrStatus } from "../scene-host.ts";
 import { SURFACE_TRANSITION_MS, type TravelPhase } from "../travel-transition.ts";
@@ -318,6 +331,7 @@ export const PlanetExperience = ({
     ? (observation.radiusJupiter ?? observation.radiusEarth)
     : (observation.radiusEarth ?? observation.radiusJupiter);
   const localOrbitKilometers = solarIdentity?.orbitalSemiMajorAxisKilometers ?? null;
+  const provenance = readProvenance(observation);
 
   const primaryBody = isMoon ? (solarIdentity.parent ?? null) : null;
 
@@ -340,8 +354,16 @@ export const PlanetExperience = ({
     .join(" · ");
 
   const worldMetrics: readonly PanelMetric[] = [
-    { label: "Mass", unit: massUnit, value: formatMeasurement(massValue) },
-    { label: "Radius", unit: radiusUnit, value: formatMeasurement(radiusValue) },
+    {
+      label: provenance.massLabel,
+      unit: massUnit,
+      value: `${massValue === null ? "" : provenance.massPrefix}${formatMeasurement(massValue)}`,
+    },
+    {
+      label: provenance.radiusLabel,
+      unit: radiusUnit,
+      value: `${radiusValue === null ? "" : provenance.radiusPrefix}${formatMeasurement(radiusValue)}`,
+    },
     {
       label: "Orbit",
       unit: localOrbitKilometers === null ? "AU" : "KM",
@@ -365,6 +387,9 @@ export const PlanetExperience = ({
       ]
     : [];
 
+  const tidalLocking = custom || primaryBody ? null : deriveTidalLocking(planet);
+  const habitableZone = custom || primaryBody ? null : readHabitableZone(planet);
+
   const worldFacts: readonly PanelFact[] = present<PanelFact>([
     {
       detail: `Exora inference · ${recipe.confidence} confidence`,
@@ -372,10 +397,29 @@ export const PlanetExperience = ({
       tone: "accent",
       value: recipe.atmosphere.label.split(" · ")[0],
     },
+    provenance.note !== null && {
+      detail: provenance.note,
+      label: "Mass & radius",
+      tone: "gold",
+      value: provenance.summary,
+    },
+    habitableZone && {
+      detail: habitableZone.detail,
+      label: "Habitable zone",
+      ...(habitableZone.within ? { tone: "cyan" as const } : {}),
+      value: habitableZone.value,
+    },
     !custom && {
       detail: hostSpectrum,
       label: "Host spectrum",
       value: observation.hostSpectralType ?? "Not reported",
+    },
+    tidalLocking && {
+      detail: tidalLocking.locked
+        ? `Star-raised tides despin it in ~${formatTimescale(tidalLocking.despinTimescaleYears)}, so one hemisphere always faces ${planet.hostStar} · day = orbit = ${formatNumber(tidalLocking.rotationPeriodDays, 2)} d`
+        : `Tidal despin would take ~${formatTimescale(tidalLocking.despinTimescaleYears)}, so it likely keeps a day of its own`,
+      label: "Rotation",
+      value: tidalLocking.locked ? "Tidally locked" : "Free rotation",
     },
     custom && {
       detail: "The generated URL carries this recipe, so the same world rebuilds from the link.",
@@ -537,6 +581,17 @@ export const PlanetExperience = ({
           ])
         : presentTabs([
             { blocks: [{ facts: worldFacts, type: "facts" }], id: "record", label: "Record" },
+            !custom &&
+              !primaryBody && {
+                blocks: [
+                  {
+                    facts: derivePlanetPhysics(planet, recipe.derived),
+                    type: "facts" as const,
+                  },
+                ],
+                id: "physics",
+                label: "Physics",
+              },
             solarIdentity?.surfaceNote
               ? {
                   blocks: [
@@ -598,9 +653,9 @@ export const PlanetExperience = ({
           summary={(solar ? solarIdentity?.summary : recipe.summary) ?? recipe.summary}
           tags={[
             recipe.classification,
-            observation.equilibriumTemperatureKelvin === null
+            recipe.derived.equilibriumTemperatureKelvin === null
               ? "TEMP UNKNOWN"
-              : `${formatNumber(observation.equilibriumTemperatureKelvin, 0)} K`,
+              : `${recipe.derived.equilibriumTemperatureSource === "derived" ? "~" : ""}${formatNumber(recipe.derived.equilibriumTemperatureKelvin, 0)} K`,
             observation.discoveryMethod,
           ]}
           tagsLabel="World classification"

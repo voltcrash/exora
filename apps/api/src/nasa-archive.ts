@@ -1,4 +1,10 @@
-import { exoplanetProfileSchema, type ExoplanetProfile, type PlanetKind } from "@exora/contracts";
+import {
+  exoplanetProfileSchema,
+  type ExoplanetProfile,
+  type MassProvenance,
+  type PlanetKind,
+  type RadiusProvenance,
+} from "@exora/contracts";
 import { z } from "zod";
 import { createArchiveCache, createRequestCoalescer } from "./archive-cache.ts";
 import { UpstreamError } from "./errors.ts";
@@ -17,6 +23,8 @@ const NASA_COLUMNS = [
   "pl_bmassj",
   "pl_rade",
   "pl_bmasse",
+  "pl_bmassprov",
+  "pl_rade_reflink",
   "pl_eqt",
   "pl_orbper",
   "pl_orbsmax",
@@ -48,6 +56,7 @@ interface NasaPlanetRow {
   hostname: string | null;
   pl_bmasse: number | null;
   pl_bmassj: number | null;
+  pl_bmassprov: string | null;
   pl_eqt: number | null;
   pl_name: string | null;
   pl_orbeccen: number | null;
@@ -55,6 +64,7 @@ interface NasaPlanetRow {
   pl_orbper: number | null;
   pl_orbsmax: number | null;
   pl_rade: number | null;
+  pl_rade_reflink: string | null;
   pl_radj: number | null;
   ra: number | null;
   st_spectype: string | null;
@@ -74,6 +84,7 @@ const nasaPlanetRowSchema = z.strictObject({
   hostname: nullableText,
   pl_bmasse: nullableFiniteNumber,
   pl_bmassj: nullableFiniteNumber,
+  pl_bmassprov: nullableText,
   pl_eqt: nullableFiniteNumber,
   pl_name: nullableText,
   pl_orbeccen: nullableFiniteNumber,
@@ -81,6 +92,7 @@ const nasaPlanetRowSchema = z.strictObject({
   pl_orbper: nullableFiniteNumber,
   pl_orbsmax: nullableFiniteNumber,
   pl_rade: nullableFiniteNumber,
+  pl_rade_reflink: nullableText,
   pl_radj: nullableFiniteNumber,
   ra: nullableFiniteNumber,
   st_lum: nullableFiniteNumber,
@@ -163,6 +175,29 @@ const classifyPlanet = (row: NasaPlanetRow): PlanetKind => {
   return "unknown";
 };
 
+// pscomppars fills gaps from a mass-radius relation and flags them only in these columns.
+const massProvenance = (row: NasaPlanetRow): MassProvenance | null => {
+  if (numberOrNull(row.pl_bmasse) === null && numberOrNull(row.pl_bmassj) === null) return null;
+  switch (stringOrNull(row.pl_bmassprov)) {
+    case "Mass":
+    case "Msin(i)/sin(i)":
+      return "measured";
+    case "Msini":
+      return "minimum";
+    case "M-R relationship":
+      return "estimated";
+    default:
+      return null;
+  }
+};
+
+const radiusProvenance = (row: NasaPlanetRow): RadiusProvenance | null => {
+  if (numberOrNull(row.pl_rade) === null && numberOrNull(row.pl_radj) === null) return null;
+  const reference = stringOrNull(row.pl_rade_reflink);
+  if (reference === null) return null;
+  return reference.includes("CALCULATED_VALUE") ? "estimated" : "measured";
+};
+
 export const normalizeNasaPlanet = (
   rawRow: Record<string, unknown>,
   retrievedOn = new Date().toISOString().slice(0, 10),
@@ -183,6 +218,8 @@ export const normalizeNasaPlanet = (
       massJupiter: numberOrNull(row.pl_bmassj),
       radiusEarth: numberOrNull(row.pl_rade),
       massEarth: numberOrNull(row.pl_bmasse),
+      massProvenance: massProvenance(row),
+      radiusProvenance: radiusProvenance(row),
       equilibriumTemperatureKelvin: numberOrNull(row.pl_eqt),
       orbitalEccentricity: numberOrNull(row.pl_orbeccen),
       orbitalInclinationDegrees: numberOrNull(row.pl_orbincl),

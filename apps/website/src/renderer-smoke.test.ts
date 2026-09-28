@@ -202,7 +202,7 @@ const sceneCounts = (scene: Scene) => ({
   transformNodes: scene.transformNodes.length,
 });
 
-test("a black-hole world separates the shadow, photon ring and observed environment", async () => {
+test("a black-hole world ray-traces its shadow and disk beside the observed environment", async () => {
   const { engine, host, scene } = createHarness();
   const scope = openWorldScope(scene);
   const before = sceneCounts(scene);
@@ -215,10 +215,8 @@ test("a black-hole world separates the shadow, photon ring and observed environm
   });
   await scope.seal();
 
-  expect(scene.meshes.some(({ name }) => name === "event-horizon-shadow")).toBe(true);
-  expect(scene.meshes.some(({ name }) => name === "photon-ring-reference")).toBe(true);
-  expect(scene.meshes.some(({ name }) => name.startsWith("accretion-band"))).toBe(true);
-  expect(scene.meshes.some(({ name }) => name.startsWith("relativistic-jet"))).toBe(true);
+  const lensing = scene.meshes.find(({ name }) => name === "event-horizon-lensing");
+  expect(lensing?.material?.name).toBe("event-horizon-lensing-material");
   expect(() => scene.render()).not.toThrow();
 
   world.dispose();

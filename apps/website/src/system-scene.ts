@@ -16,6 +16,7 @@ import {
   deriveHostStar,
   deriveWorldRecipe,
   hashObjectId,
+  type HabitableZone,
   type Rgb,
   type WorldRecipe,
 } from "@exora/worldgen";
@@ -43,6 +44,9 @@ const XR_SYSTEM_STAND = new Vector3(0, 0, -16.5);
 const XR_SYSTEM_ELEVATION_RADIANS = (14 * Math.PI) / 180;
 const NOMINAL_EYE_HEIGHT = 1.6;
 const ORBIT_THICKNESS = 0.011;
+const HABITABLE_ZONE_COLOR = new Color3(0.36, 0.86, 0.58);
+const HABITABLE_ZONE_ALPHA = 0.16;
+const HABITABLE_ZONE_DEPTH = -0.004;
 
 export interface SystemWorldOptions {
   hostName: string;
@@ -171,6 +175,72 @@ const buildOrbitRibbon = (scene: Scene, name: string, path: readonly Vector3[]):
   vertexData.applyToMesh(mesh, false);
   mesh.isPickable = false;
   mesh.applyFog = false;
+  return mesh;
+};
+
+// Optimistic limits fade to nothing so the band's hard edges read as the conservative limits.
+const buildHabitableZone = (
+  scene: Scene,
+  mapping: DistanceMapping,
+  zone: HabitableZone,
+  maximumSceneUnits: number,
+  segments: number,
+): Mesh | null => {
+  const stops = [
+    [zone.optimisticInnerAu, 0],
+    [zone.conservativeInnerAu, 0.62],
+    [Math.sqrt(zone.conservativeInnerAu * zone.conservativeOuterAu), 1],
+    [zone.conservativeOuterAu, 0.62],
+    [zone.optimisticOuterAu, 0],
+  ] as const;
+  const radii = stops.map(([au]) => Math.min(mapDistance(mapping, au), maximumSceneUnits));
+  const innermost = Math.max(radii[0] ?? 0, mapping.floorSceneUnits);
+  const outermost = radii.at(-1) ?? 0;
+  if (outermost <= innermost) return null;
+
+  const rings = stops.length;
+  const positions = new Float32Array(segments * rings * 3);
+  const colors = new Float32Array(segments * rings * 4);
+  const indices = new Uint32Array(segments * (rings - 1) * 6);
+  for (let segment = 0; segment < segments; segment += 1) {
+    const angle = (segment / segments) * Math.PI * 2;
+    const cos = Math.cos(angle);
+    const sin = Math.sin(angle);
+    for (let ring = 0; ring < rings; ring += 1) {
+      const radius = Math.max(radii[ring] ?? 0, innermost);
+      const vertex = segment * rings + ring;
+      positions.set([cos * radius, HABITABLE_ZONE_DEPTH, sin * radius], vertex * 3);
+      colors.set([1, 1, 1, stops[ring]?.[1] ?? 0], vertex * 4);
+    }
+  }
+  for (let segment = 0; segment < segments; segment += 1) {
+    const next = (segment + 1) % segments;
+    for (let ring = 0; ring < rings - 1; ring += 1) {
+      const face = (segment * (rings - 1) + ring) * 6;
+      const a = segment * rings + ring;
+      const b = next * rings + ring;
+      indices.set([a, b, b + 1, a, b + 1, a + 1], face);
+    }
+  }
+
+  const mesh = new Mesh("diorama-habitable-zone", scene);
+  const vertexData = new VertexData();
+  vertexData.positions = positions;
+  vertexData.colors = colors;
+  vertexData.indices = indices;
+  vertexData.applyToMesh(mesh, false);
+  mesh.hasVertexAlpha = true;
+  mesh.isPickable = false;
+  mesh.applyFog = false;
+
+  const material = new StandardMaterial("diorama-habitable-zone-material", scene);
+  material.disableLighting = true;
+  material.emissiveColor = HABITABLE_ZONE_COLOR;
+  material.alpha = HABITABLE_ZONE_ALPHA;
+  material.disableDepthWrite = true;
+  material.backFaceCulling = false;
+  material.freeze();
+  mesh.material = material;
   return mesh;
 };
 
@@ -318,6 +388,17 @@ export const createSystemWorld = (
   starLight.diffuse = starRecipe ? toColor3(starRecipe.color) : Color3.White();
   starLight.specular = Color3.Black();
   starLight.intensity = 1.45;
+
+  if (layout.habitableZone) {
+    const zone = buildHabitableZone(
+      scene,
+      layout.mapping,
+      layout.habitableZone,
+      outerReach * 2.9,
+      profile.systemOrbitSegments,
+    );
+    if (zone) zone.parent = root;
+  }
 
   if (hasEarthSightline(layout)) {
     const reach = outerReach * 1.3;
