@@ -516,6 +516,10 @@
   text-transform: uppercase;
 }
 
+.panel-facts dd strong .fact-unit {
+  text-transform: none;
+}
+
 .panel-facts dd small {
   color: var(--faint);
   font-family: var(--mono);

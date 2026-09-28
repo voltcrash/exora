@@ -18,6 +18,7 @@ import {
 import { warmDestinations } from "../destination-cache.ts";
 import type { ViewMode } from "../planet-scene.ts";
 import { readHabitableZone } from "../habitable-zone-reading.ts";
+import { derivePlanetPhysics } from "../planet-physics.ts";
 import {
   formatMeasurement,
   formatNumber,
@@ -564,6 +565,17 @@ export const PlanetExperience = ({
           ])
         : presentTabs([
             { blocks: [{ facts: worldFacts, type: "facts" }], id: "record", label: "Record" },
+            !custom &&
+              !primaryBody && {
+                blocks: [
+                  {
+                    facts: derivePlanetPhysics(planet, recipe.derived),
+                    type: "facts" as const,
+                  },
+                ],
+                id: "physics",
+                label: "Physics",
+              },
             solarIdentity?.surfaceNote
               ? {
                   blocks: [

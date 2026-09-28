@@ -24,7 +24,10 @@ const PanelBlockView = ({ block }: { block: PanelBlock }) => {
             <div key={fact.label} data-tone={fact.tone}>
               <dt>{fact.label}</dt>
               <dd>
-                <strong>{fact.value}</strong>
+                <strong>
+                  {fact.value}
+                  {fact.unit ? <span className={cx("fact-unit")}> {fact.unit}</span> : null}
+                </strong>
                 {fact.detail ? <small>{fact.detail}</small> : null}
               </dd>
             </div>
