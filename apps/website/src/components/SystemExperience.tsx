@@ -13,6 +13,7 @@ import type { SceneHost, XrStatus } from "../scene-host.ts";
 import { isEphemerisDerivedAt } from "../solar-ephemeris.ts";
 import {
   bodyScaleLabel,
+  bodySizeProvenance,
   elementProvenance,
   habitableZoneLabel,
   habitableZoneTag,
@@ -336,6 +337,7 @@ export const SystemExperience = ({
             : `${formatNumber(orbit.elements.periodDays, 1)} d`,
           habitableZoneTag(orbit.habitableZone),
           elementProvenance(orbit.elements),
+          bodySizeProvenance(orbit),
         ]
           .filter(Boolean)
           .join(" · "),
