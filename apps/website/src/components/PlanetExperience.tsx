@@ -17,6 +17,7 @@ import {
 } from "../destination-panel.ts";
 import { warmDestinations } from "../destination-cache.ts";
 import { detectionFacts, readDetectionSignal } from "../detection-signal.ts";
+import { nextTransitFact, predictTransits } from "../transit-ephemeris.ts";
 import type { ViewMode } from "../planet-scene.ts";
 import { readHabitableZone } from "../habitable-zone-reading.ts";
 import { readProvenance } from "../measurement-provenance.ts";
@@ -40,6 +41,15 @@ import hudStyles from "./DestinationHud.module.css";
 import { bindStyles } from "../styles/bind-styles.ts";
 
 const cx = bindStyles(sharedStyles, hudStyles);
+
+const TRANSIT_DATE_FORMAT = new Intl.DateTimeFormat(undefined, {
+  day: "numeric",
+  hour: "2-digit",
+  minute: "2-digit",
+  month: "short",
+  timeZoneName: "short",
+  weekday: "short",
+});
 
 interface PlanetExperienceProps {
   chromeHidden: boolean;
@@ -155,6 +165,7 @@ export const PlanetExperience = ({
   travelPhase,
 }: PlanetExperienceProps) => {
   const [fps, setFps] = useState("--");
+  const [clockMs, setClockMs] = useState(Date.now);
   const [sceneState, setSceneState] = useState<"loading" | "ready" | "error">("loading");
   const [sceneMode, setSceneMode] = useState<"subsystem" | "world">("world");
   const [subsystem, setSubsystem] = useState<PlanetarySubsystem | null>(null);
@@ -235,6 +246,11 @@ export const PlanetExperience = ({
   }, [custom, planet.hostStar]);
 
   useEffect(() => host?.onXrStatus(setXrStatus), [host]);
+
+  useEffect(() => {
+    const minuteTimer = window.setInterval(() => setClockMs(Date.now()), 60_000);
+    return () => window.clearInterval(minuteTimer);
+  }, []);
 
   useEffect(() => {
     if (!host) return;
@@ -393,6 +409,22 @@ export const PlanetExperience = ({
   const detection = useMemo(
     () => readDetectionSignal(planet, recipe.derived.equilibriumTemperatureKelvin),
     [planet, recipe.derived.equilibriumTemperatureKelvin],
+  );
+  const nextTransit = useMemo(
+    () =>
+      nextTransitFact(
+        predictTransits({
+          declinationDegrees: observation.declinationDegrees,
+          nowMs: clockMs,
+          periodDays: observation.orbitalPeriodDays,
+          rightAscensionDegrees: observation.rightAscensionDegrees,
+          signal: observation.signal,
+        }),
+        detection.transit?.durationHours ?? null,
+        clockMs,
+        TRANSIT_DATE_FORMAT,
+      ),
+    [clockMs, detection.transit?.durationHours, observation],
   );
   const habitableZone = custom || primaryBody ? null : readHabitableZone(planet);
 
@@ -601,6 +633,7 @@ export const PlanetExperience = ({
             !custom &&
               !solar && {
                 blocks: [
+                  { facts: present([nextTransit]), type: "facts" as const },
                   {
                     content: (
                       <SignalCurves
