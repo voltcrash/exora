@@ -12,6 +12,7 @@ import {
 } from "../destination-panel.ts";
 import { warmDestinations } from "../destination-cache.ts";
 import type { ViewMode } from "../planet-scene.ts";
+import { readHabitableZone } from "../habitable-zone-reading.ts";
 import { formatMeasurement, formatNumber, formatPlanetName } from "../planet-utils.tsx";
 import type { PlanetarySubsystem } from "../planetary-subsystems.ts";
 import type { SceneHost, XrStatus } from "../scene-host.ts";
@@ -365,12 +366,20 @@ export const PlanetExperience = ({
       ]
     : [];
 
+  const habitableZone = custom || primaryBody ? null : readHabitableZone(planet);
+
   const worldFacts: readonly PanelFact[] = present<PanelFact>([
     {
       detail: `Exora inference · ${recipe.confidence} confidence`,
       label: "Atmosphere model",
       tone: "accent",
       value: recipe.atmosphere.label.split(" · ")[0],
+    },
+    habitableZone && {
+      detail: habitableZone.detail,
+      label: "Habitable zone",
+      ...(habitableZone.within ? { tone: "cyan" as const } : {}),
+      value: habitableZone.value,
     },
     !custom && {
       detail: hostSpectrum,
