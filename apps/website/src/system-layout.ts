@@ -162,6 +162,16 @@ export const deriveOrbitElements = (planet: ExoplanetProfile): OrbitElements | n
   };
 };
 
+/**
+ * Catalog inclinations are measured against the plane of the sky, so every tilted orbit shares
+ * one axis toward Earth: the diorama's z-axis. It only means something once an inclination has
+ * been measured, and never for the Solar System, which Earth sits inside.
+ */
+export const hasEarthSightline = (layout: SystemLayout): boolean =>
+  layout.orbits.some(
+    ({ elements, planet }) => elements.inclinationSource === "measured" && !planet.solarSystem,
+  );
+
 export const orbitTiltRadians = (inclinationDegrees: number): number => {
   const folded = inclinationDegrees > 90 ? 180 - inclinationDegrees : inclinationDegrees;
   return ((90 - folded) * Math.PI) / 180;

@@ -10,6 +10,7 @@ import {
   DIORAMA_INNER_SCENE_UNITS,
   DIORAMA_OUTER_SCENE_UNITS,
   eccentricAnomaly,
+  hasEarthSightline,
   elementProvenance,
   INNERMOST_ORBIT_SECONDS,
   mapDistance,
@@ -309,4 +310,21 @@ test("the readouts state the compressions rather than leaving the layout to look
   expect(orbitMappingLabel(layout)).toBe("LOG · 0.050–1.20 AU → 3.0–13.0 m");
   expect(timeScaleLabel(layout)).toBe("1 s = 0.444 d");
   expect(bodyExaggeration(layout.mapping)).toBeGreaterThan(100);
+});
+
+test("Earth's line of sight is drawn only once an exoplanet's inclination is measured", () => {
+  expect(
+    hasEarthSightline(
+      deriveSystemLayout([
+        world("Tilted b", { orbitalInclinationDegrees: 89.6, semiMajorAxisAu: 0.2 }),
+      ]),
+    ),
+  ).toBe(true);
+  expect(
+    hasEarthSightline(
+      deriveSystemLayout([
+        world("Flat b", { orbitalInclinationDegrees: null, semiMajorAxisAu: 0.2 }),
+      ]),
+    ),
+  ).toBe(false);
 });

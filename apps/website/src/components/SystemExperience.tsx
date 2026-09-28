@@ -7,6 +7,7 @@ import {
   presentTabs,
   type DestinationPanelModel,
   type PanelBlock,
+  type PanelFact,
 } from "../destination-panel.ts";
 import { formatNumber } from "../planet-utils.tsx";
 import type { SceneHost, XrStatus } from "../scene-host.ts";
@@ -14,6 +15,7 @@ import { isEphemerisDerivedAt } from "../solar-ephemeris.ts";
 import {
   bodyScaleLabel,
   elementProvenance,
+  hasEarthSightline,
   orbitMappingLabel,
   timeScaleLabel,
   type SystemLayout,
@@ -382,10 +384,17 @@ export const SystemExperience = ({
       {
         blocks: [
           {
-            facts: [
+            facts: present<PanelFact>([
               { label: "Orbit radii", value: layout ? orbitMappingLabel(layout) : "—" },
               { label: "Body radii", value: layout ? bodyScaleLabel(layout) : "—" },
               { label: "Clock", value: layout ? timeScaleLabel(layout) : "—" },
+              layout &&
+                hasEarthSightline(layout) && {
+                  detail:
+                    "Catalog inclinations are measured against the sky, so Earth lies along this axis. A world whose orbit is seen edge-on along it crosses the star's face.",
+                  label: "Line of sight",
+                  value: "Dashed axis toward Earth",
+                },
               {
                 detail: ephemeris
                   ? isEphemerisDerivedAt(ephemeris.data, displayedAt)
@@ -396,7 +405,7 @@ export const SystemExperience = ({
                 ...(ephemeris ? { tone: "cyan" as const } : {}),
                 value: ephemeris ? "JPL Horizons" : "Not measured",
               },
-            ],
+            ]),
             type: "facts" as const,
           },
           {
