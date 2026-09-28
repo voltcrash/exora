@@ -1,11 +1,13 @@
 import { expect, test } from "vite-plus/test";
 import type { ExoplanetProfile, StarProfile } from "@exora/contracts";
 import {
+  deriveEquilibriumTemperatureKelvin,
   deriveHostStar,
   derivePlanetDerivedProperties,
   derivePlanetInferredProperties,
   derivePlanetMeasuredProperties,
   deriveStarRecipe,
+  convectiveEnvelopeStrength,
   deriveWorldRecipe,
   generateCustomStar,
   generateCustomWorld,
@@ -903,6 +905,28 @@ test("A/B hot stars resolve to a blue-white star recipe with weaker granulation 
   expect(hotRecipe.granulationStrength).toBeLessThan(coolRecipe.granulationStrength);
 });
 
+test("starspots need a convective envelope, so hot photospheres stay unspotted", () => {
+  expect(convectiveEnvelopeStrength(5_772)).toBe(1);
+  expect(convectiveEnvelopeStrength(6_800)).toBeCloseTo(0.5, 5);
+  expect(convectiveEnvelopeStrength(9_850)).toBe(0);
+
+  expect(deriveStarRecipe(hotABStar).spotCoverage).toBe(0);
+  expect(deriveStarRecipe(mDwarfStar).spotCoverage).toBeGreaterThan(0);
+  expect(deriveStarRecipe({ ...gStar, kind: "white-dwarf" }).spotCoverage).toBe(0);
+  expect(
+    deriveHostStar({
+      ...featuredPlanet,
+      observation: { ...featuredPlanet.observation, hostTemperatureKelvin: 9_000 },
+    }).spotCoverage,
+  ).toBe(0);
+  expect(
+    deriveHostStar({
+      ...earthSizeRockyPlanet,
+      observation: { ...earthSizeRockyPlanet.observation, hostTemperatureKelvin: 3_400 },
+    }).spotCoverage,
+  ).toBeGreaterThan(0);
+});
+
 test("star recipe GENERATED fields stay within their documented [0, 1] or positive ranges", () => {
   for (const star of [mDwarfStar, gStar, hotABStar, catalogStar]) {
     const recipe = deriveStarRecipe(star);
@@ -974,4 +998,52 @@ test("derivePlanetInferredProperties never claims high confidence with no measur
 
   expect(inferred.confidence).toBe("low");
   expect(inferred.visualClass).toBe("unknown");
+});
+
+test("an unreported equilibrium temperature is derived from the host and orbit", () => {
+  const sunAtOneAu = {
+    hostLuminosityLogSolar: 0,
+    hostRadiusSolar: 1,
+    hostTemperatureKelvin: 5_772,
+    semiMajorAxisAu: 1,
+  };
+
+  expect(deriveEquilibriumTemperatureKelvin(sunAtOneAu)).toBeCloseTo(278.6, 1);
+  expect(
+    deriveEquilibriumTemperatureKelvin({ ...sunAtOneAu, hostLuminosityLogSolar: null }),
+  ).toBeCloseTo(278.3, 0);
+  expect(deriveEquilibriumTemperatureKelvin({ ...sunAtOneAu, semiMajorAxisAu: null })).toBeNull();
+  expect(
+    deriveEquilibriumTemperatureKelvin({
+      ...sunAtOneAu,
+      hostLuminosityLogSolar: null,
+      hostRadiusSolar: null,
+    }),
+  ).toBeNull();
+});
+
+test("a derived temperature drives the recipe without being reported as measured", () => {
+  const unreported: ExoplanetProfile = {
+    ...earthSizeRockyPlanet,
+    id: "unreported-temperature",
+    observation: {
+      ...earthSizeRockyPlanet.observation,
+      equilibriumTemperatureKelvin: null,
+      hostLuminosityLogSolar: 0,
+      semiMajorAxisAu: 1,
+    },
+  };
+  const measured = derivePlanetMeasuredProperties(unreported);
+  const derived = derivePlanetDerivedProperties(measured);
+  const recipe = deriveWorldRecipe(unreported);
+
+  expect(measured.equilibriumTemperatureKelvin).toBeNull();
+  expect(derived.equilibriumTemperatureSource).toBe("derived");
+  expect(derived.equilibriumTemperatureKelvin).toBeCloseTo(278.6, 1);
+  expect(recipe.inferred.visualClass).not.toBe("unknown");
+  expect(recipe.summary).not.toContain("measured equilibrium temperature");
+  expect(
+    derivePlanetDerivedProperties(derivePlanetMeasuredProperties(earthSizeRockyPlanet))
+      .equilibriumTemperatureSource,
+  ).toBe("measured");
 });

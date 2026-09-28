@@ -34,6 +34,7 @@ test("physical controls immediately narrow the visible planet field", () => {
       radiusJupiter: null,
       equilibriumTemperatureKelvin: 260,
       distanceParsecs: 8,
+      semiMajorAxisAu: 0.18,
     },
   };
 
@@ -69,6 +70,29 @@ test("data-completeness control excludes sparsely observed worlds", () => {
       wellMeasured: true,
     }),
   ).toEqual([featuredPlanet]);
+});
+
+test("habitable-zone candidates follow the host's flux limits over equilibrium temperature", () => {
+  const rocky = (id: string, observation: Partial<typeof featuredPlanet.observation>) => ({
+    ...featuredPlanet,
+    id,
+    name: id,
+    kind: "rocky" as const,
+    observation: { ...featuredPlanet.observation, radiusEarth: 1.1, ...observation },
+  });
+  const inZone = rocky("in-zone", { equilibriumTemperatureKelvin: 400, semiMajorAxisAu: 0.18 });
+  const scorched = rocky("scorched", { equilibriumTemperatureKelvin: 260, semiMajorAxisAu: 0.039 });
+  const undescribedHost = rocky("undescribed-host", {
+    equilibriumTemperatureKelvin: 260,
+    hostTemperatureKelvin: null,
+  });
+
+  expect(
+    filterPlanetsByPhysicalControls([inZone, scorched, undescribedHost], {
+      ...DEFAULT_PHYSICAL_PLANET_FILTERS,
+      habitableZone: true,
+    }).map(({ id }) => id),
+  ).toEqual(["in-zone", "undescribed-host"]);
 });
 
 test("a radius the archive calculated does not count toward being well measured", () => {

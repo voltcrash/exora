@@ -23,6 +23,8 @@ export interface PanelFact {
   detail?: ReactNode;
   label: string;
   tone?: PanelTone;
+  /** Kept in its own case, since units like µas and g change meaning when capitalised. */
+  unit?: string;
   value: ReactNode;
 }
 
