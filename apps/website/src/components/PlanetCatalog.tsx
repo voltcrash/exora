@@ -541,7 +541,7 @@ export const PlanetCatalog = ({ embedded = false, onClose, onSelect }: PlanetCat
                   <label key={axis.key} className={cx("physical-axis")}>
                     <span>
                       <strong>{axis.name}</strong>
-                      <small aria-live="polite">
+                      <small aria-hidden="true">
                         {axisPositionLabel(value, axis.low, axis.high)}
                       </small>
                     </span>
@@ -555,7 +555,8 @@ export const PlanetCatalog = ({ embedded = false, onClose, onSelect }: PlanetCat
                       max="100"
                       step="1"
                       value={value}
-                      aria-label={`${axis.name}: ${axisPositionLabel(value, axis.low, axis.high)}`}
+                      aria-label={axis.name}
+                      aria-valuetext={axisPositionLabel(value, axis.low, axis.high)}
                       onChange={(event) =>
                         setPhysicalFilters((current) => ({
                           ...current,
