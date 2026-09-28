@@ -1,0 +1,110 @@
+.chart {
+  --series: var(--cyan);
+
+  display: grid;
+  gap: 6px;
+  margin: 0;
+}
+
+.chart[data-tone="gold"] {
+  --series: #ffc96f;
+}
+
+.chart-title {
+  color: var(--faint);
+  font-family: var(--mono);
+  font-size: 7px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.chart-frame {
+  display: grid;
+  gap: 4px;
+  padding: 8px 8px 6px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: rgb(255 255 255 / 2%);
+}
+
+.chart svg {
+  display: block;
+  width: 100%;
+  height: auto;
+  overflow: visible;
+  touch-action: pan-y;
+  outline: none;
+  cursor: crosshair;
+}
+
+.chart svg:focus-visible {
+  border-radius: 6px;
+  box-shadow: 0 0 0 1px var(--series);
+}
+
+.chart-grid {
+  stroke: rgb(229 244 247 / 9%);
+  stroke-width: 1;
+  vector-effect: non-scaling-stroke;
+}
+
+.chart-marker {
+  stroke: rgb(229 244 247 / 18%);
+  stroke-width: 1;
+  vector-effect: non-scaling-stroke;
+}
+
+.chart-tick {
+  fill: var(--faint);
+  font-family: var(--mono);
+  font-size: 6.5px;
+  font-variant-numeric: tabular-nums;
+}
+
+.chart-line {
+  fill: none;
+  stroke: var(--series);
+  stroke-width: 2;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  vector-effect: non-scaling-stroke;
+}
+
+.chart-crosshair {
+  stroke: rgb(229 244 247 / 40%);
+  stroke-width: 1;
+  vector-effect: non-scaling-stroke;
+}
+
+.chart-dot {
+  fill: var(--series);
+  stroke: #081012;
+  stroke-width: 2;
+  vector-effect: non-scaling-stroke;
+}
+
+.chart-readout {
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+  min-height: 12px;
+  margin: 0;
+  color: var(--faint);
+  font-family: var(--mono);
+  font-size: 7px;
+}
+
+.chart-readout strong {
+  color: #dce6e8;
+  font-weight: 500;
+  font-variant-numeric: tabular-nums;
+}
+
+.visually-hidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}

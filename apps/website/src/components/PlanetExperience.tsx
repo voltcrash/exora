@@ -34,6 +34,7 @@ import { useTypographySettled } from "../use-typography-settled.ts";
 import { DestinationIdentity } from "./DestinationIdentity.tsx";
 import { DestinationPanel } from "./DestinationPanel.tsx";
 import { MissionControl } from "./MissionControl.tsx";
+import { SignalCurves } from "./SignalCurves.tsx";
 import sharedStyles from "./ExperienceShared.module.css";
 import hudStyles from "./DestinationHud.module.css";
 import { bindStyles } from "../styles/bind-styles.ts";
@@ -389,6 +390,10 @@ export const PlanetExperience = ({
     : [];
 
   const tidalLocking = custom || primaryBody ? null : deriveTidalLocking(planet);
+  const detection = useMemo(
+    () => readDetectionSignal(planet, recipe.derived.equilibriumTemperatureKelvin),
+    [planet, recipe.derived.equilibriumTemperatureKelvin],
+  );
   const habitableZone = custom || primaryBody ? null : readHabitableZone(planet);
 
   const worldFacts: readonly PanelFact[] = present<PanelFact>([
@@ -597,12 +602,17 @@ export const PlanetExperience = ({
               !solar && {
                 blocks: [
                   {
-                    facts: detectionFacts(
-                      planet,
-                      readDetectionSignal(planet, recipe.derived.equilibriumTemperatureKelvin),
+                    content: (
+                      <SignalCurves
+                        eccentricity={observation.orbitalEccentricity}
+                        periodDays={observation.orbitalPeriodDays}
+                        transit={detection.transit}
+                        velocity={detection.velocity}
+                      />
                     ),
-                    type: "facts" as const,
+                    type: "custom" as const,
                   },
+                  { facts: detectionFacts(planet, detection), type: "facts" as const },
                 ],
                 id: "signal",
                 label: "Signal",
