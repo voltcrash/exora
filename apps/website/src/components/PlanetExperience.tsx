@@ -625,9 +625,9 @@ export const PlanetExperience = ({
           summary={(solar ? solarIdentity?.summary : recipe.summary) ?? recipe.summary}
           tags={[
             recipe.classification,
-            observation.equilibriumTemperatureKelvin === null
+            recipe.derived.equilibriumTemperatureKelvin === null
               ? "TEMP UNKNOWN"
-              : `${formatNumber(observation.equilibriumTemperatureKelvin, 0)} K`,
+              : `${recipe.derived.equilibriumTemperatureSource === "derived" ? "~" : ""}${formatNumber(recipe.derived.equilibriumTemperatureKelvin, 0)} K`,
             observation.discoveryMethod,
           ]}
           tagsLabel="World classification"
