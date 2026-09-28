@@ -6,6 +6,7 @@ import {
   derivePlanetInferredProperties,
   derivePlanetMeasuredProperties,
   deriveStarRecipe,
+  convectiveEnvelopeStrength,
   deriveWorldRecipe,
   generateCustomStar,
   generateCustomWorld,
@@ -901,6 +902,28 @@ test("A/B hot stars resolve to a blue-white star recipe with weaker granulation 
   expect(hotRecipe.spectralClassification.startsWith("B")).toBe(true);
   expect(hotRecipe.temperatureKelvin).toBeGreaterThan(10_000);
   expect(hotRecipe.granulationStrength).toBeLessThan(coolRecipe.granulationStrength);
+});
+
+test("starspots need a convective envelope, so hot photospheres stay unspotted", () => {
+  expect(convectiveEnvelopeStrength(5_772)).toBe(1);
+  expect(convectiveEnvelopeStrength(6_800)).toBeCloseTo(0.5, 5);
+  expect(convectiveEnvelopeStrength(9_850)).toBe(0);
+
+  expect(deriveStarRecipe(hotABStar).spotCoverage).toBe(0);
+  expect(deriveStarRecipe(mDwarfStar).spotCoverage).toBeGreaterThan(0);
+  expect(deriveStarRecipe({ ...gStar, kind: "white-dwarf" }).spotCoverage).toBe(0);
+  expect(
+    deriveHostStar({
+      ...featuredPlanet,
+      observation: { ...featuredPlanet.observation, hostTemperatureKelvin: 9_000 },
+    }).spotCoverage,
+  ).toBe(0);
+  expect(
+    deriveHostStar({
+      ...earthSizeRockyPlanet,
+      observation: { ...earthSizeRockyPlanet.observation, hostTemperatureKelvin: 3_400 },
+    }).spotCoverage,
+  ).toBeGreaterThan(0);
 });
 
 test("star recipe GENERATED fields stay within their documented [0, 1] or positive ranges", () => {

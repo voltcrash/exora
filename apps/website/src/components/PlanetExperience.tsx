@@ -17,6 +17,7 @@ import {
 } from "../destination-panel.ts";
 import { warmDestinations } from "../destination-cache.ts";
 import type { ViewMode } from "../planet-scene.ts";
+import { readHabitableZone } from "../habitable-zone-reading.ts";
 import {
   formatMeasurement,
   formatNumber,
@@ -376,6 +377,7 @@ export const PlanetExperience = ({
     : [];
 
   const tidalLocking = custom || primaryBody ? null : deriveTidalLocking(planet);
+  const habitableZone = custom || primaryBody ? null : readHabitableZone(planet);
 
   const worldFacts: readonly PanelFact[] = present<PanelFact>([
     {
@@ -383,6 +385,12 @@ export const PlanetExperience = ({
       label: "Atmosphere model",
       tone: "accent",
       value: recipe.atmosphere.label.split(" · ")[0],
+    },
+    habitableZone && {
+      detail: habitableZone.detail,
+      label: "Habitable zone",
+      ...(habitableZone.within ? { tone: "cyan" as const } : {}),
+      value: habitableZone.value,
     },
     !custom && {
       detail: hostSpectrum,

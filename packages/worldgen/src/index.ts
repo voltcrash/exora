@@ -5,6 +5,17 @@ export {
   generateProceduralBlackHole,
   generateProceduralBlackHoles,
 } from "./procedural-black-holes.ts";
+export {
+  deriveHabitableZone,
+  HABITABLE_ZONE_CALIBRATED_KELVIN,
+  habitableZonePlacement,
+  isWithinHabitableZone,
+} from "./habitable-zone.ts";
+export type {
+  HabitableZone,
+  HabitableZoneInputs,
+  HabitableZonePlacement,
+} from "./habitable-zone.ts";
 export { deriveTidalLocking, TIDAL_LOCK_THRESHOLD_YEARS } from "./tidal-locking.ts";
 export type { TidalLocking } from "./tidal-locking.ts";
 export type {
@@ -284,6 +295,16 @@ const clamp = (value: number, minimum: number, maximum: number): number =>
 const clampUnit = (value: number): number =>
   Number.isFinite(value) ? Math.min(1, Math.max(0, value)) : 0;
 
+// Starspots are magnetic flux concentrations in a convective envelope. Above the Kraft break
+// the envelope thins to nothing, so A, B, and O photospheres carry no spots.
+const CONVECTIVE_ENVELOPE_KELVIN = [6_200, 7_400] as const;
+
+export const convectiveEnvelopeStrength = (temperatureKelvin: number): number => {
+  const [full, none] = CONVECTIVE_ENVELOPE_KELVIN;
+  const fade = clampUnit((temperatureKelvin - full) / (none - full));
+  return 1 - fade * fade * (3 - 2 * fade);
+};
+
 export const temperatureToRgb = (temperatureKelvin: number): Rgb => {
   const temperature = clamp(temperatureKelvin, 1_000, 40_000) / 100;
   const red = temperature <= 66 ? 255 : 329.698727446 * (temperature - 60) ** -0.1332047592;
@@ -495,7 +516,7 @@ export const deriveHostStar = (planet: ExoplanetProfile): BaseWorldRecipe["star"
     intensity: clamp(1.45 + Math.log10(Math.max(0.001, luminositySolar)) * 0.34, 0.65, 3.2),
     apparentRadiusRadians: clamp(physicalAngularRadius * 2.4, 0.012, 0.09),
     activity,
-    spotCoverage: clampUnit(activity * 0.3),
+    spotCoverage: clampUnit(activity * 0.3 * convectiveEnvelopeStrength(temperatureKelvin)),
     granulationScale: 0.4 + convectiveTendency * 1.6,
     granulationStrength: clampUnit(0.2 + convectiveTendency * 0.5),
     coronalIntensity: clampUnit(0.25 + activity * 0.65),
@@ -1254,6 +1275,8 @@ export const deriveStarRecipe = (star: StarProfile): StarVisualRecipe => {
   const color = temperatureToRgb(temperatureKelvin);
   const activity = clampUnit(star.customization?.activity ?? 0.55);
   const convectiveTendency = clampUnit(1 - (temperatureKelvin - 3_000) / 27_000);
+  const compactRemnant = star.kind === "white-dwarf" || star.kind === "neutron-star";
+  const spotFraction = 0.15 + random() * 0.35;
 
   return {
     seed,
@@ -1267,7 +1290,9 @@ export const deriveStarRecipe = (star: StarProfile): StarVisualRecipe => {
     activity,
     spectralClassification: `${spectralClass ?? "G"}${luminosityClass(star.kind)}`,
     rotationFactor: clampUnit(star.customization?.rotation ?? 0.5),
-    spotCoverage: clampUnit(activity * (0.15 + random() * 0.35)),
+    spotCoverage: compactRemnant
+      ? 0
+      : clampUnit(activity * spotFraction * convectiveEnvelopeStrength(temperatureKelvin)),
     granulationScale: 0.4 + convectiveTendency * 1.6 + random() * 0.3,
     granulationStrength: clampUnit(0.2 + convectiveTendency * 0.5 + random() * 0.1),
     coronalIntensity: clampUnit(0.25 + activity * 0.65 + random() * 0.1),

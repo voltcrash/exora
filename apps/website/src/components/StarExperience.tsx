@@ -12,6 +12,7 @@ import {
 } from "../destination-panel.ts";
 import { formatNumber } from "../planet-utils.tsx";
 import type { SceneHost, XrStatus } from "../scene-host.ts";
+import { readStarHabitableZone } from "../star-habitable-zone.ts";
 import { deriveStarVisual, starKindLabel, starSummary } from "../star-utils.ts";
 import type { TravelPhase } from "../travel-transition.ts";
 import { useTypographySettled } from "../use-typography-settled.ts";
@@ -58,6 +59,7 @@ export const StarExperience = ({
   const observation = star.observation;
   const visual = deriveStarVisual(star);
   const custom = result.mode === "custom";
+  const habitableZone = custom ? null : readStarHabitableZone(star, systemPlanets);
   const solar = result.mode === "solar";
   const travelling = travelPhase === "departing" || travelPhase === "crossing";
   const typographySettled = useTypographySettled();
@@ -255,6 +257,11 @@ export const StarExperience = ({
                   : solar
                     ? `${formatNumber((star.solarSystem?.rotationPeriodHours ?? 0) / 24, 2)} d sidereal`
                     : `${formatNumber(observation.radialVelocityKmPerSecond, 1)} km/s radial`,
+              },
+              habitableZone && {
+                detail: habitableZone.detail,
+                label: "Habitable zone",
+                value: habitableZone.value,
               },
               custom && {
                 detail:
