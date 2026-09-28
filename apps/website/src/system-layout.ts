@@ -50,7 +50,7 @@ export interface PlacedOrbit {
   phaseRadians: number;
   planet: ExoplanetProfile;
   radiusEarth: number;
-  radiusEarthSource: Extract<ElementSource, "assumed" | "measured">;
+  radiusEarthSource: ElementSource;
   semiMajorAxisSceneUnits: number;
   tiltRadians: number;
 }
@@ -167,14 +167,13 @@ export const orbitTiltRadians = (inclinationDegrees: number): number => {
   return ((90 - folded) * Math.PI) / 180;
 };
 
-const radiusEarthOf = (
-  planet: ExoplanetProfile,
-): { source: Extract<ElementSource, "assumed" | "measured">; value: number } => {
+const radiusEarthOf = (planet: ExoplanetProfile): { source: ElementSource; value: number } => {
+  const source = planet.observation.radiusProvenance === "estimated" ? "derived" : "measured";
   const earth = positive(planet.observation.radiusEarth);
-  if (earth !== null) return { source: "measured", value: earth };
+  if (earth !== null) return { source, value: earth };
   const jupiter = positive(planet.observation.radiusJupiter);
   if (jupiter !== null) {
-    return { source: "measured", value: jupiter * EARTH_RADII_PER_JUPITER_RADIUS };
+    return { source, value: jupiter * EARTH_RADII_PER_JUPITER_RADIUS };
   }
   return { source: "assumed", value: 1 };
 };
@@ -323,6 +322,13 @@ export const elementProvenance = (elements: OrbitElements): string => {
   if (elements.periodSource === null) assumptions.push("UNTIMED · PARKED");
   return assumptions.length === 0 ? "ORBIT FULLY MEASURED" : assumptions.join(" · ");
 };
+
+export const bodySizeProvenance = (orbit: PlacedOrbit): string | null =>
+  orbit.radiusEarthSource === "derived"
+    ? "SIZE FROM MASS"
+    : orbit.radiusEarthSource === "assumed"
+      ? "SIZE ASSUMED"
+      : null;
 
 export const orbitSummary = (orbit: PlacedOrbit): string =>
   [

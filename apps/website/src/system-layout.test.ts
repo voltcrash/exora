@@ -2,6 +2,7 @@ import type { ExoplanetProfile } from "@exora/contracts";
 import { expect, test } from "vite-plus/test";
 import {
   bodyExaggeration,
+  bodySizeProvenance,
   bodyRadiusSceneUnits,
   deriveDistanceMapping,
   deriveOrbitElements,
@@ -283,6 +284,18 @@ test("an unmeasured planet radius is drawn as an Earth and reports itself as ass
 
   expect(layout.orbits[0]?.radiusEarth).toBe(1);
   expect(layout.orbits[0]?.radiusEarthSource).toBe("assumed");
+});
+
+test("a radius the archive calculated from the mass is drawn but reported as derived", () => {
+  const layout = deriveSystemLayout([
+    world("Estimated b", { radiusEarth: 3.3, radiusProvenance: "estimated", semiMajorAxisAu: 0.3 }),
+    world("Measured c", { radiusEarth: 1.1, semiMajorAxisAu: 0.6 }),
+  ]);
+  const [estimated, measured] = layout.orbits;
+
+  expect(estimated?.radiusEarth).toBe(3.3);
+  expect(estimated && bodySizeProvenance(estimated)).toBe("SIZE FROM MASS");
+  expect(measured && bodySizeProvenance(measured)).toBeNull();
 });
 
 test("the host radius falls back through the mass relation before it is assumed", () => {

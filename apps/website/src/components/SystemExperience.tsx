@@ -13,6 +13,7 @@ import type { SceneHost, XrStatus } from "../scene-host.ts";
 import { isEphemerisDerivedAt } from "../solar-ephemeris.ts";
 import {
   bodyScaleLabel,
+  bodySizeProvenance,
   elementProvenance,
   orbitMappingLabel,
   timeScaleLabel,
@@ -331,7 +332,9 @@ export const SystemExperience = ({
           orbit.elements.periodDays === null
             ? "UNTIMED"
             : `${formatNumber(orbit.elements.periodDays, 1)} d`
-        } · ${elementProvenance(orbit.elements)}`,
+        } · ${[elementProvenance(orbit.elements), bodySizeProvenance(orbit)]
+          .filter(Boolean)
+          .join(" · ")}`,
         name: orbit.planet.name,
         onSelect: () => onSelectPlanet(orbit.planet, cached),
       })),
