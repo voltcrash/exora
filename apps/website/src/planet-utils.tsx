@@ -21,6 +21,22 @@ export const formatMeasurement = (value: number | null, maximumFractionDigits = 
   return smallMeasurementFormatter.format(value);
 };
 
+const TIMESCALE_UNITS = [
+  [1e12, "trillion years"],
+  [1e9, "billion years"],
+  [1e6, "million years"],
+  [1e3, "thousand years"],
+] as const;
+const twoFigures = new Intl.NumberFormat("en", { maximumSignificantDigits: 2 });
+
+export const formatTimescale = (years: number): string => {
+  if (years >= 1e15) return `10^${Math.floor(Math.log10(years))} years`;
+  for (const [scale, unit] of TIMESCALE_UNITS) {
+    if (years >= scale) return `${twoFigures.format(years / scale)} ${unit}`;
+  }
+  return years < 1 ? "under a year" : `${twoFigures.format(years)} years`;
+};
+
 export const formatPlanetName = (name: string): ReactNode => {
   const segments = name.split(" ");
   const suffix = segments.at(-1);
