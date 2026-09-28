@@ -15,6 +15,8 @@ import {
   bodyScaleLabel,
   bodySizeProvenance,
   elementProvenance,
+  habitableZoneLabel,
+  habitableZoneTag,
   orbitMappingLabel,
   timeScaleLabel,
   type SystemLayout,
@@ -328,13 +330,17 @@ export const SystemExperience = ({
       bodies: drawn.map((orbit) => ({
         id: orbit.planet.id,
         kind: orbit.planet.kind,
-        meta: `${formatNumber(orbit.elements.semiMajorAxisAu, 3)} AU · ${
+        meta: [
+          `${formatNumber(orbit.elements.semiMajorAxisAu, 3)} AU`,
           orbit.elements.periodDays === null
             ? "UNTIMED"
-            : `${formatNumber(orbit.elements.periodDays, 1)} d`
-        } · ${[elementProvenance(orbit.elements), bodySizeProvenance(orbit)]
+            : `${formatNumber(orbit.elements.periodDays, 1)} d`,
+          habitableZoneTag(orbit.habitableZone),
+          elementProvenance(orbit.elements),
+          bodySizeProvenance(orbit),
+        ]
           .filter(Boolean)
-          .join(" · ")}`,
+          .join(" · "),
         name: orbit.planet.name,
         onSelect: () => onSelectPlanet(orbit.planet, cached),
       })),
@@ -389,6 +395,22 @@ export const SystemExperience = ({
               { label: "Orbit radii", value: layout ? orbitMappingLabel(layout) : "—" },
               { label: "Body radii", value: layout ? bodyScaleLabel(layout) : "—" },
               { label: "Clock", value: layout ? timeScaleLabel(layout) : "—" },
+              {
+                detail: layout?.habitableZone
+                  ? `Kopparapu et al. (2014) flux limits for an Earth-mass world, from the host's ${
+                      layout.habitableZone.luminositySource === "measured"
+                        ? "measured luminosity"
+                        : "radius and temperature"
+                    }${
+                      layout.habitableZone.extrapolated
+                        ? ", extrapolated beyond the fit's 2,600–7,200 K calibration"
+                        : ""
+                    }. The green band spans the conservative zone and fades across the optimistic one.`
+                  : "The archive lacks the host temperature and luminosity or radius the flux limits need.",
+                label: "Habitable zone",
+                ...(layout?.habitableZone ? { tone: "cyan" as const } : {}),
+                value: layout ? habitableZoneLabel(layout) : "—",
+              },
               {
                 detail: ephemeris
                   ? isEphemerisDerivedAt(ephemeris.data, displayedAt)

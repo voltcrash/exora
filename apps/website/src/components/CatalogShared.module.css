@@ -1249,33 +1249,63 @@
   z-index: 1;
   position: relative;
   border-radius: 50%;
+  /* Giants band along latitude, so the stripes run across the disc and the tilt turns them. */
   background:
-    radial-gradient(circle at 33% 28%, hsl(var(--visual-accent) 72% 78% / 72%), transparent 18%),
-    radial-gradient(circle at 68% 66%, hsl(var(--visual-shadow) 62% 11% / 85%), transparent 52%),
+    radial-gradient(circle at 33% 28%, rgb(var(--visual-light) / 55%), transparent 22%),
     repeating-linear-gradient(
-      calc(84deg + var(--visual-tilt)),
-      hsl(var(--visual-hue) 48% 46%) 0 9px,
-      hsl(var(--visual-accent) 38% 31%) 10px 17px,
-      hsl(var(--visual-shadow) 44% 20%) 18px 23px
+      180deg,
+      rgb(var(--visual-mid)) 0,
+      rgb(var(--visual-light)) 6px,
+      rgb(var(--visual-mid)) 11px,
+      rgb(var(--visual-deep) / 85%) 17px,
+      rgb(var(--visual-mid)) 23px
     );
   box-shadow:
     inset -20px -13px 28px rgb(0 0 0 / 68%),
     inset 12px 8px 20px rgb(255 255 255 / 8%),
-    0 0 32px hsl(var(--visual-hue) 55% 55% / 17%);
+    0 0 32px rgb(var(--visual-light) / 17%);
   transform: rotate(var(--visual-tilt));
 }
 
 .planet-catalog-visual.rocky .catalog-planet-sphere {
   background:
-    radial-gradient(circle at 32% 25%, hsl(var(--visual-accent) 58% 72% / 65%), transparent 15%),
-    radial-gradient(circle at 64% 38%, hsl(var(--visual-shadow) 40% 20%) 0 5%, transparent 7%),
-    radial-gradient(circle at 42% 68%, hsl(var(--visual-shadow) 32% 23%) 0 8%, transparent 10%),
-    radial-gradient(circle at 70% 72%, hsl(var(--visual-accent) 38% 34%) 0 12%, transparent 14%),
-    linear-gradient(135deg, hsl(var(--visual-hue) 48% 48%), hsl(var(--visual-shadow) 42% 22%));
-}
-
-.planet-catalog-visual.ice-giant .catalog-planet-sphere {
-  filter: saturate(0.78) brightness(1.12);
+    radial-gradient(circle at 32% 25%, rgb(var(--visual-light) / 55%), transparent 15%),
+    radial-gradient(
+      ellipse 62% 16% at 46% 30%,
+      rgb(var(--visual-cloud) / calc(var(--visual-clouds) * 70%)),
+      transparent
+    ),
+    radial-gradient(
+      ellipse 50% 14% at 58% 74%,
+      rgb(var(--visual-cloud) / calc(var(--visual-clouds) * 55%)),
+      transparent
+    ),
+    radial-gradient(
+      circle at 62% 56%,
+      rgb(var(--visual-glow) / calc(var(--visual-lava) * 90%)) 0 8%,
+      transparent 26%
+    ),
+    radial-gradient(
+      circle at var(--visual-crater-a-x) var(--visual-crater-a-y),
+      rgb(var(--visual-deep)) 0 5%,
+      transparent 7%
+    ),
+    radial-gradient(
+      circle at var(--visual-crater-b-x) var(--visual-crater-b-y),
+      rgb(var(--visual-deep)) 0 8%,
+      transparent 10%
+    ),
+    radial-gradient(
+      ellipse 78% 58% at var(--visual-sea-x) var(--visual-sea-y),
+      rgb(var(--visual-water)) 0 calc(var(--visual-ocean) * 90%),
+      transparent calc(var(--visual-ocean) * 115%)
+    ),
+    linear-gradient(
+      135deg,
+      rgb(var(--visual-light)),
+      rgb(var(--visual-mid)) 45%,
+      rgb(var(--visual-deep))
+    );
 }
 
 .catalog-visual-glint {
