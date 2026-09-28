@@ -13,6 +13,7 @@ import {
 import { formatNumber } from "../planet-utils.tsx";
 import type { SceneHost, XrStatus } from "../scene-host.ts";
 import { readStarHabitableZone } from "../star-habitable-zone.ts";
+import { skyFacts } from "../sky-position.ts";
 import { deriveStarPhysics } from "../star-physics.ts";
 import { deriveStarVisual, starKindLabel, starSummary } from "../star-utils.ts";
 import type { TravelPhase } from "../travel-transition.ts";
@@ -238,6 +239,12 @@ export const StarExperience = ({
         id: "worlds",
         label: "Worlds",
       },
+      !custom &&
+        !solar && {
+          blocks: [{ facts: skyFacts(observation), type: "facts" as const }],
+          id: "sky",
+          label: "Sky",
+        },
       {
         blocks: [
           {

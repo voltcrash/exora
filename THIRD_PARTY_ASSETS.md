@@ -413,3 +413,20 @@ an explicitly labelled two-body propagation using the returned position and velo
 presented as a second Horizons solution. The orbit ribbons remain the existing simplified catalog
 orbits and are labelled separately. If Horizons is unavailable, only a still-valid stale cache
 entry for the exact target and epoch may be served, and the interface marks it `STALE CACHE`.
+
+## Constellation boundaries
+
+`apps/website/src/constellation-boundaries.ts` is the complete 357-row table from **CDS catalogue
+VI/42**, _Identification of a Constellation From Position_ (Roman 1987, PASP 99, 695), which
+rearranges the IAU boundaries of Delporte (1930) so a position can be assigned to its
+constellation by a single ordered scan.
+
+| Field       | Value                                                       |
+| ----------- | ----------------------------------------------------------- |
+| Catalogue   | VI/42, CDS Strasbourg                                       |
+| Source file | `https://cdsarc.cds.unistra.fr/ftp/VI/42/data.dat`          |
+| Retrieved   | 2026-09-28                                                  |
+| Equinox     | B1875 (positions are precessed from J2000 before lookup)    |
+| Changes     | None to the values; reformatted from fixed-width text to TS |
+
+The row corrected by Nancy G. Roman on 1999-12-30 (#229) is included as distributed.
