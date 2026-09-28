@@ -7,6 +7,7 @@ import {
   presentTabs,
   type DestinationPanelModel,
   type PanelBlock,
+  type PanelFact,
 } from "../destination-panel.ts";
 import { formatNumber } from "../planet-utils.tsx";
 import type { SceneHost, XrStatus } from "../scene-host.ts";
@@ -15,6 +16,7 @@ import {
   bodyScaleLabel,
   bodySizeProvenance,
   elementProvenance,
+  hasEarthSightline,
   habitableZoneLabel,
   habitableZoneTag,
   orbitMappingLabel,
@@ -391,10 +393,17 @@ export const SystemExperience = ({
       {
         blocks: [
           {
-            facts: [
+            facts: present<PanelFact>([
               { label: "Orbit radii", value: layout ? orbitMappingLabel(layout) : "—" },
               { label: "Body radii", value: layout ? bodyScaleLabel(layout) : "—" },
               { label: "Clock", value: layout ? timeScaleLabel(layout) : "—" },
+              layout &&
+                hasEarthSightline(layout) && {
+                  detail:
+                    "Catalog inclinations are measured against the sky, so Earth lies along this axis. A world whose orbit is seen edge-on along it crosses the star's face.",
+                  label: "Line of sight",
+                  value: "Dashed axis toward Earth",
+                },
               {
                 detail: layout?.habitableZone
                   ? `Kopparapu et al. (2014) flux limits for an Earth-mass world, from the host's ${
@@ -421,7 +430,7 @@ export const SystemExperience = ({
                 ...(ephemeris ? { tone: "cyan" as const } : {}),
                 value: ephemeris ? "JPL Horizons" : "Not measured",
               },
-            ],
+            ]),
             type: "facts" as const,
           },
           {

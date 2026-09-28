@@ -29,6 +29,7 @@ import { createStellarSurface, makeStarTravelTarget } from "./star-surface.ts";
 import { createStarfield } from "./star-visuals.ts";
 import {
   deriveSystemLayout,
+  hasEarthSightline,
   mapDistance,
   orbitRadiusAu,
   orbitStateAt,
@@ -397,6 +398,24 @@ export const createSystemWorld = (
       profile.systemOrbitSegments,
     );
     if (zone) zone.parent = root;
+  }
+
+  if (hasEarthSightline(layout)) {
+    const reach = outerReach * 1.3;
+    const sightline = MeshBuilder.CreateDashedLines(
+      "diorama-earth-sightline",
+      {
+        dashNb: 48,
+        dashSize: 2,
+        gapSize: 1.6,
+        points: [new Vector3(0, 0, -reach), new Vector3(0, 0, reach)],
+      },
+      scene,
+    );
+    sightline.parent = root;
+    sightline.color = new Color3(0.62, 0.8, 0.86);
+    sightline.alpha = 0.32;
+    sightline.isPickable = false;
   }
 
   const drawn: DrawnWorld[] = layout.orbits.map((orbit) =>

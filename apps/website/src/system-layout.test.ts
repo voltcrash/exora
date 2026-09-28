@@ -11,6 +11,7 @@ import {
   DIORAMA_INNER_SCENE_UNITS,
   DIORAMA_OUTER_SCENE_UNITS,
   eccentricAnomaly,
+  hasEarthSightline,
   elementProvenance,
   habitableZoneLabel,
   habitableZoneTag,
@@ -358,4 +359,21 @@ test("a host the archive under-describes has no habitable zone to draw", () => {
   expect(layout.habitableZone).toBeNull();
   expect(layout.orbits[0]?.habitableZone).toBeNull();
   expect(habitableZoneLabel(layout)).toBe("NOT DERIVABLE");
+});
+
+test("Earth's line of sight is drawn only once an exoplanet's inclination is measured", () => {
+  expect(
+    hasEarthSightline(
+      deriveSystemLayout([
+        world("Tilted b", { orbitalInclinationDegrees: 89.6, semiMajorAxisAu: 0.2 }),
+      ]),
+    ),
+  ).toBe(true);
+  expect(
+    hasEarthSightline(
+      deriveSystemLayout([
+        world("Flat b", { orbitalInclinationDegrees: null, semiMajorAxisAu: 0.2 }),
+      ]),
+    ),
+  ).toBe(false);
 });
