@@ -1,6 +1,6 @@
 import type { ExoplanetProfile, StarProfile } from "@exora/contracts";
-import { deriveStarRecipe } from "@exora/worldgen";
-import type { CSSProperties } from "react";
+import { deriveStarRecipe, deriveWorldRecipe, type Rgb, type WorldRecipe } from "@exora/worldgen";
+import { useMemo, type CSSProperties } from "react";
 import type { BlackHoleProfile } from "../black-holes.ts";
 import sharedStyles from "./ExperienceShared.module.css";
 import catalogStyles from "./CatalogShared.module.css";
@@ -18,25 +18,60 @@ const hashName = (name: string): number => {
   return hash;
 };
 
-const planetPalette = (planet: ExoplanetProfile): [number, number, number] => {
-  const temperature = planet.observation.equilibriumTemperatureKelvin;
-  if (temperature !== null && temperature >= 900) return [18, 35, 8];
-  if (temperature !== null && temperature < 190) return [195, 215, 175];
-  if (planet.kind === "gas-giant") return [34, 23, 52];
-  if (planet.kind === "ice-giant") return [188, 205, 168];
-  if (planet.kind === "rocky") return [156, 202, 118];
-  return [255, 225, 280];
+const rgb = ([red, green, blue]: Rgb): string =>
+  `${Math.round(red * 255)} ${Math.round(green * 255)} ${Math.round(blue * 255)}`;
+
+const MAX_DRAWN_TILT_DEGREES = 28;
+
+// Paints the card from the same recipe the renderer builds, so a thumbnail never promises a
+// palette the world does not have.
+const recipeVisualStyle = (recipe: WorldRecipe): VisualStyle => {
+  const tilt = Math.max(
+    -MAX_DRAWN_TILT_DEGREES,
+    Math.min(MAX_DRAWN_TILT_DEGREES, recipe.axialTilt),
+  );
+  const shared = { "--visual-tilt": `${tilt.toFixed(1)}deg` };
+  if (recipe.renderer === "gas-giant") {
+    return {
+      ...shared,
+      "--visual-deep": rgb(recipe.cloudBands.deepColor),
+      "--visual-light": rgb(recipe.cloudBands.lightColor),
+      "--visual-mid": rgb(recipe.cloudBands.midColor),
+    };
+  }
+  if (recipe.renderer === "ice-giant") {
+    return {
+      ...shared,
+      "--visual-deep": rgb(recipe.atmosphereBands.deepColor),
+      "--visual-light": rgb(recipe.atmosphereBands.lightColor),
+      "--visual-mid": rgb(recipe.atmosphereBands.hazeColor),
+    };
+  }
+  const { surface } = recipe;
+  const place = (shift: number, minimum: number, span: number): string =>
+    `${(minimum + ((recipe.seed >>> shift) % span)).toFixed(0)}%`;
+  return {
+    ...shared,
+    "--visual-crater-a-x": place(0, 52, 22),
+    "--visual-crater-a-y": place(5, 28, 22),
+    "--visual-crater-b-x": place(10, 30, 24),
+    "--visual-crater-b-y": place(15, 58, 20),
+    "--visual-sea-x": place(20, 30, 30),
+    "--visual-sea-y": place(25, 48, 26),
+    "--visual-cloud": rgb(surface.cloudColor),
+    "--visual-clouds": surface.cloudCover.toFixed(2),
+    "--visual-deep": rgb(surface.lowColor),
+    "--visual-glow": rgb(surface.emissiveColor),
+    "--visual-lava": Math.min(1, surface.lavaStrength).toFixed(2),
+    "--visual-light": rgb(surface.highColor),
+    "--visual-mid": rgb(surface.midColor),
+    "--visual-ocean": Math.min(0.85, surface.waterLevel).toFixed(2),
+    "--visual-water": rgb(surface.waterColor),
+  };
 };
 
 export const PlanetCatalogVisual = ({ planet }: { planet: ExoplanetProfile }) => {
-  const hash = hashName(planet.name);
-  const [hue, accent, shadow] = planetPalette(planet);
-  const style: VisualStyle = {
-    "--visual-accent": `${accent + (hash % 13)}deg`,
-    "--visual-hue": `${hue + (hash % 17)}deg`,
-    "--visual-shadow": `${shadow}deg`,
-    "--visual-tilt": `${(hash % 25) - 12}deg`,
-  };
+  const style = useMemo(() => recipeVisualStyle(deriveWorldRecipe(planet)), [planet]);
 
   return (
     <span

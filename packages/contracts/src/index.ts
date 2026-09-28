@@ -12,10 +12,12 @@ import {
   ephemerisVectorSchema,
   exoplanetObservationSchema,
   exoplanetProfileSchema,
+  massProvenanceSchema,
   planetKindSchema,
   planetMetadataSchema,
   planetResponseSchema,
   planetSearchResponseSchema,
+  radiusProvenanceSchema,
   solarSystemIdentitySchema,
   solarSystemSourceSchema,
   starKindSchema,
@@ -27,6 +29,8 @@ import {
 } from "./schemas.ts";
 
 export type PlanetKind = z.infer<typeof planetKindSchema>;
+export type MassProvenance = z.infer<typeof massProvenanceSchema>;
+export type RadiusProvenance = z.infer<typeof radiusProvenanceSchema>;
 export type SolarSystemIdentity = z.infer<typeof solarSystemIdentitySchema>;
 export type SolarSystemSource = z.infer<typeof solarSystemSourceSchema>;
 export type ExoplanetObservation = z.infer<typeof exoplanetObservationSchema>;

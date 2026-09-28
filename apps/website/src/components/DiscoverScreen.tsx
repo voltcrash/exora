@@ -249,7 +249,7 @@ export const DiscoverScreen = ({
         </header>
 
         <main className={styles["discover-main"]}>
-          <div className={styles["discover-workspace"]} aria-live="polite">
+          <div className={styles["discover-workspace"]}>
             {section === "solar" ? (
               <SolarSystemCatalog
                 embedded

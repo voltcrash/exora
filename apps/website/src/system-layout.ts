@@ -1,5 +1,11 @@
 import type { ExoplanetProfile } from "@exora/contracts";
-import { hashObjectId } from "@exora/worldgen";
+import {
+  deriveHabitableZone,
+  habitableZonePlacement,
+  hashObjectId,
+  type HabitableZone,
+  type HabitableZonePlacement,
+} from "@exora/worldgen";
 
 export const EARTH_RADIUS_AU = 4.26351e-5;
 export const SOLAR_RADIUS_AU = 4.65047e-3;
@@ -47,10 +53,11 @@ export interface OrbitElements {
 export interface PlacedOrbit {
   bodyRadiusSceneUnits: number;
   elements: OrbitElements;
+  habitableZone: HabitableZonePlacement | null;
   phaseRadians: number;
   planet: ExoplanetProfile;
   radiusEarth: number;
-  radiusEarthSource: Extract<ElementSource, "assumed" | "measured">;
+  radiusEarthSource: ElementSource;
   semiMajorAxisSceneUnits: number;
   tiltRadians: number;
 }
@@ -58,6 +65,7 @@ export interface PlacedOrbit {
 export interface SystemLayout {
   bodyExaggeration: number;
   daysPerSecond: number;
+  habitableZone: HabitableZone | null;
   hostRadiusSceneUnits: number;
   hostRadiusSolar: number;
   hostRadiusSource: ElementSource;
@@ -167,14 +175,13 @@ export const orbitTiltRadians = (inclinationDegrees: number): number => {
   return ((90 - folded) * Math.PI) / 180;
 };
 
-const radiusEarthOf = (
-  planet: ExoplanetProfile,
-): { source: Extract<ElementSource, "assumed" | "measured">; value: number } => {
+const radiusEarthOf = (planet: ExoplanetProfile): { source: ElementSource; value: number } => {
+  const source = planet.observation.radiusProvenance === "estimated" ? "derived" : "measured";
   const earth = positive(planet.observation.radiusEarth);
-  if (earth !== null) return { source: "measured", value: earth };
+  if (earth !== null) return { source, value: earth };
   const jupiter = positive(planet.observation.radiusJupiter);
   if (jupiter !== null) {
-    return { source: "measured", value: jupiter * EARTH_RADII_PER_JUPITER_RADIUS };
+    return { source, value: jupiter * EARTH_RADII_PER_JUPITER_RADIUS };
   }
   return { source: "assumed", value: 1 };
 };
@@ -241,6 +248,14 @@ const hostRadiusSolarOf = (
   return { source: "assumed", value: 1 };
 };
 
+const hostHabitableZone = (planets: readonly ExoplanetProfile[]): HabitableZone | null => {
+  for (const planet of planets) {
+    const zone = deriveHabitableZone(planet.observation);
+    if (zone) return zone;
+  }
+  return null;
+};
+
 export const deriveSystemLayout = (planets: readonly ExoplanetProfile[]): SystemLayout => {
   const placed: { elements: OrbitElements; planet: ExoplanetProfile }[] = [];
   const unplaced: ExoplanetProfile[] = [];
@@ -264,12 +279,16 @@ export const deriveSystemLayout = (planets: readonly ExoplanetProfile[]): System
     .map(({ elements }) => elements.periodDays)
     .filter((period): period is number => period !== null && period > 0);
   const daysPerSecond = periods.length > 0 ? Math.min(...periods) / INNERMOST_ORBIT_SECONDS : 1;
+  const habitableZone = hostHabitableZone(planets);
 
   const orbits: PlacedOrbit[] = placed.map(({ elements, planet }) => {
     const radius = radiusEarthOf(planet);
     return {
       bodyRadiusSceneUnits: bodyRadiusSceneUnits(radius.value),
       elements,
+      habitableZone: habitableZone
+        ? habitableZonePlacement(habitableZone, elements.semiMajorAxisAu)
+        : null,
       phaseRadians: ((hashObjectId(planet.id) % 3_600) / 3_600) * Math.PI * 2,
       planet,
       radiusEarth: radius.value,
@@ -282,6 +301,7 @@ export const deriveSystemLayout = (planets: readonly ExoplanetProfile[]): System
   return {
     bodyExaggeration: bodyExaggeration(mapping),
     daysPerSecond,
+    habitableZone,
     hostRadiusSceneUnits,
     hostRadiusSolar: host.value,
     hostRadiusSource: host.source,
@@ -314,6 +334,22 @@ export const bodyScaleLabel = (layout: SystemLayout): string =>
 export const timeScaleLabel = (layout: SystemLayout): string =>
   `1 s = ${formatDays(layout.daysPerSecond)} d`;
 
+export const habitableZoneLabel = ({ habitableZone }: SystemLayout): string =>
+  habitableZone
+    ? `${formatAu(habitableZone.conservativeInnerAu)}–${formatAu(
+        habitableZone.conservativeOuterAu,
+      )} AU · OPTIMISTIC ${formatAu(habitableZone.optimisticInnerAu)}–${formatAu(
+        habitableZone.optimisticOuterAu,
+      )} AU`
+    : "NOT DERIVABLE";
+
+export const habitableZoneTag = (placement: HabitableZonePlacement | null): string | null =>
+  placement === "conservative"
+    ? "HABITABLE ZONE"
+    : placement === "optimistic-inner" || placement === "optimistic-outer"
+      ? "OPTIMISTIC HABITABLE ZONE"
+      : null;
+
 export const elementProvenance = (elements: OrbitElements): string => {
   const assumptions: string[] = [];
   if (elements.semiMajorAxisSource === "derived") assumptions.push("ORBIT SIZE FROM PERIOD");
@@ -323,6 +359,13 @@ export const elementProvenance = (elements: OrbitElements): string => {
   if (elements.periodSource === null) assumptions.push("UNTIMED · PARKED");
   return assumptions.length === 0 ? "ORBIT FULLY MEASURED" : assumptions.join(" · ");
 };
+
+export const bodySizeProvenance = (orbit: PlacedOrbit): string | null =>
+  orbit.radiusEarthSource === "derived"
+    ? "SIZE FROM MASS"
+    : orbit.radiusEarthSource === "assumed"
+      ? "SIZE ASSUMED"
+      : null;
 
 export const orbitSummary = (orbit: PlacedOrbit): string =>
   [

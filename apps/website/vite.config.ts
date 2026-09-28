@@ -122,6 +122,19 @@ export default defineConfig(({ mode }) => {
     },
     build: {
       chunkSizeWarningLimit: MAX_JAVASCRIPT_FILE_BYTES / 1_000,
+      rolldownOptions: {
+        output: {
+          codeSplitting: {
+            groups: [
+              {
+                name: "scene",
+                test: /@babylonjs[\\/]core[\\/]scene\.pure\.js$/,
+                includeDependenciesRecursively: false,
+              },
+            ],
+          },
+        },
+      },
     },
     plugins: [variantLaunchSdk(variantLaunchKey), react(), dropWebGpuShaders(), emitSitemap()],
     server: {

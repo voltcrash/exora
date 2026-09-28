@@ -13,6 +13,9 @@ const nasaRow = {
   pl_bmassj: 9,
   pl_rade: 16.8,
   pl_bmasse: 2860.4,
+  pl_bmassprov: "Mass",
+  pl_rade_reflink:
+    "<a refstr=CHAUVIN_ET_AL__2017 href=https://ui.adsabs.harvard.edu/abs/2017A&A...605L...9C/abstract target=ref>Chauvin et al. 2017</a>",
   pl_eqt: 1500,
   pl_orbper: null,
   pl_orbsmax: 92,
@@ -40,7 +43,9 @@ test("normalizes NASA columns into the Exora contract", () => {
     observation: {
       equilibriumTemperatureKelvin: 1500,
       massJupiter: 9,
+      massProvenance: "measured",
       radiusJupiter: 1.5,
+      radiusProvenance: "measured",
       orbitalEccentricity: 0.06,
       orbitalInclinationDegrees: 88.4,
       hostTemperatureKelvin: 8840,
@@ -52,6 +57,38 @@ test("normalizes NASA columns into the Exora contract", () => {
       declinationDegrees: -51.5045384,
     },
   });
+});
+
+test("a radial-velocity row keeps its minimum mass and calculated radius apart from measurements", () => {
+  const planet = normalizeNasaPlanet({
+    ...nasaRow,
+    pl_bmassprov: "Msini",
+    pl_rade_reflink:
+      "<a refstr=CALCULATED_VALUE href=/docs/pscp_calc.html target=_blank>Calculated Value</a>",
+  });
+
+  expect(planet?.observation).toMatchObject({
+    massProvenance: "minimum",
+    radiusProvenance: "estimated",
+  });
+});
+
+test("a mass read off the archive's mass-radius relation is marked as an estimate", () => {
+  const planet = normalizeNasaPlanet({ ...nasaRow, pl_bmassprov: "M-R relationship" });
+
+  expect(planet?.observation.massProvenance).toBe("estimated");
+});
+
+test("provenance is unknown rather than assumed when the value itself is missing", () => {
+  const planet = normalizeNasaPlanet({
+    ...nasaRow,
+    pl_bmasse: null,
+    pl_bmassj: null,
+    pl_rade: null,
+    pl_radj: null,
+  });
+
+  expect(planet?.observation).toMatchObject({ massProvenance: null, radiusProvenance: null });
 });
 
 test("a row with no solved orbit shape reports none rather than a circle in a shared plane", () => {
