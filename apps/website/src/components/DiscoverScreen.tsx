@@ -5,13 +5,14 @@ import type { BlackHoleProfile } from "../black-holes.ts";
 import type { SolarRegionProfile } from "../solar-regions.ts";
 import { WorldForge, type ForgeMode } from "./CustomPlanetBuilder.tsx";
 import { BlackHoleCatalog } from "./BlackHoleCatalog.tsx";
+import { PlanetAtlas } from "./PlanetAtlas.tsx";
 import { PlanetCatalog } from "./PlanetCatalog.tsx";
 import { SolarSystemCatalog } from "./SolarSystemCatalog.tsx";
 import { StarCatalog } from "./StarCatalog.tsx";
 import styles from "./DiscoverScreen.module.css";
 import sharedStyles from "./ExperienceShared.module.css";
 
-export type DiscoverSection = "solar" | "worlds" | "stars" | "black-holes" | "forge";
+export type DiscoverSection = "solar" | "worlds" | "atlas" | "stars" | "black-holes" | "forge";
 
 interface DiscoverScreenProps {
   initialForgeMode: ForgeMode;
@@ -37,6 +38,12 @@ const sections: readonly {
     id: "worlds",
     label: "Exoplanets",
     source: "NASA ARCHIVE",
+  },
+  {
+    accent: "cyan",
+    id: "atlas",
+    label: "Atlas",
+    source: "EVERY KNOWN WORLD",
   },
   {
     accent: "gold",
@@ -77,6 +84,14 @@ const DiscoverIcon = ({ section }: { section: DiscoverSection }) => (
         <ellipse cx="16" cy="16" rx="12" ry="6.5" />
         <circle className={styles["icon-fill"]} cx="26" cy="14" r="1.8" />
       </>
+    ) : section === "atlas" ? (
+      <>
+        <path d="M5 5v22h22" />
+        <circle className={styles["icon-fill"]} cx="11" cy="20" r="1.6" />
+        <circle className={styles["icon-fill"]} cx="15" cy="14" r="1.6" />
+        <circle className={styles["icon-fill"]} cx="20" cy="17" r="1.6" />
+        <circle className={styles["icon-fill"]} cx="24" cy="9" r="1.6" />
+      </>
     ) : section === "worlds" ? (
       <>
         <circle cx="16" cy="16" r="9" />
@@ -114,6 +129,12 @@ const sectionCopy: Record<DiscoverSection, { eyebrow: string; title: string; sum
     eyebrow: "NASA EXOPLANET ARCHIVE",
     title: "Find another world.",
     summary: "Search by name, explore curated collections, or tune the observatory by physics.",
+  },
+  atlas: {
+    eyebrow: "NASA EXOPLANET ARCHIVE · EVERY CONFIRMED WORLD",
+    title: "See them all at once.",
+    summary:
+      "Every confirmed planet on the planes astronomers read the population from. Hover to identify, click to travel.",
   },
   stars: {
     eyebrow: "SIMBAD STELLAR ARCHIVE",
@@ -264,6 +285,8 @@ export const DiscoverScreen = ({
                 onClose={() => setSection("solar")}
                 onSelect={onSelectPlanet}
               />
+            ) : section === "atlas" ? (
+              <PlanetAtlas onSelect={onSelectPlanet} />
             ) : section === "stars" ? (
               <StarCatalog embedded onClose={() => setSection("solar")} onSelect={onSelectStar} />
             ) : section === "black-holes" ? (

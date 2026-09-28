@@ -4,6 +4,7 @@ import {
   type BlackHoleResponse,
   type EphemerisResponse,
   type ExoplanetProfile,
+  type PlanetPopulationResponse,
   type PlanetResponse,
   type SchemaOutput,
   type StarProfile,
@@ -20,6 +21,7 @@ const PLANET_COLLECTION_TIMEOUT_MS = 8_000;
 const STAR_COLLECTION_TIMEOUT_MS = 10_000;
 const BLACK_HOLE_COLLECTION_TIMEOUT_MS = 10_000;
 const EPHEMERIS_TIMEOUT_MS = 20_000;
+const POPULATION_TIMEOUT_MS = 30_000;
 
 interface CollectionOptions {
   fetcher?: Fetcher;
@@ -39,6 +41,7 @@ const responseSchema = {
   BlackHole: (contracts: ContractModule) => contracts.blackHoleResponseSchema,
   BlackHoleSearch: (contracts: ContractModule) => contracts.blackHoleSearchResponseSchema,
   Planet: (contracts: ContractModule) => contracts.planetResponseSchema,
+  PlanetPopulation: (contracts: ContractModule) => contracts.planetPopulationResponseSchema,
   PlanetSearch: (contracts: ContractModule) => contracts.planetSearchResponseSchema,
   Star: (contracts: ContractModule) => contracts.starResponseSchema,
   StarSearch: (contracts: ContractModule) => contracts.starSearchResponseSchema,
@@ -175,6 +178,18 @@ const requestBlackHole = async (
     return null;
   }
 };
+
+/** Every confirmed planet as compact rows, for plotting the whole archive at once. */
+export const loadPlanetPopulation = (
+  options: CollectionOptions = {},
+): Promise<PlanetPopulationResponse> =>
+  requestCollection(
+    "/api/planets/population",
+    options,
+    POPULATION_TIMEOUT_MS,
+    "Planet population",
+    responseSchema.PlanetPopulation,
+  );
 
 export const loadBlackHoleByName = async (
   name: string,
