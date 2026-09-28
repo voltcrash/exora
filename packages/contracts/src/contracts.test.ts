@@ -2,6 +2,7 @@ import { expectTypeOf, test } from "vite-plus/test";
 import type { z } from "zod";
 import {
   apiErrorResponseSchema,
+  detectionSignalSchema,
   ephemerisResponseSchema,
   ephemerisVectorSchema,
   exoplanetObservationSchema,
@@ -20,6 +21,7 @@ import {
   starSearchResponseSchema,
   type ApiErrorResponse,
   type ApiMetadata,
+  type DetectionSignal,
   type EphemerisResponse,
   type EphemerisVector,
   type ExoplanetObservation,
@@ -41,6 +43,7 @@ test("exports contract types inferred from their schemas", () => {
   expectTypeOf<PlanetKind>().toEqualTypeOf<z.infer<typeof planetKindSchema>>();
   expectTypeOf<SolarSystemIdentity>().toEqualTypeOf<z.infer<typeof solarSystemIdentitySchema>>();
   expectTypeOf<SolarSystemSource>().toEqualTypeOf<z.infer<typeof solarSystemSourceSchema>>();
+  expectTypeOf<DetectionSignal>().toEqualTypeOf<z.infer<typeof detectionSignalSchema>>();
   expectTypeOf<ExoplanetObservation>().toEqualTypeOf<z.infer<typeof exoplanetObservationSchema>>();
   expectTypeOf<ExoplanetProfile>().toEqualTypeOf<z.infer<typeof exoplanetProfileSchema>>();
   expectTypeOf<ApiMetadata>().toEqualTypeOf<z.infer<typeof planetMetadataSchema>>();

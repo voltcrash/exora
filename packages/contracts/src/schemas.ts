@@ -63,6 +63,21 @@ export const massProvenanceSchema = z.enum(["measured", "minimum", "estimated"])
 /** Whether a radius was measured or calculated by the archive from the mass. */
 export const radiusProvenanceSchema = z.enum(["measured", "estimated"]);
 
+/**
+ * The signal the planet was actually seen in, as the archive's adopted solution reports it: the
+ * dip a transit cut into its star's light and the wobble it raised in the star's velocity.
+ */
+export const detectionSignalSchema = z.strictObject({
+  impactParameter: nullableFiniteNumber,
+  orbitalPeriodUncertaintyDays: nullableFiniteNumber,
+  radialVelocityAmplitudeMetersPerSecond: nullableFiniteNumber,
+  radiusRatio: nullableFiniteNumber,
+  transitDepthPercent: nullableFiniteNumber,
+  transitDurationHours: nullableFiniteNumber,
+  transitMidpointBjd: nullableFiniteNumber,
+  transitMidpointUncertaintyDays: nullableFiniteNumber,
+});
+
 export const exoplanetObservationSchema = z.strictObject({
   declinationDegrees: nullableFiniteNumber,
   discoveryMethod: nonEmptyString,
@@ -85,6 +100,7 @@ export const exoplanetObservationSchema = z.strictObject({
   radiusProvenance: radiusProvenanceSchema.nullable().optional(),
   rightAscensionDegrees: nullableFiniteNumber,
   semiMajorAxisAu: nullableFiniteNumber,
+  signal: detectionSignalSchema.optional(),
 });
 
 const exoplanetSourceSchema = z.union([

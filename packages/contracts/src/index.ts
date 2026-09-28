@@ -8,6 +8,7 @@ import {
   blackHoleResponseSchema,
   blackHoleSearchResponseSchema,
   blackHoleStatusSchema,
+  detectionSignalSchema,
   ephemerisResponseSchema,
   ephemerisVectorSchema,
   exoplanetObservationSchema,
@@ -33,6 +34,7 @@ export type MassProvenance = z.infer<typeof massProvenanceSchema>;
 export type RadiusProvenance = z.infer<typeof radiusProvenanceSchema>;
 export type SolarSystemIdentity = z.infer<typeof solarSystemIdentitySchema>;
 export type SolarSystemSource = z.infer<typeof solarSystemSourceSchema>;
+export type DetectionSignal = z.infer<typeof detectionSignalSchema>;
 export type ExoplanetObservation = z.infer<typeof exoplanetObservationSchema>;
 export type ExoplanetProfile = z.infer<typeof exoplanetProfileSchema>;
 export type ApiMetadata = z.infer<typeof planetMetadataSchema>;
