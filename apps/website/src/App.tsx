@@ -26,6 +26,7 @@ import { canonicalUrlForSearch } from "./canonical-url.ts";
 import { documentTitleFor } from "./document-title.ts";
 import type { BlackHoleProfile } from "./black-holes.ts";
 import { togglesClearView } from "./clear-view-shortcut.ts";
+import { opensCommandPalette, type PaletteTarget } from "./command-palette.ts";
 import { togglesDiscoverShortcut } from "./discover-shortcut.ts";
 import { TRAVEL_CROSS_MS, TRAVEL_REVEAL_MS, type TravelPhase } from "./travel-transition.ts";
 import { useSceneHost } from "./use-scene-host.ts";
@@ -38,6 +39,11 @@ const cx = bindStyles(sharedStyles);
 
 const DiscoverScreen = lazy(() =>
   import("./components/DiscoverScreen.tsx").then((module) => ({ default: module.DiscoverScreen })),
+);
+const CommandPalette = lazy(() =>
+  import("./components/CommandPalette.tsx").then((module) => ({
+    default: module.CommandPalette,
+  })),
 );
 const StarExperience = lazy(() =>
   import("./components/StarExperience.tsx").then((module) => ({ default: module.StarExperience })),
@@ -205,6 +211,7 @@ export const App = () => {
   } = useSceneHost(canvas);
   const typographySettled = useTypographySettled();
   const [discoverOpen, setDiscoverOpen] = useState(false);
+  const [paletteOpen, setPaletteOpen] = useState(false);
   const [activeObject, setActiveObject] = useState<ActiveObject | null>(() => {
     const parameters = new URLSearchParams(window.location.search);
     return parameters.has("blackHole") ||
@@ -225,7 +232,7 @@ export const App = () => {
   const [travelPhase, setTravelPhase] = useState<TravelPhase>("idle");
   useEffect(() => sceneHost?.onTravelPhase(setTravelPhase), [sceneHost]);
 
-  const overlayOpen = discoverOpen;
+  const overlayOpen = discoverOpen || paletteOpen;
   useEffect(() => {
     if (!sceneHost || !overlayOpen || sceneHost.isInXr()) return;
     return sceneHost.suspendRendering();
@@ -277,6 +284,30 @@ export const App = () => {
     document.addEventListener("keydown", toggleDiscoverWithShortcut);
     return () => document.removeEventListener("keydown", toggleDiscoverWithShortcut);
   }, [discoverOpen, onMainScreen]);
+
+  useEffect(() => {
+    const togglePalette = (event: KeyboardEvent): void => {
+      const target = event.target;
+      if (
+        !opensCommandPalette({
+          altKey: event.altKey,
+          ctrlKey: event.ctrlKey,
+          key: event.key,
+          metaKey: event.metaKey,
+          shiftKey: event.shiftKey,
+          target: target instanceof HTMLElement ? target : null,
+        })
+      ) {
+        return;
+      }
+      event.preventDefault();
+      setDiscoverOpen(false);
+      setPaletteOpen((open) => !open);
+    };
+
+    document.addEventListener("keydown", togglePalette);
+    return () => document.removeEventListener("keydown", togglePalette);
+  }, []);
 
   useEffect(() => {
     const toggleChrome = (event: KeyboardEvent): void => {
@@ -412,7 +443,37 @@ export const App = () => {
   }, []);
 
   const closeDiscover = useCallback((): void => setDiscoverOpen(false), []);
+  const closePalette = useCallback((): void => setPaletteOpen(false), []);
   const toggleChrome = useCallback((): void => setChromeHidden((hidden) => !hidden), []);
+
+  const travelFromPalette = useCallback(
+    (target: PaletteTarget): void => {
+      setPaletteOpen(false);
+      switch (target.type) {
+        case "action":
+          if (target.action === "discover") setDiscoverOpen(true);
+          else if (target.action === "clear-view") setChromeHidden((hidden) => !hidden);
+          else returnHome();
+          return;
+        case "black-hole":
+          selectBlackHole(target.blackHole);
+          return;
+        case "planet":
+          selectPlanet(target.planet, target.cached);
+          return;
+        case "region":
+          selectRegion(target.region);
+          return;
+        case "star":
+          selectStar(target.star, target.cached);
+          return;
+        case "system":
+          void selectSystem(target.hostStar);
+          return;
+      }
+    },
+    [returnHome, selectBlackHole, selectPlanet, selectRegion, selectStar, selectSystem],
+  );
 
   const subject =
     activeObject && activeObject.type !== "missing"
@@ -575,6 +636,11 @@ export const App = () => {
           />
         </Suspense>
       )}
+      {paletteOpen ? (
+        <Suspense fallback={null}>
+          <CommandPalette onClose={closePalette} onSelect={travelFromPalette} />
+        </Suspense>
+      ) : null}
       {discoverOpen && activeObject && activeObject.type !== "missing" ? (
         <Suspense fallback={null}>
           <DiscoverScreen
