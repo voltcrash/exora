@@ -11,6 +11,8 @@ import {
   DIORAMA_OUTER_SCENE_UNITS,
   eccentricAnomaly,
   elementProvenance,
+  habitableZoneLabel,
+  habitableZoneTag,
   INNERMOST_ORBIT_SECONDS,
   mapDistance,
   MIN_MAPPED_DECADES,
@@ -309,4 +311,38 @@ test("the readouts state the compressions rather than leaving the layout to look
   expect(orbitMappingLabel(layout)).toBe("LOG · 0.050–1.20 AU → 3.0–13.0 m");
   expect(timeScaleLabel(layout)).toBe("1 s = 0.444 d");
   expect(bodyExaggeration(layout.mapping)).toBeGreaterThan(100);
+});
+
+test("each placed orbit is read against the host's habitable zone", () => {
+  const layout = deriveSystemLayout([
+    world("Zone b", { semiMajorAxisAu: 0.1 }),
+    world("Zone c", { semiMajorAxisAu: 0.8 }),
+    world("Zone d", { semiMajorAxisAu: 1.15 }),
+    world("Zone e", { semiMajorAxisAu: 4 }),
+  ]);
+
+  expect(layout.habitableZone?.luminositySource).toBe("measured");
+  expect(layout.orbits.map((orbit) => orbit.habitableZone)).toEqual([
+    "too-hot",
+    "conservative",
+    "optimistic-outer",
+    "too-cold",
+  ]);
+  expect(layout.orbits.map((orbit) => habitableZoneTag(orbit.habitableZone))).toEqual([
+    null,
+    "HABITABLE ZONE",
+    "OPTIMISTIC HABITABLE ZONE",
+    null,
+  ]);
+  expect(habitableZoneLabel(layout)).toBe("0.623–1.12 AU · OPTIMISTIC 0.492–1.18 AU");
+});
+
+test("a host the archive under-describes has no habitable zone to draw", () => {
+  const layout = deriveSystemLayout([
+    world("Bare b", { hostTemperatureKelvin: null, semiMajorAxisAu: 1 }),
+  ]);
+
+  expect(layout.habitableZone).toBeNull();
+  expect(layout.orbits[0]?.habitableZone).toBeNull();
+  expect(habitableZoneLabel(layout)).toBe("NOT DERIVABLE");
 });

@@ -1,16 +1,21 @@
-import { GlowLayer } from "@babylonjs/core/Layers/glowLayer.js";
-import { StandardMaterial } from "@babylonjs/core/Materials/standardMaterial.js";
 import { Color3, Color4 } from "@babylonjs/core/Maths/math.color.js";
 import { Vector3 } from "@babylonjs/core/Maths/math.vector.js";
-import type { Mesh } from "@babylonjs/core/Meshes/mesh.js";
+import { Mesh } from "@babylonjs/core/Meshes/mesh.js";
 import { MeshBuilder } from "@babylonjs/core/Meshes/meshBuilder.js";
 import { TransformNode } from "@babylonjs/core/Meshes/transformNode.js";
+import {
+  createLensingMaterial,
+  LENSING_BOUND_RADII,
+  SHADOW_TO_SCHWARZSCHILD,
+} from "./black-hole-lensing.ts";
 import type { BlackHoleProfile } from "./black-holes.ts";
 import type { MountedWorld, SceneHost } from "./scene-host.ts";
 import { createStarfield } from "./star-visuals.ts";
 
 const BLACK_HOLE_POSITION = new Vector3(0, 0.7, 7.5);
 const XR_BLACK_HOLE_STAND = new Vector3(0, 0, -10);
+const COMPANION_OFFSET = new Vector3(-7.8, 2.6, 0.4);
+const SHADOW_RADIUS = 2.125;
 
 const radians = (degrees: number): number => (degrees * Math.PI) / 180;
 
@@ -34,12 +39,6 @@ const hslColor = (hueDegrees: number, saturation: number, lightness: number): Co
   const match = lightness - chroma / 2;
   return new Color3(red + match, green + match, blue + match);
 };
-
-const arcPath = (radius: number, start: number, end: number, segments: number): Vector3[] =>
-  Array.from({ length: segments + 1 }, (_, index) => {
-    const angle = start + ((end - start) * index) / segments;
-    return new Vector3(Math.cos(angle) * radius, Math.sin(angle) * radius, 0);
-  });
 
 export interface BlackHoleWorld extends MountedWorld {}
 
@@ -78,122 +77,38 @@ export const createBlackHoleWorld = (
   system.rotation.x = radians(57 + blackHole.visual.diskTiltDegrees * 0.22);
   system.rotation.z = radians(blackHole.visual.diskTiltDegrees);
 
-  const shadow = MeshBuilder.CreateSphere(
-    "event-horizon-shadow",
-    { diameter: 4.25, segments: profile.tier === "desktop" ? 64 : 32 },
-    scene,
-  );
-  shadow.parent = system;
-  const shadowMaterial = new StandardMaterial("event-horizon-material", scene);
-  shadowMaterial.disableLighting = true;
-  shadowMaterial.diffuseColor = Color3.Black();
-  shadowMaterial.emissiveColor = new Color3(0.000_1, 0, 0.000_2);
-  shadowMaterial.specularColor = Color3.Black();
-  shadow.material = shadowMaterial;
-  shadow.isPickable = false;
+  const schwarzschildRadius = SHADOW_RADIUS / SHADOW_TO_SCHWARZSCHILD;
+  const companionDiameter = blackHole.name === "Cygnus X-1" ? 1.7 : 1.05;
+  const companionPosition = BLACK_HOLE_POSITION.add(COMPANION_OFFSET);
+  const companionColor =
+    blackHole.name === "Cygnus X-1" ? new Color3(0.56, 0.72, 1) : new Color3(1, 0.82, 0.52);
 
-  const diskMeshes: Mesh[] = [];
-  const ringCount = profile.tier === "desktop" ? 18 : 11;
-  for (let index = 0; index < ringCount; index += 1) {
-    const progress = index / Math.max(1, ringCount - 1);
-    const radius = 2.72 + progress * 4.9;
-    const thickness = 0.045 + (1 - progress) * 0.075;
-    const segments = profile.tier === "desktop" ? 44 : 28;
-    const band = MeshBuilder.CreateTube(
-      `accretion-band-${index}`,
-      {
-        path: arcPath(radius, 0, Math.PI * 2, segments),
-        radius: thickness,
-        tessellation: 8,
-      },
-      scene,
-    );
-    band.parent = system;
-    band.isPickable = false;
-    const material = new StandardMaterial(`accretion-band-material-${index}`, scene);
-    material.disableLighting = true;
-    const localHue = hue + progress * 16;
-    const color = hslColor(localHue, 0.88, 0.54 + (1 - progress) * 0.13);
-    material.diffuseColor = Color3.Black();
-    material.emissiveColor = color.scale((0.35 + activity * 0.85) * (1 - progress * 0.48));
-    material.alpha = Math.min(1, (0.18 + activity * 0.82) * (1 - progress * 0.36));
-    material.specularColor = Color3.Black();
-    band.material = material;
-    diskMeshes.push(band);
-  }
-
-  const photonRing = MeshBuilder.CreateTorus(
-    "photon-ring-reference",
+  const lensing = MeshBuilder.CreateSphere(
+    "event-horizon-lensing",
     {
-      diameter: 4.72,
-      thickness: profile.tier === "desktop" ? 0.075 : 0.11,
-      tessellation: profile.tier === "desktop" ? 96 : 48,
+      diameter: LENSING_BOUND_RADII * 2,
+      segments: 24,
+      sideOrientation: Mesh.BACKSIDE,
     },
     scene,
   );
-  photonRing.parent = system;
-  photonRing.rotation.x = Math.PI / 2;
-  photonRing.isPickable = false;
-  const photonMaterial = new StandardMaterial("photon-ring-material", scene);
-  photonMaterial.disableLighting = true;
-  photonMaterial.diffuseColor = Color3.Black();
-  photonMaterial.emissiveColor = hslColor(hue + 12, 0.94, 0.72).scale(0.5 + activity * 0.7);
-  photonMaterial.specularColor = Color3.Black();
-  photonMaterial.alpha = 0.34 + activity * 0.58;
-  photonRing.material = photonMaterial;
-
-  const glow = new GlowLayer("black-hole-glow", scene, {
-    blurKernelSize: profile.tier === "desktop" ? 48 : 24,
-    mainTextureFixedSize: profile.tier === "desktop" ? 512 : 256,
+  lensing.parent = system;
+  lensing.rotation.x = Math.PI / 2;
+  lensing.scaling.setAll(schwarzschildRadius);
+  lensing.isPickable = false;
+  const lensingMaterial = createLensingMaterial(scene, {
+    activity,
+    companion: blackHole.observation.companion
+      ? { color: companionColor, position: companionPosition, radius: companionDiameter / 2 }
+      : null,
+    diskColor: hslColor(hue, 0.88, 0.58),
+    jetColor: hslColor(hue + 175, 0.7, 0.72),
+    jetStrength: blackHole.visual.jetStrength,
+    profile,
+    schwarzschildRadius,
+    seed: blackHole.visual.seed,
   });
-  glow.intensity = 0.62 + activity * 0.48;
-  for (const mesh of diskMeshes) glow.addIncludedOnlyMesh(mesh);
-  glow.addIncludedOnlyMesh(photonRing);
-
-  if (blackHole.visual.jetStrength > 0) {
-    for (const direction of [-1, 1] as const) {
-      const jet = MeshBuilder.CreateCylinder(
-        `relativistic-jet-${direction > 0 ? "north" : "south"}`,
-        {
-          diameterBottom: 0.7 * blackHole.visual.jetStrength,
-          diameterTop: 0.04,
-          height: 12,
-          tessellation: 16,
-        },
-        scene,
-      );
-      jet.parent = system;
-      jet.position.z = direction * 7.8;
-      jet.rotation.x = direction * (Math.PI / 2);
-      jet.isPickable = false;
-      const jetMaterial = new StandardMaterial(`relativistic-jet-material-${direction}`, scene);
-      jetMaterial.disableLighting = true;
-      jetMaterial.diffuseColor = Color3.Black();
-      jetMaterial.emissiveColor = hslColor(hue + 175, 0.7, 0.72).scale(0.42);
-      jetMaterial.alpha = 0.08 + blackHole.visual.jetStrength * 0.15;
-      jetMaterial.specularColor = Color3.Black();
-      jet.material = jetMaterial;
-      glow.addIncludedOnlyMesh(jet);
-    }
-  }
-
-  if (blackHole.observation.companion) {
-    const companion = MeshBuilder.CreateSphere(
-      "binary-companion",
-      { diameter: blackHole.name === "Cygnus X-1" ? 1.7 : 1.05, segments: 24 },
-      scene,
-    );
-    companion.position.copyFrom(BLACK_HOLE_POSITION).addInPlace(new Vector3(-7.8, 2.6, 0.4));
-    companion.isPickable = false;
-    const companionMaterial = new StandardMaterial("binary-companion-material", scene);
-    companionMaterial.disableLighting = true;
-    companionMaterial.diffuseColor = Color3.Black();
-    companionMaterial.emissiveColor =
-      blackHole.name === "Cygnus X-1" ? new Color3(0.56, 0.72, 1) : new Color3(1, 0.82, 0.52);
-    companionMaterial.specularColor = Color3.Black();
-    companion.material = companionMaterial;
-    glow.addIncludedOnlyMesh(companion);
-  }
+  lensing.material = lensingMaterial;
 
   let elapsed = 0;
   const renderObserver = scene.onBeforeRenderObservable.add(() => {
@@ -201,9 +116,7 @@ export const createBlackHoleWorld = (
     elapsed += delta;
     system.rotation.z =
       radians(blackHole.visual.diskTiltDegrees) + Math.sin(elapsed * 0.14) * 0.008 * activity;
-    diskMeshes.forEach((mesh, index) => {
-      mesh.scaling.setAll(1 + Math.sin(elapsed * (0.62 + (index % 5) * 0.04) + index) * 0.006);
-    });
+    if (!host.prefersReducedMotion()) lensingMaterial.setFloat("time", elapsed);
     const activeCameraPosition = scene.activeCamera?.globalPosition ?? camera.globalPosition;
     starfield.update(elapsed, activeCameraPosition);
   });
@@ -227,7 +140,6 @@ export const createBlackHoleWorld = (
     dispose: () => {
       scene.onBeforeRenderObservable.remove(renderObserver);
       scene.onAfterRenderObservable.remove(firstFrameObserver);
-      glow.dispose();
     },
   };
 };

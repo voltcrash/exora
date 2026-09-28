@@ -5,6 +5,19 @@ export {
   generateProceduralBlackHole,
   generateProceduralBlackHoles,
 } from "./procedural-black-holes.ts";
+export {
+  deriveHabitableZone,
+  HABITABLE_ZONE_CALIBRATED_KELVIN,
+  habitableZonePlacement,
+  isWithinHabitableZone,
+} from "./habitable-zone.ts";
+export type {
+  HabitableZone,
+  HabitableZoneInputs,
+  HabitableZonePlacement,
+} from "./habitable-zone.ts";
+export { deriveTidalLocking, TIDAL_LOCK_THRESHOLD_YEARS } from "./tidal-locking.ts";
+export type { TidalLocking } from "./tidal-locking.ts";
 export type {
   CustomBlackHole,
   CustomBlackHoleParameters,
@@ -62,6 +75,9 @@ export interface PlanetMeasuredProperties {
 
 export interface PlanetDerivedProperties {
   bulkDensityGCm3: number | null;
+  /** The archive's value when reported, otherwise derived from the host and orbit. */
+  equilibriumTemperatureKelvin: number | null;
+  equilibriumTemperatureSource: "derived" | "measured" | null;
   insolationEarthRelative: number | null;
   massEarthEffective: number;
   radiusEarthEffective: number;
@@ -282,6 +298,16 @@ const clamp = (value: number, minimum: number, maximum: number): number =>
 const clampUnit = (value: number): number =>
   Number.isFinite(value) ? Math.min(1, Math.max(0, value)) : 0;
 
+// Starspots are magnetic flux concentrations in a convective envelope. Above the Kraft break
+// the envelope thins to nothing, so A, B, and O photospheres carry no spots.
+const CONVECTIVE_ENVELOPE_KELVIN = [6_200, 7_400] as const;
+
+export const convectiveEnvelopeStrength = (temperatureKelvin: number): number => {
+  const [full, none] = CONVECTIVE_ENVELOPE_KELVIN;
+  const fade = clampUnit((temperatureKelvin - full) / (none - full));
+  return 1 - fade * fade * (3 - 2 * fade);
+};
+
 export const temperatureToRgb = (temperatureKelvin: number): Rgb => {
   const temperature = clamp(temperatureKelvin, 1_000, 40_000) / 100;
   const red = temperature <= 66 ? 255 : 329.698727446 * (temperature - 60) ** -0.1332047592;
@@ -324,6 +350,35 @@ const deriveHostLuminositySolar = (
     1e7,
   );
 
+const SOLAR_RADIUS_AU = 0.00465047;
+// Zero Bond albedo and full redistribution, the convention behind most archive pl_eqt values.
+const EARTH_EQUILIBRIUM_TEMPERATURE_KELVIN = 278.6;
+
+/**
+ * Fills an unreported equilibrium temperature from the host and orbit, preferring the measured
+ * luminosity (stellar flux) and falling back to the host's temperature and radius.
+ */
+export const deriveEquilibriumTemperatureKelvin = (
+  measured: Pick<
+    PlanetMeasuredProperties,
+    "hostLuminosityLogSolar" | "hostRadiusSolar" | "hostTemperatureKelvin" | "semiMajorAxisAu"
+  >,
+): number | null => {
+  const axis = measured.semiMajorAxisAu;
+  if (axis === null || !Number.isFinite(axis) || axis <= 0) return null;
+  if (
+    measured.hostLuminosityLogSolar !== null &&
+    Number.isFinite(measured.hostLuminosityLogSolar)
+  ) {
+    const flux = 10 ** measured.hostLuminosityLogSolar / axis ** 2;
+    return EARTH_EQUILIBRIUM_TEMPERATURE_KELVIN * flux ** 0.25;
+  }
+  const temperature = measured.hostTemperatureKelvin;
+  const radius = measured.hostRadiusSolar;
+  if (temperature === null || radius === null || !(temperature > 0) || !(radius > 0)) return null;
+  return temperature * Math.sqrt((radius * SOLAR_RADIUS_AU) / (2 * axis));
+};
+
 export const derivePlanetDerivedProperties = (
   measured: PlanetMeasuredProperties,
 ): PlanetDerivedProperties => {
@@ -346,8 +401,20 @@ export const derivePlanetDerivedProperties = (
       ? clamp(luminositySolar / measured.semiMajorAxisAu ** 2, 1e-6, 1e9)
       : null;
 
+  const derivedTemperature =
+    measured.equilibriumTemperatureKelvin === null
+      ? deriveEquilibriumTemperatureKelvin(measured)
+      : null;
+
   return {
     bulkDensityGCm3,
+    equilibriumTemperatureKelvin: measured.equilibriumTemperatureKelvin ?? derivedTemperature,
+    equilibriumTemperatureSource:
+      measured.equilibriumTemperatureKelvin !== null
+        ? "measured"
+        : derivedTemperature !== null
+          ? "derived"
+          : null,
     insolationEarthRelative,
     massEarthEffective: clamp(massEarthEffective, 1e-3, 1e6),
     radiusEarthEffective: clamp(radiusEarthEffective, 1e-2, 200),
@@ -372,7 +439,7 @@ export const derivePlanetInferredProperties = (
   derived: PlanetDerivedProperties,
   random: () => number,
 ): PlanetInferredProperties => {
-  const temperature = measured.equilibriumTemperatureKelvin;
+  const temperature = derived.equilibriumTemperatureKelvin;
   const density = derived.bulkDensityGCm3;
   const knownInputs = countKnownInputs([
     temperature,
@@ -493,7 +560,7 @@ export const deriveHostStar = (planet: ExoplanetProfile): BaseWorldRecipe["star"
     intensity: clamp(1.45 + Math.log10(Math.max(0.001, luminositySolar)) * 0.34, 0.65, 3.2),
     apparentRadiusRadians: clamp(physicalAngularRadius * 2.4, 0.012, 0.09),
     activity,
-    spotCoverage: clampUnit(activity * 0.3),
+    spotCoverage: clampUnit(activity * 0.3 * convectiveEnvelopeStrength(temperatureKelvin)),
     granulationScale: 0.4 + convectiveTendency * 1.6,
     granulationStrength: clampUnit(0.2 + convectiveTendency * 0.5),
     coronalIntensity: clampUnit(0.25 + activity * 0.65),
@@ -694,7 +761,7 @@ const deriveGasGiantRecipe = (
   const measured = derivePlanetMeasuredProperties(planet);
   const derived = derivePlanetDerivedProperties(measured);
   const inferred = derivePlanetInferredProperties(planet, measured, derived, random);
-  const equilibriumTemperature = planet.observation.equilibriumTemperatureKelvin ?? 0;
+  const equilibriumTemperature = derived.equilibriumTemperatureKelvin ?? 0;
   const radiusJupiter =
     planet.observation.radiusJupiter ??
     (planet.observation.radiusEarth !== null ? planet.observation.radiusEarth / 11.209 : 1);
@@ -811,7 +878,9 @@ const deriveRockyRecipe = (
   const measured = derivePlanetMeasuredProperties(planet);
   const derived = derivePlanetDerivedProperties(measured);
   const inferred = derivePlanetInferredProperties(planet, measured, derived, random);
-  const temperature = planet.observation.equilibriumTemperatureKelvin;
+  const temperature = derived.equilibriumTemperatureKelvin;
+  const temperatureBasis =
+    derived.equilibriumTemperatureSource === "derived" ? "derived" : "measured";
   const radiusEarth = planet.observation.radiusEarth ?? 1;
   const scaledRadius = 3.25 + Math.min(Math.max(radiusEarth, 0.3), 2) * 0.34;
   const isScorched = temperature !== null && temperature > 500;
@@ -996,17 +1065,17 @@ const deriveRockyRecipe = (
           : 0.2 + random() * 0.3,
     },
     summary: isScorched
-      ? "An intensely heated mineral world with glowing fracture networks, dark impact basins, and a thin vapor haze generated from its measured thermal regime."
+      ? `An intensely heated mineral world with glowing fracture networks, dark impact basins, and a thin vapor haze generated from its ${temperatureBasis} thermal regime.`
       : isOceanCandidate
         ? "A speculative ocean-candidate world with broad water coverage, drifting cloud systems, and scattered highland terrain, inferred from its low bulk density and temperate equilibrium temperature."
         : isTemperate
-          ? "A speculative temperate world with ocean basins, drifting cloud systems, highland terrain, and polar ice generated from its measured scale and temperature."
+          ? `A speculative temperate world with ocean basins, drifting cloud systems, highland terrain, and polar ice generated from its measured scale and ${temperatureBasis} temperature.`
           : isColdDesert
-            ? "A cold desert world of bare, wind-worked rock under polar ice, too cold for standing water and too dry for weather, inferred from its measured equilibrium temperature."
+            ? `A cold desert world of bare, wind-worked rock under polar ice, too cold for standing water and too dry for weather, inferred from its ${temperatureBasis} equilibrium temperature.`
             : isFrozen
               ? "A frozen rocky world with broad polar ice, weathered highlands, impact basins, and sparse drifting cloud systems."
               : isHotDesert
-                ? "A hot desert world of dry, sun-baked rock, held above the water boiling regime but below melting by its measured equilibrium temperature."
+                ? `A hot desert world of dry, sun-baked rock, held above the water boiling regime but below melting by its ${temperatureBasis} equilibrium temperature.`
                 : "A rocky world with weathered highlands and impact basins, generated with limited scale and temperature data.",
   };
 };
@@ -1019,7 +1088,9 @@ const deriveIceGiantRecipe = (
   const measured = derivePlanetMeasuredProperties(planet);
   const derived = derivePlanetDerivedProperties(measured);
   const inferred = derivePlanetInferredProperties(planet, measured, derived, random);
-  const temperature = planet.observation.equilibriumTemperatureKelvin;
+  const temperature = derived.equilibriumTemperatureKelvin;
+  const temperatureBasis =
+    derived.equilibriumTemperatureSource === "derived" ? "derived" : "measured";
   const radiusEarth = planet.observation.radiusEarth ?? 4;
   const scaledRadius = 3.55 + Math.min(Math.max(radiusEarth, 2), 6) * 0.11;
   const isWarm = temperature !== null && temperature >= 700;
@@ -1096,8 +1167,7 @@ const deriveIceGiantRecipe = (
       opacity: 0.1 + random() * 0.12,
       outerRadius: scaledRadius * (1.35 + random() * 0.12),
     },
-    summary:
-      "A deep volatile-rich atmosphere rendered with methane-tinted haze, subdued cloud bands, and a faint debris ring inferred from its measured scale and temperature.",
+    summary: `A deep volatile-rich atmosphere rendered with methane-tinted haze, subdued cloud bands, and a faint debris ring inferred from its measured scale and ${temperatureBasis} temperature.`,
   };
 };
 
@@ -1252,6 +1322,8 @@ export const deriveStarRecipe = (star: StarProfile): StarVisualRecipe => {
   const color = temperatureToRgb(temperatureKelvin);
   const activity = clampUnit(star.customization?.activity ?? 0.55);
   const convectiveTendency = clampUnit(1 - (temperatureKelvin - 3_000) / 27_000);
+  const compactRemnant = star.kind === "white-dwarf" || star.kind === "neutron-star";
+  const spotFraction = 0.15 + random() * 0.35;
 
   return {
     seed,
@@ -1265,7 +1337,9 @@ export const deriveStarRecipe = (star: StarProfile): StarVisualRecipe => {
     activity,
     spectralClassification: `${spectralClass ?? "G"}${luminosityClass(star.kind)}`,
     rotationFactor: clampUnit(star.customization?.rotation ?? 0.5),
-    spotCoverage: clampUnit(activity * (0.15 + random() * 0.35)),
+    spotCoverage: compactRemnant
+      ? 0
+      : clampUnit(activity * spotFraction * convectiveEnvelopeStrength(temperatureKelvin)),
     granulationScale: 0.4 + convectiveTendency * 1.6 + random() * 0.3,
     granulationStrength: clampUnit(0.2 + convectiveTendency * 0.5 + random() * 0.1),
     coronalIntensity: clampUnit(0.25 + activity * 0.65 + random() * 0.1),

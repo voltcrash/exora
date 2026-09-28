@@ -1,4 +1,5 @@
 import { ArcRotateCamera } from "@babylonjs/core/Cameras/arcRotateCamera.js";
+import { Camera } from "@babylonjs/core/Cameras/camera.js";
 import { Engine } from "@babylonjs/core/Engines/engine.js";
 import { Color4 } from "@babylonjs/core/Maths/math.color.js";
 import { Vector3 } from "@babylonjs/core/Maths/math.vector.js";
@@ -6,6 +7,13 @@ import { Scene, ScenePerformancePriority } from "@babylonjs/core/scene.js";
 import type { RenderQualityProfile } from "./render-quality.ts";
 
 const DEFAULT_CLEAR_COLOR = new Color4(0.0015, 0.003, 0.008, 1);
+
+// Babylon holds the vertical angle fixed, which leaves a portrait phone a sliver of the scene
+// horizontally; there the horizontal angle is held instead so subjects still fit across.
+export const fieldOfViewModeFor = (width: number, height: number): number =>
+  width > 0 && height > 0 && width < height
+    ? Camera.FOVMODE_HORIZONTAL_FIXED
+    : Camera.FOVMODE_VERTICAL_FIXED;
 
 export interface PersistentSceneResources {
   camera: ArcRotateCamera;
@@ -50,11 +58,18 @@ export const createPersistentScene = (
   camera.pinchDeltaPercentage = 0.008;
   camera.inertia = 0.82;
 
+  const fitFieldOfView = (): void => {
+    camera.fovMode = fieldOfViewModeFor(engine.getRenderWidth(), engine.getRenderHeight());
+  };
+  fitFieldOfView();
+  const resizeObserver = engine.onResizeObservable.add(fitFieldOfView);
+
   return {
     camera,
     engine,
     scene,
     dispose: () => {
+      engine.onResizeObservable.remove(resizeObserver);
       scene.dispose();
       engine.dispose();
     },

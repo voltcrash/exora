@@ -13,7 +13,7 @@ import { VertexData } from "@babylonjs/core/Meshes/mesh.vertexData.js";
 import { Scene } from "@babylonjs/core/scene.js";
 import { TransformNode } from "@babylonjs/core/Meshes/transformNode.js";
 import type { ExoplanetProfile } from "@exora/contracts";
-import type { Rgb, RingRecipe, WorldRecipe } from "@exora/worldgen";
+import { deriveTidalLocking, type Rgb, type RingRecipe, type WorldRecipe } from "@exora/worldgen";
 import { type RenderQualityProfile, shaderDefines } from "./render-quality.ts";
 import { createPlanetKeyLight } from "./planet-lighting.ts";
 import { bindPlanetSurfaceAssets } from "./planet-material-assets.ts";
@@ -1894,15 +1894,17 @@ export const createPlanetWorld = (
   );
 
   let elapsedSeconds = 0;
-  const displayRotationSpeed = planetProfile.solarSystem?.rotationPeriodHours
-    ? Math.sign(planetProfile.solarSystem.rotationPeriodHours) *
-      Math.min(
-        0.22,
-        Math.max(
-          0.008,
-          0.085 * (24 / Math.abs(planetProfile.solarSystem.rotationPeriodHours)) ** 0.32,
-        ),
-      )
+  // A locked world turns once per orbit, so it takes the same measured-period path as the Moon.
+  const lockedPeriodDays =
+    planetProfile.source.table === "procedural"
+      ? null
+      : (deriveTidalLocking(planetProfile)?.rotationPeriodDays ?? null);
+  const rotationPeriodHours =
+    planetProfile.solarSystem?.rotationPeriodHours ??
+    (lockedPeriodDays === null ? null : lockedPeriodDays * 24);
+  const displayRotationSpeed = rotationPeriodHours
+    ? Math.sign(rotationPeriodHours) *
+      Math.min(0.22, Math.max(0.008, 0.085 * (24 / Math.abs(rotationPeriodHours)) ** 0.32))
     : recipe.rotationSpeed;
   let viewState: "entering" | "leaving" | "orbit" | "surface" = "orbit";
   let viewTransitionSeconds = 0;
