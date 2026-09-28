@@ -423,10 +423,14 @@ export const App = () => {
       if (!tour || !tour.steps[index]) return;
       window.history.pushState({}, "", tourStepSearch(tour, index));
       setDiscoverOpen(false);
+      setSystemHostName(null);
       sceneHost?.beginTravel();
-      loadFromLocation();
+      void loadRequestedObject().then((next) => {
+        if (next.type === "missing") sceneHost?.cancelTravel();
+        setActiveObject(next);
+      });
     },
-    [loadFromLocation, sceneHost],
+    [sceneHost],
   );
   const exitTour = useCallback((): void => {
     const parameters = new URLSearchParams(window.location.search);
