@@ -1,4 +1,9 @@
 import type { ExoplanetProfile, StarProfile } from "@exora/contracts";
+import {
+  deriveHabitableZone,
+  habitableZonePlacement,
+  isWithinHabitableZone,
+} from "@exora/worldgen";
 
 interface SearchIdentity {
   aliases?: readonly string[];
@@ -156,6 +161,17 @@ const measuredFieldCount = (planet: ExoplanetProfile): number => {
   ].filter((value) => value !== null).length;
 };
 
+// Equilibrium temperature assumes an albedo, so the star's flux limits decide whenever
+// the archive describes the host well enough to derive them.
+const inHabitableZone = ({ observation }: ExoplanetProfile): boolean => {
+  const zone = deriveHabitableZone(observation);
+  if (zone && observation.semiMajorAxisAu !== null && observation.semiMajorAxisAu > 0) {
+    return isWithinHabitableZone(habitableZonePlacement(zone, observation.semiMajorAxisAu));
+  }
+  const temperature = observation.equilibriumTemperatureKelvin;
+  return temperature !== null && temperature >= 180 && temperature <= 330;
+};
+
 export const filterPlanetsByPhysicalControls = (
   planets: readonly ExoplanetProfile[],
   filters: PhysicalPlanetFilters,
@@ -186,11 +202,7 @@ export const filterPlanetsByPhysicalControls = (
         temperature === null || composition === null
           ? null
           : clampUnit(temperature * 0.72 + composition * 0.28);
-      const habitable =
-        planet.kind === "rocky" &&
-        observation.equilibriumTemperatureKelvin !== null &&
-        observation.equilibriumTemperatureKelvin >= 180 &&
-        observation.equilibriumTemperatureKelvin <= 330;
+      const habitable = planet.kind === "rocky" && inHabitableZone(planet);
       const matches =
         axisMatches(filters.composition, composition) &&
         axisMatches(filters.temperature, temperature) &&
