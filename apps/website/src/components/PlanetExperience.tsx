@@ -1,5 +1,10 @@
 import type { ExoplanetProfile, StarProfile } from "@exora/contracts";
-import { deriveWorldRecipe, WORLDGEN_VERSION, type WorldRecipe } from "@exora/worldgen";
+import {
+  deriveTidalLocking,
+  deriveWorldRecipe,
+  WORLDGEN_VERSION,
+  type WorldRecipe,
+} from "@exora/worldgen";
 import { useEffect, useMemo, useRef, useState, type CSSProperties } from "react";
 import type { PlanetLoadResult } from "../api-client.ts";
 import {
@@ -12,8 +17,14 @@ import {
 } from "../destination-panel.ts";
 import { warmDestinations } from "../destination-cache.ts";
 import type { ViewMode } from "../planet-scene.ts";
+import { readHabitableZone } from "../habitable-zone-reading.ts";
 import { derivePlanetPhysics } from "../planet-physics.ts";
-import { formatMeasurement, formatNumber, formatPlanetName } from "../planet-utils.tsx";
+import {
+  formatMeasurement,
+  formatNumber,
+  formatPlanetName,
+  formatTimescale,
+} from "../planet-utils.tsx";
 import type { PlanetarySubsystem } from "../planetary-subsystems.ts";
 import type { SceneHost, XrStatus } from "../scene-host.ts";
 import { SURFACE_TRANSITION_MS, type TravelPhase } from "../travel-transition.ts";
@@ -366,6 +377,9 @@ export const PlanetExperience = ({
       ]
     : [];
 
+  const tidalLocking = custom || primaryBody ? null : deriveTidalLocking(planet);
+  const habitableZone = custom || primaryBody ? null : readHabitableZone(planet);
+
   const worldFacts: readonly PanelFact[] = present<PanelFact>([
     {
       detail: `Exora inference · ${recipe.confidence} confidence`,
@@ -373,10 +387,23 @@ export const PlanetExperience = ({
       tone: "accent",
       value: recipe.atmosphere.label.split(" · ")[0],
     },
+    habitableZone && {
+      detail: habitableZone.detail,
+      label: "Habitable zone",
+      ...(habitableZone.within ? { tone: "cyan" as const } : {}),
+      value: habitableZone.value,
+    },
     !custom && {
       detail: hostSpectrum,
       label: "Host spectrum",
       value: observation.hostSpectralType ?? "Not reported",
+    },
+    tidalLocking && {
+      detail: tidalLocking.locked
+        ? `Star-raised tides despin it in ~${formatTimescale(tidalLocking.despinTimescaleYears)}, so one hemisphere always faces ${planet.hostStar} · day = orbit = ${formatNumber(tidalLocking.rotationPeriodDays, 2)} d`
+        : `Tidal despin would take ~${formatTimescale(tidalLocking.despinTimescaleYears)}, so it likely keeps a day of its own`,
+      label: "Rotation",
+      value: tidalLocking.locked ? "Tidally locked" : "Free rotation",
     },
     custom && {
       detail: "The generated URL carries this recipe, so the same world rebuilds from the link.",
@@ -610,9 +637,9 @@ export const PlanetExperience = ({
           summary={(solar ? solarIdentity?.summary : recipe.summary) ?? recipe.summary}
           tags={[
             recipe.classification,
-            observation.equilibriumTemperatureKelvin === null
+            recipe.derived.equilibriumTemperatureKelvin === null
               ? "TEMP UNKNOWN"
-              : `${formatNumber(observation.equilibriumTemperatureKelvin, 0)} K`,
+              : `${recipe.derived.equilibriumTemperatureSource === "derived" ? "~" : ""}${formatNumber(recipe.derived.equilibriumTemperatureKelvin, 0)} K`,
             observation.discoveryMethod,
           ]}
           tagsLabel="World classification"
