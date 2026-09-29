@@ -110,6 +110,54 @@ test("a row with no sky position reports none rather than a placeholder", () => 
   });
 });
 
+test("a transiting world carries the dip and ephemeris the archive solved for", () => {
+  const planet = normalizeNasaPlanet({
+    ...nasaRow,
+    pl_imppar: 0.507,
+    pl_orbpererr1: 0.0000003,
+    pl_orbpererr2: -0.0000004,
+    pl_ratror: 0.12086,
+    pl_rvamp: 84.7,
+    pl_trandep: 1.5,
+    pl_trandur: 3.072,
+    pl_tranmid: 2451659.93742,
+    pl_tranmiderr1: 0.00002,
+    pl_tranmiderr2: -0.00002,
+  });
+
+  expect(planet?.observation.signal).toEqual({
+    impactParameter: 0.507,
+    orbitalPeriodUncertaintyDays: 0.0000004,
+    radialVelocityAmplitudeMetersPerSecond: 84.7,
+    radiusRatio: 0.12086,
+    transitDepthPercent: 1.5,
+    transitDurationHours: 3.072,
+    transitMidpointBjd: 2451659.93742,
+    transitMidpointUncertaintyDays: 0.00002,
+  });
+});
+
+test("a conjunction time from a velocity fit is not reported as a transit", () => {
+  const planet = normalizeNasaPlanet({
+    ...nasaRow,
+    pl_imppar: null,
+    pl_ratror: null,
+    pl_rvamp: 55.77,
+    pl_trandep: null,
+    pl_trandur: null,
+    pl_tranmid: 2456326.9323,
+    pl_tranmiderr1: 0.002,
+    pl_tranmiderr2: -0.002,
+  });
+
+  expect(planet?.observation.signal).toMatchObject({
+    radialVelocityAmplitudeMetersPerSecond: 55.77,
+    transitDepthPercent: null,
+    transitMidpointBjd: null,
+    transitMidpointUncertaintyDays: null,
+  });
+});
+
 test("rejects malformed NASA measurements instead of rewriting them as null", async () => {
   const repository = new NasaPlanetRepository({
     fetcher: async () => Response.json([{ ...nasaRow, pl_orbeccen: "not measured" }]),
@@ -131,6 +179,7 @@ test("the TAP query asks for the sky position every destination needs", async ()
 
   expect(query).toContain("ra,dec");
   expect(query).toContain("pl_orbeccen,pl_orbincl");
+  expect(query).toContain("pl_trandep,pl_trandur,pl_imppar,pl_ratror,pl_rvamp,pl_tranmid");
 });
 
 test("caches identical TAP queries", async () => {

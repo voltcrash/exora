@@ -1,5 +1,6 @@
 import {
   exoplanetProfileSchema,
+  type DetectionSignal,
   type ExoplanetProfile,
   type MassProvenance,
   type PlanetKind,
@@ -40,6 +41,16 @@ const NASA_COLUMNS = [
   "st_rad",
   "st_mass",
   "st_lum",
+  "pl_trandep",
+  "pl_trandur",
+  "pl_imppar",
+  "pl_ratror",
+  "pl_rvamp",
+  "pl_tranmid",
+  "pl_tranmiderr1",
+  "pl_tranmiderr2",
+  "pl_orbpererr1",
+  "pl_orbpererr2",
 ].join(",");
 
 export {
@@ -58,14 +69,24 @@ interface NasaPlanetRow {
   pl_bmassj: number | null;
   pl_bmassprov: string | null;
   pl_eqt: number | null;
+  pl_imppar: number | null;
   pl_name: string | null;
   pl_orbeccen: number | null;
   pl_orbincl: number | null;
   pl_orbper: number | null;
+  pl_orbpererr1: number | null;
+  pl_orbpererr2: number | null;
   pl_orbsmax: number | null;
   pl_rade: number | null;
   pl_rade_reflink: string | null;
   pl_radj: number | null;
+  pl_ratror: number | null;
+  pl_rvamp: number | null;
+  pl_trandep: number | null;
+  pl_trandur: number | null;
+  pl_tranmid: number | null;
+  pl_tranmiderr1: number | null;
+  pl_tranmiderr2: number | null;
   ra: number | null;
   st_spectype: string | null;
   st_teff: number | null;
@@ -86,14 +107,24 @@ const nasaPlanetRowSchema = z.strictObject({
   pl_bmassj: nullableFiniteNumber,
   pl_bmassprov: nullableText,
   pl_eqt: nullableFiniteNumber,
+  pl_imppar: nullableFiniteNumber.optional(),
   pl_name: nullableText,
   pl_orbeccen: nullableFiniteNumber,
   pl_orbincl: nullableFiniteNumber,
   pl_orbper: nullableFiniteNumber,
+  pl_orbpererr1: nullableFiniteNumber.optional(),
+  pl_orbpererr2: nullableFiniteNumber.optional(),
   pl_orbsmax: nullableFiniteNumber,
   pl_rade: nullableFiniteNumber,
   pl_rade_reflink: nullableText,
   pl_radj: nullableFiniteNumber,
+  pl_ratror: nullableFiniteNumber.optional(),
+  pl_rvamp: nullableFiniteNumber.optional(),
+  pl_trandep: nullableFiniteNumber.optional(),
+  pl_trandur: nullableFiniteNumber.optional(),
+  pl_tranmid: nullableFiniteNumber.optional(),
+  pl_tranmiderr1: nullableFiniteNumber.optional(),
+  pl_tranmiderr2: nullableFiniteNumber.optional(),
   ra: nullableFiniteNumber,
   st_lum: nullableFiniteNumber,
   st_mass: nullableFiniteNumber,
@@ -198,6 +229,39 @@ const radiusProvenance = (row: NasaPlanetRow): RadiusProvenance | null => {
   return reference.includes("CALCULATED_VALUE") ? "estimated" : "measured";
 };
 
+const symmetricUncertainty = (upper: unknown, lower: unknown): number | null => {
+  const bounds = [numberOrNull(upper), numberOrNull(lower)]
+    .filter((bound): bound is number => bound !== null)
+    .map(Math.abs);
+  return bounds.length > 0 ? Math.max(...bounds) : null;
+};
+
+const positive = (value: unknown): number | null => {
+  const number = numberOrNull(value);
+  return number !== null && number > 0 ? number : null;
+};
+
+const detectionSignal = (row: NasaPlanetRow): DetectionSignal => {
+  const transitDepthPercent = positive(row.pl_trandep);
+  const transitDurationHours = positive(row.pl_trandur);
+  const radiusRatio = positive(row.pl_ratror);
+  // For a planet never seen to transit, pl_tranmid holds a conjunction time from the RV fit.
+  const transited =
+    transitDepthPercent !== null || transitDurationHours !== null || radiusRatio !== null;
+  return {
+    impactParameter: transited ? numberOrNull(row.pl_imppar) : null,
+    orbitalPeriodUncertaintyDays: symmetricUncertainty(row.pl_orbpererr1, row.pl_orbpererr2),
+    radialVelocityAmplitudeMetersPerSecond: positive(row.pl_rvamp),
+    radiusRatio,
+    transitDepthPercent,
+    transitDurationHours,
+    transitMidpointBjd: transited ? numberOrNull(row.pl_tranmid) : null,
+    transitMidpointUncertaintyDays: transited
+      ? symmetricUncertainty(row.pl_tranmiderr1, row.pl_tranmiderr2)
+      : null,
+  };
+};
+
 export const normalizeNasaPlanet = (
   rawRow: Record<string, unknown>,
   retrievedOn = new Date().toISOString().slice(0, 10),
@@ -235,6 +299,7 @@ export const normalizeNasaPlanet = (
       hostRadiusSolar: numberOrNull(row.st_rad),
       hostMassSolar: numberOrNull(row.st_mass),
       hostLuminosityLogSolar: numberOrNull(row.st_lum),
+      signal: detectionSignal(row),
     },
     source: {
       archive: "NASA Exoplanet Archive",
