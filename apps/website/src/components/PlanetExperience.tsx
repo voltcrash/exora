@@ -16,6 +16,7 @@ import {
   type PanelMetric,
 } from "../destination-panel.ts";
 import { warmDestinations } from "../destination-cache.ts";
+import { detectionFacts, readDetectionSignal } from "../detection-signal.ts";
 import type { ViewMode } from "../planet-scene.ts";
 import { readHabitableZone } from "../habitable-zone-reading.ts";
 import { readProvenance } from "../measurement-provenance.ts";
@@ -591,6 +592,20 @@ export const PlanetExperience = ({
                 ],
                 id: "physics",
                 label: "Physics",
+              },
+            !custom &&
+              !solar && {
+                blocks: [
+                  {
+                    facts: detectionFacts(
+                      planet,
+                      readDetectionSignal(planet, recipe.derived.equilibriumTemperatureKelvin),
+                    ),
+                    type: "facts" as const,
+                  },
+                ],
+                id: "signal",
+                label: "Signal",
               },
             solarIdentity?.surfaceNote
               ? {
