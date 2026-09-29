@@ -23,6 +23,7 @@ import type { ViewMode } from "../planet-scene.ts";
 import { readHabitableZone } from "../habitable-zone-reading.ts";
 import { readProvenance } from "../measurement-provenance.ts";
 import { derivePlanetPhysics } from "../planet-physics.ts";
+import { skyFacts } from "../sky-position.ts";
 import {
   formatMeasurement,
   formatNumber,
@@ -625,6 +626,22 @@ export const PlanetExperience = ({
           ])
         : presentTabs([
             { blocks: [{ facts: worldFacts, type: "facts" }], id: "record", label: "Record" },
+            !custom &&
+              !solar && {
+                blocks: [
+                  {
+                    facts: skyFacts({
+                      declinationDegrees: observation.declinationDegrees,
+                      distanceParsecs: observation.distanceParsecs,
+                      rightAscensionDegrees: observation.rightAscensionDegrees,
+                      visualMagnitude: null,
+                    }),
+                    type: "facts" as const,
+                  },
+                ],
+                id: "sky",
+                label: "Sky",
+              },
             !custom &&
               !primaryBody && {
                 blocks: [
