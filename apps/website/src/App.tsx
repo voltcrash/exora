@@ -19,6 +19,7 @@ import {
 } from "./api-client.ts";
 import { reachStar, reachSystem } from "./destination-cache.ts";
 import { PlanetExperience } from "./components/PlanetExperience.tsx";
+import { OfflineNotice } from "./components/OfflineNotice.tsx";
 import { RecoveryScreen } from "./components/RecoveryScreen.tsx";
 import { TourBar } from "./components/TourBar.tsx";
 import { featuredPlanet } from "./planet-profile.ts";
@@ -550,6 +551,7 @@ export const App = () => {
         }
         tabIndex={0}
       />
+      <OfflineNotice />
       <div
         className={cx(`travel-veil ${travelPhase === "crossing" ? "crossing" : ""}`)}
         aria-hidden="true"

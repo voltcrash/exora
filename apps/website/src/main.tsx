@@ -23,6 +23,15 @@ const render = (): void => {
   loadWebFonts();
 };
 
+// Development keeps the network honest; a deployed build works offline after its first visit.
+if (import.meta.env.PROD && "serviceWorker" in navigator) {
+  window.addEventListener("load", () => {
+    void navigator.serviceWorker.register("/sw.js").catch((error: unknown) => {
+      console.warn("Exora could not install its offline cache.", error);
+    });
+  });
+}
+
 if (import.meta.env.DEV || import.meta.env.VITE_XR_EMULATOR === "1") {
   void import("./xr-emulator.ts").then(({ installXrEmulator, isXrEmulatorRequested }) => {
     if (isXrEmulatorRequested()) void installXrEmulator().then(render);

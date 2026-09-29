@@ -1,0 +1,27 @@
+.offline {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  position: fixed;
+  z-index: 4;
+  top: 18px;
+  left: 50%;
+  margin: 0;
+  padding: 8px 14px;
+  border: 1px solid rgb(255 178 122 / 36%);
+  border-radius: 999px;
+  color: #ffc0a7;
+  background: rgb(20 10 6 / 88%);
+  font-family: var(--mono);
+  font-size: 7px;
+  letter-spacing: 0.08em;
+  transform: translateX(-50%);
+  backdrop-filter: blur(12px);
+}
+
+.offline span {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: #ff9a6b;
+}
