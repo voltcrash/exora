@@ -148,6 +148,7 @@ vi.mock("./system-scene.ts", async () => {
       return {
         ...mountedWorld(),
         layout: deriveSystemLayout(options.planets),
+        onSightlineCrossing: () => () => undefined,
         orbitDays: () => 0,
         setClockRate: () => undefined,
       };
