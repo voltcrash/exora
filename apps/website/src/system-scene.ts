@@ -60,6 +60,8 @@ export interface SystemWorld extends MountedWorld {
   layout: SystemLayout;
   /** Days of catalog orbit swept since the diorama opened; negative after running backwards. */
   orbitDays: () => number;
+  /** Calls back with a world's orbit index each time it crosses Earth's line of sight. */
+  onSightlineCrossing: (listener: (orbitIndex: number) => void) => () => void;
   /** Multiplies the diorama clock: 0 holds every world still, negative runs the orbits backwards. */
   setClockRate: (rate: number) => void;
   setEphemeris: (vectors: readonly EphemerisVector[] | null) => void;
@@ -426,10 +428,28 @@ export const createSystemWorld = (
     buildWorld(scene, profile, layout, orbit, root, onSelectWorld),
   );
 
+  const crossingListeners = new Set<(orbitIndex: number) => void>();
+  // The camera stands on −z, looking along Earth's sightline, so a world transits at ν = −π/2.
+  const sightlineOffsets: (number | null)[] = drawn.map(() => null);
+  const noteSightlineCrossing = (index: number, trueAnomaly: number): void => {
+    const offset = Math.atan2(
+      Math.sin(trueAnomaly + Math.PI / 2),
+      Math.cos(trueAnomaly + Math.PI / 2),
+    );
+    const previous = sightlineOffsets[index];
+    sightlineOffsets[index] = offset;
+    if (previous === null || previous === undefined || Math.abs(offset - previous) > Math.PI)
+      return;
+    if (Math.sign(previous) !== Math.sign(offset) && offset !== previous) {
+      for (const listener of crossingListeners) listener(index);
+    }
+  };
+
   const applyPositions = (elapsedSeconds: number): void => {
-    for (const world of drawn) {
+    for (const [index, world] of drawn.entries()) {
       world.bodyPlane.rotation.x = world.orbit.tiltRadians;
       const state = orbitStateAt(world.orbit, elapsedSeconds, layout.daysPerSecond);
+      noteSightlineCrossing(index, state.trueAnomaly);
       const radius = mapDistance(layout.mapping, state.radiusAu);
       world.body.position.set(
         Math.cos(state.trueAnomaly) * radius,
@@ -491,6 +511,10 @@ export const createSystemWorld = (
   return {
     focusXrRig: placeXrCamera,
     layout,
+    onSightlineCrossing: (listener) => {
+      crossingListeners.add(listener);
+      return () => crossingListeners.delete(listener);
+    },
     orbitDays: () => orbitSeconds * layout.daysPerSecond,
     setClockRate: (rate) => {
       clockRate = Number.isFinite(rate) ? rate : 1;
@@ -507,6 +531,7 @@ export const createSystemWorld = (
     },
     restoreDesktopView: () => camera.attachControl(canvas, true),
     dispose: () => {
+      crossingListeners.clear();
       scene.onBeforeRenderObservable.remove(renderObserver);
       scene.onAfterRenderObservable.remove(firstFrameObserver);
     },

@@ -11,6 +11,12 @@ import {
 } from "../destination-panel.ts";
 import { formatNumber } from "../planet-utils.tsx";
 import type { SceneHost, XrStatus } from "../scene-host.ts";
+import {
+  createOrbitVoice,
+  nearestSimpleRatio,
+  orbitPitches,
+  type OrbitVoice,
+} from "../orbit-sonification.ts";
 import { isEphemerisDerivedAt } from "../solar-ephemeris.ts";
 import {
   bodyScaleLabel,
@@ -103,6 +109,9 @@ export const SystemExperience = ({
   const [clockDirection, setClockDirection] = useState<1 | -1>(1);
   const [clockRunning, setClockRunning] = useState(true);
   const [orbitDays, setOrbitDays] = useState(0);
+  const [listening, setListening] = useState(false);
+  const [audioUnavailable, setAudioUnavailable] = useState(false);
+  const voiceRef = useRef<OrbitVoice | null>(null);
   const worldRef = useRef<SystemWorld | null>(null);
   const starJumpRef = useRef(false);
   const ephemerisRef = useRef<EphemerisResponse | null>(null);
@@ -170,6 +179,39 @@ export const SystemExperience = ({
   useEffect(() => {
     worldRef.current?.setClockRate(effectiveClockRate);
   }, [effectiveClockRate, layout]);
+
+  useEffect(() => {
+    const world = worldRef.current;
+    const voice = voiceRef.current;
+    if (!listening || !layout || !world || !voice) return;
+    const pitches = orbitPitches(layout.orbits.map((orbit) => orbit.elements.periodDays));
+    const spread = layout.orbits.length > 1 ? 1.2 / (layout.orbits.length - 1) : 0;
+    return world.onSightlineCrossing((index) => {
+      const pitch = pitches[index];
+      if (pitch !== null && pitch !== undefined) voice.pluck(pitch, -0.6 + index * spread);
+    });
+  }, [layout, listening]);
+
+  useEffect(
+    () => () => {
+      voiceRef.current?.dispose();
+      voiceRef.current = null;
+    },
+    [],
+  );
+
+  const toggleListening = (): void => {
+    if (listening) {
+      setListening(false);
+      return;
+    }
+    voiceRef.current ??= createOrbitVoice();
+    if (!voiceRef.current) {
+      setAudioUnavailable(true);
+      return;
+    }
+    setListening(true);
+  };
 
   useEffect(() => {
     if (!layout) return;
@@ -361,6 +403,25 @@ export const SystemExperience = ({
     </div>
   );
 
+  const neighbourRatios: readonly PanelFact[] = drawn.flatMap((orbit, index) => {
+    const next = drawn[index + 1];
+    const inner = orbit.elements.periodDays;
+    const outer = next?.elements.periodDays ?? null;
+    if (!next || inner === null || outer === null || inner <= 0) return [];
+    const ratio = outer / inner;
+    const simple = nearestSimpleRatio(ratio);
+    return [
+      {
+        detail: simple
+          ? `Within 1% of ${simple} · heard as that interval`
+          : "No simple ratio within 1% · the two notes drift apart",
+        label: `${orbit.planet.name} → ${next.planet.name}`,
+        ...(simple ? { tone: "cyan" as const } : {}),
+        value: `${formatNumber(ratio, 3)} × the period`,
+      },
+    ];
+  });
+
   const clockControls = (
     <div className={cx("ephemeris")}>
       <p className={cx("ephemeris-state")} role="status">
@@ -421,6 +482,19 @@ export const SystemExperience = ({
           ))}
         </select>
       </label>
+      <button
+        type="button"
+        disabled={Boolean(ephemeris) || audioUnavailable}
+        aria-pressed={listening}
+        onClick={toggleListening}
+      >
+        {listening ? "♪ LISTENING · TAP TO MUTE" : "♪ LISTEN TO THE ORBITS"}
+      </button>
+      <p className={cx("panel-status")}>
+        {audioUnavailable
+          ? "THIS BROWSER OFFERS NO WEB AUDIO"
+          : "EACH WORLD PLUCKS A NOTE AS IT CROSSES OUR LINE OF SIGHT, THE MOMENT IT WOULD TRANSIT. PITCH FOLLOWS ORBITAL FREQUENCY, FOLDED BY OCTAVES, SO RESONANT ORBITS SOUND IN HARMONY."}
+      </p>
       <p className={cx("panel-status")}>
         {ephemeris
           ? "RETURN TO CATALOG ORBITS IN THE TIME TAB TO RUN THIS CLOCK"
@@ -489,7 +563,10 @@ export const SystemExperience = ({
     tabs: presentTabs([
       { blocks: worldBlocks, count: drawn.length, id: "worlds", label: "Worlds" },
       {
-        blocks: [{ content: clockControls, label: "DIORAMA CLOCK", type: "custom" as const }],
+        blocks: [
+          { content: clockControls, label: "DIORAMA CLOCK", type: "custom" as const },
+          { facts: neighbourRatios, type: "facts" as const },
+        ],
         id: "clock",
         label: "Clock",
       },
