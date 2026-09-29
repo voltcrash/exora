@@ -21,7 +21,8 @@ export type PaletteTarget =
   | { cached: boolean; planet: ExoplanetProfile; type: "planet" }
   | { cached: boolean; star: StarProfile; type: "star" }
   | { hostStar: string; type: "system" }
-  | { region: SolarRegionProfile; type: "region" };
+  | { region: SolarRegionProfile; type: "region" }
+  | { tourId: string; type: "tour" };
 
 export type PaletteGroup =
   | "Actions"
@@ -29,7 +30,8 @@ export type PaletteGroup =
   | "Exoplanets"
   | "Solar System"
   | "Stars"
-  | "Systems";
+  | "Systems"
+  | "Tours";
 
 export const PALETTE_GROUP_ORDER: readonly PaletteGroup[] = [
   "Solar System",
@@ -37,6 +39,7 @@ export const PALETTE_GROUP_ORDER: readonly PaletteGroup[] = [
   "Systems",
   "Stars",
   "Black holes",
+  "Tours",
   "Actions",
 ];
 

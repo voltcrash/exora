@@ -498,9 +498,20 @@ export const App = () => {
         case "system":
           void selectSystem(target.hostStar);
           return;
+        case "tour":
+          goToTourStep(target.tourId, 0);
+          return;
       }
     },
-    [returnHome, selectBlackHole, selectPlanet, selectRegion, selectStar, selectSystem],
+    [
+      goToTourStep,
+      returnHome,
+      selectBlackHole,
+      selectPlanet,
+      selectRegion,
+      selectStar,
+      selectSystem,
+    ],
   );
 
   const subject =

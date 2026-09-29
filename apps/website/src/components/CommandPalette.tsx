@@ -6,6 +6,7 @@ import {
   type PaletteEntry,
   type PaletteTarget,
 } from "../command-palette.ts";
+import { TOURS } from "../tours.ts";
 import styles from "./CommandPalette.module.css";
 import { bindStyles } from "../styles/bind-styles.ts";
 
@@ -47,6 +48,7 @@ const GLYPHS: Record<PaletteTarget["type"], string> = {
   region: "◌",
   star: "✦",
   system: "◎",
+  tour: "↝",
 };
 
 let localEntriesRequest: Promise<PaletteEntry[]> | null = null;
@@ -98,6 +100,14 @@ const localEntries = (): Promise<PaletteEntry[]> => {
       keywords: [...blackHole.aliases, blackHole.host],
       name: blackHole.name,
       target: { blackHole, type: "black-hole" },
+    })),
+    ...TOURS.map((tour): PaletteEntry => ({
+      detail: `Guided tour · ${String(tour.steps.length)} stops · ${tour.summary}`,
+      group: "Tours",
+      id: `tour-${tour.id}`,
+      keywords: ["tour", "guided", ...tour.steps.map((step) => step.name)],
+      name: tour.title,
+      target: { tourId: tour.id, type: "tour" },
     })),
     ...ACTIONS,
   ]);
