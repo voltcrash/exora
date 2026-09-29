@@ -145,7 +145,12 @@ vi.mock("./system-scene.ts", async () => {
       options: { onFirstFrame: () => void; planets: readonly ExoplanetProfile[] },
     ) => {
       options.onFirstFrame();
-      return { ...mountedWorld(), layout: deriveSystemLayout(options.planets) };
+      return {
+        ...mountedWorld(),
+        layout: deriveSystemLayout(options.planets),
+        orbitDays: () => 0,
+        setClockRate: () => undefined,
+      };
     },
   };
 });
