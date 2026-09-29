@@ -58,6 +58,10 @@ export interface SystemWorldOptions {
 
 export interface SystemWorld extends MountedWorld {
   layout: SystemLayout;
+  /** Days of catalog orbit swept since the diorama opened; negative after running backwards. */
+  orbitDays: () => number;
+  /** Multiplies the diorama clock: 0 holds every world still, negative runs the orbits backwards. */
+  setClockRate: (rate: number) => void;
   setEphemeris: (vectors: readonly EphemerisVector[] | null) => void;
   setEphemerisTime: (epoch: Date) => void;
 }
@@ -458,13 +462,17 @@ export const createSystemWorld = (
   };
 
   let elapsed = 0;
+  let orbitSeconds = 0;
+  let clockRate = 1;
   const renderObserver = scene.onBeforeRenderObservable.add(() => {
-    elapsed += Math.min(engine.getDeltaTime() / 1_000, 0.05);
+    const delta = Math.min(engine.getDeltaTime() / 1_000, 0.05);
+    elapsed += delta;
+    orbitSeconds += delta * clockRate;
     const eye = scene.activeCamera?.globalPosition ?? camera.globalPosition;
     stellarSurface?.update(elapsed, eye);
     starfield.update(elapsed, eye);
     if (ephemerisByNaif) applyEphemerisPositions();
-    else applyPositions(elapsed);
+    else applyPositions(orbitSeconds);
   });
 
   const firstFrameObserver = scene.onAfterRenderObservable.addOnce(onFirstFrame);
@@ -483,11 +491,15 @@ export const createSystemWorld = (
   return {
     focusXrRig: placeXrCamera,
     layout,
+    orbitDays: () => orbitSeconds * layout.daysPerSecond,
+    setClockRate: (rate) => {
+      clockRate = Number.isFinite(rate) ? rate : 1;
+    },
     setEphemeris: (vectors) => {
       ephemerisByNaif = vectors ? new Map(vectors.map((vector) => [vector.naifId, vector])) : null;
       if (vectors?.[0]) ephemerisTime = new Date(vectors[0].epoch);
       if (ephemerisByNaif) applyEphemerisPositions();
-      else applyPositions(elapsed);
+      else applyPositions(orbitSeconds);
     },
     setEphemerisTime: (epoch) => {
       ephemerisTime = epoch;

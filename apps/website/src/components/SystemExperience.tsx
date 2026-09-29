@@ -59,6 +59,24 @@ const PLAYBACK_RATES = [
   { label: "1 d/s", secondsPerSecond: 86_400 },
 ] as const;
 
+const CLOCK_RATES = [
+  { label: "¼×", rate: 0.25 },
+  { label: "1×", rate: 1 },
+  { label: "4×", rate: 4 },
+  { label: "16×", rate: 16 },
+] as const;
+
+const signedDays = (days: number): string => {
+  const magnitude = Math.abs(days);
+  const text =
+    magnitude >= 3_652.5
+      ? `${formatNumber(magnitude / 365.25, 0)} yr`
+      : magnitude >= 365.25
+        ? `${formatNumber(magnitude / 365.25, 1)} yr`
+        : `${formatNumber(magnitude, 1)} d`;
+  return `${days < 0 ? "−" : "+"}${text}`;
+};
+
 export const SystemExperience = ({
   chromeHidden,
   host,
@@ -81,6 +99,10 @@ export const SystemExperience = ({
   const [playing, setPlaying] = useState(false);
   const [playbackRate, setPlaybackRate] = useState(3_600);
   const [playbackDirection, setPlaybackDirection] = useState<1 | -1>(1);
+  const [clockRate, setClockRate] = useState(1);
+  const [clockDirection, setClockDirection] = useState<1 | -1>(1);
+  const [clockRunning, setClockRunning] = useState(true);
+  const [orbitDays, setOrbitDays] = useState(0);
   const worldRef = useRef<SystemWorld | null>(null);
   const starJumpRef = useRef(false);
   const ephemerisRef = useRef<EphemerisResponse | null>(null);
@@ -143,6 +165,19 @@ export const SystemExperience = ({
   useEffect(() => {
     void reachStar(hostStar).catch(() => null);
   }, [hostStar]);
+
+  const effectiveClockRate = clockRunning ? clockRate * clockDirection : 0;
+  useEffect(() => {
+    worldRef.current?.setClockRate(effectiveClockRate);
+  }, [effectiveClockRate, layout]);
+
+  useEffect(() => {
+    if (!layout) return;
+    const timer = window.setInterval(() => {
+      setOrbitDays(worldRef.current?.orbitDays() ?? 0);
+    }, 250);
+    return () => window.clearInterval(timer);
+  }, [layout]);
 
   useEffect(() => host?.onXrStatus(setXrStatus), [host]);
 
@@ -326,6 +361,74 @@ export const SystemExperience = ({
     </div>
   );
 
+  const clockControls = (
+    <div className={cx("ephemeris")}>
+      <p className={cx("ephemeris-state")} role="status">
+        {ephemeris
+          ? "JPL POSITIONS DRIVE THE DIORAMA"
+          : `${clockRunning ? (clockDirection === 1 ? "RUNNING" : "RUNNING BACKWARDS") : "HELD"} · ${
+              layout
+                ? `1 s = ${formatNumber(layout.daysPerSecond * clockRate, 2)} d`
+                : "PLACING ORBITS"
+            }`}
+      </p>
+      <p className={cx("panel-status")} aria-live="off">
+        {signedDays(orbitDays)} OF CATALOG ORBIT SINCE THIS VIEW OPENED
+      </p>
+      <div className={cx("ephemeris-row ephemeris-row-three")} aria-label="Diorama clock">
+        <button
+          type="button"
+          disabled={Boolean(ephemeris)}
+          aria-pressed={clockRunning && clockDirection === -1}
+          onClick={() => {
+            setClockDirection(-1);
+            setClockRunning(true);
+          }}
+        >
+          ◀ REVERSE
+        </button>
+        <button
+          type="button"
+          disabled={Boolean(ephemeris)}
+          aria-pressed={!clockRunning}
+          onClick={() => setClockRunning(false)}
+        >
+          ‖ HOLD
+        </button>
+        <button
+          type="button"
+          disabled={Boolean(ephemeris)}
+          aria-pressed={clockRunning && clockDirection === 1}
+          onClick={() => {
+            setClockDirection(1);
+            setClockRunning(true);
+          }}
+        >
+          ▶ RUN
+        </button>
+      </div>
+      <label>
+        <span>CLOCK RATE</span>
+        <select
+          disabled={Boolean(ephemeris)}
+          value={clockRate}
+          onChange={(event) => setClockRate(Number(event.currentTarget.value))}
+        >
+          {CLOCK_RATES.map(({ label, rate }) => (
+            <option key={rate} value={rate}>
+              {label}
+            </option>
+          ))}
+        </select>
+      </label>
+      <p className={cx("panel-status")}>
+        {ephemeris
+          ? "RETURN TO CATALOG ORBITS IN THE TIME TAB TO RUN THIS CLOCK"
+          : "EVERY WORLD KEEPS ITS MEASURED PERIOD · THE RATE SCALES ALL OF THEM TOGETHER"}
+      </p>
+    </div>
+  );
+
   const worldBlocks: readonly PanelBlock[] = present<PanelBlock>([
     sceneState === "loading" && { text: "PLACING ORBITS…", type: "status" as const },
     drawn.length > 0 && {
@@ -385,6 +488,11 @@ export const SystemExperience = ({
     source: "DIORAMA SCALE",
     tabs: presentTabs([
       { blocks: worldBlocks, count: drawn.length, id: "worlds", label: "Worlds" },
+      {
+        blocks: [{ content: clockControls, label: "DIORAMA CLOCK", type: "custom" as const }],
+        id: "clock",
+        label: "Clock",
+      },
       solar && {
         blocks: [{ content: ephemerisControls, label: "LIVE EPHEMERIS", type: "custom" as const }],
         id: "time",
@@ -396,7 +504,13 @@ export const SystemExperience = ({
             facts: present<PanelFact>([
               { label: "Orbit radii", value: layout ? orbitMappingLabel(layout) : "—" },
               { label: "Body radii", value: layout ? bodyScaleLabel(layout) : "—" },
-              { label: "Clock", value: layout ? timeScaleLabel(layout) : "—" },
+              {
+                ...(clockRate === 1
+                  ? {}
+                  : { detail: `Running at ${String(clockRate)}× in the Clock tab` }),
+                label: "Clock",
+                value: layout ? timeScaleLabel(layout) : "—",
+              },
               layout &&
                 hasEarthSightline(layout) && {
                   detail:
