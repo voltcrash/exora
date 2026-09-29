@@ -12,6 +12,16 @@ The system diorama is where that discipline is most visible, because a picture o
 
 - **Confirmed-planet catalog:** Search, browse, and switch worlds live against the NASA Exoplanet Archive, with twelve curated discovery collections from `earth-like` and `ocean-candidates` through `lava-worlds` and `record-breakers`.
 - **System diorama:** A whole host system as a place to stand inside — the star at the centre, every confirmed world on the orbit the archive measured for it, turning at its own measured period. Orbit radii span decades within one host and bodies are four orders of magnitude smaller again, so both scales are compressed logarithmically and the interface prints exactly what it did; an orbit whose shape or plane was never solved for is drawn circular and coplanar and says so, and a world the archive places nowhere is named rather than given an orbit.
+- **The signal each world was found in:** A Signal tab reads the transit depth, duration and chord, the star's velocity wobble, reflex orbit and astrometric shift, the odds the orbit transits at all, and the dip one atmospheric scale height would add. It draws them as the limb-darkened light curve and velocity curve an instrument records, with the floor pinned to the archive's measured depth.
+- **Next transit:** From the archive's ephemeris, the next crossing in the reader's own time zone, converted from barycentric time to an Earth clock, with an error that grows by the period uncertainty every orbit. A prediction whose error rivals the transit itself is flagged.
+- **Composition:** The implied iron-core fraction from Zeng et al. (2016) over the 1–8 Earth-mass range the fit covers, the Earth Similarity Index as the comparison it is, and a mass–radius diagram against the Solar System's planets and the rocky composition curves. Minimum masses carry an arrow and estimated radii are drawn hollow.
+- **Exoplanet atlas:** Every confirmed planet on the period–radius and period–mass planes, with the radius valley and the Solar System marked, and discoveries stacked by year and method. Estimated values stay off their axis unless asked for, hovering identifies a world and clicking travels there.
+- **Where to look:** The constellation from the IAU boundaries (Roman 1987), the season it crosses the meridian at midnight, the latitudes that never see it rise or set, the instrument its magnitude needs, and how long Voyager 1 would take to get there.
+- **Hertzsprung–Russell diagram:** Each star placed from its own measured temperature, magnitude and distance among the naked-eye stars Exora already ships for its sky.
+- **Diorama clock and sonification:** Hold, reverse or speed up a system's orbits, and listen to them. Each world plucks a note pitched to its orbital frequency as it crosses Earth's line of sight, so a resonant chain like TRAPPIST-1's is heard as rhythm, and each neighbouring pair's period ratio is named.
+- **Go anywhere:** ⌘K, Ctrl+K or `/` opens a palette ranking every bundled world, moon, region, black hole and tour instantly, with planets, host systems and stars from the archives merged in as you type. Planet search matches names whatever separates their parts.
+- **Guided tours:** Narrated journeys through real destinations, each step an ordinary shareable URL, started from Discover or the palette.
+- **Offline:** A service worker keeps the shell, hashed assets, textures and sky catalogue after the first visit, and serves the last good archive answer only when the network fails.
 - **Stellar catalog:** Resolve stars by exact identifier through SIMBAD's keyless TAP service, with twelve stellar collections spanning nearby stars, solar analogs, blue giants, binaries, variables, and stellar remnants.
 - **Deterministic world recipes:** A shared, versioned `worldgen` package maps an object's physical properties to a visual class, palette family, terrain, cloud, and ring recipe. The same catalog row always produces the same world, and `WORLDGEN_VERSION` invalidates persisted recipes when the rules change.
 - **Physically motivated renderers:** Procedural gas-giant bands and storms, methane-hazed ice giants with ring systems, and displaced rocky terrain with oceans, ice caps, and lava driven by inferred chemistry.
@@ -76,6 +86,7 @@ GET /api/planets?q=kepler&limit=12
 GET /api/planets?category=ocean-candidates&limit=12
 GET /api/planets?host=GJ%20674
 GET /api/planets/featured
+GET /api/planets/population
 GET /api/planets/:name
 GET /api/stars?q=sirius&limit=12
 GET /api/stars?category=nearby-stars&limit=12
