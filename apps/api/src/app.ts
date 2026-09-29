@@ -5,6 +5,7 @@ import {
   blackHoleSearchResponseSchema,
   FEATURED_BLACK_HOLES,
   ephemerisResponseSchema,
+  planetPopulationResponseSchema,
   planetResponseSchema,
   planetSearchResponseSchema,
   starResponseSchema,
@@ -34,6 +35,7 @@ import {
   type RepositoryResult,
 } from "./nasa-archive.ts";
 import { NasaSystemAliasRepository, type SystemAliasRepository } from "./nasa-system-aliases.ts";
+import { NasaPopulationRepository, type PopulationRepository } from "./planet-population.ts";
 import {
   clientKey,
   createRateLimiter,
@@ -52,6 +54,7 @@ interface CreateAppOptions {
   blackHoleRepository?: BlackHoleRepository;
   horizonsRateLimiter?: RateLimiter;
   horizonsRepository?: HorizonsRepository;
+  populationRepository?: PopulationRepository;
   rateLimiter?: RateLimiter;
   repository?: PlanetRepository;
   starRepository?: StarRepository;
@@ -115,6 +118,10 @@ const CACHE_POLICY = {
   liveLookup: {
     browser: "public, max-age=60",
     cdn: "public, max-age=300, stale-while-revalidate=86400, stale-if-error=86400",
+  },
+  population: {
+    browser: "public, max-age=3600",
+    cdn: "public, max-age=43200, stale-while-revalidate=604800, stale-if-error=604800",
   },
   planetSearch: {
     browser: "public, max-age=0, must-revalidate",
@@ -191,6 +198,7 @@ export const createApp = ({
   blackHoleRepository = new VizierBlackHoleRepository(),
   horizonsRateLimiter = createRateLimiter({ limit: 8, windowMs: 60_000 }),
   horizonsRepository = new JplHorizonsRepository(),
+  populationRepository = new NasaPopulationRepository(),
   rateLimiter = createRateLimiter(DEFAULT_RATE_LIMIT),
   repository = new NasaPlanetRepository(),
   starRepository = new SimbadStarRepository(),
@@ -427,6 +435,22 @@ export const createApp = ({
 
     const result = await repository.search(query, requestedLimit(context, 12));
     return planetCollection(context, result, query, CACHE_POLICY.planetSearch);
+  });
+
+  app.get("/api/planets/population", async (context) => {
+    const result = await populationRepository.population();
+    setCachePolicy(context, CACHE_POLICY.population);
+    return context.json(
+      planetPopulationResponseSchema.parse({
+        data: result.value,
+        meta: {
+          cached: result.cached,
+          count: result.value.rows.length,
+          retrievedOn: result.retrievedOn,
+          source: "NASA Exoplanet Archive",
+        },
+      }),
+    );
   });
 
   app.get("/api/planets/featured", async (context) => {
