@@ -9,10 +9,18 @@ import { PlanetAtlas } from "./PlanetAtlas.tsx";
 import { PlanetCatalog } from "./PlanetCatalog.tsx";
 import { SolarSystemCatalog } from "./SolarSystemCatalog.tsx";
 import { StarCatalog } from "./StarCatalog.tsx";
+import { TourCatalog } from "./TourCatalog.tsx";
 import styles from "./DiscoverScreen.module.css";
 import sharedStyles from "./ExperienceShared.module.css";
 
-export type DiscoverSection = "solar" | "worlds" | "atlas" | "stars" | "black-holes" | "forge";
+export type DiscoverSection =
+  | "solar"
+  | "worlds"
+  | "atlas"
+  | "tours"
+  | "stars"
+  | "black-holes"
+  | "forge";
 
 interface DiscoverScreenProps {
   initialForgeMode: ForgeMode;
@@ -25,6 +33,7 @@ interface DiscoverScreenProps {
   onSelectPlanet: (planet: ExoplanetProfile, cached: boolean) => void;
   onSelectRegion: (region: SolarRegionProfile) => void;
   onSelectStar: (star: StarProfile, cached: boolean) => void;
+  onStartTour: (tourId: string) => void;
 }
 
 const sections: readonly {
@@ -44,6 +53,12 @@ const sections: readonly {
     id: "atlas",
     label: "Atlas",
     source: "EVERY KNOWN WORLD",
+  },
+  {
+    accent: "cyan",
+    id: "tours",
+    label: "Guided Tours",
+    source: "EXORA JOURNEYS",
   },
   {
     accent: "gold",
@@ -92,6 +107,12 @@ const DiscoverIcon = ({ section }: { section: DiscoverSection }) => (
         <circle className={styles["icon-fill"]} cx="20" cy="17" r="1.6" />
         <circle className={styles["icon-fill"]} cx="24" cy="9" r="1.6" />
       </>
+    ) : section === "tours" ? (
+      <>
+        <path d="M6 24c4-10 9-2 13-10s5-7 7-8" />
+        <circle className={styles["icon-fill"]} cx="6" cy="24" r="2" />
+        <circle cx="26" cy="6" r="2.5" />
+      </>
     ) : section === "worlds" ? (
       <>
         <circle cx="16" cy="16" r="9" />
@@ -136,6 +157,12 @@ const sectionCopy: Record<DiscoverSection, { eyebrow: string; title: string; sum
     summary:
       "Every confirmed planet on the planes astronomers read the population from. Hover to identify, click to travel.",
   },
+  tours: {
+    eyebrow: "EXORA JOURNEYS",
+    title: "Take the long way round.",
+    summary:
+      "Narrated journeys through real destinations. Each step is a shareable link, and you can leave at any moment.",
+  },
   stars: {
     eyebrow: "SIMBAD STELLAR ARCHIVE",
     title: "Follow the light.",
@@ -165,6 +192,7 @@ export const DiscoverScreen = ({
   onSelectPlanet,
   onSelectRegion,
   onSelectStar,
+  onStartTour,
 }: DiscoverScreenProps) => {
   const [section, setSection] = useState<DiscoverSection>(initialSection);
   const closeRef = useRef<HTMLButtonElement>(null);
@@ -287,6 +315,8 @@ export const DiscoverScreen = ({
               />
             ) : section === "atlas" ? (
               <PlanetAtlas onSelect={onSelectPlanet} />
+            ) : section === "tours" ? (
+              <TourCatalog onStart={onStartTour} />
             ) : section === "stars" ? (
               <StarCatalog embedded onClose={() => setSection("solar")} onSelect={onSelectStar} />
             ) : section === "black-holes" ? (

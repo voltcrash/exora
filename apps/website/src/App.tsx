@@ -20,6 +20,7 @@ import {
 import { reachStar, reachSystem } from "./destination-cache.ts";
 import { PlanetExperience } from "./components/PlanetExperience.tsx";
 import { RecoveryScreen } from "./components/RecoveryScreen.tsx";
+import { TourBar } from "./components/TourBar.tsx";
 import { featuredPlanet } from "./planet-profile.ts";
 import { hasRenderer } from "./planet-utils.tsx";
 import { canonicalUrlForSearch } from "./canonical-url.ts";
@@ -27,6 +28,7 @@ import { documentTitleFor } from "./document-title.ts";
 import type { BlackHoleProfile } from "./black-holes.ts";
 import { togglesClearView } from "./clear-view-shortcut.ts";
 import { togglesDiscoverShortcut } from "./discover-shortcut.ts";
+import { findTour, readTour, tourStepSearch } from "./tours.ts";
 import { TRAVEL_CROSS_MS, TRAVEL_REVEAL_MS, type TravelPhase } from "./travel-transition.ts";
 import { useSceneHost } from "./use-scene-host.ts";
 import { useTypographySettled } from "./use-typography-settled.ts";
@@ -412,6 +414,32 @@ export const App = () => {
   }, []);
 
   const closeDiscover = useCallback((): void => setDiscoverOpen(false), []);
+
+  const [, setTourRevision] = useState(0);
+  const activeTour = readTour(window.location.search);
+  const goToTourStep = useCallback(
+    (tourId: string, index: number): void => {
+      const tour = findTour(tourId);
+      if (!tour || !tour.steps[index]) return;
+      window.history.pushState({}, "", tourStepSearch(tour, index));
+      setDiscoverOpen(false);
+      setSystemHostName(null);
+      sceneHost?.beginTravel();
+      void loadRequestedObject().then((next) => {
+        if (next.type === "missing") sceneHost?.cancelTravel();
+        setActiveObject(next);
+      });
+    },
+    [sceneHost],
+  );
+  const exitTour = useCallback((): void => {
+    const parameters = new URLSearchParams(window.location.search);
+    parameters.delete("tour");
+    parameters.delete("step");
+    const search = parameters.toString();
+    window.history.replaceState({}, "", search ? `?${search}` : "/");
+    setTourRevision((revision) => revision + 1);
+  }, []);
   const toggleChrome = useCallback((): void => setChromeHidden((hidden) => !hidden), []);
 
   const subject =
@@ -575,6 +603,14 @@ export const App = () => {
           />
         </Suspense>
       )}
+      {activeTour && activeObject && activeObject.type !== "missing" && !discoverOpen ? (
+        <TourBar
+          active={activeTour}
+          hidden={chromeHidden || travelPhase === "departing" || travelPhase === "crossing"}
+          onExit={exitTour}
+          onStep={(index) => goToTourStep(activeTour.tour.id, index)}
+        />
+      ) : null}
       {discoverOpen && activeObject && activeObject.type !== "missing" ? (
         <Suspense fallback={null}>
           <DiscoverScreen
@@ -593,6 +629,7 @@ export const App = () => {
             onSelectPlanet={selectPlanet}
             onSelectRegion={selectRegion}
             onSelectStar={selectStar}
+            onStartTour={(tourId) => goToTourStep(tourId, 0)}
           />
         </Suspense>
       ) : null}
