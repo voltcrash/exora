@@ -15,6 +15,7 @@ const discoverMarkup = (initialSection?: DiscoverSection): string =>
       onSelectPlanet={vi.fn()}
       onSelectRegion={vi.fn()}
       onSelectStar={vi.fn()}
+      onStartTour={vi.fn()}
     />,
   );
 
@@ -94,4 +95,12 @@ test("an embedded catalog becomes a named region inside the full-screen dialog",
   expect(markup).toContain('role="region"');
   expect(markup).not.toContain('aria-label="Close planet catalog"');
   expect(markup).toContain('aria-label="Close Discover"');
+});
+
+test("Discover lists the guided tours with their first and last stops", () => {
+  const markup = discoverMarkup("tours");
+
+  expect(markup).toContain("Guided Tours");
+  expect(markup).toContain("Home to the edge");
+  expect(markup).toContain("Earth → Sagittarius A*");
 });

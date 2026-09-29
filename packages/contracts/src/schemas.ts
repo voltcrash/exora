@@ -130,6 +130,38 @@ export const planetSearchResponseSchema = z.strictObject({
   }),
 });
 
+/**
+ * Every confirmed planet as one compact row for plotting the whole archive at once. Values are
+ * rounded to four significant figures; `method` indexes `methods`; `flags` marks an estimated
+ * radius (1), a minimum mass (2) and a mass read off the mass-radius relation (4).
+ */
+export const planetPopulationSchema = z.strictObject({
+  methods: z.array(nonEmptyString),
+  rows: z.array(
+    z.tuple([
+      nonEmptyString,
+      nullableFiniteNumber,
+      nullableFiniteNumber,
+      nullableFiniteNumber,
+      nullableFiniteNumber,
+      nullableFiniteNumber,
+      z.number().int().nullable(),
+      z.number().int().nonnegative(),
+      z.number().int().min(0).max(7),
+    ]),
+  ),
+});
+
+export const planetPopulationResponseSchema = z.strictObject({
+  data: planetPopulationSchema,
+  meta: z.strictObject({
+    cached: z.boolean(),
+    count: z.number().int().nonnegative(),
+    retrievedOn: retrievedDate,
+    source: z.literal("NASA Exoplanet Archive"),
+  }),
+});
+
 export const starKindSchema = z.enum([
   "binary",
   "evolved",

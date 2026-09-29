@@ -8,6 +8,8 @@ import {
   exoplanetProfileSchema,
   planetKindSchema,
   planetMetadataSchema,
+  planetPopulationResponseSchema,
+  planetPopulationSchema,
   planetResponseSchema,
   planetSearchResponseSchema,
   solarSystemIdentitySchema,
@@ -25,6 +27,8 @@ import {
   type ExoplanetObservation,
   type ExoplanetProfile,
   type PlanetKind,
+  type PlanetPopulation,
+  type PlanetPopulationResponse,
   type PlanetResponse,
   type PlanetSearchResponse,
   type SolarSystemIdentity,
@@ -44,6 +48,10 @@ test("exports contract types inferred from their schemas", () => {
   expectTypeOf<ExoplanetObservation>().toEqualTypeOf<z.infer<typeof exoplanetObservationSchema>>();
   expectTypeOf<ExoplanetProfile>().toEqualTypeOf<z.infer<typeof exoplanetProfileSchema>>();
   expectTypeOf<ApiMetadata>().toEqualTypeOf<z.infer<typeof planetMetadataSchema>>();
+  expectTypeOf<PlanetPopulation>().toEqualTypeOf<z.infer<typeof planetPopulationSchema>>();
+  expectTypeOf<PlanetPopulationResponse>().toEqualTypeOf<
+    z.infer<typeof planetPopulationResponseSchema>
+  >();
   expectTypeOf<PlanetResponse>().toEqualTypeOf<z.infer<typeof planetResponseSchema>>();
   expectTypeOf<PlanetSearchResponse>().toEqualTypeOf<z.infer<typeof planetSearchResponseSchema>>();
 

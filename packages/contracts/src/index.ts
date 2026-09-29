@@ -15,6 +15,8 @@ import {
   massProvenanceSchema,
   planetKindSchema,
   planetMetadataSchema,
+  planetPopulationResponseSchema,
+  planetPopulationSchema,
   planetResponseSchema,
   planetSearchResponseSchema,
   radiusProvenanceSchema,
@@ -36,6 +38,8 @@ export type SolarSystemSource = z.infer<typeof solarSystemSourceSchema>;
 export type ExoplanetObservation = z.infer<typeof exoplanetObservationSchema>;
 export type ExoplanetProfile = z.infer<typeof exoplanetProfileSchema>;
 export type ApiMetadata = z.infer<typeof planetMetadataSchema>;
+export type PlanetPopulation = z.infer<typeof planetPopulationSchema>;
+export type PlanetPopulationResponse = z.infer<typeof planetPopulationResponseSchema>;
 export type PlanetResponse = z.infer<typeof planetResponseSchema>;
 export type PlanetSearchResponse = z.infer<typeof planetSearchResponseSchema>;
 

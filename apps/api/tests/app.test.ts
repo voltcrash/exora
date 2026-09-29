@@ -147,6 +147,31 @@ test("returns a structured 404 for an unknown observed black hole", async () => 
   expect(await response.json()).toMatchObject({ error: { code: "NOT_FOUND" } });
 });
 
+test("serves the whole archive as a compact population with a long CDN lifetime", async () => {
+  const app = createApp({
+    populationRepository: {
+      population: async () => ({
+        cached: true,
+        retrievedOn: "2026-09-28",
+        value: {
+          methods: ["Transit"],
+          rows: [["TRAPPIST-1 e", 6.099, 0.92, 0.692, 249.7, 12.43, 2016, 0, 0]],
+        },
+      }),
+    },
+    repository,
+  });
+
+  const response = await app.request("/api/planets/population");
+
+  expect(response.status).toBe(200);
+  expect(response.headers.get("CDN-Cache-Control")).toContain("max-age=43200");
+  expect(await response.json()).toMatchObject({
+    data: { methods: ["Transit"] },
+    meta: { count: 1, retrievedOn: "2026-09-28", source: "NASA Exoplanet Archive" },
+  });
+});
+
 test("public read-only API CORS is wildcard and never credentialed", async () => {
   const app = createApp({ repository });
   const response = await app.request("/api/health", {
