@@ -4,6 +4,9 @@ import {
   NasaArchiveError,
   NasaPlanetRepository,
   normalizeNasaPlanet,
+  planetNamePattern,
+  planetNamePrefixes,
+  rankPlanetMatches,
 } from "../src/nasa-archive.ts";
 
 const nasaRow = {
@@ -311,19 +314,63 @@ test("the query cache is bounded, so arbitrary searches cannot grow it without l
     },
   });
 
-  await repository.search("first", 12);
-  await repository.search("first", 12);
+  await repository.findByName("first");
+  await repository.findByName("first");
   expect(requests).toBe(1);
 
   for (let index = 0; index < DEFAULT_MAX_ENTRIES; index += 1) {
-    await repository.search(`flood-${index}`, 12);
+    await repository.findByName(`flood-${index}`);
   }
 
   const beforeResident = requests;
-  await repository.search(`flood-${DEFAULT_MAX_ENTRIES - 1}`, 12);
+  await repository.findByName(`flood-${DEFAULT_MAX_ENTRIES - 1}`);
   expect(requests).toBe(beforeResident);
 
   const beforeEvicted = requests;
-  await repository.search("first", 12);
+  await repository.findByName("first");
   expect(requests).toBe(beforeEvicted + 1);
+});
+
+test("planet search ignores the separators people type between a name's parts", () => {
+  expect(planetNamePattern("kepler 18")).toBe("%kepler%18%");
+  expect(planetNamePattern("Kepler18")).toBe("%kepler%18%");
+  expect(planetNamePattern("TRAPPIST-1e")).toBe("%trappist%1%e%");
+  expect(planetNamePattern("51 Peg b")).toBe("%51%peg%b%");
+  expect(planetNamePattern("o'neil_%")).toBe("%o%neil%");
+  expect(planetNamePattern(" -- ")).toBeNull();
+});
+
+test("a search with nothing searchable in it never reaches the archive", async () => {
+  let requests = 0;
+  const repository = new NasaPlanetRepository({
+    fetcher: async () => {
+      requests += 1;
+      return Response.json([nasaRow]);
+    },
+  });
+
+  expect(await repository.search("--", 12)).toEqual({ cached: true, value: [] });
+  expect(requests).toBe(0);
+});
+
+test("whole names are tried with a hyphen, a space and nothing between the parts", () => {
+  expect(planetNamePrefixes("kepler 18")).toEqual([
+    "kepler-18",
+    "kepler-18 %",
+    "kepler 18",
+    "kepler 18 %",
+    "kepler18",
+    "kepler18 %",
+  ]);
+  expect(planetNamePrefixes("wasp")).toEqual(["wasp", "wasp %"]);
+});
+
+test("the planet a reader means outranks longer names that merely contain it", () => {
+  const named = (name: string) => normalizeNasaPlanet({ ...nasaRow, pl_name: name })!;
+  const ranked = rankPlanetMatches(
+    "kepler 18",
+    ["Kepler-1018 b", "Kepler-187 b", "Kepler-18 c", "Kepler-18 b"].map(named),
+  ).map(({ name }) => name);
+
+  expect(ranked).toEqual(["Kepler-18 b", "Kepler-18 c", "Kepler-187 b", "Kepler-1018 b"]);
 });

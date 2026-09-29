@@ -312,6 +312,72 @@ export const normalizeNasaPlanet = (
 const escapeAdqlLiteral = (value: string): string =>
   value.replaceAll("%", "").replaceAll("_", "").replaceAll("'", "''");
 
+const nameTokens = (query: string): string[] =>
+  query
+    .trim()
+    .toLowerCase()
+    .slice(0, 80)
+    .split(/[^\p{L}\p{N}]+/u)
+    .flatMap((token) => token.split(/(?<=\p{L})(?=\p{N})|(?<=\p{N})(?=\p{L})/u))
+    .map(escapeAdqlLiteral)
+    .filter((token) => token.length > 0);
+
+/**
+ * A LIKE pattern that matches a planet name whatever separates its parts, so "kepler 18",
+ * "kepler-18" and "Kepler18" all reach "Kepler-18 b". Null when nothing searchable is left.
+ */
+export const planetNamePattern = (query: string): string | null => {
+  const tokens = nameTokens(query);
+  return tokens.length > 0 ? `%${tokens.join("%")}%` : null;
+};
+
+/**
+ * The query as a whole name the ways archives write one — hyphen, space or neither between its
+ * parts — alone or followed by a planet letter, so "kepler 18" is answered by Kepler-18 b itself
+ * rather than by whichever of the hundreds of Kepler-18xx names the archive returns first.
+ */
+export const planetNamePrefixes = (query: string): string[] => {
+  const tokens = nameTokens(query);
+  if (tokens.length === 0) return [];
+  return [...new Set(["-", " ", ""].map((separator) => tokens.join(separator)))].flatMap((name) => [
+    name,
+    `${name} %`,
+  ]);
+};
+
+const compactName = (value: string): string =>
+  value.toLowerCase().replaceAll(/[^\p{L}\p{N}]/gu, "");
+
+/**
+ * Orders matches the way a reader means them: the exact name, then names the query begins at a
+ * word boundary ("kepler 18" → Kepler-18 b before Kepler-187 b), then other prefixes, then the rest.
+ */
+export const rankPlanetMatches = (
+  query: string,
+  planets: readonly ExoplanetProfile[],
+): ExoplanetProfile[] => {
+  const needle = compactName(query);
+  const rank = (name: string): number => {
+    const compact = compactName(name);
+    if (compact === needle) return 0;
+    if (compact.startsWith(needle)) {
+      const next = compact.charAt(needle.length);
+      const last = needle.charAt(needle.length - 1);
+      return /\p{N}/u.test(next) && /\p{N}/u.test(last) ? 2 : 1;
+    }
+    return compact.includes(needle) ? 3 : 4;
+  };
+  return planets
+    .map((planet) => ({ planet, rank: rank(planet.name) }))
+    .sort(
+      (left, right) =>
+        left.rank - right.rank ||
+        left.planet.name.length - right.planet.name.length ||
+        left.planet.name.localeCompare(right.planet.name, "en"),
+    )
+    .map(({ planet }) => planet);
+};
+
 // Keyset cursors are compared, not pattern matched, so wildcards stay intact.
 const escapeAdqlCursor = (value: string): string => value.replaceAll("'", "''");
 
@@ -376,12 +442,27 @@ export class NasaPlanetRepository implements PlanetRepository {
   }
 
   async search(query: string, limit: number): Promise<RepositoryResult<ExoplanetProfile[]>> {
-    const normalizedQuery = query.trim().toLowerCase().slice(0, 80);
-    const escapedQuery = escapeAdqlLiteral(normalizedQuery);
+    const pattern = planetNamePattern(query);
+    if (pattern === null) return { cached: true, value: [] };
     const safeLimit = Math.max(1, Math.min(Math.trunc(limit), 24));
-    const adql = `select top ${safeLimit} ${NASA_COLUMNS} from pscomppars where lower(pl_name) like '%${escapedQuery}%' order by pl_name`;
+    const prefixes = planetNamePrefixes(query)
+      .map((prefix) => `lower(pl_name) like '${prefix}'`)
+      .join(" or ");
+    // The archive's own ordering buries short exact names, so both sets are ranked here.
+    const [anchored, loose] = await Promise.all([
+      this.#query(`select top 48 ${NASA_COLUMNS} from pscomppars where ${prefixes}`),
+      this.#query(
+        `select top 48 ${NASA_COLUMNS} from pscomppars where lower(pl_name) like '${pattern}'`,
+      ),
+    ]);
+    const unique = new Map(
+      [...anchored.value, ...loose.value].map((planet) => [planet.id, planet] as const),
+    );
 
-    return this.#query(adql);
+    return {
+      cached: anchored.cached && loose.cached,
+      value: rankPlanetMatches(query, [...unique.values()]).slice(0, safeLimit),
+    };
   }
 
   async #query(adql: string): Promise<RepositoryResult<ExoplanetProfile[]>> {
