@@ -108,3 +108,52 @@
   clip-path: inset(50%);
   white-space: nowrap;
 }
+
+.chart-model {
+  fill: none;
+  stroke: rgb(229 244 247 / 34%);
+  stroke-width: 1.25;
+  vector-effect: non-scaling-stroke;
+}
+
+.chart-annotation {
+  fill: var(--muted);
+  font-family: var(--mono);
+  font-size: 6px;
+}
+
+.chart-reference {
+  fill: #5d6c72;
+  stroke: #081012;
+  stroke-width: 2;
+  vector-effect: non-scaling-stroke;
+}
+
+.chart-subject {
+  fill: var(--series);
+  stroke: #081012;
+  stroke-width: 2;
+  vector-effect: non-scaling-stroke;
+}
+
+.chart-subject.estimated {
+  fill: #081012;
+  stroke: var(--series);
+  stroke-width: 1.75;
+}
+
+.chart-bound {
+  fill: none;
+  stroke: var(--series);
+  stroke-width: 1.5;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  vector-effect: non-scaling-stroke;
+}
+
+.chart-focus {
+  fill: none;
+  stroke: rgb(229 244 247 / 70%);
+  stroke-width: 1;
+  vector-effect: non-scaling-stroke;
+}

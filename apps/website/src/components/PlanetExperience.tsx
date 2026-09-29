@@ -16,6 +16,7 @@ import {
   type PanelMetric,
 } from "../destination-panel.ts";
 import { warmDestinations } from "../destination-cache.ts";
+import { compositionFacts, readComposition } from "../composition.ts";
 import { detectionFacts, readDetectionSignal } from "../detection-signal.ts";
 import { nextTransitFact, predictTransits } from "../transit-ephemeris.ts";
 import type { ViewMode } from "../planet-scene.ts";
@@ -34,6 +35,7 @@ import { SURFACE_TRANSITION_MS, type TravelPhase } from "../travel-transition.ts
 import { useTypographySettled } from "../use-typography-settled.ts";
 import { DestinationIdentity } from "./DestinationIdentity.tsx";
 import { DestinationPanel } from "./DestinationPanel.tsx";
+import { MassRadiusDiagram } from "./MassRadiusDiagram.tsx";
 import { MissionControl } from "./MissionControl.tsx";
 import { SignalCurves } from "./SignalCurves.tsx";
 import sharedStyles from "./ExperienceShared.module.css";
@@ -410,6 +412,10 @@ export const PlanetExperience = ({
     () => readDetectionSignal(planet, recipe.derived.equilibriumTemperatureKelvin),
     [planet, recipe.derived.equilibriumTemperatureKelvin],
   );
+  const composition = useMemo(
+    () => readComposition(planet, recipe.derived.equilibriumTemperatureKelvin),
+    [planet, recipe.derived.equilibriumTemperatureKelvin],
+  );
   const nextTransit = useMemo(
     () =>
       nextTransitFact(
@@ -623,7 +629,16 @@ export const PlanetExperience = ({
               !primaryBody && {
                 blocks: [
                   {
-                    facts: derivePlanetPhysics(planet, recipe.derived),
+                    content: composition ? (
+                      <MassRadiusDiagram name={planet.name} reading={composition} />
+                    ) : null,
+                    type: "custom" as const,
+                  },
+                  {
+                    facts: [
+                      ...compositionFacts(composition),
+                      ...derivePlanetPhysics(planet, recipe.derived),
+                    ],
                     type: "facts" as const,
                   },
                 ],
