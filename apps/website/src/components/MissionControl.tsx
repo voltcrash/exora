@@ -59,7 +59,7 @@ export const MissionControl = ({
       </p>
     ) : (
       <div className={cx("interaction-hint")} aria-label="Desktop controls">
-        {hints.map((hint) => (
+        {[...hints, { key: "⌘K", meaning: "GO ANYWHERE" }].map((hint) => (
           <span key={hint.key}>
             <kbd>{hint.key}</kbd>
             <small>{hint.meaning}</small>
