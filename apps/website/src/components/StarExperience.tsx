@@ -13,12 +13,14 @@ import {
 import { formatNumber } from "../planet-utils.tsx";
 import type { SceneHost, XrStatus } from "../scene-host.ts";
 import { readStarHabitableZone } from "../star-habitable-zone.ts";
+import { hrSubject } from "../hr-diagram.ts";
 import { deriveStarPhysics } from "../star-physics.ts";
 import { deriveStarVisual, starKindLabel, starSummary } from "../star-utils.ts";
 import type { TravelPhase } from "../travel-transition.ts";
 import { useTypographySettled } from "../use-typography-settled.ts";
 import { DestinationIdentity } from "./DestinationIdentity.tsx";
 import { DestinationPanel } from "./DestinationPanel.tsx";
+import { HrDiagram } from "./HrDiagram.tsx";
 import { MissionControl } from "./MissionControl.tsx";
 import sharedStyles from "./ExperienceShared.module.css";
 import hudStyles from "./DestinationHud.module.css";
@@ -62,6 +64,7 @@ export const StarExperience = ({
   const custom = result.mode === "custom";
   const habitableZone = custom ? null : readStarHabitableZone(star, systemPlanets);
   const physics = deriveStarPhysics(star, new Date().getFullYear());
+  const hrPoint = hrSubject(star);
   const solar = result.mode === "solar";
   const travelling = travelPhase === "departing" || travelPhase === "crossing";
   const typographySettled = useTypographySettled();
@@ -278,8 +281,14 @@ export const StarExperience = ({
         id: "record",
         label: "Record",
       },
-      physics.length > 0 && {
-        blocks: [{ facts: physics, type: "facts" }],
+      (physics.length > 0 || hrPoint !== null) && {
+        blocks: [
+          {
+            content: hrPoint ? <HrDiagram name={star.name} subject={hrPoint} /> : null,
+            type: "custom",
+          },
+          { facts: physics, type: "facts" },
+        ],
         id: "physics",
         label: "Physics",
       },

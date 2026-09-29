@@ -1,0 +1,108 @@
+.hr {
+  display: grid;
+  gap: 6px;
+  margin: 0;
+}
+
+.hr-title {
+  color: var(--faint);
+  font-family: var(--mono);
+  font-size: 7px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.hr-frame {
+  aspect-ratio: 260 / 190;
+  position: relative;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: rgb(0 0 0 / 30%);
+  cursor: crosshair;
+  touch-action: pan-y;
+}
+
+.hr-canvas,
+.hr-axes {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+}
+
+.hr-axes {
+  overflow: visible;
+  pointer-events: none;
+}
+
+.hr-grid {
+  stroke: rgb(229 244 247 / 8%);
+  stroke-width: 1;
+  vector-effect: non-scaling-stroke;
+}
+
+.hr-tick {
+  fill: var(--faint);
+  font-family: var(--mono);
+  font-size: 6.5px;
+  font-variant-numeric: tabular-nums;
+}
+
+.hr-region {
+  fill: rgb(229 244 247 / 38%);
+  font-family: var(--mono);
+  font-size: 6px;
+  font-style: italic;
+  letter-spacing: 0.04em;
+}
+
+.hr-sun {
+  fill: none;
+  stroke: #ffdda4;
+  stroke-width: 1.25;
+  vector-effect: non-scaling-stroke;
+}
+
+.hr-subject {
+  fill: none;
+  stroke: #f4f7f8;
+  stroke-width: 2;
+  vector-effect: non-scaling-stroke;
+}
+
+.hr-label {
+  fill: #dce6e8;
+  font-family: var(--mono);
+  font-size: 6.5px;
+  paint-order: stroke;
+  stroke: #05090b;
+  stroke-width: 2.5px;
+}
+
+.hr-label.strong {
+  fill: #f4f7f8;
+  font-size: 7px;
+  font-weight: 600;
+}
+
+.hr-readout {
+  min-height: 12px;
+  margin: 0;
+  color: var(--faint);
+  font-family: var(--mono);
+  font-size: 7px;
+}
+
+.hr-readout strong {
+  color: #dce6e8;
+  font-weight: 500;
+}
+
+.visually-hidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
