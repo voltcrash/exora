@@ -6,7 +6,6 @@ export interface RenderQualityProfile {
   hardwareScalingLevel: number;
   maxRenderScale: number;
   maxHardwareScalingLevel: number;
-  maxXrFixedFoveation: number;
   maxGiantStorms: number;
   planetIcoSubdivisions: number;
   planetSegments: number;
@@ -18,7 +17,6 @@ export interface RenderQualityProfile {
   surfaceMicrodetail: boolean;
   surfaceColorDetail: boolean;
   tier: RenderQualityTier;
-  xrFixedFoveation: number;
   xrFramebufferScaleFactor: number;
 }
 
@@ -68,8 +66,6 @@ export const deriveRenderQuality = ({
       hardwareScalingLevel: roundScale(Math.max(1.3, pixelRatio / 1.2)),
       maxHardwareScalingLevel: 2,
       xrFramebufferScaleFactor: 0.9,
-      xrFixedFoveation: 0.55,
-      maxXrFixedFoveation: 0.85,
     };
   }
 
@@ -92,8 +88,6 @@ export const deriveRenderQuality = ({
       hardwareScalingLevel: roundScale(Math.max(1.2, pixelRatio / 1.35)),
       maxHardwareScalingLevel: 1.9,
       xrFramebufferScaleFactor: 1,
-      xrFixedFoveation: 0.4,
-      maxXrFixedFoveation: 0.72,
     };
   }
 
@@ -116,8 +110,6 @@ export const deriveRenderQuality = ({
       hardwareScalingLevel: scalingLevelForDisplay(pixelRatio, 1.5),
       maxHardwareScalingLevel: 1.8,
       xrFramebufferScaleFactor: 0.88,
-      xrFixedFoveation: 0.5,
-      maxXrFixedFoveation: 0.85,
     };
   }
 
@@ -139,8 +131,6 @@ export const deriveRenderQuality = ({
     hardwareScalingLevel: scalingLevelForDisplay(pixelRatio, 1.25),
     maxHardwareScalingLevel: 1.65,
     xrFramebufferScaleFactor: 1,
-    xrFixedFoveation: 0.35,
-    maxXrFixedFoveation: 0.6,
   };
 };
 
@@ -161,22 +151,6 @@ export const adaptHardwareScaling = (
   }
 
   return currentLevel;
-};
-
-export const adaptFixedFoveation = (
-  current: number,
-  fps: number,
-  profile: RenderQualityProfile,
-): number => {
-  if (fps < 62) {
-    return roundScale(Math.min(profile.maxXrFixedFoveation, current + 0.1));
-  }
-
-  if (fps > 70 && current > profile.xrFixedFoveation) {
-    return roundScale(Math.max(profile.xrFixedFoveation, current - 0.05));
-  }
-
-  return current;
 };
 
 export const shaderDefines = (profile: RenderQualityProfile): string[] => [

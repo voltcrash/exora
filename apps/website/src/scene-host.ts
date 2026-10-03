@@ -6,7 +6,6 @@ import { Scene } from "@babylonjs/core/scene.js";
 import type { WebXRDefaultExperience } from "@babylonjs/core/XR/webXRDefaultExperience.js";
 import { createArPresentation } from "./ar-presentation.ts";
 import {
-  adaptFixedFoveation,
   adaptHardwareScaling,
   deriveRenderQuality,
   type RenderQualityProfile,
@@ -96,7 +95,6 @@ const createSceneHost = (canvas: HTMLCanvasElement): SceneHost => {
   let xrRuntime: typeof XrRuntime | null = null;
   let xrInitialization: Promise<WebXRDefaultExperience | null> | null = null;
   let mountToken = 0;
-  let sessionFoveation = profile.xrFixedFoveation;
   let qualitySampleSeconds = 0;
 
   const xrIntegration = createXrIntegration({
@@ -105,31 +103,17 @@ const createSceneHost = (canvas: HTMLCanvasElement): SceneHost => {
     xrSystem: () => navigator.xr,
   });
 
-  const adaptSessionFoveation = (fps: number): void => {
-    const sessionManager = xr?.baseExperience.sessionManager;
-    if (!sessionManager?.isFixedFoveationSupported) return;
-    const next = adaptFixedFoveation(sessionFoveation, fps, profile);
-    if (next === sessionFoveation) return;
-    sessionFoveation = next;
-    sessionManager.fixedFoveation = next;
-  };
-
   scene.onBeforeRenderObservable.add(() => {
     const deltaSeconds = Math.min(engine.getDeltaTime() / 1_000, 0.05);
 
     qualitySampleSeconds += deltaSeconds;
-    if (qualitySampleSeconds >= 3) {
-      qualitySampleSeconds = 0;
-      if (isInXr) {
-        adaptSessionFoveation(engine.getFps());
-      } else {
-        const currentLevel = engine.getHardwareScalingLevel();
-        const nextLevel = adaptHardwareScaling(currentLevel, engine.getFps(), profile, false);
-        if (nextLevel !== currentLevel) {
-          engine.setHardwareScalingLevel(nextLevel);
-          engine.resize();
-        }
-      }
+    if (qualitySampleSeconds < 3) return;
+    qualitySampleSeconds = 0;
+    const currentLevel = engine.getHardwareScalingLevel();
+    const nextLevel = adaptHardwareScaling(currentLevel, engine.getFps(), profile, isInXr);
+    if (nextLevel !== currentLevel) {
+      engine.setHardwareScalingLevel(nextLevel);
+      engine.resize();
     }
   });
 
@@ -364,10 +348,6 @@ const createSceneHost = (canvas: HTMLCanvasElement): SceneHost => {
         if (state === runtime.WebXRState.IN_XR) {
           isInXr = true;
           renderLifecycle.start();
-          sessionFoveation = profile.xrFixedFoveation;
-          if (createdXr.baseExperience.sessionManager.isFixedFoveationSupported) {
-            createdXr.baseExperience.sessionManager.fixedFoveation = sessionFoveation;
-          }
           xrIntegration.markInXr();
         }
         if (state === runtime.WebXRState.NOT_IN_XR) {

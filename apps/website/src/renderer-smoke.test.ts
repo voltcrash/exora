@@ -35,7 +35,6 @@ const testProfile: RenderQualityProfile = {
   maxGiantStorms: 1,
   maxHardwareScalingLevel: 2,
   maxRenderScale: 1,
-  maxXrFixedFoveation: 1,
   planetIcoSubdivisions: 4,
   planetSegments: 16,
   ringTessellation: 16,
@@ -46,7 +45,6 @@ const testProfile: RenderQualityProfile = {
   systemBodySegments: 6,
   systemOrbitSegments: 16,
   tier: "quest",
-  xrFixedFoveation: 0,
   xrFramebufferScaleFactor: 1,
 };
 
