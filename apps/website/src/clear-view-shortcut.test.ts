@@ -8,10 +8,10 @@ const element = (tagName: string, type?: string): ShortcutTarget => ({
   ...(type === undefined ? {} : { type }),
 });
 
-const tab = (overrides: Partial<ClearViewShortcutEvent> = {}): ClearViewShortcutEvent => ({
+const press = (overrides: Partial<ClearViewShortcutEvent> = {}): ClearViewShortcutEvent => ({
   altKey: false,
   ctrlKey: false,
-  key: "Tab",
+  key: "h",
   metaKey: false,
   onMainScreen: true,
   shiftKey: false,
@@ -19,19 +19,20 @@ const tab = (overrides: Partial<ClearViewShortcutEvent> = {}): ClearViewShortcut
   ...overrides,
 });
 
-test("toggles clear view only for an unmodified Tab on the main screen", () => {
-  expect(togglesClearView(tab())).toBe(true);
-  expect(togglesClearView(tab({ target: element("BODY") }))).toBe(true);
-  expect(togglesClearView(tab({ target: element("CANVAS") }))).toBe(true);
-  expect(togglesClearView(tab({ target: element("BUTTON") }))).toBe(true);
-  for (const key of ["Escape", "Enter", " ", "a", "/", "ArrowRight", "tab"]) {
-    expect(togglesClearView(tab({ key }))).toBe(false);
+test("toggles clear view only for an unmodified H on the main screen", () => {
+  expect(togglesClearView(press())).toBe(true);
+  expect(togglesClearView(press({ target: element("BODY") }))).toBe(true);
+  expect(togglesClearView(press({ target: element("CANVAS") }))).toBe(true);
+  expect(togglesClearView(press({ target: element("BUTTON") }))).toBe(true);
+  expect(togglesClearView(press({ key: "H" }))).toBe(true);
+  for (const key of ["Escape", "Enter", " ", "a", "/", "ArrowRight", "Tab"]) {
+    expect(togglesClearView(press({ key }))).toBe(false);
   }
-  expect(togglesClearView(tab({ onMainScreen: false }))).toBe(false);
-  expect(togglesClearView(tab({ shiftKey: true }))).toBe(false);
-  expect(togglesClearView(tab({ ctrlKey: true }))).toBe(false);
-  expect(togglesClearView(tab({ metaKey: true }))).toBe(false);
-  expect(togglesClearView(tab({ altKey: true }))).toBe(false);
+  expect(togglesClearView(press({ onMainScreen: false }))).toBe(false);
+  expect(togglesClearView(press({ shiftKey: true }))).toBe(false);
+  expect(togglesClearView(press({ ctrlKey: true }))).toBe(false);
+  expect(togglesClearView(press({ metaKey: true }))).toBe(false);
+  expect(togglesClearView(press({ altKey: true }))).toBe(false);
 });
 
 test("leaves text entry to the browser while allowing non-text controls", () => {
@@ -43,9 +44,9 @@ test("leaves text entry to the browser while allowing non-text controls", () => 
     element("SELECT"),
     { isContentEditable: true, tagName: "DIV" },
   ]) {
-    expect(togglesClearView(tab({ target }))).toBe(false);
+    expect(togglesClearView(press({ target }))).toBe(false);
   }
   for (const target of [element("INPUT", "range"), element("INPUT", "checkbox")]) {
-    expect(togglesClearView(tab({ target }))).toBe(true);
+    expect(togglesClearView(press({ target }))).toBe(true);
   }
 });
