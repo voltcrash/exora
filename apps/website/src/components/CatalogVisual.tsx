@@ -2,11 +2,10 @@ import type { ExoplanetProfile, StarProfile } from "@exora/contracts";
 import { deriveStarRecipe, deriveWorldRecipe, type Rgb, type WorldRecipe } from "@exora/worldgen";
 import { useMemo, type CSSProperties } from "react";
 import type { BlackHoleProfile } from "../black-holes.ts";
-import sharedStyles from "./ExperienceShared.module.css";
-import catalogStyles from "./CatalogShared.module.css";
 import { bindStyles } from "../styles/bind-styles.ts";
+import styles from "./CatalogVisual.module.css";
 
-const cx = bindStyles(sharedStyles, catalogStyles);
+const cx = bindStyles(styles);
 
 type VisualStyle = CSSProperties & Record<`--${string}`, string>;
 
@@ -70,12 +69,21 @@ const recipeVisualStyle = (recipe: WorldRecipe): VisualStyle => {
   };
 };
 
-export const PlanetCatalogVisual = ({ planet }: { planet: ExoplanetProfile }) => {
-  const style = useMemo(() => recipeVisualStyle(deriveWorldRecipe(planet)), [planet]);
+export const PlanetCatalogVisual = ({
+  planet,
+  recipe,
+}: {
+  planet: ExoplanetProfile;
+  /** A recipe already derived for this planet, such as a World Forge draft's. */
+  recipe?: WorldRecipe;
+}) => {
+  const drawn = useMemo(() => recipe ?? deriveWorldRecipe(planet), [planet, recipe]);
+  const style = useMemo(() => recipeVisualStyle(drawn), [drawn]);
 
   return (
     <span
-      className={cx(`catalog-visual planet-catalog-visual ${planet.kind}`)}
+      className={cx("catalog-visual planet-catalog-visual")}
+      data-renderer={drawn.renderer}
       style={style}
       aria-hidden="true"
     >
@@ -90,11 +98,11 @@ export const StarCatalogVisual = ({ star }: { star: StarProfile }) => {
   const hash = hashName(star.name);
   const recipe = deriveStarRecipe(star);
   const rgb = recipe.color.map((channel) => Math.round(channel * 255)).join(" ");
-  const size = 68 + ((recipe.radiusSceneUnits - 2.2) / (12 - 2.2)) * 56;
+  const scale = 0.4 + ((recipe.radiusSceneUnits - 2.2) / (12 - 2.2)) * 0.34;
   const style: VisualStyle = {
     "--star-color": rgb,
     "--star-ray": `${hash % 90}deg`,
-    "--star-size": `${Math.min(124, Math.max(68, size))}px`,
+    "--star-scale": Math.min(0.74, Math.max(0.4, scale)).toFixed(3),
   };
 
   return (

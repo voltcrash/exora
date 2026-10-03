@@ -10,8 +10,11 @@ import { PlanetCatalog } from "./PlanetCatalog.tsx";
 import { SolarSystemCatalog } from "./SolarSystemCatalog.tsx";
 import { StarCatalog } from "./StarCatalog.tsx";
 import { TourCatalog } from "./TourCatalog.tsx";
+import { BrandMark } from "./shell/BrandMark.tsx";
+import { Button } from "./ui/Button.tsx";
+import { Icon, type IconName } from "./ui/Icon.tsx";
+import { Kbd } from "./ui/Kbd.tsx";
 import styles from "./DiscoverScreen.module.css";
-import sharedStyles from "./ExperienceShared.module.css";
 
 export type DiscoverSection =
   | "solar"
@@ -36,151 +39,76 @@ interface DiscoverScreenProps {
   onStartTour: (tourId: string) => void;
 }
 
-const sections: readonly {
-  accent: string;
+interface SectionEntry {
+  icon: IconName;
   id: DiscoverSection;
   label: string;
   source: string;
-}[] = [
-  {
-    accent: "cyan",
-    id: "worlds",
-    label: "Exoplanets",
-    source: "NASA ARCHIVE",
-  },
-  {
-    accent: "cyan",
-    id: "atlas",
-    label: "Atlas",
-    source: "EVERY KNOWN WORLD",
-  },
-  {
-    accent: "cyan",
-    id: "tours",
-    label: "Guided Tours",
-    source: "EXORA JOURNEYS",
-  },
-  {
-    accent: "gold",
-    id: "stars",
-    label: "Stars",
-    source: "SIMBAD",
-  },
-  {
-    accent: "amber",
-    id: "solar",
-    label: "Solar System",
-    source: "NASA / JPL",
-  },
-  {
-    accent: "violet",
-    id: "black-holes",
-    label: "Black Holes",
-    source: "NASA / EHT / ESA",
-  },
-  {
-    accent: "coral",
-    id: "forge",
-    label: "World Forge",
-    source: "EXORA LABS",
-  },
-] as const;
+}
 
-const DiscoverIcon = ({ section }: { section: DiscoverSection }) => (
-  <svg
-    className={styles["discover-nav-icon"]}
-    data-icon={section}
-    viewBox="0 0 32 32"
-    aria-hidden="true"
-  >
-    {section === "solar" ? (
-      <>
-        <circle cx="16" cy="16" r="4" />
-        <ellipse cx="16" cy="16" rx="12" ry="6.5" />
-        <circle className={styles["icon-fill"]} cx="26" cy="14" r="1.8" />
-      </>
-    ) : section === "atlas" ? (
-      <>
-        <path d="M5 5v22h22" />
-        <circle className={styles["icon-fill"]} cx="11" cy="20" r="1.6" />
-        <circle className={styles["icon-fill"]} cx="15" cy="14" r="1.6" />
-        <circle className={styles["icon-fill"]} cx="20" cy="17" r="1.6" />
-        <circle className={styles["icon-fill"]} cx="24" cy="9" r="1.6" />
-      </>
-    ) : section === "tours" ? (
-      <>
-        <path d="M6 24c4-10 9-2 13-10s5-7 7-8" />
-        <circle className={styles["icon-fill"]} cx="6" cy="24" r="2" />
-        <circle cx="26" cy="6" r="2.5" />
-      </>
-    ) : section === "worlds" ? (
-      <>
-        <circle cx="16" cy="16" r="9" />
-        <path d="M10 10.5c4.8 1.2 8.8 5.4 11 11" />
-        <path d="M6 21.5c6-2.8 13.3-2 20 2.5" />
-      </>
-    ) : section === "stars" ? (
-      <>
-        <path d="m16 3 2.4 8.6L27 14l-8.6 2.4L16 25l-2.4-8.6L5 14l8.6-2.4L16 3Z" />
-        <path d="m25 5 .8 3.2L29 9l-3.2.8L25 13l-.8-3.2L21 9l3.2-.8L25 5Z" />
-      </>
-    ) : section === "black-holes" ? (
-      <>
-        <circle className={styles["icon-fill"]} cx="16" cy="16" r="5" />
-        <ellipse cx="16" cy="16" rx="13" ry="7" transform="rotate(-18 16 16)" />
-        <path d="M4.5 21c6-3 17.5-6.5 23-10" />
-      </>
-    ) : (
-      <>
-        <circle cx="16" cy="16" r="10.5" />
-        <path d="M16 9v14M9 16h14" />
-        <path d="M11 11 8.5 8.5M21 21l2.5 2.5M21 11l2.5-2.5M11 21l-2.5 2.5" />
-      </>
-    )}
-  </svg>
-);
+const NAVIGATION: readonly { label: string; sections: readonly SectionEntry[] }[] = [
+  {
+    label: "Browse",
+    sections: [
+      { icon: "planet", id: "worlds", label: "Exoplanets", source: "NASA Exoplanet Archive" },
+      { icon: "star", id: "stars", label: "Stars", source: "SIMBAD" },
+      { icon: "orbit", id: "solar", label: "Solar System", source: "NASA/JPL" },
+      { icon: "black-hole", id: "black-holes", label: "Black Holes", source: "NASA, EHT and ESA" },
+    ],
+  },
+  {
+    label: "Learn",
+    sections: [
+      { icon: "atlas", id: "atlas", label: "Atlas", source: "Every known world" },
+      { icon: "route", id: "tours", label: "Guided Tours", source: "Narrated journeys" },
+    ],
+  },
+  {
+    label: "Create",
+    sections: [{ icon: "forge", id: "forge", label: "World Forge", source: "Your own objects" }],
+  },
+];
 
-const sectionCopy: Record<DiscoverSection, { eyebrow: string; title: string; summary: string }> = {
+const sectionCopy: Record<DiscoverSection, { title: string; summary: string }> = {
   solar: {
-    eyebrow: "NASA / JPL HOME SYSTEM",
-    title: "Close to home.",
-    summary: "Search measured worlds and dynamic regions across our home system.",
+    title: "Close to home",
+    summary: "Every planet, the principal moons and the regions between them, from NASA/JPL.",
   },
   worlds: {
-    eyebrow: "NASA EXOPLANET ARCHIVE",
-    title: "Find another world.",
-    summary: "Search by name, explore curated collections, or tune the observatory by physics.",
+    title: "Find another world",
+    summary: "Search the NASA Exoplanet Archive, browse a collection, or filter by physics.",
   },
   atlas: {
-    eyebrow: "NASA EXOPLANET ARCHIVE · EVERY CONFIRMED WORLD",
-    title: "See them all at once.",
+    title: "See them all at once",
     summary:
       "Every confirmed planet on the planes astronomers read the population from. Hover to identify, click to travel.",
   },
   tours: {
-    eyebrow: "EXORA JOURNEYS",
-    title: "Take the long way round.",
+    title: "Take the long way round",
     summary:
-      "Narrated journeys through real destinations. Each step is a shareable link, and you can leave at any moment.",
+      "Narrated journeys through real destinations. Every stop is a shareable link, and you can leave at any time.",
   },
   stars: {
-    eyebrow: "SIMBAD STELLAR ARCHIVE",
-    title: "Follow the light.",
-    summary: "Search the stellar catalog or browse distinct stellar families.",
+    title: "Follow the light",
+    summary: "Search the SIMBAD stellar archive or browse families of stars.",
   },
   "black-holes": {
-    eyebrow: "NASA / EHT / ESA COMPACT OBJECT ATLAS",
-    title: "Follow the light to its edge.",
-    summary: "Search observed horizons or browse them by curated journey and horizon family.",
+    title: "Follow the light to its edge",
+    summary: "Observed horizons, from the one at the heart of our galaxy to the heaviest known.",
   },
   forge: {
-    eyebrow: "EXORA CELESTIAL SYNTHESIS",
-    title: "Make the next discovery.",
-    summary:
-      "Build a world, star, or black hole from first principles and launch it into the live renderer.",
+    title: "Make the next discovery",
+    summary: "Build a world, a star or a black hole from first principles, then step into it.",
   },
 };
 
+/*
+ * EXPLORE
+ *
+ * Everywhere Exora can take you, behind one door. A rail of sections on a wide screen, a row of
+ * tabs on a phone; each section is a catalogue with its own search. It is a modal dialog, so the
+ * scene behind it rests and Escape always leads back to it.
+ */
 export const DiscoverScreen = ({
   initialForgeMode,
   initialSection = "worlds",
@@ -227,7 +155,7 @@ export const DiscoverScreen = ({
   return (
     <dialog
       ref={dialogRef}
-      className={styles["discover-screen"]}
+      className={styles["explore"]}
       data-state={section}
       aria-labelledby="discover-title"
       onCancel={(event) => {
@@ -235,107 +163,85 @@ export const DiscoverScreen = ({
         onClose();
       }}
     >
-      <div className={styles["discover-sky"]} aria-hidden="true">
-        <span />
-        <span />
-        <span />
-      </div>
-
-      <aside className={styles["discover-rail"]}>
-        <a className={styles["discover-home"]} href="/" aria-label="Exora home">
-          <span
-            className={sharedStyles["brand-mark"]}
-            data-style-role="brand-mark"
-            aria-hidden="true"
-          />
-          <span>
-            <strong>EXORA</strong>
-            <small>UNIVERSE OBSERVATORY</small>
-          </span>
+      <aside className={styles["rail"]}>
+        <a className={styles["home"]} href="/" aria-label="Exora home">
+          <BrandMark />
+          <span>Exora</span>
         </a>
 
-        <nav className={styles["discover-nav"]} aria-label="Discover destinations">
-          {sections.map((item, index) => (
-            <button
-              className={`${styles["discover-nav-item"]} ${styles[item.accent]}`}
-              key={item.id}
-              type="button"
-              aria-label={`${item.label} · ${item.source}`}
-              aria-current={section === item.id ? "page" : undefined}
-              onClick={() => setSection(item.id)}
-            >
-              <span className={styles["discover-nav-index"]}>0{index + 1}</span>
-              <span className={styles["discover-nav-glyph"]} aria-hidden="true">
-                <DiscoverIcon section={item.id} />
-              </span>
-              <span className={styles["discover-nav-copy"]} data-testid="discover-nav-copy">
-                <strong>{item.label}</strong>
-                <small>{item.source}</small>
-              </span>
-            </button>
+        <nav className={styles["nav"]} aria-label="Explore destinations">
+          {NAVIGATION.map((group) => (
+            <div key={group.label} className={styles["nav-group"]}>
+              <p className={styles["nav-label"]}>{group.label}</p>
+              {group.sections.map((item) => (
+                <button
+                  className={styles["nav-item"]}
+                  key={item.id}
+                  type="button"
+                  aria-label={`${item.label} · ${item.source}`}
+                  aria-current={section === item.id ? "page" : undefined}
+                  onClick={() => setSection(item.id)}
+                >
+                  <span data-icon={item.id} className={styles["nav-icon"]}>
+                    <Icon name={item.icon} size={18} />
+                  </span>
+                  <span className={styles["nav-copy"]} data-testid="discover-nav-copy">
+                    <strong>{item.label}</strong>
+                    <small>{item.source}</small>
+                  </span>
+                </button>
+              ))}
+            </div>
           ))}
         </nav>
+
+        <p className={styles["rail-tip"]}>
+          <Kbd>/</Kbd> jumps straight to anywhere by name
+        </p>
       </aside>
 
-      <div ref={stageRef} className={styles["discover-stage"]} data-testid="discover-stage">
-        <header className={styles["discover-header"]}>
-          <div>
-            <p>{copy.eyebrow}</p>
+      <div ref={stageRef} className={styles["stage"]} data-testid="discover-stage">
+        <header className={styles["header"]}>
+          <div className={styles["header-copy"]}>
             <h1 id="discover-title">{copy.title}</h1>
-            <span>{copy.summary}</span>
+            <p>{copy.summary}</p>
           </div>
-          <button
+          <Button
             ref={closeRef}
-            className={styles["discover-close"]}
-            type="button"
-            aria-label="Close Discover"
+            className={styles["close"]}
+            icon="close"
+            variant="secondary"
+            aria-label="Close Explore"
+            aria-keyshortcuts="Escape"
             onClick={onClose}
-          >
-            <span>RETURN TO VIEW</span>
-            <kbd aria-label="Backspace or Delete">⌫</kbd>
-            <i aria-hidden="true">×</i>
-          </button>
+          />
         </header>
 
-        <main className={styles["discover-main"]}>
-          <div className={styles["discover-workspace"]}>
-            {section === "solar" ? (
-              <SolarSystemCatalog
-                embedded
-                onClose={() => setSection("solar")}
-                onSelectPlanet={onSelectPlanet}
-                onSelectRegion={onSelectRegion}
-                onSelectStar={onSelectStar}
-              />
-            ) : section === "worlds" ? (
-              <PlanetCatalog
-                embedded
-                onClose={() => setSection("solar")}
-                onSelect={onSelectPlanet}
-              />
-            ) : section === "atlas" ? (
-              <PlanetAtlas onSelect={onSelectPlanet} />
-            ) : section === "tours" ? (
-              <TourCatalog onStart={onStartTour} />
-            ) : section === "stars" ? (
-              <StarCatalog embedded onClose={() => setSection("solar")} onSelect={onSelectStar} />
-            ) : section === "black-holes" ? (
-              <BlackHoleCatalog
-                embedded
-                onClose={() => setSection("solar")}
-                onSelect={onSelectBlackHole}
-              />
-            ) : (
-              <WorldForge
-                embedded
-                initialMode={initialForgeMode}
-                onClose={() => setSection("solar")}
-                onGenerateBlackHole={onGenerateBlackHole}
-                onGeneratePlanet={onGeneratePlanet}
-                onGenerateStar={onGenerateStar}
-              />
-            )}
-          </div>
+        <main className={styles["main"]}>
+          {section === "solar" ? (
+            <SolarSystemCatalog
+              onSelectPlanet={onSelectPlanet}
+              onSelectRegion={onSelectRegion}
+              onSelectStar={onSelectStar}
+            />
+          ) : section === "worlds" ? (
+            <PlanetCatalog onSelect={onSelectPlanet} />
+          ) : section === "atlas" ? (
+            <PlanetAtlas onSelect={onSelectPlanet} />
+          ) : section === "tours" ? (
+            <TourCatalog onStart={onStartTour} />
+          ) : section === "stars" ? (
+            <StarCatalog onSelect={onSelectStar} />
+          ) : section === "black-holes" ? (
+            <BlackHoleCatalog onSelect={onSelectBlackHole} />
+          ) : (
+            <WorldForge
+              initialMode={initialForgeMode}
+              onGenerateBlackHole={onGenerateBlackHole}
+              onGeneratePlanet={onGeneratePlanet}
+              onGenerateStar={onGenerateStar}
+            />
+          )}
         </main>
       </div>
     </dialog>

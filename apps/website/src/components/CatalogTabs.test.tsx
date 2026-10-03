@@ -6,7 +6,6 @@ const forgeMarkup = (): string =>
   renderToStaticMarkup(
     <WorldForge
       initialMode="planet"
-      onClose={vi.fn()}
       onGenerateBlackHole={vi.fn()}
       onGeneratePlanet={vi.fn()}
       onGenerateStar={vi.fn()}
@@ -31,4 +30,12 @@ test("connects the selected tab to the mounted panel", () => {
   expect(tabs.filter((tag) => tag.includes('tabindex="-1"'))).toHaveLength(2);
   const selected = tabs.find((tag) => tag.includes('aria-selected="true"'));
   expect(selected).toContain('tabindex="0"');
+});
+
+test("previews the object being forged before it is generated", () => {
+  const markup = forgeMarkup();
+
+  expect(markup).toContain("planet-catalog-visual");
+  expect(markup).toContain("Asteria");
+  expect(markup).toContain("Generate planet");
 });
