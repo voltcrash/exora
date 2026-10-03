@@ -37,7 +37,6 @@ const KEEP = new Set([
   "TESS",
   "UTC",
   "UV",
-  "VR",
   "XR",
 ]);
 

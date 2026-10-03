@@ -12,7 +12,7 @@ export const useFrameRate = (host: SceneHost | null): string => {
   return fps;
 };
 
-/** Whether this device can enter VR or AR right now. */
+/** Whether this device can enter AR right now. */
 export const useXrStatus = (host: SceneHost | null): XrStatus => {
   const [status, setStatus] = useState<XrStatus>("checking");
   useEffect(() => host?.onXrStatus(setStatus), [host]);

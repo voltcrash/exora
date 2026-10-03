@@ -26,7 +26,7 @@ const mountedWorld = () => ({
 });
 
 vi.mock("./scene-host.ts", () => {
-  let insideHeadset = false;
+  let insideXr = false;
   const host = {
     beginTravel: () => undefined,
     cancelTravel: () => undefined,
@@ -35,11 +35,11 @@ vi.mock("./scene-host.ts", () => {
     dispose: () => undefined,
     engine: null,
     enterImmersive: async () => {
-      insideHeadset = true;
+      insideXr = true;
     },
     getFps: () => 60,
     isArSupported: () => false,
-    isInXr: () => insideHeadset,
+    isInXr: () => insideXr,
     prefersReducedMotion: () => false,
     mountWorld: async (build: () => unknown) => build(),
     onRendererStatus: (listener: (status: string) => void) => {
@@ -57,7 +57,7 @@ vi.mock("./scene-host.ts", () => {
     profile: { hardwareScalingLevel: 1, tier: "desktop" },
     qualityTier: "desktop",
     setInXr: (value: boolean) => {
-      insideHeadset = value;
+      insideXr = value;
     },
     renderSuspensions: 0,
     suspendRendering: () => {

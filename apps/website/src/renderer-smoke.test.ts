@@ -144,10 +144,7 @@ interface Harness {
   scene: Scene;
 }
 
-const createHarness = (
-  profile: RenderQualityProfile = testProfile,
-  insideHeadset = true,
-): Harness => {
+const createHarness = (profile: RenderQualityProfile = testProfile, insideXr = true): Harness => {
   const engine = new NullEngine({
     deterministicLockstep: false,
     lockstepMaxSteps: 4,
@@ -176,7 +173,7 @@ const createHarness = (
     qualityTier: profile.tier,
     scene,
     getFps: () => 60,
-    isInXr: () => insideHeadset,
+    isInXr: () => insideXr,
     prefersReducedMotion: () => false,
     onTravelPhase: () => () => undefined,
   } as unknown as SceneHost;
