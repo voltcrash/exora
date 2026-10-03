@@ -1,8 +1,6 @@
 import type { ActiveTour } from "../tours.ts";
+import { Button } from "./ui/Button.tsx";
 import styles from "./TourBar.module.css";
-import { bindStyles } from "../styles/bind-styles.ts";
-
-const cx = bindStyles(styles);
 
 interface TourBarProps {
   active: ActiveTour;
@@ -16,20 +14,30 @@ export const TourBar = ({ active: { index, tour }, hidden, onExit, onStep }: Tou
   const step = tour.steps[index];
   if (!step) return null;
   const last = index === tour.steps.length - 1;
+  const next = tour.steps[index + 1];
 
   return (
-    <section className={cx("tour")} data-hidden={hidden} aria-label={`Guided tour: ${tour.title}`}>
-      <p className={cx("tour-eyebrow")}>
-        <span>GUIDED TOUR</span>
-        <span>
-          {index + 1} / {tour.steps.length}
-        </span>
-        <span>{tour.title}</span>
-      </p>
-      <p className={cx("tour-caption")} aria-live="polite">
-        <strong>{step.name}.</strong> {step.caption}
-      </p>
-      <ol className={cx("tour-progress")} aria-hidden="true">
+    <section
+      className={styles["tour"]}
+      data-hidden={hidden}
+      aria-label={`Guided tour: ${tour.title}`}
+    >
+      <header className={styles["tour-head"]}>
+        <p>
+          <span>{tour.title}</span>
+          <span className={styles["tour-count"]}>
+            Stop {index + 1} of {tour.steps.length}
+          </span>
+        </p>
+        <Button
+          icon="close"
+          size="sm"
+          variant="ghost"
+          aria-label="Leave the tour"
+          onClick={onExit}
+        />
+      </header>
+      <ol className={styles["tour-progress"]} aria-hidden="true">
         {tour.steps.map((entry, position) => (
           <li
             key={entry.name + String(position)}
@@ -37,22 +45,33 @@ export const TourBar = ({ active: { index, tour }, hidden, onExit, onStep }: Tou
           />
         ))}
       </ol>
-      <div className={cx("tour-controls")}>
-        <button type="button" disabled={index === 0} onClick={() => onStep(index - 1)}>
-          ◀ PREVIOUS
-        </button>
+      <p className={styles["tour-caption"]} aria-live="polite">
+        <strong>{step.name}.</strong> {step.caption}
+      </p>
+      <div className={styles["tour-controls"]}>
+        <Button
+          icon="chevron-left"
+          size="sm"
+          variant="ghost"
+          disabled={index === 0}
+          onClick={() => onStep(index - 1)}
+        >
+          Previous
+        </Button>
         {last ? (
-          <button type="button" data-primary="true" onClick={onExit}>
-            FINISH TOUR
-          </button>
+          <Button size="sm" variant="primary" icon="check" onClick={onExit}>
+            Finish tour
+          </Button>
         ) : (
-          <button type="button" data-primary="true" onClick={() => onStep(index + 1)}>
-            NEXT · {tour.steps[index + 1]?.name.toUpperCase()} ▶
-          </button>
+          <Button
+            size="sm"
+            variant="primary"
+            iconEnd="arrow-right"
+            onClick={() => onStep(index + 1)}
+          >
+            Next: {next?.name}
+          </Button>
         )}
-        <button type="button" aria-label="Leave the tour" onClick={onExit}>
-          ×
-        </button>
       </div>
     </section>
   );

@@ -1,54 +1,52 @@
 .tour {
-  width: min(560px, calc(100vw - 32px));
-  display: grid;
-  gap: 10px;
   position: fixed;
-  z-index: 3;
-  bottom: 64px;
+  z-index: calc(var(--layer-hud) + 1);
+  top: calc(var(--safe-top) + var(--edge) + var(--control-height) + var(--space-3));
   left: 50%;
-  padding: 14px 16px 12px;
-  border: 1px solid rgb(139 230 234 / 22%);
-  border-radius: 16px;
-  background: linear-gradient(155deg, rgb(24 45 49 / 24%), transparent 50%), rgb(6 10 12 / 88%);
-  box-shadow: 0 18px 60px rgb(0 0 0 / 45%);
-  backdrop-filter: blur(18px);
+  display: grid;
+  gap: var(--space-3);
+  width: min(520px, calc(100vw - 2 * var(--edge)));
+  padding: var(--space-4) var(--space-4) var(--space-3) var(--space-5);
+  border: 1px solid var(--hairline);
+  border-radius: var(--radius-lg);
+  background: var(--surface);
+  box-shadow: var(--shadow-float);
   transform: translateX(-50%);
+  backdrop-filter: var(--blur);
+  -webkit-backdrop-filter: var(--blur);
   transition:
-    opacity 220ms ease,
-    visibility 220ms ease;
+    opacity var(--duration) var(--ease),
+    visibility var(--duration) var(--ease);
 }
 
 .tour[data-hidden="true"] {
-  opacity: 0;
   visibility: hidden;
+  opacity: 0;
 }
 
-.tour-eyebrow {
+.tour-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+  margin: -4px -4px 0 0;
+}
+
+.tour-head p {
   display: flex;
   flex-wrap: wrap;
-  gap: 10px;
-  margin: 0;
-  color: var(--cyan);
-  font-family: var(--mono);
-  font-size: 7px;
-  letter-spacing: 0.1em;
-  text-transform: uppercase;
+  align-items: baseline;
+  gap: 4px var(--space-3);
+  color: var(--light);
+  font-size: var(--text-sm);
+  font-weight: 560;
 }
 
-.tour-eyebrow span + span {
-  color: var(--faint);
-}
-
-.tour-caption {
-  margin: 0;
-  color: #dce6e8;
-  font-size: 13px;
-  line-height: 1.55;
-}
-
-.tour-caption strong {
-  color: var(--ink);
-  font-weight: 600;
+.tour-count {
+  color: var(--ink-3);
+  font-size: var(--text-xs);
+  font-weight: 400;
+  font-variant-numeric: tabular-nums;
 }
 
 .tour-progress {
@@ -60,118 +58,135 @@
 }
 
 .tour-progress li {
-  height: 3px;
   flex: 1;
+  height: 3px;
   border-radius: 2px;
-  background: rgb(229 244 247 / 12%);
+  background: var(--hairline-strong);
 }
 
 .tour-progress li[data-state="done"] {
-  background: rgb(139 230 234 / 45%);
+  background: rgb(var(--light-rgb) / 45%);
 }
 
 .tour-progress li[data-state="here"] {
-  background: var(--cyan);
+  background: var(--light);
+}
+
+.tour-caption {
+  color: var(--ink-2);
+  font-size: var(--text-sm);
+  line-height: 1.55;
+}
+
+.tour-caption strong {
+  color: var(--ink);
+  font-weight: 560;
 }
 
 .tour-controls {
   display: flex;
-  gap: 6px;
+  justify-content: space-between;
+  gap: var(--space-2);
+  margin-left: calc(-1 * var(--space-3));
 }
 
-.tour-controls button {
-  min-height: 34px;
-  padding: 0 12px;
-  border: 1px solid rgb(229 244 247 / 14%);
-  border-radius: 10px;
-  color: #dce9eb;
-  background: rgb(255 255 255 / 3%);
-  cursor: pointer;
-  font-family: var(--mono);
-  font-size: 8px;
-  letter-spacing: 0.06em;
-}
+/* The tours on offer in Explore */
 
-.tour-controls button[data-primary="true"] {
-  flex: 1;
-  border-color: rgb(139 230 234 / 42%);
-  color: var(--cyan);
-  background: rgb(139 230 234 / 9%);
-}
-
-.tour-controls button:hover:not(:disabled),
-.tour-controls button:focus-visible {
-  border-color: rgb(139 230 234 / 62%);
-  outline: none;
-}
-
-.tour-controls button:disabled {
-  opacity: 0.4;
-  cursor: default;
-}
-
-@media (max-width: 720px) {
-  .tour {
-    top: 76px;
-    bottom: auto;
-  }
-}
-
-.tour-catalog {
+.catalog {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
-  gap: 12px;
+  grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+  gap: var(--space-3);
   margin: 0;
-  padding: 22px 26px 30px;
+  padding: 0;
   list-style: none;
 }
 
-.tour-catalog button {
-  width: 100%;
-  min-height: 150px;
+.catalog-card {
   display: grid;
   align-content: start;
-  gap: 8px;
-  padding: 18px;
-  border: 1px solid rgb(229 244 247 / 11%);
-  border-radius: 16px;
+  gap: var(--space-2);
+  width: 100%;
+  height: 100%;
+  padding: var(--space-5);
+  border: 1px solid var(--hairline);
+  border-radius: var(--radius-md);
   color: var(--ink);
-  background: rgb(255 255 255 / 2%);
-  cursor: pointer;
+  background: var(--fill);
   text-align: left;
   transition:
-    border-color 160ms ease,
-    background 160ms ease;
+    border-color var(--duration-fast) var(--ease),
+    background-color var(--duration-fast) var(--ease);
 }
 
-.tour-catalog button:hover,
-.tour-catalog button:focus-visible {
-  border-color: rgb(139 230 234 / 48%);
-  outline: none;
-  background: rgb(139 230 234 / 6%);
+.catalog-card:hover {
+  border-color: var(--light-line);
+  background: var(--fill-hover);
 }
 
-.tour-catalog small,
-.tour-catalog em {
-  color: var(--cyan);
-  font-family: var(--mono);
-  font-size: 7px;
-  font-style: normal;
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
+.catalog-route {
+  display: flex;
+  align-items: center;
+  margin-bottom: var(--space-2);
 }
 
-.tour-catalog em {
-  color: var(--faint);
+.catalog-route i {
+  width: 7px;
+  height: 7px;
+  border: 1.5px solid var(--light);
+  border-radius: 50%;
 }
 
-.tour-catalog strong {
-  font-size: 18px;
-  font-weight: 500;
+.catalog-route i {
+  position: relative;
 }
 
-.tour-catalog span {
-  color: var(--muted);
-  font-size: 12px;
-  line-height: 1.5;
+.catalog-route i + i {
+  margin-left: 18px;
+}
+
+.catalog-route i + i::before {
+  content: "";
+  position: absolute;
+  top: 2px;
+  right: calc(100% + 1px);
+  width: 16px;
+  height: 1px;
+  background: var(--light-line);
+}
+
+.catalog-route i:first-child {
+  background: var(--light);
+}
+
+.catalog-card strong {
+  font-size: var(--text-lg);
+  font-stretch: var(--wide);
+  font-weight: 420;
+  letter-spacing: -0.01em;
+}
+
+.catalog-card > span:not([class]) {
+  color: var(--ink-2);
+  font-size: var(--text-sm);
+}
+
+.catalog-card small {
+  color: var(--ink-3);
+  font-size: var(--text-xs);
+}
+
+.catalog-start {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  margin-top: var(--space-2);
+  color: var(--light);
+  font-size: var(--text-sm);
+  font-weight: 560;
+}
+
+@media (max-width: 760px) {
+  .tour {
+    padding: var(--space-3) var(--space-3) var(--space-2) var(--space-4);
+  }
 }
