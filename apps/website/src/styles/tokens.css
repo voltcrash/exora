@@ -1,17 +1,112 @@
+/*
+ * Exora's design tokens. Every component stylesheet reads from here; nothing else defines a
+ * colour, a size on the type scale, a radius or a duration.
+ *
+ * The one colour that is not fixed is the light: each destination sets `--light-rgb` to the
+ * blackbody colour of the star it is lit by, so the interface over a red dwarf's world is warm and
+ * the interface over Sirius is cold. See `star-light.ts`.
+ */
 :root {
-  color: #f4f7f8;
-  background: #030506;
-  font-family: "Exo 2", system-ui, sans-serif;
-  font-synthesis: none;
-  text-rendering: optimizeLegibility;
-  -webkit-font-smoothing: antialiased;
-  --accent: #ff6b32;
-  --accent-soft: rgb(255 107 50 / 12%);
-  --cyan: #8be6ea;
-  --ink: #f4f7f8;
-  --muted: #91a0a6;
-  --faint: #536168;
-  --line: rgb(229 244 247 / 12%);
-  --panel: rgb(8 13 15 / 78%);
-  --mono: "IBM Plex Mono", ui-monospace, monospace;
+  color-scheme: dark;
+
+  /* Archivo has no astronomical symbols, so ☉ and ⊕ fall through to a face that does. */
+  --font-sans:
+    "Archivo Variable", "Archivo", "Apple Symbols", "Segoe UI Symbol", "Noto Sans Symbols",
+    ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
+
+  /* Ink on the void, brightest to faintest. */
+  --ink: #ecebe6;
+  --ink-2: #aeb1b7;
+  --ink-3: #7b7f88;
+  --ink-4: #50545c;
+  --void: #000;
+
+  /* Surfaces float over a live scene, so they are smoked glass rather than paint. */
+  --surface: rgb(16 17 20 / 74%);
+  --surface-solid: #101114;
+  --surface-sunken: rgb(0 0 0 / 28%);
+  --fill: rgb(255 255 255 / 5%);
+  --fill-hover: rgb(255 255 255 / 9%);
+  --fill-active: rgb(255 255 255 / 13%);
+  --hairline: rgb(255 255 255 / 9%);
+  --hairline-strong: rgb(255 255 255 / 17%);
+  --scrim: rgb(0 0 0 / 62%);
+
+  /* The local star's light. Defaults to a G dwarf like the Sun. */
+  --light-rgb: 255 222 186;
+  --light: rgb(var(--light-rgb));
+  --light-wash: rgb(var(--light-rgb) / 10%);
+  --light-line: rgb(var(--light-rgb) / 38%);
+  --on-light: #0b0b0c;
+
+  /* What kind of claim a reading makes. */
+  --tone-measured: #8fd8c8;
+  --tone-note: #e7c681;
+  --tone-caveat: #f2a184;
+  --tone-danger: #ff8f80;
+
+  /* Type: a minor-third scale on a 15px body. */
+  --text-2xs: 0.6875rem;
+  --text-xs: 0.75rem;
+  --text-sm: 0.8125rem;
+  --text-base: 0.9375rem;
+  --text-md: 1.0625rem;
+  --text-lg: 1.3125rem;
+  --text-xl: 1.625rem;
+  --text-2xl: 2.125rem;
+  --text-display: clamp(2.25rem, 3.4vw + 1rem, 4.25rem);
+
+  --leading-tight: 1.15;
+  --leading: 1.5;
+
+  --wide: 118%;
+  --narrow: 88%;
+
+  /* Space: a 4px grid. */
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-5: 20px;
+  --space-6: 24px;
+  --space-8: 32px;
+  --space-10: 40px;
+  --space-12: 48px;
+
+  --radius-xs: 6px;
+  --radius-sm: 10px;
+  --radius-md: 14px;
+  --radius-lg: 20px;
+  --radius-pill: 999px;
+
+  --blur: blur(22px) saturate(140%);
+  --shadow-float: 0 18px 50px rgb(0 0 0 / 45%), 0 2px 8px rgb(0 0 0 / 30%);
+
+  --ease: cubic-bezier(0.2, 0.8, 0.2, 1);
+  --ease-in-out: cubic-bezier(0.65, 0, 0.35, 1);
+  --duration-fast: 140ms;
+  --duration: 220ms;
+  --duration-slow: 380ms;
+
+  --control-height: 40px;
+  --control-height-sm: 32px;
+  --edge: clamp(14px, 2.2vw, 28px);
+  --safe-top: env(safe-area-inset-top, 0px);
+  --safe-right: env(safe-area-inset-right, 0px);
+  --safe-bottom: env(safe-area-inset-bottom, 0px);
+  --safe-left: env(safe-area-inset-left, 0px);
+
+  --layer-veil: 1;
+  --layer-hud: 2;
+  --layer-loading: 6;
+  --layer-travel: 9;
+  --layer-overlay: 20;
+  --layer-toast: 40;
+}
+
+@media (pointer: coarse) {
+  :root {
+    --control-height: 44px;
+    --control-height-sm: 38px;
+  }
 }

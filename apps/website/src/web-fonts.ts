@@ -1,7 +1,6 @@
-const STYLESHEET =
-  "https://fonts.googleapis.com/css2?family=Exo+2:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap";
+import "@fontsource-variable/archivo/wdth.css";
 
-const FACES = ["Exo 2", "IBM Plex Mono"];
+const FACES = ["Archivo Variable"];
 
 const ARRIVED = "exora:web-fonts-ready";
 
@@ -9,6 +8,7 @@ const ARRIVED = "exora:web-fonts-ready";
 const HIDDEN_TAB_FALLBACK_MS = 200;
 
 let arrived = false;
+let requested = false;
 
 const announce = (): void => {
   arrived = true;
@@ -16,29 +16,21 @@ const announce = (): void => {
 };
 
 const request = (): void => {
-  if (document.head.querySelector('link[data-exora-fonts="true"]')) return;
-  const link = document.createElement("link");
-  link.rel = "stylesheet";
-  link.href = STYLESHEET;
-  link.dataset.exoraFonts = "true";
-  link.addEventListener("load", () => {
-    // The stylesheet only declares the faces. WebKit settles `document.fonts.ready` before it has
-    // begun fetching them, so the faces are asked for by name and waited on individually.
-    void Promise.all(FACES.map((face) => document.fonts.load(`1em "${face}"`))).then(
-      announce,
-      announce,
-    );
-  });
-  link.addEventListener("error", announce);
-  document.head.append(link);
+  if (requested) return;
+  requested = true;
+  // The face ships with the bundle and is declared up front, but WebKit settles
+  // `document.fonts.ready` before it has begun fetching it, so it is asked for by name.
+  void Promise.all(FACES.map((face) => document.fonts.load(`1em "${face}"`))).then(
+    announce,
+    announce,
+  );
 };
 
 /*
- * The typefaces are asked for as soon as the first frame is on screen, so the interface is drawn
- * twice: once in whatever sans the platform supplies, and again in Exo 2. Anything whose layout was
- * measured against the first face has to hear about the second, and the FontFaceSet events that
- * should say so are not delivered by WebKit — so the load Exora itself schedules announces its own
- * arrival.
+ * The typeface is asked for once the first frame is on screen, so the interface may be drawn
+ * twice: once in the platform sans and again in Archivo. Anything whose layout was measured against
+ * the first face has to hear about the second, and the FontFaceSet events that should say so are
+ * not delivered by WebKit — so Exora announces the arrival itself.
  */
 export const loadWebFonts = (): void => {
   window.requestAnimationFrame(() => {
