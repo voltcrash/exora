@@ -38,7 +38,7 @@ Vercel CLI back to the workspace dependencies.
   decoders.
 - `Permissions-Policy` keeps camera and spatial tracking available to Exora while disabling
   geolocation, microphone, payment, and USB. Camera and `xr-spatial-tracking` must remain allowed
-  for immersive AR and VR capability checks.
+  for immersive AR capability checks.
 - HSTS covers two years and deeper subdomains. The preload token is intentionally omitted because
   preloading is an owner-wide operational commitment that must be made at the registrable domain,
   not by this application. Referrers are reduced to the origin on cross-origin navigation.

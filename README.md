@@ -2,7 +2,7 @@
 
 ## Purpose
 
-Exora turns catalogued astronomy into a place you can stand in. It reads confirmed exoplanets from the NASA Exoplanet Archive and stars from SIMBAD, derives a deterministic visual recipe from each object's measured properties, and renders that recipe as a real-time Babylon.js world you can orbit on a desktop or walk inside a WebXR headset.
+Exora turns catalogued astronomy into a place you can stand in. It reads confirmed exoplanets from the NASA Exoplanet Archive and stars from SIMBAD, derives a deterministic visual recipe from each object's measured properties, and renders that recipe as a real-time Babylon.js world you can orbit on a desktop or place on a table in phone AR.
 
 Every world is a reading of a catalog row, never observed imagery. Exora keeps the three tiers apart at the type level and in the interface: **measured** values are printed verbatim from the archive, **derived** values come from established physics applied to those measurements, and **inferred** appearance is a cautious probabilistic read carrying its own confidence. A field the catalog never reported stays `null` rather than being backfilled with a plausible number.
 
@@ -114,9 +114,9 @@ vp run @exora/api#build
 
 ### Immersive mode
 
-WebXR requires a secure context. Localhost works for desktop development, but testing from a Quest on the local network needs HTTPS or a deployed origin.
+WebXR requires a secure context. Localhost works for desktop development, but testing from a phone on the local network needs HTTPS or a deployed origin.
 
-Use the [Meta Quest smoke-test checklist](docs/quest-testing.md) for headset validation and performance targets, and follow the [iPhone AR deployment and smoke-test guide](docs/iphone-ar.md) for Variant Launch configuration and real-device testing.
+Follow the [iPhone AR deployment and smoke-test guide](docs/iphone-ar.md) for Variant Launch configuration and real-device testing.
 
 ## Workspace
 
@@ -169,13 +169,12 @@ quotas. See [API rate limiting and caching](docs/api-rate-limiting-and-caching.m
 boundary, shared-cache behavior, operational tradeoffs, and the evidence threshold for adding a
 globally enforced control.
 
-The browser holds one Babylon engine for the lifetime of the page. Worlds are built into and removed from that single scene, which is what lets an immersive session survive travel between destinations.
+The browser holds one Babylon engine for the lifetime of the page. Worlds are built into and removed from that single scene, which is what lets travel between destinations reuse one engine and XR session.
 
 ```mermaid
 flowchart TB
     subgraph Clients
         Desktop["Desktop browser<br/>orbit controls"]
-        Headset["Meta Quest<br/>WebXR immersive session"]
         Phone["iPhone / Android<br/>WebXR AR session"]
     end
 
@@ -197,7 +196,6 @@ flowchart TB
     end
 
     Desktop --> Static
-    Headset --> Static
     Phone --> Static
     Static --> UI
     UI --> Host
