@@ -1,10 +1,6 @@
 import { ArcRotateCamera } from "@babylonjs/core/Cameras/arcRotateCamera.js";
 import "@babylonjs/core/Culling/ray.js";
 import type { Engine } from "@babylonjs/core/Engines/engine.js";
-import { Color3 } from "@babylonjs/core/Maths/math.color.js";
-import { StandardMaterial } from "@babylonjs/core/Materials/standardMaterial.js";
-import { Mesh } from "@babylonjs/core/Meshes/mesh.js";
-import { MeshBuilder } from "@babylonjs/core/Meshes/meshBuilder.js";
 import "@babylonjs/core/Meshes/instancedMesh.js";
 import { Scene } from "@babylonjs/core/scene.js";
 import type { WebXRDefaultExperience } from "@babylonjs/core/XR/webXRDefaultExperience.js";
@@ -44,7 +40,6 @@ import type * as XrRuntime from "./xr-runtime.ts";
 export type { XrStatus } from "./scene-xr-integration.ts";
 
 // One host owns the WebGL context across every destination and WebXR session.
-const VEIL_FADE_SECONDS = 0.22;
 
 export interface MountedWorld {
   farthestView?: () => number | undefined;
@@ -92,52 +87,7 @@ const createSceneHost = (canvas: HTMLCanvasElement): SceneHost => {
 
   let isInXr = false;
 
-  const veilMaterial = new StandardMaterial("travelVeilMaterial", scene);
-  veilMaterial.disableLighting = true;
-  veilMaterial.diffuseColor = Color3.Black();
-  veilMaterial.emissiveColor = Color3.Black();
-  veilMaterial.specularColor = Color3.Black();
-  veilMaterial.disableDepthWrite = true;
-  veilMaterial.alpha = 0;
-  const veil = MeshBuilder.CreateSphere(
-    "travelVeil",
-    { diameter: 0.8, segments: 10, sideOrientation: Mesh.BACKSIDE },
-    scene,
-  );
-  veil.material = veilMaterial;
-  veil.isPickable = false;
-  veil.applyFog = false;
-  veil.alwaysSelectAsActiveMesh = true;
-  veil.renderingGroupId = 3;
-  veil.setEnabled(false);
-
   const arPresentation = createArPresentation(scene);
-
-  let veilAlpha = 0;
-  let veilTarget = 0;
-  let settleVeil: (() => void) | null = null;
-
-  const resolveVeil = (): void => {
-    const settle = settleVeil;
-    settleVeil = null;
-    settle?.();
-  };
-
-  const fadeVeil = async (target: number): Promise<void> => {
-    if (!isInXr) {
-      veilTarget = 0;
-      veilAlpha = 0;
-      veilMaterial.alpha = 0;
-      veil.setEnabled(false);
-      return;
-    }
-    resolveVeil();
-    veilTarget = target;
-    if (veilAlpha === veilTarget) return;
-    await new Promise<void>((resolve) => {
-      settleVeil = resolve;
-    });
-  };
 
   let arActive = false;
   let xrCameraLayerMask = 0x0fff_ffff;
@@ -166,19 +116,6 @@ const createSceneHost = (canvas: HTMLCanvasElement): SceneHost => {
 
   scene.onBeforeRenderObservable.add(() => {
     const deltaSeconds = Math.min(engine.getDeltaTime() / 1_000, 0.05);
-
-    if (veilAlpha !== veilTarget || veil.isEnabled()) {
-      const step = deltaSeconds / VEIL_FADE_SECONDS;
-      veilAlpha =
-        veilTarget > veilAlpha
-          ? Math.min(veilTarget, veilAlpha + step)
-          : Math.max(veilTarget, veilAlpha - step);
-      veilMaterial.alpha = veilAlpha;
-      veil.setEnabled(veilAlpha > 0.001);
-      const eye = scene.activeCamera?.globalPosition;
-      if (eye) veil.position.copyFrom(eye);
-      if (veilAlpha === veilTarget) resolveVeil();
-    }
 
     qualitySampleSeconds += deltaSeconds;
     if (qualitySampleSeconds >= 3) {
@@ -370,17 +307,13 @@ const createSceneHost = (canvas: HTMLCanvasElement): SceneHost => {
     build: () => Promise<World> | World,
   ): Promise<World | null> => {
     const token = (mountToken += 1);
-    if (worldMount.current) {
-      await fadeVeil(1);
-      await departFromWorld();
-    }
+    if (worldMount.current) await departFromWorld();
     if (token !== mountToken || disposed) return null;
 
     let world: World | null;
     try {
       world = await worldMount.replace(build, () => token === mountToken && !disposed);
     } catch (error) {
-      void fadeVeil(0);
       endGlide(null, false);
       departure = null;
       travelOrigin = null;
@@ -391,7 +324,6 @@ const createSceneHost = (canvas: HTMLCanvasElement): SceneHost => {
     if (!world) return null;
 
     arPresentation.setWorld(worldMount.scope?.presentation ?? null);
-    void fadeVeil(0);
     arriveAtWorld(token);
     if (!renderLifecycle.isRunning) renderLifecycle.renderFrame();
     engine.performanceMonitor.reset();
@@ -441,11 +373,6 @@ const createSceneHost = (canvas: HTMLCanvasElement): SceneHost => {
         if (state === runtime.WebXRState.NOT_IN_XR) {
           isInXr = false;
           if (renderLifecycle.suspensionCount > 0) renderLifecycle.stop();
-          veilTarget = 0;
-          veilAlpha = 0;
-          veilMaterial.alpha = 0;
-          veil.setEnabled(false);
-          resolveVeil();
           if (arActive) {
             arPresentation.end();
             createdXr.baseExperience.camera.layerMask = xrCameraLayerMask;
