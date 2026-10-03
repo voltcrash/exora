@@ -27,7 +27,7 @@ Vercel CLI back to the workspace dependencies.
   workers and media/images so decoder workers and browser-generated resources keep working.
 - Google Fonts is allowed only for stylesheets and fonts. Vercel Analytics and Speed Insights use
   same-origin `/_vercel` scripts and collection endpoints in production.
-- Inline styles remain allowed because Babylon, the XR emulator, and React components set runtime
+- Inline styles remain allowed because Babylon and React components set runtime
   element styles. This exception does not authorize inline scripts.
 - `frame-ancestors 'none'` and `X-Frame-Options: DENY` both prevent framing. Variant's supported
   Launch Card flow is a top-level navigation, not an iframe, so it remains available.
@@ -38,7 +38,7 @@ Vercel CLI back to the workspace dependencies.
   decoders.
 - `Permissions-Policy` keeps camera and spatial tracking available to Exora while disabling
   geolocation, microphone, payment, and USB. Camera and `xr-spatial-tracking` must remain allowed
-  for immersive AR and VR capability checks.
+  for immersive AR capability checks.
 - HSTS covers two years and deeper subdomains. The preload token is intentionally omitted because
   preloading is an owner-wide operational commitment that must be made at the registrable domain,
   not by this application. Referrers are reduced to the origin on cross-origin navigation.

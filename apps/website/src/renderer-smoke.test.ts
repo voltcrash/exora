@@ -35,7 +35,6 @@ const testProfile: RenderQualityProfile = {
   maxGiantStorms: 1,
   maxHardwareScalingLevel: 2,
   maxRenderScale: 1,
-  maxXrFixedFoveation: 1,
   planetIcoSubdivisions: 4,
   planetSegments: 16,
   ringTessellation: 16,
@@ -45,8 +44,7 @@ const testProfile: RenderQualityProfile = {
   surfaceMicrodetail: false,
   systemBodySegments: 6,
   systemOrbitSegments: 16,
-  tier: "quest",
-  xrFixedFoveation: 0,
+  tier: "mobile",
   xrFramebufferScaleFactor: 1,
 };
 
@@ -146,10 +144,7 @@ interface Harness {
   scene: Scene;
 }
 
-const createHarness = (
-  profile: RenderQualityProfile = testProfile,
-  insideHeadset = true,
-): Harness => {
+const createHarness = (profile: RenderQualityProfile = testProfile, insideXr = true): Harness => {
   const engine = new NullEngine({
     deterministicLockstep: false,
     lockstepMaxSteps: 4,
@@ -178,11 +173,9 @@ const createHarness = (
     qualityTier: profile.tier,
     scene,
     getFps: () => 60,
-    isInXr: () => insideHeadset,
+    isInXr: () => insideXr,
     prefersReducedMotion: () => false,
     onTravelPhase: () => () => undefined,
-    isVrSupported: () => false,
-    xrCamera: () => null,
   } as unknown as SceneHost;
 
   return { engine, host, scene };
@@ -798,8 +791,8 @@ test("a world moves along its orbit as the scene runs, and stays on it", async (
 const sceneVertexCount = (scene: Scene): number =>
   scene.meshes.reduce((total, mesh) => total + mesh.getTotalVertices(), 0);
 
-const questProfile = deriveRenderQuality({
-  userAgent: "Mozilla/5.0 (Linux; Android 12; Quest 2) OculusBrowser/33.0",
+const mobileProfile = deriveRenderQuality({
+  userAgent: "Mozilla/5.0 (Linux; Android 14; Pixel 8) Mobile",
   pixelRatio: 2,
   hardwareConcurrency: 8,
   deviceMemory: 6,
@@ -853,7 +846,7 @@ test("the Solar System diorama accepts and clears authoritative Horizons positio
 
 test("a seven-world diorama costs less than the one world it travels to", async () => {
   vi.stubGlobal("window", new EventTarget());
-  const planetHarness = createHarness(questProfile);
+  const planetHarness = createHarness(mobileProfile);
   const planetScope = openWorldScope(planetHarness.scene);
   const rocky = planets[0];
   if (!rocky) throw new Error("Expected a rocky fixture.");
@@ -883,7 +876,7 @@ test("a seven-world diorama costs less than the one world it travels to", async 
     },
   }));
 
-  const { engine, host, scene } = createHarness(questProfile);
+  const { engine, host, scene } = createHarness(mobileProfile);
   const scope = openWorldScope(scene);
   const before = scene.meshes.length;
   const world = createSystemWorld(host, {

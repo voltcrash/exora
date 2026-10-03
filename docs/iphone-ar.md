@@ -16,8 +16,8 @@ devices with native WebXR use the same AR session directly and do not need the i
 4. Confirm the response keeps `camera=(self)` and `xr-spatial-tracking=(self)` in its
    `Permissions-Policy` header.
 
-When no SDK key is configured, the Variant script is omitted entirely. Desktop, Quest, and native
-Android WebXR continue to work, while Safari reports the same unavailable fallback as before.
+When no SDK key is configured, the Variant script is omitted entirely. Desktop and native Android
+WebXR continue to work, while Safari reports the same unavailable fallback as before.
 
 The SDK is loaded without `redirect=true`: opening Exora on an iPhone never redirects on its own.
 The existing immersive button reads **OPEN AR ON IPHONE** when Variant reports that a handoff is
@@ -45,9 +45,7 @@ by desktop emulation. Run this pass on a physical iPhone in a non-private Safari
    the same `immersive-ar` session. Tap **SHOW CAMERA · AR VIEW** to restore passthrough.
 8. Exit AR. The flat desktop/mobile view must return at its original camera framing, with its
    virtual sky restored.
-9. Repeat with one planet, one star, and one black hole. Then re-run the existing Meta Quest
-   checklist to confirm the same control still enters `immersive-vr` and retains thumbstick
-   locomotion. Explore must remain browser-only.
+9. Repeat with one planet, one star, and one black hole. Explore must remain browser-only.
 
 If Safari never offers AR, check the Variant SDK key, authorized hostname, HTTPS certificate,
 Safari/private-browsing state, and whether a content blocker prevented `launchar.app` from

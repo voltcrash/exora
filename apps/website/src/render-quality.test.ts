@@ -1,36 +1,5 @@
 import { expect, test } from "vite-plus/test";
-import {
-  adaptFixedFoveation,
-  adaptHardwareScaling,
-  deriveRenderQuality,
-  shaderDefines,
-} from "./render-quality.ts";
-
-const desktopProfile = deriveRenderQuality({
-  userAgent: "Mozilla/5.0 (Macintosh; Intel Mac OS X)",
-  pixelRatio: 2,
-  hardwareConcurrency: 12,
-  deviceMemory: 16,
-});
-
-test("selects a Quest-focused rendering budget", () => {
-  const profile = deriveRenderQuality({
-    userAgent: "Mozilla/5.0 (Linux; Android 12; Quest 3) OculusBrowser/35.0",
-    pixelRatio: 2,
-    hardwareConcurrency: 8,
-    deviceMemory: 8,
-  });
-
-  expect(profile.tier).toBe("quest");
-  expect(profile.starCount).toBeLessThan(desktopProfile.starCount);
-  expect(profile.planetSegments).toBeLessThan(96);
-  expect(profile.xrFramebufferScaleFactor).toBeLessThanOrEqual(1);
-  expect(profile.xrFixedFoveation).toBeGreaterThanOrEqual(0.4);
-  expect(profile.surfaceMicrodetail).toBe(true);
-  expect(profile.systemBodySegments).toBeLessThan(profile.planetSegments);
-  expect(profile.systemBodySegments).toBeLessThan(desktopProfile.systemBodySegments);
-  expect(profile.systemOrbitSegments).toBeLessThan(desktopProfile.systemOrbitSegments);
-});
+import { adaptHardwareScaling, deriveRenderQuality, shaderDefines } from "./render-quality.ts";
 
 test("keeps the high-detail profile on capable desktops", () => {
   const profile = deriveRenderQuality({
@@ -85,55 +54,20 @@ test("reduces desktop resolution after sustained low frame rate", () => {
 });
 
 test("does not resize the canvas during an immersive session", () => {
-  const profile = deriveRenderQuality({ userAgent: "Quest 3", pixelRatio: 2 });
+  const profile = deriveRenderQuality({ userAgent: "Android Mobile", pixelRatio: 2 });
 
   expect(adaptHardwareScaling(1.5, 30, profile, true)).toBe(1.5);
 });
 
-test("gives Quest 2 a lighter budget than a Quest 3", () => {
-  const questTwo = deriveRenderQuality({
-    userAgent: "Mozilla/5.0 (X11; Linux x86_64; Quest 2) OculusBrowser/33.0",
-    pixelRatio: 1,
-  });
-  const questThree = deriveRenderQuality({
-    userAgent: "Mozilla/5.0 (X11; Linux x86_64; Quest 3) OculusBrowser/35.0",
-    pixelRatio: 1,
-  });
-
-  expect(questTwo.tier).toBe("quest");
-  expect(questTwo.fbmOctaves).toBeLessThan(questThree.fbmOctaves);
-  expect(questTwo.planetSegments).toBeLessThan(questThree.planetSegments);
-  expect(questTwo.xrFramebufferScaleFactor).toBeLessThan(questThree.xrFramebufferScaleFactor);
-  expect(questTwo.xrFixedFoveation).toBeGreaterThan(questThree.xrFixedFoveation);
-  expect(questTwo.surfaceColorDetail).toBe(true);
-  expect(questTwo.surfaceMicrodetail).toBe(false);
-});
-
-test("treats an unrecognised headset as the weaker one", () => {
-  const profile = deriveRenderQuality({ userAgent: "OculusBrowser/33.0", pixelRatio: 1 });
-
-  expect(profile.tier).toBe("quest");
-  expect(profile.fbmOctaves).toBe(4);
-});
-
-test("raises foveation only while the session misses the refresh rate", () => {
-  const profile = deriveRenderQuality({ userAgent: "Quest 2", pixelRatio: 1 });
-
-  expect(adaptFixedFoveation(profile.xrFixedFoveation, 50, profile)).toBe(0.65);
-  expect(adaptFixedFoveation(1, 50, profile)).toBe(0.85);
-  expect(adaptFixedFoveation(0.65, 72, profile)).toBe(0.6);
-  expect(adaptFixedFoveation(profile.xrFixedFoveation, 72, profile)).toBe(0.55);
-  expect(adaptFixedFoveation(0.9, 66, profile)).toBe(0.9);
-});
-
 test("bakes the octave budget into the shader defines", () => {
-  const profile = deriveRenderQuality({ userAgent: "Quest 2", pixelRatio: 1 });
+  const profile = deriveRenderQuality({ userAgent: "Android Mobile", pixelRatio: 1 });
 
   expect(profile.surfaceMicrodetail).toBe(false);
   expect(shaderDefines(profile)).toEqual([
     "#define FBM_OCTAVES 4",
-    "#define MAX_GIANT_STORMS 1",
+    "#define MAX_GIANT_STORMS 3",
     "#define SURFACE_COLOR_DETAIL",
+    "#define CLOUD_DETAIL",
   ]);
 });
 

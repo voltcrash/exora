@@ -25,14 +25,12 @@
     "react-dom": "catalog:"
   },
   "devDependencies": {
-    "@iwer/devui": "catalog:",
     "@lhci/cli": "catalog:",
     "@types/node": "catalog:",
     "@types/react": "catalog:",
     "@types/react-dom": "catalog:",
     "@vitejs/plugin-react": "catalog:",
     "@vitest/browser-playwright": "catalog:",
-    "iwer": "catalog:",
     "playwright": "catalog:",
     "typescript": "catalog:",
     "vite": "catalog:",

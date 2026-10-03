@@ -37,7 +37,6 @@ export interface SolarRegionProfile {
   sampleCount: {
     desktop: number;
     mobile: number;
-    quest: number;
   };
   scaleNote: string;
   sources: readonly RegionSource[];
@@ -65,7 +64,7 @@ export const SOLAR_SYSTEM_REGIONS: readonly SolarRegionProfile[] = [
     kind: "belt",
     name: "Main Asteroid Belt",
     parent: "Sun",
-    sampleCount: { desktop: 14_000, mobile: 5_000, quest: 3_000 },
+    sampleCount: { desktop: 14_000, mobile: 5_000 },
     scaleNote: "LINEAR RADIAL SCALE · 1 AU = 4.2 VIEW UNITS",
     sources: [
       {
@@ -98,7 +97,7 @@ export const SOLAR_SYSTEM_REGIONS: readonly SolarRegionProfile[] = [
     kind: "trojan-clouds",
     name: "Jupiter Trojan Clouds",
     parent: "Sun",
-    sampleCount: { desktop: 12_000, mobile: 4_000, quest: 2_500 },
+    sampleCount: { desktop: 12_000, mobile: 4_000 },
     scaleNote: "LINEAR RADIAL SCALE · L4 LEADS AND L5 TRAILS JUPITER BY 60°",
     sources: [
       {
@@ -131,7 +130,7 @@ export const SOLAR_SYSTEM_REGIONS: readonly SolarRegionProfile[] = [
     kind: "belt",
     name: "Kuiper Belt",
     parent: "Sun",
-    sampleCount: { desktop: 15_000, mobile: 5_000, quest: 3_000 },
+    sampleCount: { desktop: 15_000, mobile: 5_000 },
     scaleNote: "LINEAR RADIAL SCALE · THICK-DISK POPULATION",
     sources: [
       {
@@ -163,7 +162,7 @@ export const SOLAR_SYSTEM_REGIONS: readonly SolarRegionProfile[] = [
     kind: "scattered-disk",
     name: "Scattered Disk",
     parent: "Sun",
-    sampleCount: { desktop: 10_000, mobile: 3_500, quest: 2_200 },
+    sampleCount: { desktop: 10_000, mobile: 3_500 },
     scaleNote: "LOGARITHMIC RADIAL COMPRESSION · ORBITAL ENVELOPE, NOT A HARD EDGE",
     sources: [
       {
@@ -195,7 +194,7 @@ export const SOLAR_SYSTEM_REGIONS: readonly SolarRegionProfile[] = [
     kind: "oort-shell",
     name: "Oort Cloud",
     parent: "Sun",
-    sampleCount: { desktop: 18_000, mobile: 6_000, quest: 3_500 },
+    sampleCount: { desktop: 18_000, mobile: 6_000 },
     scaleNote: "LOGARITHMIC RADIAL COMPRESSION · INNER AND OUTER EDGES ARE MODEL ASSUMPTIONS",
     sources: [
       {
@@ -227,7 +226,7 @@ export const SOLAR_SYSTEM_REGIONS: readonly SolarRegionProfile[] = [
     kind: "heliosphere",
     name: "Heliosphere",
     parent: "Sun",
-    sampleCount: { desktop: 5_000, mobile: 2_000, quest: 1_200 },
+    sampleCount: { desktop: 5_000, mobile: 2_000 },
     scaleNote: "NORMALIZED GLOBAL MODEL · VOYAGER PROVIDES TWO LOCAL CUTS, NOT A COMPLETE SURFACE",
     sources: [
       {
@@ -260,7 +259,7 @@ export const SOLAR_SYSTEM_REGIONS: readonly SolarRegionProfile[] = [
     kind: "termination-shock",
     name: "Termination Shock",
     parent: "Sun",
-    sampleCount: { desktop: 4_000, mobile: 1_500, quest: 900 },
+    sampleCount: { desktop: 4_000, mobile: 1_500 },
     scaleNote: "NORMALIZED SHELL · TWO MEASURED CROSSINGS, INTERPOLATED GLOBAL FORM",
     sources: [
       {
@@ -293,7 +292,7 @@ export const SOLAR_SYSTEM_REGIONS: readonly SolarRegionProfile[] = [
     kind: "heliopause",
     name: "Heliopause",
     parent: "Sun",
-    sampleCount: { desktop: 4_000, mobile: 1_500, quest: 900 },
+    sampleCount: { desktop: 4_000, mobile: 1_500 },
     scaleNote: "NORMALIZED SHELL · TWO MEASURED CROSSINGS, MODELED BETWEEN TRACKS",
     sources: [
       {

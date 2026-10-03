@@ -13,7 +13,6 @@ import type { MountedWorld, SceneHost } from "./scene-host.ts";
 import { createStarfield } from "./star-visuals.ts";
 
 const BLACK_HOLE_POSITION = new Vector3(0, 0.7, 7.5);
-const XR_BLACK_HOLE_STAND = new Vector3(0, 0, -10);
 const COMPANION_OFFSET = new Vector3(-7.8, 2.6, 0.4);
 const SHADOW_RADIUS = 2.125;
 
@@ -122,20 +121,7 @@ export const createBlackHoleWorld = (
   });
   const firstFrameObserver = scene.onAfterRenderObservable.addOnce(onFirstFrame);
 
-  const placeXrCamera = (initial: boolean): void => {
-    const rig = host.xrCamera();
-    if (!rig) return;
-    const headOffset = initial ? 0 : rig.realWorldHeight;
-    rig.position.set(
-      XR_BLACK_HOLE_STAND.x,
-      XR_BLACK_HOLE_STAND.y + headOffset,
-      XR_BLACK_HOLE_STAND.z,
-    );
-    rig.setTarget(BLACK_HOLE_POSITION);
-  };
-
   return {
-    focusXrRig: placeXrCamera,
     restoreDesktopView: () => camera.attachControl(canvas, true),
     dispose: () => {
       scene.onBeforeRenderObservable.remove(renderObserver);

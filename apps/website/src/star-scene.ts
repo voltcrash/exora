@@ -10,7 +10,6 @@ import { skyViewpointFrom } from "./sky-catalog.ts";
 import { createStarfield } from "./star-visuals.ts";
 
 const STAR_POSITION = new Vector3(0, 0.8, 7.5);
-const XR_STAR_STAND = new Vector3(0, 0, -9);
 
 interface StarWorldOptions {
   onFirstFrame: () => void;
@@ -78,16 +77,7 @@ export const createStarWorld = (
 
   const firstFrameObserver = scene.onAfterRenderObservable.addOnce(onFirstFrame);
 
-  const placeXrCamera = (initial: boolean): void => {
-    const rig = host.xrCamera();
-    if (!rig) return;
-    const headOffset = initial ? 0 : rig.realWorldHeight;
-    rig.position.set(XR_STAR_STAND.x, XR_STAR_STAND.y + headOffset, XR_STAR_STAND.z);
-    rig.setTarget(STAR_POSITION);
-  };
-
   return {
-    focusXrRig: placeXrCamera,
     restoreDesktopView: () => camera.attachControl(canvas, true),
     dispose: () => {
       scene.onBeforeRenderObservable.remove(renderObserver);

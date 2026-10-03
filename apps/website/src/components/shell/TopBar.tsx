@@ -10,10 +10,9 @@ const XR_LABELS: Partial<Record<XrStatus, string>> = {
   entering: "Entering…",
   "ready-ar": "View in AR",
   "ready-ar-launch": "View in AR",
-  "ready-vr": "Enter VR",
 };
 
-const XR_READY = new Set<XrStatus>(["ready-ar", "ready-ar-launch", "ready-vr"]);
+const XR_READY = new Set<XrStatus>(["ready-ar", "ready-ar-launch"]);
 
 interface TopBarProps {
   host: SceneHost | null;
@@ -22,8 +21,8 @@ interface TopBarProps {
 
 /*
  * Everything a view can be asked to do, in one row: go somewhere by name, browse, clear the view,
- * or step into it with a headset. The immersive control only appears once the device can honour
- * it — a disabled "not available" button is a promise the page cannot keep.
+ * or place it in the room around you. The immersive control only appears once the device can
+ * honour it — a disabled "not available" button is a promise the page cannot keep.
  */
 export const TopBar = ({ host, xrStatus }: TopBarProps) => {
   const { chromeHidden, openDiscover, openPalette, toggleChrome } = useChrome();
@@ -76,8 +75,8 @@ export const TopBar = ({ host, xrStatus }: TopBarProps) => {
         {xrLabel ? (
           <Button
             className={styles["xr"]}
-            data-testid="enter-vr"
-            icon="headset"
+            data-testid="enter-ar"
+            icon="cube"
             variant="surface"
             disabled={!XR_READY.has(xrStatus)}
             onClick={() =>

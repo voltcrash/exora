@@ -2,7 +2,7 @@
 
 ## Purpose
 
-Exora turns catalogued astronomy into a place you can stand in. It reads confirmed exoplanets from the NASA Exoplanet Archive and stars from SIMBAD, derives a deterministic visual recipe from each object's measured properties, and renders that recipe as a real-time Babylon.js world you can orbit on a desktop or walk inside a WebXR headset.
+Exora turns catalogued astronomy into a place you can stand in. It reads confirmed exoplanets from the NASA Exoplanet Archive and stars from SIMBAD, derives a deterministic visual recipe from each object's measured properties, and renders that recipe as a real-time Babylon.js world you can orbit on a desktop or place on a table in phone AR.
 
 Every world is a reading of a catalog row, never observed imagery. Exora keeps the three tiers apart at the type level and in the interface: **measured** values are printed verbatim from the archive, **derived** values come from established physics applied to those measurements, and **inferred** appearance is a cautious probabilistic read carrying its own confidence. A field the catalog never reported stays `null` rather than being backfilled with a plausible number.
 
@@ -29,11 +29,9 @@ The system diorama is where that discipline is most visible, because a picture o
 - **Surface vistas built from geology:** Standing on a world means standing in its landform provinces — crater-saturated highlands, dune seas, canyon systems, lava fields, fractured ice, folded ranges — mixed per world and blended across a patch that runs to a real horizon. For a Solar System body the provinces, palette, crater density, relief and sky are stated from mission science rather than inferred: Io has no impact craters because nothing on it survives long enough to keep one, Venus has almost none, Europa's relief is a fraction of a rocky planet's, and the Moon's sky is black at noon. Sunlight is baked per vertex into the terrain and everything standing on it, so a low sun throws real shadows, and each world is exposed the way a camera would expose for it.
 - **One resolved star implementation:** Photosphere with multi-scale convection, a supergranular magnetic network, limb-brightened faculae, deterministic starspots, limb darkening, corona, and glare — shared by the star scene and by every host star hanging in a planet's sky.
 - **World Forge:** A seeded, reproducible builder for procedural planets, custom stars, and black holes, using the same recipe engines as the catalogs.
-- **Persistent immersive session:** The engine, scene, camera, and WebXR session outlive the active destination, so entering and leaving VR does not rebuild the viewing context.
-- **iPhone and Android AR:** The same immersive control prefers the established Meta Quest VR session, selects native `immersive-ar` on an AR-only phone, and uses Variant Launch's App Clip handoff on iPhone. AR presents the existing Babylon world at tabletop scale over camera passthrough, with hit-tested placement, drag repositioning, and pinch scaling — no GLB or USDZ export path.
-- **Direct Quest shortcuts:** The controller trigger can enter or exit immersive VR when the runtime exposes it. Explore and World Forge remain browser-only; no browser UI is captured or rendered inside VR.
-- **Adaptive rendering budget:** Separate desktop, mobile, and Quest profiles govern shader octaves, sphere tessellation, star count, texture detail, and render scale. Immersive sessions raise fixed foveation after three seconds below 62 FPS and relax it again above 70.
-- **Desktop WebXR emulation:** An opt-in Immersive Web Emulation Runtime installs a synthetic Quest over `navigator.xr`, so the immersive path runs unmodified in a normal tab.
+- **Persistent immersive session:** The engine, scene, camera, and WebXR session outlive the active destination, so entering and leaving AR does not rebuild the viewing context.
+- **iPhone and Android AR:** The immersive control selects native `immersive-ar` on a phone that supports it and uses Variant Launch's App Clip handoff on iPhone. AR presents the existing Babylon world at tabletop scale over camera passthrough, with hit-tested placement, drag repositioning, and pinch scaling — no GLB or USDZ export path.
+- **Adaptive rendering budget:** Separate desktop and mobile profiles govern shader octaves, sphere tessellation, star count, texture detail, and render scale.
 - **Graceful degradation:** A six-hour planet cache, a twelve-hour star cache, and a bundled local profile keep the experience alive when NASA, SIMBAD, or the API is unreachable.
 
 ## Keyboard
@@ -53,7 +51,6 @@ The system diorama is where that discipline is most visible, because a picture o
 - **Web:** React 19, Vite, Babylon.js 9 (WebGL2 + WebXR)
 - **API:** Hono on Node 24
 - **Data sources:** NASA Exoplanet Archive TAP, SIMBAD TAP (CDS, Strasbourg), and NASA/JPL APIs
-- **Immersive tooling:** IWER and `@iwer/devui` for desktop WebXR emulation
 - **Hosting:** Vercel static output plus a Vercel Function, with Analytics and Speed Insights
 
 ## Development
@@ -117,9 +114,9 @@ vp run @exora/api#build
 
 ### Immersive mode
 
-WebXR requires a secure context. Localhost works for desktop development, but testing from a Quest on the local network needs HTTPS or a deployed origin.
+WebXR requires a secure context. Localhost works for desktop development, but testing from a phone on the local network needs HTTPS or a deployed origin.
 
-To exercise the immersive VR flow without a headset, open <http://localhost:5173/?xr=emulate>; `?xr=stereo` renders both eyes side by side and `?xr=off` returns to the native runtime. See the [desktop WebXR emulation guide](docs/webxr-emulation.md), use the [Meta Quest smoke-test checklist](docs/quest-testing.md) for headset validation and performance targets, and follow the [iPhone AR deployment and smoke-test guide](docs/iphone-ar.md) for Variant Launch configuration and real-device testing.
+Follow the [iPhone AR deployment and smoke-test guide](docs/iphone-ar.md) for Variant Launch configuration and real-device testing.
 
 ## Workspace
 
@@ -172,13 +169,12 @@ quotas. See [API rate limiting and caching](docs/api-rate-limiting-and-caching.m
 boundary, shared-cache behavior, operational tradeoffs, and the evidence threshold for adding a
 globally enforced control.
 
-The browser holds one Babylon engine for the lifetime of the page. Worlds are built into and removed from that single scene, which is what lets an immersive session survive travel between destinations.
+The browser holds one Babylon engine for the lifetime of the page. Worlds are built into and removed from that single scene, which is what lets travel between destinations reuse one engine and XR session.
 
 ```mermaid
 flowchart TB
     subgraph Clients
         Desktop["Desktop browser<br/>orbit controls"]
-        Headset["Meta Quest<br/>WebXR immersive session"]
         Phone["iPhone / Android<br/>WebXR AR session"]
     end
 
@@ -200,7 +196,6 @@ flowchart TB
     end
 
     Desktop --> Static
-    Headset --> Static
     Phone --> Static
     Static --> UI
     UI --> Host

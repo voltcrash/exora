@@ -20,14 +20,13 @@ const planetSceneStub = vi.hoisted(() => ({
 
 const mountedWorld = () => ({
   dispose: () => undefined,
-  focusXrRig: () => undefined,
   restoreDesktopView: () => undefined,
   setEphemeris: () => undefined,
   setEphemerisTime: () => undefined,
 });
 
 vi.mock("./scene-host.ts", () => {
-  let insideHeadset = false;
+  let insideXr = false;
   const host = {
     beginTravel: () => undefined,
     cancelTravel: () => undefined,
@@ -36,12 +35,11 @@ vi.mock("./scene-host.ts", () => {
     dispose: () => undefined,
     engine: null,
     enterImmersive: async () => {
-      insideHeadset = true;
+      insideXr = true;
     },
     getFps: () => 60,
     isArSupported: () => false,
-    isInXr: () => insideHeadset,
-    isVrSupported: () => false,
+    isInXr: () => insideXr,
     prefersReducedMotion: () => false,
     mountWorld: async (build: () => unknown) => build(),
     onRendererStatus: (listener: (status: string) => void) => {
@@ -53,13 +51,13 @@ vi.mock("./scene-host.ts", () => {
       return () => undefined;
     },
     onXrStatus: (listener: (status: string) => void) => {
-      listener("ready-vr");
+      listener("ready-ar");
       return () => undefined;
     },
     profile: { hardwareScalingLevel: 1, tier: "desktop" },
     qualityTier: "desktop",
     setInXr: (value: boolean) => {
-      insideHeadset = value;
+      insideXr = value;
     },
     renderSuspensions: 0,
     suspendRendering: () => {
@@ -72,7 +70,6 @@ vi.mock("./scene-host.ts", () => {
       };
     },
     scene: null,
-    xrCamera: () => null,
   };
 
   return { acquireSceneHost: () => host, recreateSceneHost: () => host };
@@ -1120,7 +1117,7 @@ desktopTest(
 );
 
 desktopTest(
-  "VR presents the active destination without a console and exits to the same browser view",
+  "AR presents the active destination without a console and exits to the same browser view",
   async () => {
     stubArchive();
     mountApp();
@@ -1128,7 +1125,7 @@ desktopTest(
     await expect.element(destination).toBeVisible();
     const destinationName = destination.element().textContent;
 
-    await userEvent.click(page.getByRole("button", { name: "Enter VR" }));
+    await userEvent.click(page.getByRole("button", { name: "View in AR" }));
     expect(page.getByRole("dialog")).not.toBeInTheDocument();
 
     stubbedHost().setInXr(false);
@@ -1220,7 +1217,7 @@ test("the navigation deck keeps an even gap between every control", async () => 
     .querySelector<HTMLElement>('[data-testid="clear-view"]')!
     .getBoundingClientRect();
   const xr = document
-    .querySelector<HTMLElement>('[data-testid="enter-vr"]')!
+    .querySelector<HTMLElement>('[data-testid="enter-ar"]')!
     .getBoundingClientRect();
   const firstGap = clearView.left - discover.right;
   const secondGap = xr.left - clearView.right;

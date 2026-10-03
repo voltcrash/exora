@@ -6,11 +6,10 @@ export type XrStatus =
   | "in-xr"
   | "ready-ar"
   | "ready-ar-launch"
-  | "ready-vr"
   | "unavailable";
 
 interface XrSystemLike {
-  isSessionSupported: (mode: "immersive-ar" | "immersive-vr") => Promise<boolean>;
+  isSessionSupported: (mode: "immersive-ar") => Promise<boolean>;
 }
 
 export interface XrIntegrationOptions {
@@ -23,7 +22,6 @@ export interface XrIntegration {
   readonly destination: ImmersiveDestination;
   dispose: () => void;
   isArSupported: () => boolean;
-  isVrSupported: () => boolean;
   markEntering: () => void;
   markInXr: () => void;
   markReady: () => void;
@@ -32,7 +30,6 @@ export interface XrIntegration {
 
 const statusFor = (destination: ImmersiveDestination): XrStatus => {
   if (!destination) return "unavailable";
-  if (destination.mode === "vr") return "ready-vr";
   return destination.launchUrl ? "ready-ar-launch" : "ready-ar";
 };
 
@@ -46,10 +43,8 @@ export const createXrIntegration = ({
   let destination: ImmersiveDestination = chooseImmersiveDestination({
     ar: false,
     launchUrl: getLaunchUrl(),
-    vr: false,
   });
   let status: XrStatus = "checking";
-  let vrSupported = false;
   const listeners = new Set<(status: XrStatus) => void>();
 
   const setStatus = (next: XrStatus): void => {
@@ -61,17 +56,13 @@ export const createXrIntegration = ({
 
   const refresh = async (): Promise<void> => {
     const system = xrSystem();
-    [arSupported, vrSupported] = system
-      ? await Promise.all([
-          system.isSessionSupported("immersive-ar").catch(() => false),
-          system.isSessionSupported("immersive-vr").catch(() => false),
-        ])
-      : [false, false];
+    arSupported = system
+      ? await system.isSessionSupported("immersive-ar").catch(() => false)
+      : false;
     if (disposed) return;
     destination = chooseImmersiveDestination({
       ar: arSupported,
       launchUrl: getLaunchUrl(),
-      vr: vrSupported,
     });
     if (status !== "entering" && status !== "in-xr") markReady();
   };
@@ -90,7 +81,6 @@ export const createXrIntegration = ({
       listeners.clear();
     },
     isArSupported: () => arSupported,
-    isVrSupported: () => vrSupported,
     markEntering: () => setStatus("entering"),
     markInXr: () => setStatus("in-xr"),
     markReady,

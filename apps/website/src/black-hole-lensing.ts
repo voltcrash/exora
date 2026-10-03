@@ -259,9 +259,9 @@ export interface LensingOptions {
   seed: number;
 }
 
-const STEP_BUDGET = { desktop: 180, mobile: 120, quest: 90 } as const;
-const STEP_SCALE = { desktop: 0.1, mobile: 0.13, quest: 0.16 } as const;
-const DISK_OCTAVES = { desktop: 4, mobile: 3, quest: 2 } as const;
+const STEP_BUDGET = { desktop: 180, mobile: 120 } as const;
+const STEP_SCALE = { desktop: 0.1, mobile: 0.13 } as const;
+const DISK_OCTAVES = { desktop: 4, mobile: 3 } as const;
 
 export const createLensingMaterial = (scene: Scene, options: LensingOptions): ShaderMaterial => {
   Effect.ShadersStore.exoraLensingVertexShader = LENSING_VERTEX_SHADER;
