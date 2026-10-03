@@ -109,7 +109,7 @@ test.each([
   ["ready-ar-launch", "View in AR"],
 ] as const)("the immersive control appears once %s is ready", (status, label) => {
   const markup = topBarMarkup(status);
-  const immersive = deckButtons(markup).find((button) => button.includes('data-testid="enter-vr"'));
+  const immersive = deckButtons(markup).find((button) => button.includes('data-testid="enter-ar"'));
 
   expect(deckNames(markup)).toContain(label);
   expect(immersive).toBeDefined();
@@ -119,7 +119,7 @@ test.each([
 test.each(["checking", "unavailable", "in-xr"] as const)(
   "the immersive control stays away while XR is %s",
   (status) => {
-    expect(topBarMarkup(status)).not.toContain('data-testid="enter-vr"');
+    expect(topBarMarkup(status)).not.toContain('data-testid="enter-ar"');
   },
 );
 

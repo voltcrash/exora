@@ -1217,7 +1217,7 @@ test("the navigation deck keeps an even gap between every control", async () => 
     .querySelector<HTMLElement>('[data-testid="clear-view"]')!
     .getBoundingClientRect();
   const xr = document
-    .querySelector<HTMLElement>('[data-testid="enter-vr"]')!
+    .querySelector<HTMLElement>('[data-testid="enter-ar"]')!
     .getBoundingClientRect();
   const firstGap = clearView.left - discover.right;
   const secondGap = xr.left - clearView.right;

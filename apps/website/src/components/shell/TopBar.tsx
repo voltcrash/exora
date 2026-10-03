@@ -75,8 +75,8 @@ export const TopBar = ({ host, xrStatus }: TopBarProps) => {
         {xrLabel ? (
           <Button
             className={styles["xr"]}
-            data-testid="enter-vr"
-            icon="headset"
+            data-testid="enter-ar"
+            icon="cube"
             variant="surface"
             disabled={!XR_READY.has(xrStatus)}
             onClick={() =>
