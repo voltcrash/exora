@@ -27,7 +27,7 @@ quantisation.
 | Neptune | `textures/solar-system/neptune.jpg` | NASA/JPL Solar System Simulator visualization                   | `science.nasa.gov/3d-resources/neptune/`                                       |
 | Pluto   | `textures/solar-system/pluto.jpg`   | New Horizons MVIC global color map / NASA/JHUAPL                | `science.nasa.gov/resource/pluto-global-color-map/`                            |
 
-Mobile and Quest routes use 1024×512 JPEG derivatives of only the source mosaics larger than
+Mobile routes use 1024×512 JPEG derivatives of only the source mosaics larger than
 900 kB. They preserve the source pixels and coverage with no retouching: `callisto-mobile.jpg`,
 `dione-mobile.jpg`, `enceladus-mobile.jpg`, `europa-mobile.jpg`, `ganymede-mobile.jpg`,
 `mars-mobile.jpg`, `mercury-mobile.jpg`, `mimas-mobile.jpg`, `rhea-mobile.jpg`,
@@ -265,8 +265,8 @@ They are flat-lit, orthographic, texture-only material scans with no text, objec
 baked directional lighting. The exact production prompt set is recorded in
 `docs/planet-texture-prompts.md`.
 
-On Quest and mobile, only the palette-selected 1K chemistry map is sampled. Desktop adds the two
-palette-selected 2K normal/roughness pairs. This keeps chemistry visible on constrained headsets
+On mobile, only the palette-selected 1K chemistry map is sampled. Desktop adds the two
+palette-selected 2K normal/roughness pairs. This keeps chemistry visible on constrained devices
 without paying the full physical-detail fragment cost.
 
 ## Babylon.js KTX2 runtime
@@ -287,7 +287,7 @@ Babylon release adds another.
 | ------------------------------ | -------------------------------------------- | -------------------------------------- |
 | `babylon.ktx2Decoder.js`       | Worker-side decoder entry point              | npm `babylonjs-ktx2decoder@9.22.1`     |
 | `msc_basis_transcoder.js/wasm` | ETC1S/BasisLZ — roughness and chemistry maps | `cdn.babylonjs.com/ktx2Transcoders/1/` |
-| `uastc_astc.wasm`              | UASTC → ASTC, used on Quest and mobile       | `cdn.babylonjs.com/ktx2Transcoders/1/` |
+| `uastc_astc.wasm`              | UASTC → ASTC, used on mobile                 | `cdn.babylonjs.com/ktx2Transcoders/1/` |
 | `uastc_bc7.wasm`               | UASTC → BC7, used on desktop                 | `cdn.babylonjs.com/ktx2Transcoders/1/` |
 | `uastc_r8_unorm.wasm`          | UASTC → R8, single-channel fallback          | `cdn.babylonjs.com/ktx2Transcoders/1/` |
 | `uastc_rg8_unorm.wasm`         | UASTC → RG8, two-channel fallback            | `cdn.babylonjs.com/ktx2Transcoders/1/` |

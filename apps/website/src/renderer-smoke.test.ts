@@ -44,7 +44,7 @@ const testProfile: RenderQualityProfile = {
   surfaceMicrodetail: false,
   systemBodySegments: 6,
   systemOrbitSegments: 16,
-  tier: "quest",
+  tier: "mobile",
   xrFramebufferScaleFactor: 1,
 };
 
@@ -794,8 +794,8 @@ test("a world moves along its orbit as the scene runs, and stays on it", async (
 const sceneVertexCount = (scene: Scene): number =>
   scene.meshes.reduce((total, mesh) => total + mesh.getTotalVertices(), 0);
 
-const questProfile = deriveRenderQuality({
-  userAgent: "Mozilla/5.0 (Linux; Android 12; Quest 2) OculusBrowser/33.0",
+const mobileProfile = deriveRenderQuality({
+  userAgent: "Mozilla/5.0 (Linux; Android 14; Pixel 8) Mobile",
   pixelRatio: 2,
   hardwareConcurrency: 8,
   deviceMemory: 6,
@@ -849,7 +849,7 @@ test("the Solar System diorama accepts and clears authoritative Horizons positio
 
 test("a seven-world diorama costs less than the one world it travels to", async () => {
   vi.stubGlobal("window", new EventTarget());
-  const planetHarness = createHarness(questProfile);
+  const planetHarness = createHarness(mobileProfile);
   const planetScope = openWorldScope(planetHarness.scene);
   const rocky = planets[0];
   if (!rocky) throw new Error("Expected a rocky fixture.");
@@ -879,7 +879,7 @@ test("a seven-world diorama costs less than the one world it travels to", async 
     },
   }));
 
-  const { engine, host, scene } = createHarness(questProfile);
+  const { engine, host, scene } = createHarness(mobileProfile);
   const scope = openWorldScope(scene);
   const before = scene.meshes.length;
   const world = createSystemWorld(host, {

@@ -15,7 +15,6 @@ const COBBLE_RADIUS = 26;
 const SCATTER_BUDGET: Readonly<Record<RenderQualityProfile["tier"], number>> = {
   desktop: 620,
   mobile: 260,
-  quest: 200,
 };
 
 const createSeededRandom = (seed: number): (() => number) => {

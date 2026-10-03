@@ -368,9 +368,8 @@ export const createStellarSurface = ({
   registerSurfaceShaders();
 
   const isSubject = detail === "subject";
-  const advanced = isSubject && profile.tier !== "quest";
   const segments = isSubject ? (profile.tier === "desktop" ? 128 : 64) : 32;
-  const coronaOctaves = profile.tier === "desktop" ? 4 : profile.tier === "mobile" ? 3 : 2;
+  const coronaOctaves = profile.tier === "desktop" ? 4 : 3;
   const coronaShellRadii = 2.6;
 
   const photosphere = MeshBuilder.CreateSphere("star-photosphere", { diameter, segments }, scene);
@@ -386,7 +385,7 @@ export const createStellarSurface = ({
     { vertex: "exoraStar", fragment: "exoraStar" },
     {
       attributes: ["position", "normal"],
-      defines: [...shaderDefines(profile), ...(advanced ? ["#define STAR_ADVANCED"] : [])],
+      defines: [...shaderDefines(profile), ...(isSubject ? ["#define STAR_ADVANCED"] : [])],
       uniforms: [
         "world",
         "worldViewProjection",

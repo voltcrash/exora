@@ -74,7 +74,6 @@ void main(void) {
 const MOTE_BUDGET: Readonly<Record<RenderQualityProfile["tier"], number>> = {
   desktop: 2_600,
   mobile: 900,
-  quest: 800,
 };
 
 const BOX = new Vector3(72, 26, 72);

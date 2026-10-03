@@ -1,4 +1,4 @@
-export type RenderQualityTier = "desktop" | "mobile" | "quest";
+export type RenderQualityTier = "desktop" | "mobile";
 
 export interface RenderQualityProfile {
   anisotropicFiltering: number;
@@ -40,56 +40,10 @@ export const deriveRenderQuality = ({
   pixelRatio,
   userAgent,
 }: DeviceCapabilities): RenderQualityProfile => {
-  const isQuest = /OculusBrowser|Meta Quest|Quest \d|Quest Pro/i.test(userAgent);
-  const isFirstGenerationQuest = isQuest && !/Quest (Pro|[3-9])/i.test(userAgent);
   const isConstrainedMobile =
     /Android|Mobile/i.test(userAgent) ||
     (deviceMemory !== undefined && deviceMemory <= 4) ||
     (hardwareConcurrency !== undefined && hardwareConcurrency <= 4);
-
-  if (isFirstGenerationQuest) {
-    return {
-      tier: "quest",
-      starCount: 420,
-      planetSegments: 48,
-      planetIcoSubdivisions: 12,
-      ringTessellation: 56,
-      systemBodySegments: 12,
-      systemOrbitSegments: 72,
-      fbmOctaves: 4,
-      maxGiantStorms: 1,
-      anisotropicFiltering: 4,
-      surfaceColorDetail: true,
-      surfaceMicrodetail: false,
-      secondaryCloudDetail: false,
-      maxRenderScale: 1,
-      hardwareScalingLevel: roundScale(Math.max(1.3, pixelRatio / 1.2)),
-      maxHardwareScalingLevel: 2,
-      xrFramebufferScaleFactor: 0.9,
-    };
-  }
-
-  if (isQuest) {
-    return {
-      tier: "quest",
-      starCount: 620,
-      planetSegments: 60,
-      planetIcoSubdivisions: 14,
-      ringTessellation: 72,
-      systemBodySegments: 14,
-      systemOrbitSegments: 96,
-      fbmOctaves: 5,
-      maxGiantStorms: 2,
-      anisotropicFiltering: 4,
-      surfaceColorDetail: true,
-      surfaceMicrodetail: true,
-      secondaryCloudDetail: false,
-      maxRenderScale: 1,
-      hardwareScalingLevel: roundScale(Math.max(1.2, pixelRatio / 1.35)),
-      maxHardwareScalingLevel: 1.9,
-      xrFramebufferScaleFactor: 1,
-    };
-  }
 
   if (isConstrainedMobile) {
     return {
