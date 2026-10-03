@@ -1,34 +1,41 @@
 import { useState } from "react";
 import type { DestinationPanelModel, PanelBlock } from "../destination-panel.ts";
+import { readable, readableUnit } from "../readable.ts";
+import { bindStyles } from "../styles/bind-styles.ts";
 import { useTabList } from "../use-tab-list.ts";
 import { FrameRateSignal } from "./FrameRateSignal.tsx";
 import { ShareButton } from "./ShareButton.tsx";
-import hudStyles from "./DestinationHud.module.css";
-import { bindStyles } from "../styles/bind-styles.ts";
+import { Icon } from "./ui/Icon.tsx";
+import { TabBar } from "./ui/TabBar.tsx";
+import styles from "./Destination.module.css";
 
-const cx = bindStyles(hudStyles);
+const cx = bindStyles(styles);
 
 /* The orb is drawn for the kinds the stylesheet paints; anything else keeps the neutral body. */
-const ORB_KINDS = new Set(["gas-giant", "ice-giant", "marker"]);
+const ORB_KINDS = new Set(["gas-giant", "ice-giant", "marker", "rocky", "super-earth"]);
 
 /* A tile is a fixed width, so a value that spells a word out is set smaller rather than clipped. */
 const metricLength = (value: string): "long" | "longest" | undefined =>
-  value.length > 15 ? "longest" : value.length > 11 ? "long" : undefined;
+  value.length > 14 ? "longest" : value.length > 9 ? "long" : undefined;
 
 const PanelBlockView = ({ block }: { block: PanelBlock }) => {
   switch (block.type) {
     case "facts":
       return (
-        <dl className={cx("panel-facts")}>
+        <dl className={cx("facts")}>
           {block.facts.map((fact) => (
-            <div key={fact.label} data-tone={fact.tone}>
-              <dt>{fact.label}</dt>
+            <div key={fact.label} className={cx("fact")} data-tone={fact.tone}>
+              <dt>{readable(fact.label)}</dt>
               <dd>
                 <strong>
-                  {fact.value}
+                  {typeof fact.value === "string" ? readable(fact.value) : fact.value}
                   {fact.unit ? <span className={cx("fact-unit")}> {fact.unit}</span> : null}
                 </strong>
-                {fact.detail ? <small>{fact.detail}</small> : null}
+                {fact.detail ? (
+                  <small>
+                    {typeof fact.detail === "string" ? readable(fact.detail) : fact.detail}
+                  </small>
+                ) : null}
               </dd>
             </div>
           ))}
@@ -36,34 +43,41 @@ const PanelBlockView = ({ block }: { block: PanelBlock }) => {
       );
     case "bodies":
       return (
-        <div className={cx("panel-group")}>
-          {block.label ? <p className={cx("panel-group-label")}>{block.label}</p> : null}
-          <ul className={cx("panel-bodies")}>
+        <div className={cx("group")}>
+          {block.label ? <h3 className={cx("group-label")}>{readable(block.label)}</h3> : null}
+          <ul className={cx("bodies")}>
             {block.bodies.map((body) => {
-              const action = body.status ?? (body.onSelect ? "VISIT ↗" : null);
               const contents = (
                 <>
                   <span
-                    className={cx(
-                      `panel-orb ${body.kind && ORB_KINDS.has(body.kind) ? body.kind : ""}`,
-                    )}
+                    className={cx("orb")}
+                    data-kind={body.kind && ORB_KINDS.has(body.kind) ? body.kind : undefined}
                     aria-hidden="true"
                   />
-                  <span className={cx("panel-body-copy")}>
+                  <span className={cx("body-copy")}>
                     <strong>{body.name}</strong>
-                    {body.meta ? <small>{body.meta}</small> : null}
+                    {body.meta ? <small>{readable(body.meta)}</small> : null}
                   </span>
-                  {action ? <small className={cx("panel-body-action")}>{action}</small> : null}
+                  {body.status ? (
+                    <small className={cx("body-status")}>{readable(body.status)}</small>
+                  ) : body.onSelect ? (
+                    <Icon className={cx("body-go")} name="arrow-right" size={16} />
+                  ) : null}
                 </>
               );
               return (
                 <li key={body.id}>
                   {body.onSelect ? (
-                    <button type="button" onClick={body.onSelect} aria-label={`Visit ${body.name}`}>
+                    <button
+                      className={cx("body")}
+                      type="button"
+                      onClick={body.onSelect}
+                      aria-label={`Visit ${body.name}`}
+                    >
                       {contents}
                     </button>
                   ) : (
-                    <span>{contents}</span>
+                    <span className={cx("body")}>{contents}</span>
                   )}
                 </li>
               );
@@ -73,15 +87,15 @@ const PanelBlockView = ({ block }: { block: PanelBlock }) => {
       );
     case "custom":
       return (
-        <div className={cx("panel-group")}>
-          {block.label ? <p className={cx("panel-group-label")}>{block.label}</p> : null}
+        <div className={cx("group")}>
+          {block.label ? <h3 className={cx("group-label")}>{readable(block.label)}</h3> : null}
           {block.content}
         </div>
       );
     case "status":
       return (
-        <p className={cx("panel-status")} data-tone={block.tone} role="status">
-          {block.text}
+        <p className={cx("status")} data-tone={block.tone} role="status">
+          {readable(block.text)}
         </p>
       );
   }
@@ -95,17 +109,11 @@ interface DestinationPanelProps {
 /*
  * WHAT IS KNOWN — one instrument, whatever the destination is.
  *
- * Every reading a main screen carries now arrives here: the four measured values, the places this
- * object can be left for, and the rest grouped into tabs. A tabbed body is what makes the panel
- * the same size on a moon with a plasma torus as on a horizon with one disclosure — the sections
- * a destination happens to have cost a row of labels rather than a column of stacked cards.
- *
- * The same markup is the phone's bottom sheet. `data-expanded` is inert above the sheet breakpoint
- * and there is no viewport measured in JavaScript, so the panel renders identically on a server,
- * in a test and on a phone, and a resize never catches it in the wrong composition.
+ * Four headline readings, then everything else grouped into tabs, so a moon system with six
+ * sections costs exactly as much screen as a black hole with one. On a wide screen it is an
+ * inspector down the right edge; on a phone it is the lower part of the destination sheet.
  */
 export const DestinationPanel = ({ fps, model }: DestinationPanelProps) => {
-  const [expanded, setExpanded] = useState(false);
   const [requested, setRequested] = useState("");
   const tabs = model.tabs;
   const active = tabs.find((tab) => tab.id === requested) ?? tabs[0];
@@ -119,93 +127,38 @@ export const DestinationPanel = ({ fps, model }: DestinationPanelProps) => {
   const tabbed = tabs.length > 1;
 
   return (
-    <aside
-      className={cx("panel")}
-      data-testid="telemetry"
-      data-expanded={expanded}
-      aria-label={model.label}
-    >
-      <div className={cx("panel-head")}>
-        <span className={cx("panel-title")}>
-          <small>{model.source}</small>
-          <strong>{model.title}</strong>
-        </span>
-        <FrameRateSignal fps={fps} />
+    <aside className={cx("panel")} data-testid="telemetry" aria-label={model.label}>
+      <header className={cx("panel-head")}>
+        <div>
+          <p className={cx("panel-source")}>{readable(model.source)}</p>
+          <h2 className={cx("panel-title")}>{model.title}</h2>
+        </div>
         <ShareButton />
-        <button
-          className={cx("panel-disclosure")}
-          data-testid="panel-disclosure"
-          type="button"
-          aria-expanded={expanded}
-          aria-label={expanded ? "Hide destination readings" : "Show destination readings"}
-          onClick={() => setExpanded((open) => !open)}
-        >
-          <svg viewBox="0 0 16 16" aria-hidden="true">
-            <path d="M3.5 10.5 8 6l4.5 4.5" />
-          </svg>
-        </button>
-      </div>
+      </header>
 
-      <dl className={cx("panel-metrics")}>
+      <dl className={cx("metrics")}>
         {model.metrics.map((metric) => (
-          <div key={metric.label}>
-            <dt>{metric.label}</dt>
+          <div key={metric.label} className={cx("metric")}>
+            <dt>{readable(metric.label)}</dt>
             <dd data-length={metricLength(metric.value)}>
-              {metric.value}
-              {metric.unit ? <small>{metric.unit}</small> : null}
+              {readable(metric.value)}
+              {metric.unit ? (
+                <small>
+                  {typeof metric.unit === "string" ? readableUnit(metric.unit) : metric.unit}
+                </small>
+              ) : null}
             </dd>
           </div>
         ))}
       </dl>
 
-      {model.links.length > 0 ? (
-        <div className={cx("panel-links")}>
-          {model.links.map((link) => (
-            <button
-              key={link.id}
-              className={cx("panel-link")}
-              data-tone={link.tone ?? "gold"}
-              type="button"
-              disabled={link.disabled}
-              aria-pressed={link.pressed}
-              onClick={link.onSelect}
-            >
-              <span aria-hidden="true">{link.glyph}</span>
-              <strong>{link.title}</strong>
-              <small>{link.action}</small>
-            </button>
-          ))}
-        </div>
-      ) : null}
-
-      {model.links.map((link) =>
-        link.error ? (
-          <p
-            className={cx("panel-status panel-link-status")}
-            data-tone="accent"
-            key={link.id}
-            role="status"
-          >
-            {link.error}
-          </p>
-        ) : null,
-      )}
-
       <div className={cx("panel-drawer")} data-testid="panel-drawer">
         {tabbed ? (
-          <div className={cx("panel-tabs")} {...tabList.tabListProps}>
-            {tabs.map((tab) => (
-              <button
-                key={tab.id}
-                className={cx("panel-tab")}
-                {...tabList.tabProps(tab.id)}
-                onClick={() => setRequested(tab.id)}
-              >
-                {tab.label}
-                {tab.count === undefined ? null : <small>{tab.count}</small>}
-              </button>
-            ))}
-          </div>
+          <TabBar
+            api={tabList}
+            items={tabs.map((tab) => ({ count: tab.count, id: tab.id, label: tab.label }))}
+            onSelect={setRequested}
+          />
         ) : null}
 
         {active ? (
@@ -220,7 +173,10 @@ export const DestinationPanel = ({ fps, model }: DestinationPanelProps) => {
           </div>
         ) : null}
 
-        <p className={cx("panel-footer")}>{model.footer}</p>
+        <footer className={cx("panel-foot")}>
+          <p>{typeof model.footer === "string" ? readable(model.footer) : model.footer}</p>
+          <FrameRateSignal fps={fps} />
+        </footer>
       </div>
     </aside>
   );

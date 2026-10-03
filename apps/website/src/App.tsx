@@ -9,7 +9,15 @@ import {
   type CustomWorld,
   type WorldRecipe,
 } from "@exora/worldgen";
-import { lazy, Suspense, useCallback, useEffect, useState, type CSSProperties } from "react";
+import {
+  lazy,
+  Suspense,
+  useCallback,
+  useEffect,
+  useMemo,
+  useState,
+  type CSSProperties,
+} from "react";
 import {
   loadBlackHoleByName,
   loadPlanetByName,
@@ -33,12 +41,13 @@ import { togglesDiscoverShortcut } from "./discover-shortcut.ts";
 import { findTour, readTour, tourStepSearch } from "./tours.ts";
 import { TRAVEL_CROSS_MS, TRAVEL_REVEAL_MS, type TravelPhase } from "./travel-transition.ts";
 import { useSceneHost } from "./use-scene-host.ts";
-import { useTypographySettled } from "./use-typography-settled.ts";
 import type { SolarRegionProfile } from "./solar-regions.ts";
-import sharedStyles from "./components/ExperienceShared.module.css";
+import { ChromeContext, type ChromeActions } from "./chrome-context.ts";
+import { LoadingScreen } from "./components/shell/LoadingScreen.tsx";
+import shellStyles from "./components/shell/shell.module.css";
 import { bindStyles } from "./styles/bind-styles.ts";
 
-const cx = bindStyles(sharedStyles);
+const cx = bindStyles(shellStyles);
 
 const DiscoverScreen = lazy(() =>
   import("./components/DiscoverScreen.tsx").then((module) => ({ default: module.DiscoverScreen })),
@@ -105,7 +114,7 @@ const loadRequestedObject = async (): Promise<ActiveObject> => {
     if (!customParameters) {
       return {
         detail:
-          "This custom-black-hole link contains an invalid or incompatible World Forge recipe. Return to the featured world and generate a new link.",
+          "This link carries a World Forge recipe that is invalid or from an incompatible version. Make a new one in World Forge.",
         kind: "black hole",
         name: "custom recipe",
         type: "missing",
@@ -171,7 +180,7 @@ const loadRequestedObject = async (): Promise<ActiveObject> => {
     if (!customParameters) {
       return {
         detail:
-          "This custom-world link contains an invalid or incompatible World Forge recipe. Return to the featured world and generate a new link.",
+          "This link carries a World Forge recipe that is invalid or from an incompatible version. Make a new one in World Forge.",
         kind: "planet",
         name: "custom recipe",
         type: "missing",
@@ -192,7 +201,7 @@ const loadRequestedObject = async (): Promise<ActiveObject> => {
     if (!customParameters) {
       return {
         detail:
-          "This custom-star link contains an invalid or incompatible World Forge recipe. Return to the featured world and generate a new link.",
+          "This link carries a World Forge recipe that is invalid or from an incompatible version. Make a new one in World Forge.",
         kind: "star",
         name: "custom recipe",
         type: "missing",
@@ -212,7 +221,6 @@ export const App = () => {
     restart: restartSceneHost,
     status: sceneHostStatus,
   } = useSceneHost(canvas);
-  const typographySettled = useTypographySettled();
   const [discoverOpen, setDiscoverOpen] = useState(false);
   const [paletteOpen, setPaletteOpen] = useState(false);
   const [activeObject, setActiveObject] = useState<ActiveObject | null>(() => {
@@ -473,7 +481,15 @@ export const App = () => {
     setTourRevision((revision) => revision + 1);
   }, []);
   const closePalette = useCallback((): void => setPaletteOpen(false), []);
+  const openPalette = useCallback((): void => {
+    setDiscoverOpen(false);
+    setPaletteOpen(true);
+  }, []);
   const toggleChrome = useCallback((): void => setChromeHidden((hidden) => !hidden), []);
+  const chrome = useMemo<ChromeActions>(
+    () => ({ chromeHidden, openDiscover, openPalette, toggleChrome }),
+    [chromeHidden, openDiscover, openPalette, toggleChrome],
+  );
 
   const travelFromPalette = useCallback(
     (target: PaletteTarget): void => {
@@ -542,7 +558,7 @@ export const App = () => {
   }, [titleSubject]);
 
   return (
-    <>
+    <ChromeContext value={chrome}>
       <canvas
         ref={setCanvas}
         id="render-canvas"
@@ -553,7 +569,8 @@ export const App = () => {
       />
       <OfflineNotice />
       <div
-        className={cx(`travel-veil ${travelPhase === "crossing" ? "crossing" : ""}`)}
+        className={cx("travel-veil")}
+        data-crossing={travelPhase === "crossing" || undefined}
         aria-hidden="true"
         style={
           {
@@ -564,46 +581,41 @@ export const App = () => {
       />
       {sceneHostStatus === "context-lost" || sceneHostStatus === "recovering" ? (
         <RecoveryScreen
-          action="RESTART NOW"
+          action="Restart now"
           detail={
             sceneHostStatus === "context-lost"
-              ? "The browser paused graphics access. Exora will resume when the GPU context returns."
-              : "Graphics access returned. Exora is rebuilding the current destination."
+              ? "The browser paused graphics access. Exora will pick up where it was as soon as the GPU is back."
+              : "Graphics access is back. Exora is rebuilding the current destination."
           }
-          heading={sceneHostStatus === "context-lost" ? "RECONNECTING TO GPU" : "RESTORING SCENE"}
+          heading={
+            sceneHostStatus === "context-lost" ? "Reconnecting to the GPU" : "Restoring the scene"
+          }
           onRetry={restartSceneHost}
           pending
         />
       ) : null}
       {sceneHostStatus === "failed" ? (
         <RecoveryScreen
-          action="RESTART RENDERER"
-          detail="The graphics session could not be restored. Restarting keeps the current destination selected."
-          heading="RENDERER OFFLINE"
+          action="Restart the renderer"
+          detail="The graphics session could not be restored. Restarting keeps this destination selected."
+          heading="The renderer stopped"
           onRetry={restartSceneHost}
         />
       ) : null}
       {!activeObject ? (
-        <div
-          className={cx(
-            `loading-screen initial-loading ${typographySettled ? "type-settled" : ""}`,
-          )}
-          role="status"
-        >
-          <div className={cx("loading-orbit")} aria-hidden="true">
-            <span />
-          </div>
-          <p>CONTACTING OBSERVATORIES</p>
-          <small>RESOLVING CELESTIAL OBJECT</small>
-        </div>
+        <LoadingScreen
+          detail="Asking the archives for this destination"
+          standalone
+          title="Finding your destination"
+        />
       ) : activeObject.type === "missing" ? (
         <RecoveryScreen
-          action="RETURN TO FEATURED WORLD"
+          action="Go to the featured world"
           detail={
             activeObject.detail ??
-            `The ${activeObject.kind} “${activeObject.name}” could not be resolved from its archive or is not yet supported by Exora.`
+            `Exora could not find the ${activeObject.kind} “${activeObject.name}” in its archive, or cannot draw it yet.`
           }
-          heading="DESTINATION UNAVAILABLE"
+          heading="Destination unavailable"
           onRetry={returnHome}
         />
       ) : activeObject.type === "black-hole" ? (
@@ -611,10 +623,7 @@ export const App = () => {
           <BlackHoleExperience
             key={activeObject.blackHole.id}
             blackHole={activeObject.blackHole}
-            chromeHidden={chromeHidden}
             host={sceneHost}
-            onToggleChrome={toggleChrome}
-            onOpenDiscover={openDiscover}
             travelPhase={travelPhase}
           />
         </Suspense>
@@ -622,10 +631,7 @@ export const App = () => {
         <Suspense fallback={null}>
           <RegionExperience
             key={activeObject.region.id}
-            chromeHidden={chromeHidden}
             host={sceneHost}
-            onToggleChrome={toggleChrome}
-            onOpenDiscover={openDiscover}
             onSelectStar={selectStar}
             region={activeObject.region}
             travelPhase={travelPhase}
@@ -634,11 +640,8 @@ export const App = () => {
       ) : activeObject.type === "planet" ? (
         <PlanetExperience
           key={activeObject.result.planet.id}
-          chromeHidden={chromeHidden}
           host={sceneHost}
           result={activeObject.result}
-          onToggleChrome={toggleChrome}
-          onOpenDiscover={openDiscover}
           onSelectHostStar={selectHostStar}
           onSelectPlanet={selectPlanet}
           onSelectStar={selectStar}
@@ -650,14 +653,11 @@ export const App = () => {
         <Suspense fallback={null}>
           <SystemExperience
             key={activeObject.result.hostStar}
-            chromeHidden={chromeHidden}
             host={sceneHost}
             result={activeObject.result}
-            onToggleChrome={toggleChrome}
             onSelectHostStar={selectHostStar}
             onSelectPlanet={selectPlanet}
             onSelectStar={selectStar}
-            onOpenDiscover={openDiscover}
             travelPhase={travelPhase}
           />
         </Suspense>
@@ -665,14 +665,11 @@ export const App = () => {
         <Suspense fallback={null}>
           <StarExperience
             key={activeObject.result.star.id}
-            chromeHidden={chromeHidden}
             host={sceneHost}
             result={activeObject.result}
             systemHostName={systemHostName}
-            onToggleChrome={toggleChrome}
             onSelectPlanet={selectPlanet}
             onSelectSystem={selectSystem}
-            onOpenDiscover={openDiscover}
             travelPhase={travelPhase}
           />
         </Suspense>
@@ -712,6 +709,6 @@ export const App = () => {
           />
         </Suspense>
       ) : null}
-    </>
+    </ChromeContext>
   );
 };

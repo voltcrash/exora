@@ -11,29 +11,20 @@ import {
   type PanelMetric,
 } from "../destination-panel.ts";
 import { formatNumber } from "../planet-utils.tsx";
-import type { SceneHost, XrStatus } from "../scene-host.ts";
+import { capitalize } from "../readable.ts";
+import type { SceneHost } from "../scene-host.ts";
+import { starLight } from "../star-light.ts";
 import { readStarHabitableZone } from "../star-habitable-zone.ts";
 import { hrSubject } from "../hr-diagram.ts";
 import { skyFacts } from "../sky-position.ts";
 import { deriveStarPhysics } from "../star-physics.ts";
 import { deriveStarVisual, starKindLabel, starSummary } from "../star-utils.ts";
 import type { TravelPhase } from "../travel-transition.ts";
-import { useTypographySettled } from "../use-typography-settled.ts";
-import { DestinationIdentity } from "./DestinationIdentity.tsx";
-import { DestinationPanel } from "./DestinationPanel.tsx";
 import { HrDiagram } from "./HrDiagram.tsx";
-import { MissionControl } from "./MissionControl.tsx";
-import sharedStyles from "./ExperienceShared.module.css";
-import hudStyles from "./DestinationHud.module.css";
-import { bindStyles } from "../styles/bind-styles.ts";
-
-const cx = bindStyles(sharedStyles, hudStyles);
+import { DestinationShell, type SceneState } from "./shell/DestinationShell.tsx";
 
 interface StarExperienceProps {
-  chromeHidden: boolean;
   host: SceneHost | null;
-  onToggleChrome: () => void;
-  onOpenDiscover: () => void;
   onSelectPlanet: (planet: ExoplanetProfile, cached: boolean) => void;
   onSelectSystem: (hostStar: string) => Promise<boolean>;
   result: StarLoadResult;
@@ -42,19 +33,14 @@ interface StarExperienceProps {
 }
 
 export const StarExperience = ({
-  chromeHidden,
   host,
-  onToggleChrome,
-  onOpenDiscover,
   onSelectPlanet,
   onSelectSystem,
   result,
   systemHostName,
   travelPhase,
 }: StarExperienceProps) => {
-  const [fps, setFps] = useState("--");
-  const [sceneState, setSceneState] = useState<"loading" | "ready" | "error">("loading");
-  const [xrStatus, setXrStatus] = useState<XrStatus>("checking");
+  const [sceneState, setSceneState] = useState<SceneState>("loading");
   const [systemPlanets, setSystemPlanets] = useState<ExoplanetProfile[]>([]);
   const [systemCached, setSystemCached] = useState(false);
   const [systemState, setSystemState] = useState<"idle" | "loading" | "ready" | "error">("idle");
@@ -67,12 +53,6 @@ export const StarExperience = ({
   const physics = deriveStarPhysics(star, new Date().getFullYear());
   const hrPoint = hrSubject(star);
   const solar = result.mode === "solar";
-  const travelling = travelPhase === "departing" || travelPhase === "crossing";
-  const typographySettled = useTypographySettled();
-  const settled =
-    (sceneState === "ready" && typographySettled) ||
-    sceneState === "error" ||
-    travelPhase !== "idle";
 
   const dioramaHostRef = useRef(star.name);
   useEffect(() => {
@@ -112,14 +92,6 @@ export const StarExperience = ({
       });
     return () => controller.abort();
   }, [custom, solar, star.name, systemHostName]);
-
-  useEffect(() => host?.onXrStatus(setXrStatus), [host]);
-
-  useEffect(() => {
-    if (!host) return;
-    const fpsTimer = window.setInterval(() => setFps(Math.round(host.getFps()).toString()), 1_000);
-    return () => window.clearInterval(fpsTimer);
-  }, [host]);
 
   useEffect(() => {
     if (!host) return;
@@ -187,26 +159,29 @@ export const StarExperience = ({
   ];
 
   const worldBlocks: readonly PanelBlock[] = present<PanelBlock>([
-    systemState === "loading" && { text: "QUERYING NASA ARCHIVE…", type: "status" as const },
+    systemState === "loading" && {
+      text: "Asking the NASA Exoplanet Archive for this star's worlds…",
+      type: "status" as const,
+    },
     systemState === "error" && {
-      text: "SYSTEM LINK UNAVAILABLE",
+      text: "The archive could not be reached, so this star's worlds are unknown for now.",
       tone: "accent" as const,
       type: "status" as const,
     },
     systemState === "ready" &&
       systemPlanets.length === 0 && {
-        text: "NO CONFIRMED WORLDS LINKED",
+        text: "The archive lists no confirmed worlds around this star.",
         type: "status" as const,
       },
     systemPlanets.length > 0 && {
       bodies: systemPlanets.map((planet) => ({
         id: planet.id,
         kind: planet.kind,
-        meta: planet.kind.replace("-", " "),
+        meta: capitalize(planet.kind.replace("-", " ")),
         name: planet.name,
         onSelect: () => onSelectPlanet(planet, systemCached),
       })),
-      label: "CONFIRMED WORLDS",
+      label: "Confirmed worlds",
       type: "bodies" as const,
     },
   ]);
@@ -222,19 +197,19 @@ export const StarExperience = ({
     label: custom ? "Custom star data" : "Observed star data",
     links: present([
       systemPlanets.length > 0 && {
-        action: dioramaState === "loading" ? "PLACING ORBITS…" : "STAND AMONG THE ORBITS ↗",
+        busy: dioramaState === "loading",
         disabled: dioramaState === "loading",
         ...(dioramaState === "error"
-          ? { error: "The archive links no placeable orbits to this host." }
+          ? { error: "The archive has no orbits it can place for this system." }
           : {}),
-        glyph: "◎",
+        icon: "orbit" as const,
         id: "whole-system",
+        label: "Whole system",
         onSelect: () => void openSystem(),
-        title: "Whole system",
       },
     ]),
     metrics: custom ? customMetrics : solar ? solarMetrics : observedMetrics,
-    source: custom ? "WORLD FORGE" : solar ? "NASA/JPL" : "SIMBAD ARCHIVE",
+    source: custom ? "World Forge" : solar ? "NASA/JPL" : "SIMBAD",
     tabs: presentTabs([
       !custom && {
         blocks: worldBlocks,
@@ -304,74 +279,40 @@ export const StarExperience = ({
   };
 
   return (
-    <div
-      className={cx(
-        `experience-shell star-experience ${settled ? "scene-ready" : ""} ${sceneState === "error" ? "scene-error" : ""} ${travelling ? "travelling" : ""} ${chromeHidden ? "chrome-hidden" : ""}`,
-      )}
-    >
-      <div className={cx("space-haze")} aria-hidden="true" />
-      <div className={cx("viewport-grid")} aria-hidden="true" />
-
-      <header className={cx("topbar")} data-testid="topbar">
-        <a className={cx("brand")} href="/" aria-label="Exora home">
-          <span className={cx("brand-mark")} aria-hidden="true" />
-          <span className={cx("brand-copy")}>
-            <strong>EXORA</strong>
-            <small>UNIVERSE OBSERVATORY</small>
-          </span>
-        </a>
-      </header>
-
-      <main className={cx("hud")} data-testid="hud">
-        <DestinationIdentity
-          category={custom ? "GENERATED STAR" : solar ? "OUR STAR" : "OBSERVED STAR"}
-          classification={starKindLabel(star)}
-          name={star.name}
-          nameId="star-name"
-          note={
-            custom
-              ? `SHAREABLE URL RECIPE · WORLDGEN V${WORLDGEN_VERSION}`
-              : solar
-                ? "NASA/JPL MEASUREMENTS · EXORA STELLAR SURFACE"
-                : observation.effectiveTemperatureKelvin == null
-                  ? "STELLAR APPEARANCE INFERRED FROM SIMBAD SPECTRAL CLASS"
-                  : "SIMBAD STELLAR MEASUREMENTS · EXORA STELLAR SURFACE"
-          }
-          summary={starSummary(star)}
-          tags={[
-            visual.label,
-            observation.spectralType ?? "SPECTRUM UNKNOWN",
-            `${custom ? "" : "~"}${formatNumber(visual.temperatureKelvin, 0)} K`,
-          ]}
-          tagsLabel="Star classification"
-          tone="star"
-        />
-
-        <DestinationPanel fps={fps} model={panel} />
-      </main>
-
-      <MissionControl
-        chromeHidden={chromeHidden}
-        hints={[
-          { key: "DRAG", meaning: "ORBIT" },
-          { key: "SCROLL", meaning: "ZOOM" },
-        ]}
-        onToggleChrome={onToggleChrome}
-        onOpenDiscover={onOpenDiscover}
-        sceneFailed={sceneState === "error"}
-        xr={{ host, status: xrStatus }}
-      />
-
-      <div
-        className={cx(`loading-screen ${typographySettled ? "type-settled" : ""}`)}
-        role="status"
-      >
-        <div className={cx("loading-orbit")} aria-hidden="true">
-          <span />
-        </div>
-        <p>RESOLVING STAR</p>
-        <small>{star.name.toUpperCase()} · SPECTRAL MODEL</small>
-      </div>
-    </div>
+    <DestinationShell
+      className="star-experience"
+      hints={[
+        { key: "Drag", meaning: "Orbit" },
+        { key: "Scroll", meaning: "Zoom" },
+        { key: "H", meaning: "Hide interface" },
+      ]}
+      host={host}
+      identity={{
+        category: custom ? "Generated star" : solar ? "Our star" : "Observed star",
+        classification: starKindLabel(star),
+        name: star.name,
+        nameId: "star-name",
+        note: custom
+          ? `Rebuilt from the recipe in its link · worldgen v${WORLDGEN_VERSION}.`
+          : solar
+            ? "NASA/JPL measurements, with a stellar surface modelled by Exora."
+            : observation.effectiveTemperatureKelvin == null
+              ? "Its appearance is inferred from the spectral class SIMBAD records."
+              : "SIMBAD measurements, with a stellar surface modelled by Exora.",
+        summary: starSummary(star),
+        tags: [
+          visual.label,
+          observation.spectralType ?? "Spectrum unknown",
+          `${custom ? "" : "~"}${formatNumber(visual.temperatureKelvin, 0)} K`,
+        ],
+        tagsLabel: "Star classification",
+        tone: "star",
+      }}
+      light={starLight(visual.temperatureKelvin)}
+      loading={{ detail: `${star.name} · spectral model`, title: "Resolving star" }}
+      panel={panel}
+      sceneState={sceneState}
+      travelPhase={travelPhase}
+    />
   );
 };

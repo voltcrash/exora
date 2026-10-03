@@ -10,7 +10,7 @@ import {
   type PanelFact,
 } from "../destination-panel.ts";
 import { formatNumber } from "../planet-utils.tsx";
-import type { SceneHost, XrStatus } from "../scene-host.ts";
+import type { SceneHost } from "../scene-host.ts";
 import {
   createOrbitVoice,
   nearestSimpleRatio,
@@ -29,23 +29,16 @@ import {
   timeScaleLabel,
   type SystemLayout,
 } from "../system-layout.ts";
+import { starLight } from "../star-light.ts";
 import type { SystemWorld } from "../system-scene.ts";
 import type { TravelPhase } from "../travel-transition.ts";
-import { useTypographySettled } from "../use-typography-settled.ts";
-import { DestinationIdentity } from "./DestinationIdentity.tsx";
-import { DestinationPanel } from "./DestinationPanel.tsx";
-import { MissionControl } from "./MissionControl.tsx";
-import sharedStyles from "./ExperienceShared.module.css";
-import hudStyles from "./DestinationHud.module.css";
-import { bindStyles } from "../styles/bind-styles.ts";
-
-const cx = bindStyles(sharedStyles, hudStyles);
+import { DestinationShell, type SceneState } from "./shell/DestinationShell.tsx";
+import { Button } from "./ui/Button.tsx";
+import { Segmented } from "./ui/Segmented.tsx";
+import styles from "./SystemControls.module.css";
 
 interface SystemExperienceProps {
-  chromeHidden: boolean;
   host: SceneHost | null;
-  onToggleChrome: () => void;
-  onOpenDiscover: () => void;
   onSelectHostStar: (hostStar: string) => Promise<boolean>;
   onSelectPlanet: (planet: ExoplanetProfile, cached: boolean) => void;
   onSelectStar: (star: StarProfile, cached: boolean) => void;
@@ -59,17 +52,17 @@ const localDateTimeValue = (date: Date): string => {
 };
 
 const PLAYBACK_RATES = [
-  { label: "1×", secondsPerSecond: 1 },
-  { label: "60×", secondsPerSecond: 60 },
-  { label: "1 h/s", secondsPerSecond: 3_600 },
-  { label: "1 d/s", secondsPerSecond: 86_400 },
+  { id: "1", label: "Real time" },
+  { id: "60", label: "1 min/s" },
+  { id: "3600", label: "1 h/s" },
+  { id: "86400", label: "1 d/s" },
 ] as const;
 
 const CLOCK_RATES = [
-  { label: "¼×", rate: 0.25 },
-  { label: "1×", rate: 1 },
-  { label: "4×", rate: 4 },
-  { label: "16×", rate: 16 },
+  { id: "0.25", label: "¼×" },
+  { id: "1", label: "1×" },
+  { id: "4", label: "4×" },
+  { id: "16", label: "16×" },
 ] as const;
 
 const signedDays = (days: number): string => {
@@ -84,20 +77,15 @@ const signedDays = (days: number): string => {
 };
 
 export const SystemExperience = ({
-  chromeHidden,
   host,
-  onToggleChrome,
-  onOpenDiscover,
   onSelectHostStar,
   onSelectPlanet,
   onSelectStar,
   result,
   travelPhase,
 }: SystemExperienceProps) => {
-  const [fps, setFps] = useState("--");
   const [layout, setLayout] = useState<SystemLayout | null>(null);
-  const [sceneState, setSceneState] = useState<"loading" | "ready" | "error">("loading");
-  const [xrStatus, setXrStatus] = useState<XrStatus>("checking");
+  const [sceneState, setSceneState] = useState<SceneState>("loading");
   const [starJumpState, setStarJumpState] = useState<"error" | "idle" | "loading">("idle");
   const [ephemeris, setEphemeris] = useState<EphemerisResponse | null>(null);
   const [ephemerisRequest, setEphemerisRequest] = useState<"error" | "idle" | "loading">("idle");
@@ -119,12 +107,6 @@ export const SystemExperience = ({
   const requestSequence = useRef(0);
   const { cached, hostStar, planets } = result;
   const solar = planets.length > 0 && planets.every((planet) => planet.solarSystem);
-  const travelling = travelPhase === "departing" || travelPhase === "crossing";
-  const typographySettled = useTypographySettled();
-  const settled =
-    (sceneState === "ready" && typographySettled) ||
-    sceneState === "error" ||
-    travelPhase !== "idle";
 
   const activateEphemeris = async (epoch: Date): Promise<void> => {
     if (!solar || ephemerisRequest === "loading") return;
@@ -221,8 +203,6 @@ export const SystemExperience = ({
     return () => window.clearInterval(timer);
   }, [layout]);
 
-  useEffect(() => host?.onXrStatus(setXrStatus), [host]);
-
   useEffect(() => {
     if (!playing || !ephemeris) return;
     let previous = performance.now();
@@ -244,12 +224,6 @@ export const SystemExperience = ({
     }, 100);
     return () => window.clearInterval(timer);
   }, [ephemeris, playbackDirection, playbackRate, playing]);
-
-  useEffect(() => {
-    if (!host) return;
-    const fpsTimer = window.setInterval(() => setFps(Math.round(host.getFps()).toString()), 1_000);
-    return () => window.clearInterval(fpsTimer);
-  }, [host]);
 
   useEffect(() => {
     if (!host) return;
@@ -295,28 +269,29 @@ export const SystemExperience = ({
 
   const positionMode =
     ephemerisRequest === "loading"
-      ? "CONTACTING JPL…"
+      ? "Asking JPL Horizons…"
       : ephemerisRequest === "error"
-        ? "JPL UNAVAILABLE"
+        ? "JPL Horizons could not be reached"
         : ephemeris?.meta.stale
-          ? "STALE CACHE"
+          ? "JPL positions from an expired cache"
           : ephemeris?.meta.cached
-            ? "SERVER-CACHED JPL"
+            ? "JPL positions, cached on the server"
             : ephemeris
-              ? "FRESH JPL VECTOR"
-              : "SIMPLIFIED CATALOG";
+              ? "Fresh JPL positions"
+              : "Simplified catalog orbits";
 
   const ephemerisControls = (
-    <div className={cx("ephemeris")}>
+    <div className={styles["controls"]}>
       <p
-        className={cx("ephemeris-state")}
+        className={styles["state"]}
+        data-live={ephemeris ? "true" : undefined}
         data-stale={ephemeris?.meta.stale ? "true" : undefined}
         role="status"
       >
         {positionMode}
       </p>
-      <label>
-        <span>LOCAL DATE &amp; TIME</span>
+      <label className={styles["field"]}>
+        <span>Local date and time</span>
         <input
           type="datetime-local"
           min="1900-01-01T00:00:00"
@@ -333,39 +308,26 @@ export const SystemExperience = ({
           }}
         />
       </label>
-      <div className={cx("ephemeris-row")}>
-        <button
-          type="button"
+      <div className={styles["row"]}>
+        <Button
+          size="sm"
           disabled={ephemerisRequest === "loading"}
           onClick={() => void activateEphemeris(displayedAt)}
         >
-          APPLY JPL
-        </button>
-        <button
-          type="button"
+          Use this date
+        </Button>
+        <Button
+          size="sm"
           disabled={ephemerisRequest === "loading"}
           onClick={() => void activateEphemeris(new Date())}
         >
-          NOW
-        </button>
+          Now
+        </Button>
       </div>
-      <div className={cx("ephemeris-row ephemeris-row-three")} aria-label="Ephemeris playback">
-        <button
-          type="button"
-          disabled={!ephemeris}
-          aria-pressed={playing && playbackDirection === 1}
-          onClick={() => {
-            setPlaybackDirection(1);
-            setPlaying(true);
-          }}
-        >
-          ▶ PLAY
-        </button>
-        <button type="button" disabled={!ephemeris || !playing} onClick={() => setPlaying(false)}>
-          ‖ PAUSE
-        </button>
-        <button
-          type="button"
+      <div className={styles["transport"]} role="group" aria-label="Ephemeris playback">
+        <Button
+          size="sm"
+          icon="reverse"
           disabled={!ephemeris}
           aria-pressed={playing && playbackDirection === -1}
           onClick={() => {
@@ -373,32 +335,48 @@ export const SystemExperience = ({
             setPlaying(true);
           }}
         >
-          ◀ REVERSE
-        </button>
-      </div>
-      <label>
-        <span>RATE</span>
-        <select
-          value={playbackRate}
-          onChange={(event) => setPlaybackRate(Number(event.currentTarget.value))}
+          Reverse
+        </Button>
+        <Button
+          size="sm"
+          icon="pause"
+          disabled={!ephemeris || !playing}
+          onClick={() => setPlaying(false)}
         >
-          {PLAYBACK_RATES.map((rate) => (
-            <option key={rate.secondsPerSecond} value={rate.secondsPerSecond}>
-              {rate.label}
-            </option>
-          ))}
-        </select>
-      </label>
-      <button type="button" disabled={!ephemeris} onClick={useCatalogPositions}>
-        CATALOG ORBITS
-      </button>
-      <p className={cx("panel-status")}>
+          Pause
+        </Button>
+        <Button
+          size="sm"
+          icon="play"
+          disabled={!ephemeris}
+          aria-pressed={playing && playbackDirection === 1}
+          onClick={() => {
+            setPlaybackDirection(1);
+            setPlaying(true);
+          }}
+        >
+          Play
+        </Button>
+      </div>
+      <div className={styles["field"]}>
+        <span>Playback rate</span>
+        <Segmented
+          label="Playback rate"
+          options={PLAYBACK_RATES}
+          value={String(playbackRate) as (typeof PLAYBACK_RATES)[number]["id"]}
+          onChange={(rate) => setPlaybackRate(Number(rate))}
+        />
+      </div>
+      <Button size="sm" variant="ghost" disabled={!ephemeris} onClick={useCatalogPositions}>
+        Back to catalog orbits
+      </Button>
+      <p className={styles["note"]}>
         {ephemeris
           ? isEphemerisDerivedAt(ephemeris.data, displayedAt)
-            ? `DERIVED BETWEEN LOOKUPS · TWO-BODY PROPAGATION FROM ${new Date(ephemeris.meta.epoch).toISOString().replace(".000Z", "Z")} JPL ANCHOR`
-            : `MEASURED STATE VECTORS · ${ephemeris.meta.coordinateFrame.toUpperCase()} · CENTER ${ephemeris.meta.center.toUpperCase()}`
-          : "CATALOG ORBIT SHAPES · SEEDED PHASES · NOT A DATE-SOLVED CONFIGURATION"}
-        {ephemeris?.meta.stale ? " · HORIZONS WAS OFFLINE; EXPIRED CACHE RETAINED" : ""}
+            ? `Derived between lookups by two-body propagation from the ${new Date(ephemeris.meta.epoch).toISOString().replace(".000Z", "Z")} JPL anchor.`
+            : `Measured state vectors · ${ephemeris.meta.coordinateFrame} frame · centred on ${ephemeris.meta.center}.`
+          : "Catalog orbit shapes with seeded phases. This is not the configuration on any real date until JPL positions are applied."}
+        {ephemeris?.meta.stale ? " Horizons was offline, so an expired cache was kept." : ""}
       </p>
     </div>
   );
@@ -423,22 +401,27 @@ export const SystemExperience = ({
   });
 
   const clockControls = (
-    <div className={cx("ephemeris")}>
-      <p className={cx("ephemeris-state")} role="status">
+    <div className={styles["controls"]}>
+      <p
+        className={styles["state"]}
+        data-live={!ephemeris && clockRunning ? "true" : undefined}
+        role="status"
+      >
         {ephemeris
-          ? "JPL POSITIONS DRIVE THE DIORAMA"
-          : `${clockRunning ? (clockDirection === 1 ? "RUNNING" : "RUNNING BACKWARDS") : "HELD"} · ${
+          ? "JPL positions are driving the diorama"
+          : `${clockRunning ? (clockDirection === 1 ? "Running" : "Running backwards") : "Held"} · ${
               layout
                 ? `1 s = ${formatNumber(layout.daysPerSecond * clockRate, 2)} d`
-                : "PLACING ORBITS"
+                : "placing orbits"
             }`}
       </p>
-      <p className={cx("panel-status")} aria-live="off">
-        {signedDays(orbitDays)} OF CATALOG ORBIT SINCE THIS VIEW OPENED
+      <p className={styles["readout"]} aria-live="off">
+        <strong>{signedDays(orbitDays)}</strong> of catalog orbit since this view opened
       </p>
-      <div className={cx("ephemeris-row ephemeris-row-three")} aria-label="Diorama clock">
-        <button
-          type="button"
+      <div className={styles["transport"]} role="group" aria-label="Diorama clock">
+        <Button
+          size="sm"
+          icon="reverse"
           disabled={Boolean(ephemeris)}
           aria-pressed={clockRunning && clockDirection === -1}
           onClick={() => {
@@ -446,18 +429,20 @@ export const SystemExperience = ({
             setClockRunning(true);
           }}
         >
-          ◀ REVERSE
-        </button>
-        <button
-          type="button"
+          Reverse
+        </Button>
+        <Button
+          size="sm"
+          icon="pause"
           disabled={Boolean(ephemeris)}
           aria-pressed={!clockRunning}
           onClick={() => setClockRunning(false)}
         >
-          ‖ HOLD
-        </button>
-        <button
-          type="button"
+          Hold
+        </Button>
+        <Button
+          size="sm"
+          icon="play"
           disabled={Boolean(ephemeris)}
           aria-pressed={clockRunning && clockDirection === 1}
           onClick={() => {
@@ -465,46 +450,43 @@ export const SystemExperience = ({
             setClockRunning(true);
           }}
         >
-          ▶ RUN
-        </button>
+          Run
+        </Button>
       </div>
-      <label>
-        <span>CLOCK RATE</span>
-        <select
-          disabled={Boolean(ephemeris)}
-          value={clockRate}
-          onChange={(event) => setClockRate(Number(event.currentTarget.value))}
-        >
-          {CLOCK_RATES.map(({ label, rate }) => (
-            <option key={rate} value={rate}>
-              {label}
-            </option>
-          ))}
-        </select>
-      </label>
-      <button
-        type="button"
+      <div className={styles["field"]}>
+        <span>Clock rate</span>
+        <Segmented
+          label="Clock rate"
+          options={CLOCK_RATES}
+          value={String(clockRate) as (typeof CLOCK_RATES)[number]["id"]}
+          onChange={(rate) => {
+            if (!ephemeris) setClockRate(Number(rate));
+          }}
+        />
+      </div>
+      <Button
+        icon={listening ? "music-off" : "music"}
         disabled={Boolean(ephemeris) || audioUnavailable}
         aria-pressed={listening}
         onClick={toggleListening}
       >
-        {listening ? "♪ LISTENING · TAP TO MUTE" : "♪ LISTEN TO THE ORBITS"}
-      </button>
-      <p className={cx("panel-status")}>
+        {listening ? "Stop listening" : "Listen to the orbits"}
+      </Button>
+      <p className={styles["note"]}>
         {audioUnavailable
-          ? "THIS BROWSER OFFERS NO WEB AUDIO"
-          : "EACH WORLD PLUCKS A NOTE AS IT CROSSES OUR LINE OF SIGHT, THE MOMENT IT WOULD TRANSIT. PITCH FOLLOWS ORBITAL FREQUENCY, FOLDED BY OCTAVES, SO RESONANT ORBITS SOUND IN HARMONY."}
+          ? "This browser offers no Web Audio, so the orbits cannot be heard."
+          : "Each world plucks a note as it crosses our line of sight — the moment it would transit. Pitch follows orbital frequency, folded into one octave, so resonant orbits sound in harmony."}
       </p>
-      <p className={cx("panel-status")}>
+      <p className={styles["note"]}>
         {ephemeris
-          ? "RETURN TO CATALOG ORBITS IN THE TIME TAB TO RUN THIS CLOCK"
-          : "EVERY WORLD KEEPS ITS MEASURED PERIOD · THE RATE SCALES ALL OF THEM TOGETHER"}
+          ? "Go back to catalog orbits in the Time tab to run this clock."
+          : "Every world keeps its measured period; the rate scales all of them together."}
       </p>
     </div>
   );
 
   const worldBlocks: readonly PanelBlock[] = present<PanelBlock>([
-    sceneState === "loading" && { text: "PLACING ORBITS…", type: "status" as const },
+    sceneState === "loading" && { text: "Placing orbits…", type: "status" as const },
     drawn.length > 0 && {
       bodies: drawn.map((orbit) => ({
         id: orbit.planet.id,
@@ -512,7 +494,7 @@ export const SystemExperience = ({
         meta: [
           `${formatNumber(orbit.elements.semiMajorAxisAu, 3)} AU`,
           orbit.elements.periodDays === null
-            ? "UNTIMED"
+            ? "untimed"
             : `${formatNumber(orbit.elements.periodDays, 1)} d`,
           habitableZoneTag(orbit.habitableZone),
           elementProvenance(orbit.elements),
@@ -523,11 +505,11 @@ export const SystemExperience = ({
         name: orbit.planet.name,
         onSelect: () => onSelectPlanet(orbit.planet, cached),
       })),
-      label: "WORLDS IN THE DIORAMA",
+      label: "Worlds in the diorama",
       type: "bodies" as const,
     },
     unplaced.length > 0 && {
-      text: `NOT PLACED · ${unplaced.map(({ name }) => name).join(", ")} · NO MEASURED ORBIT SIZE AND NO PERIOD TO DERIVE ONE FROM`,
+      text: `Not placed: ${unplaced.map(({ name }) => name).join(", ")}. The archive has no orbit size for them and no period to derive one from.`,
       tone: "accent" as const,
       type: "status" as const,
     },
@@ -535,18 +517,20 @@ export const SystemExperience = ({
 
   const panel: DestinationPanelModel = {
     footer: ephemeris
-      ? `NASA/JPL Horizons API ${ephemeris.meta.sourceVersion} · ${ephemeris.meta.cached ? "SERVER CACHE" : "FRESH RESPONSE"}`
+      ? `NASA/JPL Horizons API ${ephemeris.meta.sourceVersion} · ${ephemeris.meta.cached ? "server cache" : "fresh response"}`
       : `NASA Exoplanet Archive · pscomppars · ${result.planets[0]?.source.retrievedOn ?? "unsynchronized"}`,
     label: "System layout and observed data",
     links: [
       {
-        action: starJumpState === "loading" ? "RESOLVING…" : "STAND AT THE STAR ↗",
+        busy: starJumpState === "loading",
         disabled: starJumpState === "loading",
-        ...(starJumpState === "error" ? { error: "SIMBAD could not resolve this host name." } : {}),
-        glyph: "☀",
+        ...(starJumpState === "error"
+          ? { error: `SIMBAD could not find a star called ${hostStar}.` }
+          : {}),
+        icon: "star",
         id: "host-star",
+        label: `Visit ${hostStar}`,
         onSelect: () => void openHostStar(),
-        title: hostStar,
       },
     ],
     metrics: [
@@ -557,21 +541,21 @@ export const SystemExperience = ({
         unit: "R☉",
         value: layout ? formatNumber(layout.hostRadiusSolar, 2) : "—",
       },
-      { label: "Positions", value: ephemeris ? "JPL" : "CATALOG" },
+      { label: "Positions", value: ephemeris ? "JPL" : "Catalog" },
     ],
-    source: "DIORAMA SCALE",
+    source: "Diorama scale",
     tabs: presentTabs([
       { blocks: worldBlocks, count: drawn.length, id: "worlds", label: "Worlds" },
       {
         blocks: [
-          { content: clockControls, label: "DIORAMA CLOCK", type: "custom" as const },
+          { content: clockControls, type: "custom" as const },
           { facts: neighbourRatios, type: "facts" as const },
         ],
         id: "clock",
         label: "Clock",
       },
       solar && {
-        blocks: [{ content: ephemerisControls, label: "LIVE EPHEMERIS", type: "custom" as const }],
+        blocks: [{ content: ephemerisControls, type: "custom" as const }],
         id: "time",
         label: "Time",
       },
@@ -625,7 +609,7 @@ export const SystemExperience = ({
             type: "facts" as const,
           },
           {
-            text: "RADII ARE LOGARITHMIC, NOT LINEAR. BODIES ARE DRAWN FAR LARGER THAN THEIR ORBITS TO SCALE.",
+            text: "Radii are logarithmic, not linear, and bodies are drawn far larger than their orbits would allow.",
             tone: "accent" as const,
             type: "status" as const,
           },
@@ -637,76 +621,44 @@ export const SystemExperience = ({
     title: "What the picture compressed",
   };
 
+  const hostTemperature = planets.find(
+    (planet) => planet.observation.hostTemperatureKelvin !== null,
+  )?.observation.hostTemperatureKelvin;
+
   return (
-    <div
-      className={cx(
-        `experience-shell system-experience ${settled ? "scene-ready" : ""} ${sceneState === "error" ? "scene-error" : ""} ${travelling ? "travelling" : ""} ${chromeHidden ? "chrome-hidden" : ""}`,
-      )}
-    >
-      <div className={cx("space-haze")} aria-hidden="true" />
-      <div className={cx("viewport-grid")} aria-hidden="true" />
-
-      <header className={cx("topbar")} data-testid="topbar">
-        <a className={cx("brand")} href="/" aria-label="Exora home">
-          <span className={cx("brand-mark")} aria-hidden="true" />
-          <span className={cx("brand-copy")}>
-            <strong>EXORA</strong>
-            <small>UNIVERSE OBSERVATORY</small>
-          </span>
-        </a>
-      </header>
-
-      <main className={cx("hud")} data-testid="hud">
-        <DestinationIdentity
-          category={solar ? "HOME SYSTEM" : "CONFIRMED SYSTEM"}
-          classification={`${planets.length} KNOWN WORLD${planets.length === 1 ? "" : "S"}`}
-          name={hostStar}
-          nameId="system-name"
-          note={
-            ephemeris
-              ? "BODY POSITIONS: JPL HORIZONS · ORBIT TRACKS: SIMPLIFIED CATALOG"
-              : "ORBITS MEASURED · PHASES SEEDED · APPEARANCE INFERRED"
-          }
-          summary={
-            solar
-              ? "Every planet in our Solar System, placed on its measured orbit and turning on its own clock. Select a world to cross the system, or the Sun at the centre to stand at our star."
-              : `Every confirmed world of ${hostStar}, on the orbit the archive measured for it and turning at its own measured period. Select a world to travel to it, or the star at the centre to stand at the star itself.`
-          }
-          tags={[
-            "ORBITAL DIORAMA",
-            `${drawn.length} ORBIT${drawn.length === 1 ? "" : "S"} DRAWN`,
-            solar ? "NASA/JPL" : "NASA ARCHIVE",
-          ]}
-          tagsLabel="System classification"
-          tone="region"
-        />
-
-        <DestinationPanel fps={fps} model={panel} />
-      </main>
-
-      <MissionControl
-        chromeHidden={chromeHidden}
-        hints={[
-          { key: "DRAG", meaning: "ORBIT" },
-          { key: "SCROLL", meaning: "ZOOM" },
-          { key: "CLICK", meaning: "TRAVEL" },
-        ]}
-        onToggleChrome={onToggleChrome}
-        onOpenDiscover={onOpenDiscover}
-        sceneFailed={sceneState === "error"}
-        xr={{ host, status: xrStatus }}
-      />
-
-      <div
-        className={cx(`loading-screen ${typographySettled ? "type-settled" : ""}`)}
-        role="status"
-      >
-        <div className={cx("loading-orbit")} aria-hidden="true">
-          <span />
-        </div>
-        <p>PLACING ORBITS</p>
-        <small>{hostStar.toUpperCase()} · MEASURED ORBITAL ELEMENTS</small>
-      </div>
-    </div>
+    <DestinationShell
+      className="system-experience"
+      hints={[
+        { key: "Drag", meaning: "Orbit" },
+        { key: "Scroll", meaning: "Zoom" },
+        { key: "Click", meaning: "Travel" },
+        { key: "H", meaning: "Hide interface" },
+      ]}
+      host={host}
+      identity={{
+        category: solar ? "Home system" : "Confirmed system",
+        classification: `${planets.length} known world${planets.length === 1 ? "" : "s"}`,
+        name: hostStar,
+        nameId: "system-name",
+        note: ephemeris
+          ? "Body positions from JPL Horizons; orbit tracks are simplified catalog shapes."
+          : "Orbits measured, phases seeded, appearance inferred.",
+        summary: solar
+          ? "Every planet in our Solar System, placed on its measured orbit and turning on its own clock. Select a world to cross the system, or the Sun at the centre to stand at our star."
+          : `Every confirmed world of ${hostStar}, on the orbit the archive measured for it and turning at its own measured period. Select a world to travel to it, or the star at the centre to stand at the star itself.`,
+        tags: [
+          "Orbital diorama",
+          `${drawn.length} orbit${drawn.length === 1 ? "" : "s"} drawn`,
+          solar ? "NASA/JPL" : "NASA Exoplanet Archive",
+        ],
+        tagsLabel: "System classification",
+        tone: "region",
+      }}
+      light={starLight(solar ? null : hostTemperature)}
+      loading={{ detail: `${hostStar} · measured orbital elements`, title: "Placing orbits" }}
+      panel={panel}
+      sceneState={sceneState}
+      travelPhase={travelPhase}
+    />
   );
 };

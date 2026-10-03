@@ -17,8 +17,10 @@ export const deriveStarVisual = (star: StarProfile): StarVisualProfile => {
   };
 };
 
-export const starKindLabel = (star: StarProfile): string =>
-  star.kind.replaceAll("-", " ").toUpperCase();
+export const starKindLabel = (star: StarProfile): string => {
+  const label = star.kind.replaceAll("-", " ");
+  return label.charAt(0).toUpperCase() + label.slice(1);
+};
 
 export const starSummary = (star: StarProfile): string => {
   const visual = deriveStarVisual(star);

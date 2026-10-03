@@ -1,10 +1,13 @@
 import type { StarProfile } from "@exora/contracts";
+import type { ReactNode } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { expect, test, vi } from "vite-plus/test";
+import { ChromeContext } from "../chrome-context.ts";
 import { featuredPlanet } from "../planet-profile.ts";
+import type { XrStatus } from "../scene-host.ts";
 import { PlanetExperience } from "./PlanetExperience.tsx";
 import { StarExperience } from "./StarExperience.tsx";
-import { MissionControl } from "./MissionControl.tsx";
+import { TopBar } from "./shell/TopBar.tsx";
 
 const sirius: StarProfile = {
   catalogName: "* alf CMa",
@@ -27,13 +30,24 @@ const sirius: StarProfile = {
   source: { archive: "SIMBAD", retrievedOn: "2026-08-14", tables: ["basic", "ident", "allfluxes"] },
 };
 
-const planetMarkup = (): string =>
+const withChrome = (node: ReactNode, chromeHidden = false): string =>
   renderToStaticMarkup(
+    <ChromeContext
+      value={{
+        chromeHidden,
+        openDiscover: vi.fn(),
+        openPalette: vi.fn(),
+        toggleChrome: vi.fn(),
+      }}
+    >
+      {node}
+    </ChromeContext>,
+  );
+
+const planetMarkup = (chromeHidden = false): string =>
+  withChrome(
     <PlanetExperience
-      chromeHidden={false}
       host={null}
-      onToggleChrome={vi.fn()}
-      onOpenDiscover={vi.fn()}
       onSelectHostStar={vi.fn()}
       onSelectPlanet={vi.fn()}
       onSelectStar={vi.fn()}
@@ -42,15 +56,13 @@ const planetMarkup = (): string =>
       result={{ cached: false, mode: "live", planet: featuredPlanet }}
       travelPhase="idle"
     />,
+    chromeHidden,
   );
 
 const starMarkup = (): string =>
-  renderToStaticMarkup(
+  withChrome(
     <StarExperience
-      chromeHidden={false}
       host={null}
-      onToggleChrome={vi.fn()}
-      onOpenDiscover={vi.fn()}
       onSelectPlanet={vi.fn()}
       onSelectSystem={vi.fn()}
       result={{ cached: false, mode: "live", star: sirius }}
@@ -59,100 +71,75 @@ const starMarkup = (): string =>
     />,
   );
 
+const topBarMarkup = (xrStatus: XrStatus): string =>
+  withChrome(<TopBar host={null} xrStatus={xrStatus} />);
+
 const deckButtons = (markup: string): string[] => {
   const start = markup.indexOf('data-testid="control-deck"');
   expect(start).toBeGreaterThan(-1);
-  const deck = markup.slice(start, markup.indexOf("</footer>", start));
+  const deck = markup.slice(start, markup.indexOf("</header>", start));
   return [...deck.matchAll(/<button[^>]*>/g)].map(([tag]) => tag);
 };
 
-const deckNames = (markup: string): string[] =>
-  deckButtons(markup).map((button) => /aria-label="([^"]+)"/.exec(button)?.[1] ?? "");
+const deckNames = (markup: string): string[] => {
+  const start = markup.indexOf('data-testid="control-deck"');
+  const deck = markup.slice(start, markup.indexOf("</header>", start));
+  return [...deck.matchAll(/<button([^>]*)>([\s\S]*?)<\/button>/g)].map(
+    ([, attributes, contents]) =>
+      /aria-label="([^"]+)"/.exec(attributes ?? "")?.[1] ??
+      (contents ?? "").replaceAll(/<[^>]+>/g, "").trim(),
+  );
+};
 
-test("the world view gathers every control onto one named deck", () => {
+test("the world view gathers every control into the top bar", () => {
   const markup = planetMarkup();
-
-  expect(deckNames(markup)).toEqual(["Open Discover", "Hide the interface", "XR: NOT AVAILABLE"]);
-  expect(markup).toContain('data-testid="discover-shortcut"');
-  expect(markup).toContain('data-testid="clear-view-shortcut"');
-  expect(markup).toContain('data-testid="discover-trigger-icon"');
-  expect(markup).toContain('data-testid="clear-view-icon"');
-  expect(markup).toContain("<small>XR</small><strong>NOT AVAILABLE</strong>");
-
   const header = markup.slice(markup.indexOf("<header"), markup.indexOf("</header>"));
-  expect([...header.matchAll(/<button[^>]*>/g)]).toHaveLength(0);
+
+  expect(deckNames(markup)).toEqual(["Explore", "Hide the interface"]);
+  expect(header).toContain('aria-label="Go anywhere"');
+  expect(header).toContain('aria-label="Exora home"');
 });
 
-test("the star view gathers the same controls onto the same deck", () => {
-  expect(deckNames(starMarkup())).toEqual([
-    "Open Discover",
-    "Hide the interface",
-    "XR: NOT AVAILABLE",
-  ]);
-});
-
-test("the same control is named the same way from either view", () => {
-  expect(deckNames(planetMarkup())).toEqual(deckNames(starMarkup()));
+test("the star view offers the same controls under the same names", () => {
+  expect(deckNames(starMarkup())).toEqual(deckNames(planetMarkup()));
 });
 
 test.each([
-  ["ready-vr", "VR AVAILABLE"],
-  ["ready-ar", "AR AVAILABLE"],
-  ["ready-ar-launch", "AR AVAILABLE"],
-] as const)("the shared immersive control reflects the selected %s mode", (status, copy) => {
-  const markup = renderToStaticMarkup(
-    <MissionControl
-      chromeHidden={false}
-      hints={[]}
-      onOpenDiscover={vi.fn()}
-      onToggleChrome={vi.fn()}
-      sceneFailed={false}
-      xr={{ host: null, status }}
-    />,
-  );
+  ["ready-vr", "Enter VR"],
+  ["ready-ar", "View in AR"],
+  ["ready-ar-launch", "View in AR"],
+] as const)("the immersive control appears once %s is ready", (status, label) => {
+  const markup = topBarMarkup(status);
+  const immersive = deckButtons(markup).find((button) => button.includes('data-testid="enter-vr"'));
 
-  expect(markup).toContain(`<strong>${copy}</strong>`);
-  expect(markup).toContain("<small>XR</small>");
-  expect(markup).toContain('data-testid="immersive-mode-icon"');
-  expect(markup).not.toContain("disabled");
+  expect(deckNames(markup)).toContain(label);
+  expect(immersive).toBeDefined();
+  expect(immersive).not.toContain("disabled");
 });
 
-test("the unavailable immersive control reports its XR state", () => {
-  const markup = renderToStaticMarkup(
-    <MissionControl
-      chromeHidden={false}
-      hints={[]}
-      onOpenDiscover={vi.fn()}
-      onToggleChrome={vi.fn()}
-      sceneFailed={false}
-      xr={{ host: null, status: "unavailable" }}
-    />,
-  );
-
-  expect(markup).toContain("<small>XR</small><strong>NOT AVAILABLE</strong>");
-  expect(markup).toContain('data-testid="immersive-mode-icon"');
-  expect(markup).toContain("disabled");
-});
+test.each(["checking", "unavailable", "in-xr"] as const)(
+  "the immersive control stays away while XR is %s",
+  (status) => {
+    expect(topBarMarkup(status)).not.toContain('data-testid="enter-vr"');
+  },
+);
 
 test("the clear-view control becomes the way back when the interface is hidden", () => {
-  const markup = renderToStaticMarkup(
-    <PlanetExperience
-      chromeHidden
-      host={null}
-      onToggleChrome={vi.fn()}
-      onOpenDiscover={vi.fn()}
-      onSelectHostStar={vi.fn()}
-      onSelectPlanet={vi.fn()}
-      onSelectStar={vi.fn()}
-      onSelectSystem={vi.fn()}
-      recipeOverride={null}
-      result={{ cached: false, mode: "live", planet: featuredPlanet }}
-      travelPhase="idle"
-    />,
-  );
+  const markup = planetMarkup(true);
 
   expect(deckNames(markup)).toContain("Show the interface");
   expect(deckButtons(markup).find((button) => button.includes("Show the interface"))).toContain(
     'aria-pressed="true"',
   );
+  expect(markup).toContain('data-testid="restore-view"');
+  expect(markup).toContain("chrome-hidden");
+});
+
+test("a world is introduced under its host star's light", () => {
+  const markup = planetMarkup();
+
+  expect(markup).toMatch(/--light-rgb:\s*\d+ \d+ \d+/);
+  expect(markup).toContain("Confirmed world");
+  expect(markup).toContain(`Visit ${featuredPlanet.hostStar}`);
+  expect(markup).toContain("Whole system");
 });

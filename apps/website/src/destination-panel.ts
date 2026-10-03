@@ -1,4 +1,5 @@
 import type { ReactNode } from "react";
+import type { IconName } from "./components/ui/Icon.tsx";
 
 /*
  * THE DESTINATION PANEL MODEL
@@ -30,15 +31,15 @@ export interface PanelFact {
 
 /** Somewhere this destination can be left for: a host star, a diorama, a parent body. */
 export interface PanelLink {
-  action: string;
+  /** Set while the destination is being resolved; the label then says what is happening. */
+  busy?: boolean;
   disabled?: boolean;
   error?: string;
-  glyph: string;
+  icon: IconName;
   id: string;
+  label: string;
   onSelect: () => void;
   pressed?: boolean;
-  title: string;
-  tone?: PanelTone;
 }
 
 /** A member of this destination — a world, a moon, a ring, a dataset — listed and often visitable. */

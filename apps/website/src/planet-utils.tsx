@@ -50,7 +50,9 @@ export const formatPlanetName = (name: string): ReactNode => {
   );
 };
 
-export const planetKindLabel = (planet: ExoplanetProfile): string =>
-  planet.kind.replace("-", " ").toUpperCase();
+export const planetKindLabel = (planet: ExoplanetProfile): string => {
+  const label = planet.kind.replace("-", " ");
+  return label.charAt(0).toUpperCase() + label.slice(1);
+};
 
 export const hasRenderer = (planet: ExoplanetProfile): boolean => planet.kind !== "unknown";
