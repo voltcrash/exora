@@ -32,11 +32,4 @@ if (import.meta.env.PROD && "serviceWorker" in navigator) {
   });
 }
 
-if (import.meta.env.DEV || import.meta.env.VITE_XR_EMULATOR === "1") {
-  void import("./xr-emulator.ts").then(({ installXrEmulator, isXrEmulatorRequested }) => {
-    if (isXrEmulatorRequested()) void installXrEmulator().then(render);
-    else render();
-  });
-} else {
-  render();
-}
+render();

@@ -33,7 +33,6 @@ The system diorama is where that discipline is most visible, because a picture o
 - **iPhone and Android AR:** The same immersive control prefers the established Meta Quest VR session, selects native `immersive-ar` on an AR-only phone, and uses Variant Launch's App Clip handoff on iPhone. AR presents the existing Babylon world at tabletop scale over camera passthrough, with hit-tested placement, drag repositioning, and pinch scaling — no GLB or USDZ export path.
 - **Direct Quest shortcuts:** The controller trigger can enter or exit immersive VR when the runtime exposes it. Explore and World Forge remain browser-only; no browser UI is captured or rendered inside VR.
 - **Adaptive rendering budget:** Separate desktop, mobile, and Quest profiles govern shader octaves, sphere tessellation, star count, texture detail, and render scale. Immersive sessions raise fixed foveation after three seconds below 62 FPS and relax it again above 70.
-- **Desktop WebXR emulation:** An opt-in Immersive Web Emulation Runtime installs a synthetic Quest over `navigator.xr`, so the immersive path runs unmodified in a normal tab.
 - **Graceful degradation:** A six-hour planet cache, a twelve-hour star cache, and a bundled local profile keep the experience alive when NASA, SIMBAD, or the API is unreachable.
 
 ## Keyboard
@@ -53,7 +52,6 @@ The system diorama is where that discipline is most visible, because a picture o
 - **Web:** React 19, Vite, Babylon.js 9 (WebGL2 + WebXR)
 - **API:** Hono on Node 24
 - **Data sources:** NASA Exoplanet Archive TAP, SIMBAD TAP (CDS, Strasbourg), and NASA/JPL APIs
-- **Immersive tooling:** IWER and `@iwer/devui` for desktop WebXR emulation
 - **Hosting:** Vercel static output plus a Vercel Function, with Analytics and Speed Insights
 
 ## Development
@@ -119,7 +117,7 @@ vp run @exora/api#build
 
 WebXR requires a secure context. Localhost works for desktop development, but testing from a Quest on the local network needs HTTPS or a deployed origin.
 
-To exercise the immersive VR flow without a headset, open <http://localhost:5173/?xr=emulate>; `?xr=stereo` renders both eyes side by side and `?xr=off` returns to the native runtime. See the [desktop WebXR emulation guide](docs/webxr-emulation.md), use the [Meta Quest smoke-test checklist](docs/quest-testing.md) for headset validation and performance targets, and follow the [iPhone AR deployment and smoke-test guide](docs/iphone-ar.md) for Variant Launch configuration and real-device testing.
+Use the [Meta Quest smoke-test checklist](docs/quest-testing.md) for headset validation and performance targets, and follow the [iPhone AR deployment and smoke-test guide](docs/iphone-ar.md) for Variant Launch configuration and real-device testing.
 
 ## Workspace
 

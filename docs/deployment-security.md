@@ -27,7 +27,7 @@ Vercel CLI back to the workspace dependencies.
   workers and media/images so decoder workers and browser-generated resources keep working.
 - Google Fonts is allowed only for stylesheets and fonts. Vercel Analytics and Speed Insights use
   same-origin `/_vercel` scripts and collection endpoints in production.
-- Inline styles remain allowed because Babylon, the XR emulator, and React components set runtime
+- Inline styles remain allowed because Babylon and React components set runtime
   element styles. This exception does not authorize inline scripts.
 - `frame-ancestors 'none'` and `X-Frame-Options: DENY` both prevent framing. Variant's supported
   Launch Card flow is a top-level navigation, not an iframe, so it remains available.
