@@ -1,4 +1,6 @@
-* {
+*,
+*::before,
+*::after {
   box-sizing: border-box;
 }
 
@@ -12,39 +14,62 @@ body,
   overflow: hidden;
 }
 
+html {
+  -webkit-text-size-adjust: 100%;
+  text-size-adjust: 100%;
+}
+
 body {
   min-width: 320px;
+  color: var(--ink);
+  background: var(--void);
+  font-family: var(--font-sans);
+  font-size: var(--text-base);
+  font-feature-settings: "ss01";
+  line-height: var(--leading);
+  font-synthesis: none;
+  text-rendering: optimizeLegibility;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
 }
 
 button,
 input,
 select,
+textarea,
 kbd {
   font: inherit;
-}
-
-/* The page's one first-level heading, wherever it is written: a destination name, the Discover
-   title, or a recovery screen's report. Each of those refines it; none of them restates it. */
-h1 {
-  max-width: 390px;
-  margin: 0;
-  color: var(--ink);
-  font-size: clamp(48px, 5.5vw, 82px);
-  font-weight: 400;
-  line-height: 0.92;
-  letter-spacing: -0.07em;
-  text-wrap: balance;
-  text-transform: uppercase;
-}
-
-h1 em {
-  color: var(--accent);
-  font-style: normal;
-  font-weight: 400;
+  color: inherit;
 }
 
 button {
+  cursor: pointer;
   -webkit-tap-highlight-color: transparent;
+}
+
+button:disabled {
+  cursor: default;
+}
+
+h1,
+h2,
+h3,
+p {
+  margin: 0;
+}
+
+a {
+  color: inherit;
+}
+
+:focus-visible {
+  outline: 2px solid var(--light);
+  outline-offset: 2px;
+}
+
+::selection {
+  color: var(--on-light);
+  background: var(--light);
 }
 
 #render-canvas {
@@ -55,6 +80,15 @@ button {
   border: 0;
   outline: none;
   touch-action: none;
+}
+
+.visually-hidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
 }
 
 /* Variant composites the iPhone camera beneath the page, so every viewport surface is transparent during AR. */
@@ -72,7 +106,6 @@ body[data-presentation-mode="ar"] #app > :not(#render-canvas) {
 
 body[data-presentation-mode="ar"] .experience-shell > *,
 body[data-presentation-mode="ar"] .space-haze,
-body[data-presentation-mode="ar"] .viewport-grid,
 body[data-presentation-mode="ar"] .surface-veil,
 body[data-presentation-mode="ar"] .travel-veil {
   display: none !important;
@@ -100,40 +133,41 @@ body[data-presentation-mode="ar"] #render-canvas {
 
 #ar-overlay p {
   position: absolute;
-  bottom: max(28px, env(safe-area-inset-bottom));
+  bottom: max(28px, var(--safe-bottom));
   left: 50%;
   width: max-content;
   max-width: calc(100vw - 32px);
   margin: 0;
-  padding: 10px 14px;
-  border: 1px solid rgb(139 230 234 / 42%);
-  border-radius: 999px;
-  color: #eafafa;
-  background: rgb(3 9 10 / 68%);
-  box-shadow: 0 8px 32px rgb(0 0 0 / 28%);
-  font-family: var(--mono);
-  font-size: 9px;
-  letter-spacing: 0.08em;
+  padding: 10px 16px;
+  border: 1px solid var(--hairline-strong);
+  border-radius: var(--radius-pill);
+  color: var(--ink);
+  background: var(--surface);
+  box-shadow: var(--shadow-float);
+  font-size: var(--text-sm);
   text-align: center;
   transform: translateX(-50%);
-  backdrop-filter: blur(12px);
+  backdrop-filter: var(--blur);
+  -webkit-backdrop-filter: var(--blur);
 }
 
 #ar-overlay .ar-background-toggle,
 #ar-overlay .ar-back-button {
   position: absolute;
-  top: max(18px, env(safe-area-inset-top));
-  padding: 9px 12px;
-  border: 1px solid rgb(139 230 234 / 46%);
-  border-radius: 999px;
-  color: #eafafa;
-  background: rgb(3 9 10 / 76%);
-  box-shadow: 0 8px 28px rgb(0 0 0 / 24%);
-  font-family: var(--mono);
-  font-size: 8px;
-  letter-spacing: 0.08em;
+  top: max(18px, var(--safe-top));
+  min-height: 44px;
+  padding: 0 16px;
+  border: 1px solid var(--hairline-strong);
+  border-radius: var(--radius-pill);
+  color: var(--ink);
+  background: var(--surface);
+  box-shadow: var(--shadow-float);
+  font-size: var(--text-sm);
+  font-weight: 500;
   pointer-events: auto;
   touch-action: manipulation;
+  backdrop-filter: var(--blur);
+  -webkit-backdrop-filter: var(--blur);
 }
 
 #ar-overlay .ar-background-toggle {
@@ -149,6 +183,6 @@ body[data-presentation-mode="ar"] #render-canvas {
 }
 
 #ar-overlay .ar-background-toggle[aria-pressed="true"] {
-  border-color: rgb(255 190 80 / 58%);
-  color: #ffe2ae;
+  border-color: var(--light-line);
+  color: var(--light);
 }

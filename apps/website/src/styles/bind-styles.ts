@@ -1,5 +1,9 @@
 type StyleMap = Readonly<Record<string, string>>;
 
+/*
+ * Class names that other code and tests address directly, so they are kept verbatim alongside
+ * whatever the CSS module hashed them to.
+ */
 const GLOBAL_STYLE_CONTRACTS = new Set([
   "black-hole-experience",
   "chrome-hidden",
@@ -14,7 +18,6 @@ const GLOBAL_STYLE_CONTRACTS = new Set([
   "travel-veil",
   "travelling",
   "view-surface",
-  "viewport-grid",
 ]);
 
 export const bindStyles =

@@ -1,17 +1,25 @@
 import { useLayoutEffect, useRef, type ReactNode } from "react";
-import hudStyles from "./DestinationHud.module.css";
+import type { PanelLink } from "../destination-panel.ts";
+import { capitalize, readable } from "../readable.ts";
 import { bindStyles } from "../styles/bind-styles.ts";
 import { onWebFontsReady } from "../web-fonts.ts";
+import { Button } from "./ui/Button.tsx";
+import { Icon } from "./ui/Icon.tsx";
+import { Spinner } from "./ui/Spinner.tsx";
+import styles from "./Destination.module.css";
 
-const cx = bindStyles(hudStyles);
+const cx = bindStyles(styles);
 
 export type IdentityTone = "black-hole" | "region" | "star" | "subsystem" | "world";
 
-interface DestinationIdentityProps {
+export interface DestinationIdentityProps {
+  /** Where this object comes from: a confirmed world, a generated star, our own system. */
   category: string;
   classification: string;
+  links?: readonly PanelLink[];
   name: ReactNode;
   nameId: string;
+  /** What the picture is honestly claiming to be. */
   note: string;
   summary: string;
   tags: readonly string[];
@@ -20,17 +28,15 @@ interface DestinationIdentityProps {
 }
 
 /*
- * A name is one unbreakable word — SAGITTARIUS, HELIOSPHERE — and the column holding it is a fixed
- * width, so whether it fits is a question about the live font rather than about the design. Exora
- * asks for its webfont a second after the first paint, and platform sans faces run up to 13% wider
- * than Exo 2, so the heading is measured rather than trusted: it is scaled down until its longest
- * word is inside the column, and measured again when the column resizes or the real font lands.
+ * A name is often one unbreakable word — SAGITTARIUS, HELIOSPHERE — set in an expanded face in a
+ * column of fixed width, so whether it fits is a question about the live font rather than about
+ * the design. The heading is measured rather than trusted: scaled down until its longest word is
+ * inside the column, and measured again when the column resizes or the real font lands.
  */
 const FIT_PASSES = 4;
 
 const fitToColumn = (heading: HTMLElement): void => {
-  // A heading with no column yet — offscreen, unmounted, a viewport still being sized — has no
-  // measurement to make, and scaling it to a width of zero would be one.
+  // A heading with no column yet has no measurement to make, and scaling it to zero would be one.
   if (heading.clientWidth === 0) return;
 
   heading.style.removeProperty("--identity-name-fit");
@@ -43,18 +49,33 @@ const fitToColumn = (heading: HTMLElement): void => {
   }
 };
 
+const NextDestination = ({ link }: { link: PanelLink }) => (
+  <Button
+    className={cx("next-link")}
+    icon={link.icon}
+    variant="surface"
+    disabled={link.disabled}
+    aria-busy={link.busy || undefined}
+    aria-pressed={link.pressed}
+    onClick={link.onSelect}
+  >
+    {link.label}
+    {link.busy ? <Spinner size={14} /> : null}
+  </Button>
+);
+
 /*
- * WHO THIS IS — the one region of the main screen that never changes shape.
+ * WHO THIS IS, AND WHERE TO GO FROM HERE
  *
- * A star with sixty catalogued worlds and a black hole with none introduce themselves with the
- * same five lines in the same place: what class of object this is, its name, three classification
- * chips, a sentence, and what the picture over it is honestly claiming. Everything a destination
- * additionally knows, offers or lets you leave for belongs to the panel opposite, so this column
- * cannot grow, cannot scroll, and cannot walk up the viewport as a destination gets richer.
+ * Every destination introduces itself the same way: what kind of object it is, its name, a few
+ * classifying facts, a sentence, and what the picture behind it honestly claims to be. The places
+ * it can be left for — its star, its whole system, its parent world — sit directly under the name,
+ * because they are the next thing most people want.
  */
 export const DestinationIdentity = ({
   category,
   classification,
+  links = [],
   name,
   nameId,
   note,
@@ -95,6 +116,8 @@ export const DestinationIdentity = ({
     };
   }, []);
 
+  const errors = links.filter((link) => link.error);
+
   return (
     <section
       className={cx("identity")}
@@ -102,22 +125,40 @@ export const DestinationIdentity = ({
       data-tone={tone}
       aria-labelledby={nameId}
     >
-      <p className={cx("identity-eyebrow")}>
-        <span>{category}</span>
-        <span>{classification}</span>
-      </p>
-      <h1 className={cx("identity-name")} id={nameId} ref={heading}>
-        {name}
-      </h1>
-      <div className={cx("identity-tags")} aria-label={tagsLabel}>
-        {tags.map((tag) => (
-          <span key={tag}>{tag}</span>
-        ))}
+      <div className={cx("identity-head")} data-sheet-grip>
+        <p className={cx("identity-kind")}>
+          <span className={cx("identity-category")}>{capitalize(readable(category))}</span>
+          <span>{capitalize(readable(classification))}</span>
+        </p>
+        <h1 className={cx("identity-name")} id={nameId} ref={heading}>
+          {name}
+        </h1>
+        <ul className={cx("identity-tags")} aria-label={tagsLabel} data-sheet-peek-end>
+          {tags.map((tag) => (
+            <li key={tag}>{readable(tag)}</li>
+          ))}
+        </ul>
       </div>
+
       <p className={cx("identity-summary")}>{summary}</p>
+
+      {links.length > 0 ? (
+        <nav className={cx("identity-next")} aria-label="Go from here">
+          {links.map((link) => (
+            <NextDestination key={link.id} link={link} />
+          ))}
+        </nav>
+      ) : null}
+      {errors.map((link) => (
+        <p className={cx("identity-error")} key={link.id} role="status">
+          {link.error}
+        </p>
+      ))}
+
       {note ? (
         <p className={cx("identity-note")}>
-          <span aria-hidden="true" /> {note}
+          <Icon name="info" size={14} />
+          <span>{readable(note)}</span>
         </p>
       ) : null}
     </section>

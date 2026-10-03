@@ -386,8 +386,10 @@ const expandPanel = async (): Promise<void> => {
     .toBe(true);
   const disclosure = document.querySelector<HTMLButtonElement>('[data-testid="panel-disclosure"]');
   if (!disclosure || getComputedStyle(disclosure).display === "none") return;
-  if (disclosure.getAttribute("aria-expanded") === "true") return;
-  await userEvent.click(page.elementLocator(disclosure));
+  // The sheet opens in steps, from its peek to half the screen to all of it.
+  for (let step = 0; step < 2 && disclosure.parentElement?.dataset.snap !== "full"; step += 1) {
+    await userEvent.click(page.elementLocator(disclosure));
+  }
 };
 
 const openPanelSection = async (name: string): Promise<void> => {
@@ -400,7 +402,7 @@ const openPanelSection = async (name: string): Promise<void> => {
 const openDiscoverSection = async (
   name: "Black Holes" | "Exoplanets" | "Solar System" | "Stars" | "World Forge",
 ): Promise<void> => {
-  await userEvent.click(page.getByRole("button", { name: "Open Discover" }));
+  await userEvent.click(page.getByRole("button", { exact: true, name: "Explore" }));
   await expect.element(page.getByRole("dialog", { name: /Find another world/ })).toBeVisible();
   await userEvent.click(page.getByRole("button", { name: new RegExp(name) }).first());
 };
@@ -432,7 +434,8 @@ desktopTest("the landing page reaches a rendered world", async () => {
   mountApp();
 
   await expect.element(page.getByRole("heading", { level: 1 })).toBeVisible();
-  await expect.element(page.getByRole("button", { name: "Open Discover" })).toBeVisible();
+  await expect.element(page.getByRole("button", { exact: true, name: "Explore" })).toBeVisible();
+  await expect.element(page.getByRole("button", { name: "Go anywhere" })).toBeVisible();
 });
 
 desktopTest("the browser test server exposes the production sky catalog", async () => {
@@ -444,24 +447,34 @@ desktopTest("the browser test server exposes the production sky catalog", async 
   expect(header.getUint32(0, true)).toBe(0x4b_53_58_45);
 });
 
-test("Discover opens directly into Exoplanets at this width", async () => {
+test("Explore opens directly into Exoplanets at this width", async () => {
   stubArchive();
   mountApp();
 
-  await expect.element(page.getByRole("button", { name: "Open Discover" })).toBeVisible();
-  await userEvent.click(page.getByRole("button", { name: "Open Discover" }));
+  const explore = page.getByRole("button", { exact: true, name: "Explore" });
+  await expect.element(explore).toBeVisible();
+  await userEvent.click(explore);
   await expect.element(page.getByRole("dialog", { name: /Find another world/ })).toBeVisible();
   await expect.element(page.getByRole("region", { name: "Exoplanet catalog" })).toBeVisible();
 
-  if (window.innerWidth <= 760) {
-    for (const label of ["Exoplanets", "Stars", "Solar System", "Black Holes", "World Forge"]) {
+  if (window.innerWidth <= 640) {
+    const sections = [
+      "Exoplanets",
+      "Stars",
+      "Solar System",
+      "Black Holes",
+      "Atlas",
+      "Guided Tours",
+      "World Forge",
+    ];
+    for (const label of sections) {
       const button = page.getByRole("button", { name: new RegExp(label) }).first();
       await expect.element(button).toBeVisible();
     }
     const visibleLabels = Array.from(
       document.querySelectorAll<HTMLElement>('[data-testid="discover-nav-copy"]'),
     ).filter((label) => getComputedStyle(label).display !== "none");
-    expect(visibleLabels).toHaveLength(5);
+    expect(visibleLabels).toHaveLength(sections.length);
   }
 });
 
@@ -487,7 +500,7 @@ desktopTest("a black-hole deep link resolves without an archive request", async 
   mountApp("?blackHole=M87*");
 
   await expect.element(page.getByRole("heading", { level: 1 })).toHaveTextContent("M87*");
-  await expect.element(page.getByText(/INTERPRETIVE GRAVITATIONAL-LENSING MODEL/)).toBeVisible();
+  await expect.element(page.getByText(/interpretive model of gravitational lensing/)).toBeVisible();
   expect(window.location.search).toBe("?blackHole=M87*");
   expect(document.querySelector('link[rel="canonical"]')?.getAttribute("href")).toContain(
     "?blackHole=M87*",
@@ -500,7 +513,7 @@ desktopTest("an observed BlackCAT deep link resolves through the Exora API", asy
   mountApp("?blackHole=GS%202023%2B338");
 
   await expect.element(page.getByRole("heading", { level: 1 })).toHaveTextContent("GS 2023+338");
-  await expect.element(page.getByText("OBSERVED BLACK HOLE")).toBeVisible();
+  await expect.element(page.getByText("Observed black hole")).toBeVisible();
   expect(calls.some((path) => path.includes("/api/black-holes/GS%202023%2B338"))).toBe(true);
 });
 
@@ -513,7 +526,7 @@ desktopTest(
     await expect
       .element(page.getByRole("heading", { level: 1 }))
       .toHaveTextContent("EXORA SYNTHETIC 0007");
-    await expect.element(page.getByText("PROCEDURAL BLACK HOLE")).toBeVisible();
+    await expect.element(page.getByText("Procedural black hole")).toBeVisible();
     expect(calls.filter((path) => path.includes("/api/")).length).toBe(0);
   },
 );
@@ -530,8 +543,8 @@ desktopTest(
     );
 
     await openPanelSection("Scale");
-    await expect.element(page.getByText(/LOG · .+ AU → .+ m/)).toBeVisible();
-    await expect.element(page.getByText(/EARTH ×/)).toBeVisible();
+    await expect.element(page.getByText(/Log · .+ AU → .+ m/)).toBeVisible();
+    await expect.element(page.getByText(/Earth ×/)).toBeVisible();
     await expect.element(page.getByText(/^1 s = /)).toBeVisible();
   },
 );
@@ -562,7 +575,7 @@ desktopTest(
     mountApp("?system=Barren");
 
     await expect
-      .element(page.getByRole("heading", { name: "DESTINATION UNAVAILABLE" }))
+      .element(page.getByRole("heading", { name: "Destination unavailable" }))
       .toBeVisible();
     await expect.element(page.getByText(/system “Barren”/)).toBeVisible();
   },
@@ -575,12 +588,12 @@ desktopTest(
     mountApp("?planet=Withdrawn%20b");
 
     await expect
-      .element(page.getByRole("heading", { name: "DESTINATION UNAVAILABLE" }))
+      .element(page.getByRole("heading", { name: "Destination unavailable" }))
       .toBeVisible();
     await expect.element(page.getByText(/planet “Withdrawn b”/)).toBeVisible();
     expect(window.location.search).toBe("?planet=Withdrawn%20b");
 
-    await userEvent.click(page.getByRole("button", { name: "RETURN TO FEATURED WORLD" }));
+    await userEvent.click(page.getByRole("button", { name: "Go to the featured world" }));
 
     await expect.element(page.getByRole("heading", { level: 1 })).toHaveTextContent("GJ 674");
     expect(window.location.pathname).toBe("/");
@@ -596,7 +609,7 @@ desktopTest("the catalog opens, searches, and travels to a result", async () => 
   const dialog = page.getByRole("dialog");
   await expect.element(dialog).toBeVisible();
 
-  await userEvent.fill(page.getByPlaceholder(/Type a name or catalog ID/), "TRAPPIST-1 e");
+  await userEvent.fill(page.getByPlaceholder(/Search by name or catalog ID/), "TRAPPIST-1 e");
   const result = page.getByRole("button", { name: /TRAPPIST-1 e/ });
   await expect.element(result).toBeVisible();
 
@@ -612,9 +625,9 @@ desktopTest("the star catalog opens and travels to a star", async () => {
   mountApp();
 
   await openDiscoverSection("Stars");
-  await expect.element(page.getByRole("heading", { name: "Follow the light." })).toBeVisible();
+  await expect.element(page.getByRole("heading", { name: "Follow the light" })).toBeVisible();
 
-  await userEvent.fill(page.getByPlaceholder(/Type a common name or catalog ID/), "Sirius");
+  await userEvent.fill(page.getByPlaceholder(/Search by common name or catalog ID/), "Sirius");
   const result = page.getByRole("button", { name: /Sirius/ }).first();
   await expect.element(result).toBeVisible();
   await userEvent.click(result);
@@ -642,7 +655,7 @@ desktopTest("the black-hole atlas opens and travels to a sourced horizon", async
 
   await openDiscoverSection("Black Holes");
   await expect
-    .element(page.getByRole("heading", { name: "Follow the light to its edge." }))
+    .element(page.getByRole("heading", { name: "Follow the light to its edge" }))
     .toBeVisible();
   const destination = page.getByRole("button", { name: /Sagittarius A\*/ });
   await expect.element(destination).toBeVisible();
@@ -662,7 +675,7 @@ desktopTest("the atlas folds archive candidates in beside the curated horizons",
 
   const candidate = page.getByRole("button", { name: /GS 2023\+338/ });
   await expect.element(candidate).toBeVisible();
-  await expect.element(page.getByText("STELLAR MASS · CANDIDATE").first()).toBeVisible();
+  await expect.element(page.getByText(/· Candidate ·/).first()).toBeVisible();
   await expect.element(page.getByText("Mass unavailable").first()).toBeVisible();
   await expect.element(page.getByRole("button", { name: /Sagittarius A\*/ })).toBeVisible();
 });
@@ -677,8 +690,7 @@ desktopTest("a black-hole collection narrows the atlas to its own horizons", asy
   await expect.element(page.getByRole("button", { name: /M87\*/ })).toBeVisible();
   await expect.element(page.getByRole("button", { name: /GS 2023\+338/ })).not.toBeInTheDocument();
 
-  await userEvent.click(page.getByRole("tab", { name: "Horizon types" }));
-  await userEvent.click(page.getByRole("button", { name: /Stellar mass/ }));
+  await userEvent.click(page.getByRole("button", { exact: true, name: "Stellar mass" }));
   await expect.element(page.getByRole("button", { name: /Cygnus X-1/ })).toBeVisible();
   await expect.element(page.getByRole("button", { name: /M87\*/ })).not.toBeInTheDocument();
 });
@@ -688,7 +700,7 @@ desktopTest("the atlas search resolves a horizon by its catalog alias", async ()
   mountApp();
   await openDiscoverSection("Black Holes");
 
-  await userEvent.fill(page.getByPlaceholder("Type a name, catalog ID, or host galaxy"), "sgr a");
+  await userEvent.fill(page.getByPlaceholder("Search by name, catalog ID or host galaxy"), "sgr a");
   const destination = page.getByRole("button", { name: /Sagittarius A\*/ });
   await expect.element(destination).toBeVisible();
   await expect.element(page.getByRole("button", { name: /TON 618/ })).not.toBeInTheDocument();
@@ -721,16 +733,14 @@ desktopTest(
     mountApp();
 
     await openDiscoverSection("Solar System");
-    await userEvent.click(page.getByRole("button", { exact: true, name: "REGIONS" }));
-    await userEvent.fill(page.getByPlaceholder("Name or SPK ID"), "Oort");
+    await userEvent.click(page.getByRole("button", { exact: true, name: "Regions" }));
+    await userEvent.fill(page.getByPlaceholder("Search by name or SPK ID"), "Oort");
     const oortCloud = page.getByRole("button", { name: /Oort Cloud/ });
     await expect.element(oortCloud).toBeVisible();
     await userEvent.click(oortCloud);
 
     await expect.element(page.getByRole("heading", { level: 1 })).toHaveTextContent("Oort Cloud");
-    await expect
-      .element(page.getByText(/MODELED \/ INDIRECTLY INFERRED · NOT DIRECTLY OBSERVED/).first())
-      .toBeVisible();
+    await expect.element(page.getByText(/never directly observed/).first()).toBeVisible();
     await expandPanel();
     await expect.element(page.getByLabelText("Region data")).toHaveTextContent("NAIF 10");
     expect(window.location.search).toBe("?region=Oort%20Cloud");
@@ -744,19 +754,20 @@ desktopTest(
     mountApp("?planet=Jupiter");
 
     await expect.element(page.getByRole("heading", { level: 1 })).toHaveTextContent("Jupiter");
-    const subsystem = page.getByRole("button", { name: /Jupiter system/ });
+    const subsystem = page.getByRole("button", { name: "Explore Jupiter's moons" });
     await expect.element(subsystem).toBeVisible();
     await userEvent.click(subsystem);
 
     await expect
       .element(
-        page.getByText("JPL MEAN ORBITS · LOG-COMPRESSED DISTANCE · BODY SIZES EXAGGERATED", {
-          exact: true,
-        }),
+        page.getByText(
+          "JPL mean orbits, with distances log-compressed and bodies drawn larger than life.",
+          { exact: true },
+        ),
       )
       .toBeVisible();
     await expect
-      .element(page.getByRole("button", { name: /Jupiter close view/ }))
+      .element(page.getByRole("button", { name: "Back to Jupiter" }))
       .toHaveAttribute("aria-pressed", "true");
 
     await openPanelSection("Moons");
@@ -775,17 +786,23 @@ desktopTest(
 
     await expect.element(page.getByRole("heading", { level: 1 })).toHaveTextContent("Sun");
     await openPanelSection("Time");
-    await expect.element(page.getByText("SIMPLIFIED CATALOG", { exact: true })).toBeVisible();
-    await userEvent.click(page.getByRole("button", { name: "NOW" }));
-
-    await expect.element(page.getByText("SERVER-CACHED JPL", { exact: true })).toBeVisible();
-    await expect.element(page.getByRole("button", { name: /PLAY/ })).toBeEnabled();
-    await userEvent.click(page.getByRole("button", { name: /REVERSE/ }));
     await expect
-      .element(page.getByRole("button", { name: /REVERSE/ }))
+      .element(page.getByText("Simplified catalog orbits", { exact: true }))
+      .toBeVisible();
+    await userEvent.click(page.getByRole("button", { exact: true, name: "Now" }));
+
+    await expect
+      .element(page.getByText("JPL positions, cached on the server", { exact: true }))
+      .toBeVisible();
+    await expect.element(page.getByRole("button", { exact: true, name: "Play" })).toBeEnabled();
+    await userEvent.click(page.getByRole("button", { exact: true, name: "Reverse" }));
+    await expect
+      .element(page.getByRole("button", { exact: true, name: "Reverse" }))
       .toHaveAttribute("aria-pressed", "true");
-    await userEvent.click(page.getByRole("button", { name: "CATALOG ORBITS" }));
-    await expect.element(page.getByText("SIMPLIFIED CATALOG", { exact: true })).toBeVisible();
+    await userEvent.click(page.getByRole("button", { name: "Back to catalog orbits" }));
+    await expect
+      .element(page.getByText("Simplified catalog orbits", { exact: true }))
+      .toBeVisible();
   },
 );
 
@@ -795,7 +812,7 @@ desktopTest("the Sun's complete world list scrolls inside the destination panel"
 
   const telemetry = page.getByLabelText("Observed star data");
   await expect.element(telemetry).toHaveTextContent(/Earth distance\s*1\s*AU/);
-  await expect.element(telemetry).toHaveTextContent(/Diameter\s*1,391,400\s*KM/);
+  await expect.element(telemetry).toHaveTextContent(/Diameter\s*1,391,400\s*km/);
   await expect.element(telemetry).toHaveTextContent(/Temperature\s*5,772\s*K/);
 
   await openPanelSection("Record");
@@ -851,11 +868,11 @@ desktopTest("the World Forge opens and builds a world the page then shows", asyn
 
   await openDiscoverSection("World Forge");
   await expect
-    .element(page.getByRole("heading", { name: "Make the next discovery." }))
+    .element(page.getByRole("heading", { name: "Make the next discovery" }))
     .toBeVisible();
   await userEvent.click(page.getByRole("button", { name: /GENERATE/i }).first());
 
-  await expect.element(page.getByText("GENERATED WORLD")).toBeVisible();
+  await expect.element(page.getByText("Generated world")).toBeVisible();
   expect(window.location.search).toContain("custom=");
 });
 
@@ -864,8 +881,8 @@ desktopTest("the World Forge builds a black hole with a reloadable recipe", asyn
   mountApp();
 
   await openDiscoverSection("World Forge");
-  await userEvent.click(page.getByRole("tab", { name: /COLLAPSE SPACETIME/i }));
-  await userEvent.fill(page.getByLabelText("BLACK HOLE NAME"), "Umbra Prime");
+  await userEvent.click(page.getByRole("tab", { name: "Black hole" }));
+  await userEvent.fill(page.getByLabelText("Name", { exact: true }), "Umbra Prime");
   await userEvent.click(page.getByRole("button", { name: /GENERATE BLACK HOLE/i }));
 
   await expect.element(page.getByRole("heading", { level: 1 })).toHaveTextContent("Umbra Prime");
@@ -884,7 +901,7 @@ desktopTest("a generated world survives a reload and its URL opens as a deep lin
   mountApp();
 
   await openDiscoverSection("World Forge");
-  await userEvent.fill(page.getByLabelText("WORLD NAME"), "Reloadia");
+  await userEvent.fill(page.getByLabelText("Name", { exact: true }), "Reloadia");
   await userEvent.click(page.getByRole("button", { name: /GENERATE PLANET/i }));
   await expect.element(page.getByRole("heading", { level: 1 })).toHaveTextContent("Reloadia");
   const sharedSearch = window.location.search;
@@ -894,7 +911,7 @@ desktopTest("a generated world survives a reload and its URL opens as a deep lin
 
   await expect.element(page.getByRole("heading", { level: 1 })).toHaveTextContent("Reloadia");
   expect(window.location.search).toBe(sharedSearch);
-  await expect.element(page.getByText("GENERATED WORLD")).toBeVisible();
+  await expect.element(page.getByText("Generated world")).toBeVisible();
 });
 
 desktopTest("an invalid custom recipe fails safely with a clear recovery path", async () => {
@@ -902,11 +919,11 @@ desktopTest("an invalid custom recipe fails safely with a clear recovery path", 
   mountApp("?custom=not-a-valid-recipe");
 
   await expect
-    .element(page.getByRole("heading", { name: "DESTINATION UNAVAILABLE" }))
+    .element(page.getByRole("heading", { name: "Destination unavailable" }))
     .toBeVisible();
-  await expect.element(page.getByText(/invalid or incompatible World Forge recipe/i)).toBeVisible();
+  await expect.element(page.getByText(/World Forge recipe that is invalid/i)).toBeVisible();
   await expect
-    .element(page.getByRole("button", { name: "RETURN TO FEATURED WORLD" }))
+    .element(page.getByRole("button", { name: "Go to the featured world" }))
     .toBeVisible();
 });
 
@@ -915,14 +932,14 @@ desktopTest("back and forward restore generated planets and stars", async () => 
   mountApp();
 
   await openDiscoverSection("World Forge");
-  await userEvent.fill(page.getByLabelText("WORLD NAME"), "History World");
+  await userEvent.fill(page.getByLabelText("Name", { exact: true }), "History World");
   await userEvent.click(page.getByRole("button", { name: /GENERATE PLANET/i }));
   await expect.element(page.getByRole("heading", { level: 1 })).toHaveTextContent("History World");
   const planetSearch = window.location.search;
 
   await openDiscoverSection("World Forge");
-  await userEvent.click(page.getByRole("tab", { name: /IGNITE A STAR/i }));
-  await userEvent.fill(page.getByLabelText("STAR NAME"), "History Star");
+  await userEvent.click(page.getByRole("tab", { exact: true, name: "Star" }));
+  await userEvent.fill(page.getByLabelText("Name", { exact: true }), "History Star");
   await userEvent.click(page.getByRole("button", { name: /GENERATE STAR/i }));
   await expect.element(page.getByRole("heading", { level: 1 })).toHaveTextContent("History Star");
   const starSearch = window.location.search;
@@ -936,7 +953,7 @@ desktopTest("back and forward restore generated planets and stars", async () => 
   expect(window.location.search).toBe(starSearch);
 });
 
-desktopTest("Backspace toggles Discover open and closed", async () => {
+desktopTest("Backspace toggles Explore open and closed", async () => {
   stubArchive();
   mountApp();
   await expect.element(page.getByRole("heading", { level: 1 })).toBeVisible();
@@ -948,12 +965,12 @@ desktopTest("Backspace toggles Discover open and closed", async () => {
   await expect.element(page.getByRole("dialog")).not.toBeInTheDocument();
 });
 
-desktopTest("Backspace edits a Discover search field instead of closing the screen", async () => {
+desktopTest("Backspace edits an Explore search field instead of closing the screen", async () => {
   stubArchive();
   mountApp();
 
   await openDiscoverSection("Exoplanets");
-  const search = page.getByPlaceholder(/Type a name or catalog ID/i);
+  const search = page.getByPlaceholder(/Search by name or catalog ID/i);
   await userEvent.fill(search, "Kepler");
   await userEvent.keyboard("{Backspace}");
 
@@ -961,7 +978,7 @@ desktopTest("Backspace edits a Discover search field instead of closing the scre
   await expect.element(page.getByRole("dialog")).toBeVisible();
 });
 
-test("Tab toggles the interface away and back, and only on the main screen", async () => {
+test("H toggles the interface away and back, and only on the main screen", async () => {
   stubArchive();
   mountApp();
   await expect.element(page.getByRole("heading", { level: 1 })).toBeVisible();
@@ -969,19 +986,23 @@ test("Tab toggles the interface away and back, and only on the main screen", asy
   const clearView = page.getByRole("button", { name: "Hide the interface" });
   await expect.element(clearView).toBeVisible();
 
-  const panels = ["topbar", "hud", "mission-control"].map((testId) => {
+  const panels = ["topbar", "world-intro", "telemetry"].map((testId) => {
     const selector = `[data-testid="${testId}"]`;
     const panel = document.querySelector<HTMLElement>(selector);
     expect(panel, selector).not.toBeNull();
-    return { panel: panel!, selector };
+    return panel!;
   });
   const mobile = window.innerWidth <= 760;
+  // Found by test id, since a hidden button is not in the accessibility tree to be found by role.
+  const restore = page.getByTestId("restore-view");
   const expectCleared = async (): Promise<void> => {
-    for (const { panel, selector } of panels) {
-      if (selector === '[data-testid="mission-control"]') await expect.element(panel).toBeVisible();
-      else await expect.element(panel).not.toBeVisible();
-    }
-    await expect.element(page.getByRole("button", { name: "Show the interface" })).toBeVisible();
+    for (const panel of panels) await expect.element(panel).not.toBeVisible();
+    await expect.element(restore).toBeVisible();
+    await expect.element(restore).toHaveAccessibleName("Show the interface");
+  };
+  const expectRestored = async (): Promise<void> => {
+    for (const panel of panels) await expect.element(panel).toBeVisible();
+    await expect.element(restore).not.toBeVisible();
   };
 
   await userEvent.click(clearView);
@@ -993,17 +1014,16 @@ test("Tab toggles the interface away and back, and only on the main screen", asy
   await expect.element(page.getByRole("dialog")).not.toBeInTheDocument();
   await expectCleared();
 
-  if (mobile) await userEvent.click(page.getByRole("button", { name: "Show the interface" }));
-  else await userEvent.keyboard("{Tab}");
-  for (const { panel } of panels) await expect.element(panel).toBeVisible();
+  if (mobile) await userEvent.click(restore);
+  else await userEvent.keyboard("h");
+  await expectRestored();
 
   if (mobile) await userEvent.click(page.getByRole("button", { name: "Hide the interface" }));
-  else await userEvent.keyboard("{Tab}");
+  else await userEvent.keyboard("h");
   await expectCleared();
 
-  if (mobile) await userEvent.click(page.getByRole("button", { name: "Show the interface" }));
-  else await userEvent.keyboard("{Tab}");
-  for (const { panel } of panels) await expect.element(panel).toBeVisible();
+  await userEvent.click(restore);
+  await expectRestored();
 });
 
 desktopTest("terrain view fades every interface region and reveals the hovered one", async () => {
@@ -1020,25 +1040,23 @@ desktopTest("terrain view fades every interface region and reveals the hovered o
   expect(canvas).not.toBeNull();
   await page.elementLocator(canvas!).hover();
 
-  const regions = document.querySelectorAll<HTMLElement>(
-    '[data-testid="topbar"] > *, [data-testid="hud"] > *, [data-testid="mission-control"] > *',
+  const regions = ["topbar", "world-intro", "telemetry"].map((testId) =>
+    document.querySelector<HTMLElement>(`[data-testid="${testId}"]`)!,
   );
-  expect(regions.length).toBeGreaterThan(2);
   for (const region of regions) {
-    await expect.poll(() => getComputedStyle(region).opacity).toBe("0.34");
+    await expect.poll(() => getComputedStyle(region).opacity).toBe("0.38");
   }
 
-  const hoveredRegion = document.querySelector<HTMLElement>('[data-testid="world-intro"]');
-  expect(hoveredRegion).not.toBeNull();
-  await page.elementLocator(hoveredRegion!).hover();
+  const hoveredRegion = regions[1]!;
+  await page.elementLocator(hoveredRegion).hover();
 
-  await expect.poll(() => getComputedStyle(hoveredRegion!).opacity).toBe("1");
+  await expect.poll(() => getComputedStyle(hoveredRegion).opacity).toBe("1");
   for (const region of regions) {
-    if (region !== hoveredRegion) expect(getComputedStyle(region).opacity).toBe("0.34");
+    if (region !== hoveredRegion) expect(getComputedStyle(region).opacity).toBe("0.38");
   }
 });
 
-desktopTest("Tab keeps traversing focus wherever the shortcut stands down", async () => {
+desktopTest("Tab only ever moves focus, and never hides the interface", async () => {
   stubArchive();
   mountApp();
   await expect.element(page.getByRole("heading", { level: 1 })).toBeVisible();
@@ -1046,6 +1064,7 @@ desktopTest("Tab keeps traversing focus wherever the shortcut stands down", asyn
   const shell = document.querySelector<HTMLElement>(".experience-shell");
   expect(shell).not.toBeNull();
 
+  await userEvent.keyboard("{Tab}");
   await userEvent.keyboard("{Shift>}{Tab}{/Shift}");
   expect(shell!.classList.contains("chrome-hidden")).toBe(false);
 
@@ -1055,6 +1074,22 @@ desktopTest("Tab keeps traversing focus wherever the shortcut stands down", asyn
   await userEvent.keyboard("{Tab}");
   expect(shell!.classList.contains("chrome-hidden")).toBe(false);
   await expect.element(page.getByRole("dialog")).toBeVisible();
+});
+
+desktopTest("the search pill opens the palette, which travels by name", async () => {
+  stubArchive();
+  mountApp();
+  await expect.element(page.getByRole("heading", { level: 1 })).toBeVisible();
+
+  await userEvent.click(page.getByRole("button", { name: "Go anywhere" }));
+  const field = page.getByRole("combobox");
+  await expect.element(field).toHaveFocus();
+  await userEvent.fill(field, "Sagittarius");
+  const option = page.getByRole("option", { name: /Sagittarius A\*/ });
+  await expect.element(option).toBeVisible();
+  await userEvent.click(option);
+
+  await expect.element(page.getByRole("heading", { level: 1 })).toHaveTextContent("Sagittarius A*");
 });
 
 desktopTest(
@@ -1070,7 +1105,7 @@ desktopTest(
     await expect.element(page.getByRole("dialog")).toBeVisible();
     expect(stubbedHost().renderSuspensions).toBe(1);
 
-    await userEvent.click(page.getByRole("button", { name: "Close Discover" }));
+    await userEvent.click(page.getByRole("button", { name: "Close Explore" }));
     await expect.element(page.getByRole("dialog")).not.toBeInTheDocument();
     expect(stubbedHost().renderSuspensions).toBe(0);
 
@@ -1078,7 +1113,7 @@ desktopTest(
     await expect.element(page.getByRole("dialog")).toBeVisible();
     expect(stubbedHost().renderSuspensions).toBe(1);
 
-    await userEvent.click(page.getByRole("button", { name: "Close Discover" }));
+    await userEvent.click(page.getByRole("button", { name: "Close Explore" }));
     await expect.element(page.getByRole("dialog")).not.toBeInTheDocument();
     expect(stubbedHost().renderSuspensions).toBe(0);
   },
@@ -1093,7 +1128,7 @@ desktopTest(
     await expect.element(destination).toBeVisible();
     const destinationName = destination.element().textContent;
 
-    await userEvent.click(page.getByRole("button", { name: "XR: VR AVAILABLE" }));
+    await userEvent.click(page.getByRole("button", { name: "Enter VR" }));
     expect(page.getByRole("dialog")).not.toBeInTheDocument();
 
     stubbedHost().setInXr(false);
@@ -1103,47 +1138,31 @@ desktopTest(
   },
 );
 
-test("Discover uses one scrolling surface without a viewport blur", async () => {
+test("Explore scrolls as one surface, with the Forge's action kept in reach", async () => {
   stubArchive();
   mountApp();
   await expect.element(page.getByRole("heading", { level: 1 })).toBeVisible();
 
   await openDiscoverSection("Exoplanets");
-  const catalog = document.querySelector<HTMLDialogElement>('[data-testid="planet-catalog"]');
-  const catalogScroller = catalog?.querySelector<HTMLElement>(
-    '[data-testid="catalog-scroll-region"]',
-  );
-  const catalogSearch = catalog?.querySelector<HTMLElement>('[data-style-role="catalog-search"]');
+  const catalog = document.querySelector<HTMLElement>('[data-testid="planet-catalog"]');
   const discoverStage = document.querySelector<HTMLElement>('[data-testid="discover-stage"]');
   expect(getComputedStyle(catalog!).overflowY).toBe("visible");
   expect(getComputedStyle(discoverStage!).overflowY).toBe("auto");
-  expect(getComputedStyle(catalogScroller!).overflowY).toBe("visible");
-  expect(getComputedStyle(catalogSearch!).marginBottom).toBe("12px");
   expect(
     getComputedStyle(document.querySelector('[data-testid="catalog-results"]')!).overflowY,
   ).toBe("visible");
-  expect(getComputedStyle(catalog!, "::backdrop").backdropFilter).toBe("none");
 
-  await userEvent.click(page.getByRole("button", { name: "Close Discover" }));
+  await userEvent.click(page.getByRole("button", { name: "Close Explore" }));
   await openDiscoverSection("World Forge");
-  const forge = document.querySelector<HTMLDialogElement>('[data-testid="planet-builder"]');
-  const forgeScroller = forge?.querySelector<HTMLFormElement>(
-    '[data-testid="planet-builder-form"]',
-  );
-  const forgeTabs = forge?.querySelector<HTMLElement>('[data-style-role="forge-tabs"]');
-  const forgeBody = forge?.querySelector<HTMLElement>('[data-style-role="builder-body"]');
+  const forge = document.querySelector<HTMLElement>('[data-testid="planet-builder"]');
+  const forgeForm = forge?.querySelector<HTMLFormElement>('[data-testid="planet-builder-form"]');
   const forgeFooter = forge?.querySelector<HTMLElement>('[data-style-role="builder-footer"]');
   expect(getComputedStyle(forge!).overflowY).toBe("visible");
-  expect(getComputedStyle(forgeScroller!).overflowY).toBe("visible");
-  expect(getComputedStyle(forgeTabs!).borderBottomWidth).toBe("0px");
-  expect(getComputedStyle(forgeBody!).borderTopWidth).toBe("1px");
-  expect(getComputedStyle(forgeBody!).borderBottomWidth).toBe("0px");
-  expect(getComputedStyle(forgeFooter!).borderTopWidth).toBe("0px");
-  expect(getComputedStyle(forgeFooter!).borderBottomWidth).toBe("1px");
-  expect(getComputedStyle(forge!, "::backdrop").backdropFilter).toBe("none");
+  expect(getComputedStyle(forgeForm!).overflowY).toBe("visible");
+  expect(getComputedStyle(forgeFooter!).position).toBe("sticky");
 });
 
-desktopTest("Discover resets its scroll position when changing sections", async () => {
+desktopTest("Explore resets its scroll position when changing sections", async () => {
   stubArchive();
   mountApp();
   await expect.element(page.getByRole("heading", { level: 1 })).toBeVisible();
@@ -1157,7 +1176,7 @@ desktopTest("Discover resets its scroll position when changing sections", async 
   await expect.poll(() => discoverStage.scrollTop).toBe(0);
 });
 
-test("Discover content fits the mobile viewport in every section", async () => {
+test("Explore content fits the mobile viewport in every section", async () => {
   if (window.innerWidth > 760) return;
 
   stubArchive();
@@ -1169,6 +1188,8 @@ test("Discover content fits the mobile viewport in every section", async () => {
     "Stars",
     "Solar System",
     "Black Holes",
+    "Atlas",
+    "Guided Tours",
     "World Forge",
   ] as const) {
     await userEvent.click(page.getByRole("button", { name: new RegExp(section) }).first());

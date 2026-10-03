@@ -1,0 +1,38 @@
+.recovery {
+  position: fixed;
+  z-index: var(--layer-overlay);
+  inset: 0;
+  display: grid;
+  place-items: center;
+  padding: var(--space-6);
+  background:
+    radial-gradient(circle at 50% 40%, rgb(var(--light-rgb) / 6%), transparent 60%), var(--void);
+}
+
+.recovery-card {
+  display: grid;
+  justify-items: center;
+  gap: var(--space-4);
+  max-width: 420px;
+  text-align: center;
+}
+
+.recovery-card h1 {
+  color: var(--ink);
+  font-size: var(--text-2xl);
+  font-stretch: var(--wide);
+  font-weight: 380;
+  letter-spacing: -0.02em;
+  line-height: var(--leading-tight);
+  text-wrap: balance;
+}
+
+.recovery-card p {
+  color: var(--ink-2);
+  font-size: var(--text-base);
+  text-wrap: pretty;
+}
+
+.recovery-card button {
+  margin-top: var(--space-2);
+}

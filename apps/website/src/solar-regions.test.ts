@@ -33,7 +33,7 @@ test("every region records its evidence class, scale, parent identity, and autho
 test("the Oort Cloud is never presented as observed", () => {
   const oort = findSolarRegion("Öpik-Oort cloud")!;
   expect(oort.evidence).toBe("modeled-inferred");
-  expect(oort.disclosure).toContain("NOT DIRECTLY OBSERVED");
+  expect(oort.disclosure).toContain("never directly observed");
   expect(oort.summary).toContain("hypothesized");
 });
 

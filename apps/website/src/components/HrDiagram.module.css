@@ -5,19 +5,17 @@
 }
 
 .hr-title {
-  color: var(--faint);
-  font-family: var(--mono);
-  font-size: 7px;
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
+  color: var(--ink-2);
+  font-size: var(--text-xs);
+  font-weight: 500;
 }
 
 .hr-frame {
   aspect-ratio: 260 / 190;
   position: relative;
-  border: 1px solid var(--line);
-  border-radius: 10px;
-  background: rgb(0 0 0 / 30%);
+  border: 1px solid var(--hairline);
+  border-radius: var(--radius-sm);
+  background: var(--surface-sunken);
   cursor: crosshair;
   touch-action: pan-y;
 }
@@ -36,24 +34,21 @@
 }
 
 .hr-grid {
-  stroke: rgb(229 244 247 / 8%);
+  stroke: rgb(255 255 255 / 8%);
   stroke-width: 1;
   vector-effect: non-scaling-stroke;
 }
 
 .hr-tick {
-  fill: var(--faint);
-  font-family: var(--mono);
-  font-size: 6.5px;
+  fill: var(--ink-3);
+  font-size: 8.5px;
   font-variant-numeric: tabular-nums;
 }
 
 .hr-region {
-  fill: rgb(229 244 247 / 38%);
-  font-family: var(--mono);
-  font-size: 6px;
+  fill: rgb(255 255 255 / 38%);
+  font-size: 8px;
   font-style: italic;
-  letter-spacing: 0.04em;
 }
 
 .hr-sun {
@@ -65,36 +60,34 @@
 
 .hr-subject {
   fill: none;
-  stroke: #f4f7f8;
+  stroke: var(--ink);
   stroke-width: 2;
   vector-effect: non-scaling-stroke;
 }
 
 .hr-label {
-  fill: #dce6e8;
-  font-family: var(--mono);
-  font-size: 6.5px;
+  fill: var(--ink);
+  font-size: 8.5px;
   paint-order: stroke;
-  stroke: #05090b;
+  stroke: var(--surface-solid);
   stroke-width: 2.5px;
 }
 
 .hr-label.strong {
-  fill: #f4f7f8;
-  font-size: 7px;
+  fill: var(--ink);
+  font-size: 9px;
   font-weight: 600;
 }
 
 .hr-readout {
   min-height: 12px;
   margin: 0;
-  color: var(--faint);
-  font-family: var(--mono);
-  font-size: 7px;
+  color: var(--ink-3);
+  font-size: var(--text-xs);
 }
 
 .hr-readout strong {
-  color: #dce6e8;
+  color: var(--ink);
   font-weight: 500;
 }
 

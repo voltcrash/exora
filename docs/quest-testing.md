@@ -12,15 +12,15 @@ from a plain LAN HTTP address.
 3. Orbit around one gas giant, one rocky world, and one ice giant.
 4. Confirm the planet, atmosphere, and ice-giant rings render in both eyes, with no smearing of
    the previous frame at the edges of either eye.
-5. Verify VR opens directly onto the full world and never creates a Discover panel, DOM capture,
+5. Verify VR opens directly onto the full world and never creates an Explore panel, DOM capture,
    or other browser UI in the immersive scene. In orbit, point at the planet and press A/X once;
    confirm it enters the terrain view. Holding A/X or moving the controller must do nothing else.
 6. Walk the surface excursion with the thumbstick and confirm the wearer stays on the terrain.
 7. Press either trigger to exit VR. Confirm the same browser interface and selected destination
-   are still present. Choose a different destination in browser Discover or World Forge before
+   are still present. Choose a different destination in browser Explore or World Forge before
    entering VR again; neither control is available inside the headset.
 8. While VR is active, press grips and application-menu controls and confirm they do not open or
-   manipulate browser Discover.
+   manipulate browser Explore.
 9. Open a system diorama on a host with several worlds — TRAPPIST-1, Kepler-90 and our own Sun
    are the three worth checking, being the most compact, the most spread out, and the one with
    the most worlds. A session opens on a deck above the plane, so confirm the orbits read as
@@ -37,7 +37,7 @@ trigger/grip pointer selection are deliberately off. A/X only enters terrain whe
 ## Performance target
 
 - Target the headset's 72 Hz refresh rate with no sustained drops below 60 FPS.
-- Browser Discover and World Forge are not available from controller shortcuts; there is no DOM
+- Browser Explore and World Forge are not available from controller shortcuts; there is no DOM
   capture or in-headset UI texture.
 - Brief shader compilation drops during the first frame of a new world family are acceptable.
 - The session raises fixed foveation on its own after three seconds below 62 FPS and relaxes it

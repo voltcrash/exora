@@ -1,5 +1,5 @@
 .chart {
-  --series: var(--cyan);
+  --series: var(--tone-measured);
 
   display: grid;
   gap: 6px;
@@ -7,24 +7,22 @@
 }
 
 .chart[data-tone="gold"] {
-  --series: #ffc96f;
+  --series: var(--light);
 }
 
 .chart-title {
-  color: var(--faint);
-  font-family: var(--mono);
-  font-size: 7px;
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
+  color: var(--ink-2);
+  font-size: var(--text-xs);
+  font-weight: 500;
 }
 
 .chart-frame {
   display: grid;
   gap: 4px;
   padding: 8px 8px 6px;
-  border: 1px solid var(--line);
-  border-radius: 10px;
-  background: rgb(255 255 255 / 2%);
+  border: 1px solid var(--hairline);
+  border-radius: var(--radius-sm);
+  background: var(--surface-sunken);
 }
 
 .chart svg {
@@ -43,21 +41,20 @@
 }
 
 .chart-grid {
-  stroke: rgb(229 244 247 / 9%);
+  stroke: rgb(255 255 255 / 9%);
   stroke-width: 1;
   vector-effect: non-scaling-stroke;
 }
 
 .chart-marker {
-  stroke: rgb(229 244 247 / 18%);
+  stroke: rgb(255 255 255 / 18%);
   stroke-width: 1;
   vector-effect: non-scaling-stroke;
 }
 
 .chart-tick {
-  fill: var(--faint);
-  font-family: var(--mono);
-  font-size: 6.5px;
+  fill: var(--ink-3);
+  font-size: 8.5px;
   font-variant-numeric: tabular-nums;
 }
 
@@ -71,14 +68,14 @@
 }
 
 .chart-crosshair {
-  stroke: rgb(229 244 247 / 40%);
+  stroke: rgb(255 255 255 / 40%);
   stroke-width: 1;
   vector-effect: non-scaling-stroke;
 }
 
 .chart-dot {
   fill: var(--series);
-  stroke: #081012;
+  stroke: var(--surface-solid);
   stroke-width: 2;
   vector-effect: non-scaling-stroke;
 }
@@ -89,13 +86,13 @@
   gap: 8px;
   min-height: 12px;
   margin: 0;
-  color: var(--faint);
-  font-family: var(--mono);
-  font-size: 7px;
+  color: var(--ink-3);
+  font-size: var(--text-xs);
+  font-variant-numeric: tabular-nums;
 }
 
 .chart-readout strong {
-  color: #dce6e8;
+  color: var(--ink);
   font-weight: 500;
   font-variant-numeric: tabular-nums;
 }
@@ -111,33 +108,32 @@
 
 .chart-model {
   fill: none;
-  stroke: rgb(229 244 247 / 34%);
+  stroke: rgb(255 255 255 / 34%);
   stroke-width: 1.25;
   vector-effect: non-scaling-stroke;
 }
 
 .chart-annotation {
-  fill: var(--muted);
-  font-family: var(--mono);
-  font-size: 6px;
+  fill: var(--ink-2);
+  font-size: 8px;
 }
 
 .chart-reference {
-  fill: #5d6c72;
-  stroke: #081012;
+  fill: var(--ink-3);
+  stroke: var(--surface-solid);
   stroke-width: 2;
   vector-effect: non-scaling-stroke;
 }
 
 .chart-subject {
   fill: var(--series);
-  stroke: #081012;
+  stroke: var(--surface-solid);
   stroke-width: 2;
   vector-effect: non-scaling-stroke;
 }
 
 .chart-subject.estimated {
-  fill: #081012;
+  fill: var(--surface-solid);
   stroke: var(--series);
   stroke-width: 1.75;
 }
@@ -153,7 +149,7 @@
 
 .chart-focus {
   fill: none;
-  stroke: rgb(229 244 247 / 70%);
+  stroke: rgb(255 255 255 / 70%);
   stroke-width: 1;
   vector-effect: non-scaling-stroke;
 }

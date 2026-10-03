@@ -27,9 +27,9 @@ export class ApplicationErrorBoundary extends Component<
     if (this.state.failed) {
       return (
         <RecoveryScreen
-          action="RELOAD OBSERVATORY"
-          detail="The interface encountered an unexpected fault. Your destination remains in the address bar."
-          heading="INTERFACE OFFLINE"
+          action="Reload Exora"
+          detail="Something in the interface broke. Your destination is still in the address bar, so reloading brings you back to it."
+          heading="Exora hit a problem"
           onRetry={() => window.location.reload()}
         />
       );

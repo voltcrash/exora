@@ -31,19 +31,13 @@ import {
   formatTimescale,
 } from "../planet-utils.tsx";
 import type { PlanetarySubsystem } from "../planetary-subsystems.ts";
-import type { SceneHost, XrStatus } from "../scene-host.ts";
+import { capitalize } from "../readable.ts";
+import type { SceneHost } from "../scene-host.ts";
+import { starLight } from "../star-light.ts";
 import { SURFACE_TRANSITION_MS, type TravelPhase } from "../travel-transition.ts";
-import { useTypographySettled } from "../use-typography-settled.ts";
-import { DestinationIdentity } from "./DestinationIdentity.tsx";
-import { DestinationPanel } from "./DestinationPanel.tsx";
 import { MassRadiusDiagram } from "./MassRadiusDiagram.tsx";
-import { MissionControl } from "./MissionControl.tsx";
 import { SignalCurves } from "./SignalCurves.tsx";
-import sharedStyles from "./ExperienceShared.module.css";
-import hudStyles from "./DestinationHud.module.css";
-import { bindStyles } from "../styles/bind-styles.ts";
-
-const cx = bindStyles(sharedStyles, hudStyles);
+import { DestinationShell, type SceneState } from "./shell/DestinationShell.tsx";
 
 const TRANSIT_DATE_FORMAT = new Intl.DateTimeFormat(undefined, {
   day: "numeric",
@@ -55,10 +49,7 @@ const TRANSIT_DATE_FORMAT = new Intl.DateTimeFormat(undefined, {
 });
 
 interface PlanetExperienceProps {
-  chromeHidden: boolean;
   host: SceneHost | null;
-  onToggleChrome: () => void;
-  onOpenDiscover: () => void;
   onSelectHostStar: (hostStar: string) => Promise<boolean>;
   onSelectPlanet: (planet: ExoplanetProfile, cached: boolean) => void;
   onSelectStar: (star: StarProfile, cached: boolean) => void;
@@ -82,25 +73,25 @@ const visualNote = ({
   subsystemActive: boolean;
 }): string => {
   if (subsystemActive) {
-    return "JPL MEAN ORBITS · LOG-COMPRESSED DISTANCE · BODY SIZES EXAGGERATED";
+    return "JPL mean orbits, with distances log-compressed and bodies drawn larger than life.";
   }
-  if (custom) return `SHAREABLE URL RECIPE · WORLDGEN V${WORLDGEN_VERSION}`;
+  if (custom) return `Rebuilt from the recipe in its link · worldgen v${WORLDGEN_VERSION}.`;
   if (!solar) return "";
   if (solarIdentity?.surfaceStatus === "unresolved") {
-    return "UNRESOLVED SURFACE · PHYSICALLY CONSTRAINED NEUTRAL VISUALIZATION";
+    return "No spacecraft has resolved this surface, so it is drawn neutral within its measured constraints.";
   }
   if (solarIdentity?.surfaceStatus === "modeled") {
-    return "MEASURED PROPORTIONS · UNRESOLVED NEUTRAL SURFACE";
+    return "Measured proportions; the surface itself is unresolved and drawn neutral.";
   }
   if (solarIdentity?.texture?.topography) {
-    return "DAWN GLOBAL MOSAIC + MEASURED TOPOGRAPHY · EXORA LIGHTING";
+    return "Dawn's global mosaic over measured topography, lit by Exora.";
   }
   if (solarIdentity?.texture) {
     return isMoon
-      ? "NASA MISSION MOSAIC · MEASURED ROTATION + EXORA LIGHTING"
-      : "SPACECRAFT GLOBAL MOSAIC · EXORA ATMOSPHERE + LIGHTING";
+      ? "NASA mission mosaic on its measured rotation, lit by Exora."
+      : "Spacecraft global mosaic under an atmosphere and lighting modelled by Exora.";
   }
-  return "KNOWN PLANET · PHYSICALLY TUNED ATMOSPHERIC VISUALIZATION";
+  return "A known planet, its atmosphere tuned to its measured physics.";
 };
 
 const subsystemLayers = (subsystem: PlanetarySubsystem): readonly PanelBody[] => [
@@ -155,10 +146,7 @@ const subsystemLayers = (subsystem: PlanetarySubsystem): readonly PanelBody[] =>
 ];
 
 export const PlanetExperience = ({
-  chromeHidden,
   host,
-  onToggleChrome,
-  onOpenDiscover,
   onSelectHostStar,
   onSelectPlanet,
   onSelectStar,
@@ -167,13 +155,11 @@ export const PlanetExperience = ({
   result,
   travelPhase,
 }: PlanetExperienceProps) => {
-  const [fps, setFps] = useState("--");
   const [clockMs, setClockMs] = useState(Date.now);
-  const [sceneState, setSceneState] = useState<"loading" | "ready" | "error">("loading");
+  const [sceneState, setSceneState] = useState<SceneState>("loading");
   const [sceneMode, setSceneMode] = useState<"subsystem" | "world">("world");
   const [subsystem, setSubsystem] = useState<PlanetarySubsystem | null>(null);
   const [viewMode, setViewMode] = useState<ViewMode>("orbit");
-  const [xrStatus, setXrStatus] = useState<XrStatus>("checking");
   const [hostJumpState, setHostJumpState] = useState<"idle" | "loading" | "error">("idle");
   const [systemJumpState, setSystemJumpState] = useState<"idle" | "loading" | "error">("idle");
   const [findSolarWorld, setFindSolarWorld] = useState<
@@ -215,13 +201,6 @@ export const PlanetExperience = ({
     };
   }, [planet.name, solar]);
 
-  const travelling = travelPhase === "departing" || travelPhase === "crossing";
-  const typographySettled = useTypographySettled();
-  const settled =
-    (sceneState === "ready" && typographySettled) ||
-    sceneState === "error" ||
-    travelPhase !== "idle";
-
   const openHostStar = async (): Promise<void> => {
     if (custom || hostJumpRef.current) return;
     hostJumpRef.current = true;
@@ -248,21 +227,10 @@ export const PlanetExperience = ({
     if (!custom) warmDestinations(planet.hostStar);
   }, [custom, planet.hostStar]);
 
-  useEffect(() => host?.onXrStatus(setXrStatus), [host]);
-
   useEffect(() => {
     const minuteTimer = window.setInterval(() => setClockMs(Date.now()), 60_000);
     return () => window.clearInterval(minuteTimer);
   }, []);
-
-  useEffect(() => {
-    if (!host) return;
-    document.body.dataset.qualityTier = host.qualityTier;
-    const fpsTimer = window.setInterval(() => {
-      setFps(Math.round(host.getFps()).toString());
-    }, 1_000);
-    return () => window.clearInterval(fpsTimer);
-  }, [host]);
 
   useEffect(() => {
     if (!host) return;
@@ -494,50 +462,47 @@ export const PlanetExperience = ({
     label: custom ? "Custom planet data" : "Observed planet data",
     links: present([
       subsystem && {
-        action: subsystemActive ? "RETURN TO WORLD" : "EXPLORE MOONS + FIELDS ↗",
-        glyph: subsystemActive ? "◉" : "⌾",
+        icon: subsystemActive ? ("planet" as const) : ("moon" as const),
         id: "subsystem",
+        label: subsystemActive ? `Back to ${planet.name}` : `Explore ${planet.name}'s moons`,
         onSelect: () => setSceneMode(subsystemActive ? "world" : "subsystem"),
         pressed: subsystemActive,
-        title: subsystemActive ? `${planet.name} close view` : `${planet.name} system`,
-        tone: "cyan" as const,
       },
       !custom &&
         !subsystemActive && {
-          action: hostJumpState === "loading" ? "RESOLVING…" : "VISIT STAR ↗",
+          busy: hostJumpState === "loading",
           disabled: hostJumpState === "loading",
           ...(hostJumpState === "error"
-            ? { error: "SIMBAD could not resolve this host name." }
+            ? { error: `SIMBAD could not find a star called ${planet.hostStar}.` }
             : {}),
-          glyph: "☀",
+          icon: "star" as const,
           id: "host-star",
+          label: `Visit ${planet.hostStar}`,
           onSelect: () => void openHostStar(),
-          title: planet.hostStar,
         },
       !custom &&
         !subsystemActive && {
-          action: systemJumpState === "loading" ? "PLACING ORBITS…" : "VIEW EVERY ORBIT ↗",
+          busy: systemJumpState === "loading",
           disabled: systemJumpState === "loading",
           ...(systemJumpState === "error"
-            ? { error: "The archive links no placeable orbits to this host." }
+            ? { error: "The archive has no orbits it can place for this system." }
             : {}),
-          glyph: "◎",
+          icon: "orbit" as const,
           id: "whole-system",
+          label: "Whole system",
           onSelect: () => void openHostSystem(),
-          title: "Whole system",
         },
       primaryBody && !subsystemActive
         ? {
-            action: "VISIT PRIMARY ↗",
-            glyph: "◉",
+            icon: "planet" as const,
             id: "primary-body",
+            label: `Visit ${primaryBody}`,
             onSelect: openPrimaryBody,
-            title: primaryBody,
           }
         : null,
     ]),
     metrics: subsystemActive ? subsystemMetrics : worldMetrics,
-    source: custom ? "WORLD FORGE" : solar ? "NASA/JPL" : "NASA ARCHIVE",
+    source: custom ? "World Forge" : solar ? "NASA/JPL" : "NASA Exoplanet Archive",
     tabs:
       subsystemActive && subsystem
         ? presentTabs([
@@ -710,91 +675,63 @@ export const PlanetExperience = ({
           : "Observed properties",
   };
 
+  const hints = [
+    { key: "Drag", meaning: viewMode === "surface" ? "Look around" : "Orbit" },
+    {
+      key: "Scroll",
+      meaning:
+        viewMode === "surface"
+          ? "Return to orbit"
+          : viewMode === "subsystem"
+            ? "Scale the system"
+            : "Zoom, or land",
+    },
+    ...(viewMode === "subsystem" ? [] : [{ key: "W A S D", meaning: "Move" }]),
+    ...(viewMode === "subsystem"
+      ? [{ key: "Click", meaning: "Visit a moon" }]
+      : viewMode === "orbit" && !custom
+        ? [{ key: "Click", meaning: "Visit the star" }]
+        : []),
+    { key: "H", meaning: "Hide interface" },
+  ];
+
   return (
-    <div
-      className={cx(
-        `experience-shell view-${viewMode} ${subsystemActive ? "subsystem-experience" : ""} ${settled ? "scene-ready" : ""} ${sceneState === "error" ? "scene-error" : ""} ${travelling ? "travelling" : ""} ${chromeHidden ? "chrome-hidden" : ""}`,
-      )}
+    <DestinationShell
+      className={`view-${viewMode} ${subsystemActive ? "subsystem-experience" : ""}`}
+      hints={hints}
+      host={host}
+      identity={{
+        category: custom ? "Generated world" : solar ? "Solar System" : "Confirmed world",
+        classification: capitalize(
+          (solar ? solarIdentity?.bodyType.replace("-", " ") : planet.kind.replace("-", " ")) ??
+            "world",
+        ),
+        name: formatPlanetName(planet.name),
+        nameId: "world-name",
+        note: visualNote({ custom, isMoon, solar, solarIdentity, subsystemActive }),
+        summary: (solar ? solarIdentity?.summary : recipe.summary) ?? recipe.summary,
+        tags: [
+          recipe.classification,
+          recipe.derived.equilibriumTemperatureKelvin === null
+            ? "Temperature unknown"
+            : `${recipe.derived.equilibriumTemperatureSource === "derived" ? "~" : ""}${formatNumber(recipe.derived.equilibriumTemperatureKelvin, 0)} K`,
+          observation.discoveryMethod,
+        ],
+        tagsLabel: "World classification",
+        tone: subsystemActive ? "subsystem" : "world",
+      }}
+      light={starLight(custom ? null : observation.hostTemperatureKelvin)}
+      loading={{
+        detail: subsystemActive
+          ? `${planet.name} and its moons`
+          : `${planet.name} · seed ${recipe.seed.toString(16).toUpperCase()}`,
+        title: subsystemActive ? "Placing moons" : "Calculating world",
+      }}
+      panel={panel}
+      sceneState={sceneState}
       style={{ "--surface-transition": `${SURFACE_TRANSITION_MS}ms` } as CSSProperties}
-    >
-      <div className={cx("space-haze")} aria-hidden="true" />
-      <div className={cx("viewport-grid")} aria-hidden="true" />
-      <div className={cx("surface-veil")} aria-hidden="true" />
-
-      <header className={cx("topbar")} data-testid="topbar">
-        <a className={cx("brand")} href="/" aria-label="Exora home">
-          <span className={cx("brand-mark")} aria-hidden="true" />
-          <span className={cx("brand-copy")}>
-            <strong>EXORA</strong>
-            <small>UNIVERSE OBSERVATORY</small>
-          </span>
-        </a>
-      </header>
-
-      <main className={cx("hud")} data-testid="hud">
-        <DestinationIdentity
-          category={custom ? "GENERATED WORLD" : solar ? "SOLAR SYSTEM WORLD" : "CONFIRMED WORLD"}
-          classification={
-            (solar ? solarIdentity?.bodyType : planet.kind.replace("-", " ")) ?? "WORLD"
-          }
-          name={formatPlanetName(planet.name)}
-          nameId="world-name"
-          note={visualNote({ custom, isMoon, solar, solarIdentity, subsystemActive })}
-          summary={(solar ? solarIdentity?.summary : recipe.summary) ?? recipe.summary}
-          tags={[
-            recipe.classification,
-            recipe.derived.equilibriumTemperatureKelvin === null
-              ? "TEMP UNKNOWN"
-              : `${recipe.derived.equilibriumTemperatureSource === "derived" ? "~" : ""}${formatNumber(recipe.derived.equilibriumTemperatureKelvin, 0)} K`,
-            observation.discoveryMethod,
-          ]}
-          tagsLabel="World classification"
-          tone={subsystemActive ? "subsystem" : "world"}
-        />
-
-        <DestinationPanel fps={fps} model={panel} />
-      </main>
-
-      <MissionControl
-        chromeHidden={chromeHidden}
-        hints={[
-          { key: "WASD", meaning: "MOVE" },
-          { key: "DRAG", meaning: viewMode === "surface" ? "LOOK" : "ORBIT" },
-          {
-            key: "SCROLL",
-            meaning:
-              viewMode === "surface"
-                ? "RETURN"
-                : viewMode === "subsystem"
-                  ? "SCALE SYSTEM"
-                  : "ZOOM / APPROACH",
-          },
-          ...(viewMode === "subsystem"
-            ? [{ key: "CLICK", meaning: "VISIT MOON" }]
-            : viewMode === "orbit" && !custom
-              ? [{ key: "CLICK", meaning: "VISIT STAR" }]
-              : []),
-        ]}
-        onToggleChrome={onToggleChrome}
-        onOpenDiscover={onOpenDiscover}
-        sceneFailed={sceneState === "error"}
-        xr={{ host, status: xrStatus }}
-      />
-
-      <div
-        className={cx(`loading-screen ${typographySettled ? "type-settled" : ""}`)}
-        role="status"
-      >
-        <div className={cx("loading-orbit")} aria-hidden="true">
-          <span />
-        </div>
-        <p>CALCULATING WORLD</p>
-        <small>
-          {subsystemActive
-            ? `${planet.name.toUpperCase()} SUBSYSTEM`
-            : `${planet.name.toUpperCase()} · SEED ${recipe.seed.toString(16).toUpperCase()}`}
-        </small>
-      </div>
-    </div>
+      surfaceVeil
+      travelPhase={travelPhase}
+    />
   );
 };

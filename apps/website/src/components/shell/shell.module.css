@@ -1,0 +1,515 @@
+/* Scene overlays */
+
+.space-haze,
+.surface-veil {
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+}
+
+.space-haze {
+  background:
+    radial-gradient(ellipse 70% 60% at 50% 45%, transparent 40%, rgb(0 0 0 / 55%) 100%),
+    linear-gradient(to top, rgb(0 0 0 / 55%), transparent 38%);
+}
+
+.surface-veil {
+  z-index: var(--layer-veil);
+  background: var(--void);
+  visibility: hidden;
+  opacity: 0;
+}
+
+/*
+ * The dark a descent passes through. One timeline with the camera, run from
+ * `travel-transition.ts`: full dark across the middle, which is where the scene hands one half of
+ * the world over to the other. It is held wide because the timeline starts with a React commit a
+ * frame or two after the scene's own clock, a gap that is a fifth of a second on a slow machine.
+ */
+:global(.view-transition) .surface-veil {
+  visibility: visible;
+  animation: surface-dip var(--surface-transition, 760ms) linear both;
+}
+
+@keyframes surface-dip {
+  0% {
+    opacity: 0;
+  }
+  28%,
+  72% {
+    opacity: 1;
+  }
+  100% {
+    opacity: 0;
+  }
+}
+
+/*
+ * The dark a jump crosses in. The flight itself is flown by the camera; this covers only the
+ * moment between worlds, when the scene's contents are swapped and the frame loop stalls. It
+ * darkens quickly and clears slowly, so the jump ends on the new world rather than on a curtain.
+ */
+.travel-veil {
+  position: fixed;
+  z-index: var(--layer-travel);
+  inset: 0;
+  background: var(--void);
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity var(--travel-reveal, 300ms) ease-out;
+}
+
+.travel-veil[data-crossing] {
+  opacity: 1;
+  transition: opacity var(--travel-cross, 190ms) ease-in;
+}
+
+/* Chrome visibility */
+
+.topbar,
+.hud,
+.hints,
+.restore {
+  position: fixed;
+  z-index: var(--layer-hud);
+  transition:
+    opacity var(--duration) var(--ease),
+    visibility var(--duration) var(--ease);
+}
+
+/*
+ * Hidden rather than merely transparent: a faded-out button is still a button. Travel hides the
+ * chrome because it reads the world being left; a cleared view hides it because that was asked.
+ */
+.travelling .topbar,
+.travelling .hud,
+.travelling .hints,
+.travelling .restore,
+.chrome-hidden .topbar,
+.chrome-hidden .hud,
+.chrome-hidden .hints,
+.restore {
+  visibility: hidden;
+  opacity: 0;
+}
+
+.chrome-hidden:not(.travelling) .restore {
+  visibility: visible;
+  opacity: 1;
+}
+
+/*
+ * On a surface the horizon is the point, so the chrome steps back until it is reached for. The
+ * sheet has no box of its own on a wide screen, so its children are what fade.
+ */
+:global(.view-surface) .topbar,
+:global(.view-surface) .sheet-scroll > *,
+:global(.view-surface) .hints {
+  opacity: 0.38;
+}
+
+:global(.view-surface) .topbar:hover,
+:global(.view-surface) .topbar:focus-within,
+:global(.view-surface) .sheet-scroll > *:hover,
+:global(.view-surface) .sheet-scroll > *:focus-within {
+  opacity: 1;
+}
+
+.sheet-scroll > * {
+  transition: opacity var(--duration) var(--ease);
+}
+
+/* Top bar */
+
+.topbar {
+  top: calc(var(--safe-top) + var(--edge));
+  right: calc(var(--safe-right) + var(--edge));
+  left: calc(var(--safe-left) + var(--edge));
+  display: grid;
+  grid-template-columns: 1fr minmax(0, 360px) 1fr;
+  align-items: center;
+  gap: var(--space-3);
+  pointer-events: none;
+}
+
+.topbar > * {
+  pointer-events: auto;
+}
+
+.brand {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  justify-self: start;
+  padding: 4px 10px 4px 4px;
+  border-radius: var(--radius-pill);
+  color: var(--ink);
+  text-decoration: none;
+}
+
+.brand:hover .brand-moon {
+  transform: rotate(-40deg);
+}
+
+.brand-mark {
+  flex: none;
+  overflow: visible;
+}
+
+.brand-orbit {
+  fill: none;
+  stroke: var(--hairline-strong);
+  stroke-width: 1.2;
+}
+
+.brand-world {
+  fill: var(--ink);
+}
+
+.brand-moon {
+  fill: var(--light);
+  transform-origin: 14px 14px;
+  transition: transform var(--duration-slow) var(--ease);
+}
+
+.brand-name {
+  font-size: var(--text-md);
+  font-stretch: var(--wide);
+  font-weight: 600;
+  letter-spacing: 0.01em;
+}
+
+.search {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  width: 100%;
+  height: var(--control-height);
+  padding: 0 6px 0 14px;
+  border: 1px solid var(--hairline);
+  border-radius: var(--radius-pill);
+  color: var(--ink-3);
+  background: var(--surface);
+  box-shadow: 0 6px 24px rgb(0 0 0 / 28%);
+  font-size: var(--text-sm);
+  text-align: left;
+  backdrop-filter: var(--blur);
+  -webkit-backdrop-filter: var(--blur);
+  transition:
+    border-color var(--duration-fast) var(--ease),
+    color var(--duration-fast) var(--ease);
+}
+
+.search:hover {
+  border-color: var(--hairline-strong);
+  color: var(--ink-2);
+}
+
+.search-label {
+  flex: 1;
+}
+
+.search-keys {
+  display: inline-flex;
+  margin-right: 4px;
+}
+
+.actions {
+  display: flex;
+  align-items: center;
+  justify-self: end;
+  gap: var(--space-2);
+}
+
+/* Hints */
+
+.hints {
+  bottom: calc(var(--safe-bottom) + var(--edge));
+  left: 50%;
+  display: none;
+  gap: var(--space-4);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  color: var(--ink-3);
+  font-size: var(--text-xs);
+  transform: translateX(-50%);
+  pointer-events: none;
+}
+
+.hints li {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.hints kbd {
+  padding: 2px 6px;
+  border: 1px solid var(--hairline);
+  border-radius: 5px;
+  color: var(--ink-2);
+  font-size: var(--text-2xs);
+  font-weight: 500;
+}
+
+@media (min-width: 1400px) and (pointer: fine) {
+  .hints {
+    display: flex;
+  }
+}
+
+.scene-alert {
+  position: fixed;
+  z-index: var(--layer-hud);
+  bottom: calc(var(--safe-bottom) + var(--edge));
+  left: 50%;
+  padding: 10px 16px;
+  border: 1px solid rgb(255 143 128 / 40%);
+  border-radius: var(--radius-pill);
+  color: var(--tone-danger);
+  background: var(--surface);
+  font-size: var(--text-sm);
+  transform: translateX(-50%);
+  backdrop-filter: var(--blur);
+  -webkit-backdrop-filter: var(--blur);
+}
+
+/* The way back from a cleared view */
+
+.restore {
+  right: calc(var(--safe-right) + var(--edge));
+  bottom: calc(var(--safe-bottom) + var(--edge));
+}
+
+/* HUD and sheet */
+
+.hud {
+  inset: 0;
+  pointer-events: none;
+}
+
+/* On a wide screen the sheet has no box of its own; its children are placed by their own rules. */
+.sheet,
+.sheet-scroll {
+  display: contents;
+}
+
+.sheet-handle {
+  display: none;
+}
+
+/* Loading */
+
+.loading {
+  position: fixed;
+  z-index: var(--layer-loading);
+  inset: 0;
+  display: grid;
+  place-content: center;
+  justify-items: center;
+  gap: var(--space-2);
+  background: var(--void);
+  pointer-events: none;
+  text-align: center;
+  transition:
+    opacity var(--duration-slow) var(--ease),
+    visibility 0s linear var(--duration-slow);
+}
+
+.scene-ready .loading:not([data-standalone]) {
+  visibility: hidden;
+  opacity: 0;
+}
+
+.loading-mark {
+  width: 44px;
+  height: 44px;
+  margin-bottom: var(--space-3);
+  overflow: visible;
+  animation: orbit 2.4s linear infinite;
+}
+
+.loading-mark circle {
+  fill: none;
+  stroke: var(--hairline-strong);
+  stroke-width: 1;
+}
+
+.loading-mark .loading-body {
+  fill: var(--light);
+  stroke: none;
+}
+
+.loading p {
+  color: var(--ink);
+  font-size: var(--text-md);
+  font-weight: 500;
+}
+
+.loading small {
+  max-width: 32ch;
+  color: var(--ink-3);
+  font-size: var(--text-sm);
+}
+
+/* The copy is withheld rather than drawn in the platform sans and redrawn once Archivo lands. */
+.loading p,
+.loading small {
+  opacity: 0;
+  transition: opacity var(--duration) var(--ease);
+}
+
+.loading[data-type-settled] p,
+.loading[data-type-settled] small {
+  opacity: 1;
+}
+
+@keyframes orbit {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+/* Phones: one sheet holds the identity and the readings. */
+
+@media (max-width: 760px) {
+  .topbar {
+    grid-template-columns: auto 1fr auto;
+    gap: var(--space-2);
+  }
+
+  .brand {
+    padding-right: 4px;
+  }
+
+  .brand-name {
+    display: none;
+  }
+
+  .search {
+    justify-self: end;
+    width: var(--control-height);
+    padding: 0;
+    justify-content: center;
+  }
+
+  .search-label,
+  .search-keys {
+    display: none;
+  }
+
+  .actions {
+    gap: 6px;
+  }
+
+  /* Icon-only on a phone, but the label stays as the button's accessible name. */
+  .explore > span,
+  .xr > span {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip-path: inset(50%);
+    white-space: nowrap;
+  }
+
+  .explore,
+  .xr {
+    width: var(--control-height);
+    padding: 0;
+  }
+
+  .sheet {
+    position: fixed;
+    right: 0;
+    bottom: 0;
+    left: 0;
+    display: flex;
+    flex-direction: column;
+    height: var(--sheet-peek, 172px);
+    max-height: calc(100dvh - var(--safe-top) - var(--edge) - var(--control-height) - 12px);
+    border: 1px solid var(--hairline);
+    border-bottom: 0;
+    border-radius: var(--radius-lg) var(--radius-lg) 0 0;
+    background: var(--surface);
+    box-shadow: 0 -12px 40px rgb(0 0 0 / 40%);
+    pointer-events: auto;
+    touch-action: none;
+    backdrop-filter: var(--blur);
+    -webkit-backdrop-filter: var(--blur);
+    transition: height var(--duration-slow) var(--ease);
+  }
+
+  .sheet[data-snap="half"] {
+    height: 56dvh;
+  }
+
+  .sheet[data-snap="full"] {
+    height: 100dvh;
+  }
+
+  .sheet[data-dragging] {
+    transition: none;
+    user-select: none;
+  }
+
+  .sheet-handle {
+    display: grid;
+    flex: none;
+    place-items: center;
+    width: 100%;
+    height: 22px;
+    padding: 0;
+    border: 0;
+    background: none;
+  }
+
+  .sheet-handle span {
+    width: 38px;
+    height: 4px;
+    border-radius: 2px;
+    background: var(--hairline-strong);
+  }
+
+  .sheet-scroll {
+    position: relative;
+    display: block;
+    flex: 1;
+    min-height: 0;
+    padding: 0 var(--space-4) calc(var(--safe-bottom) + var(--space-6));
+    overflow: hidden;
+    overscroll-behavior: contain;
+    touch-action: none;
+  }
+
+  .sheet [data-sheet-grip] {
+    touch-action: none;
+  }
+
+  .sheet[data-snap="full"] .sheet-scroll {
+    overflow-y: auto;
+    touch-action: pan-y;
+  }
+
+  .restore {
+    left: 50%;
+    right: auto;
+    transform: translateX(-50%);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .loading-mark {
+    animation-duration: 8s;
+  }
+
+  .topbar,
+  .hud,
+  .hints,
+  .restore,
+  .loading,
+  .sheet,
+  .travel-veil {
+    transition: none;
+  }
+}

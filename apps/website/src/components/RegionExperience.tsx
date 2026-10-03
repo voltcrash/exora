@@ -1,25 +1,16 @@
 import type { StarProfile } from "@exora/contracts";
 import { useEffect, useState } from "react";
 import type { DestinationPanelModel } from "../destination-panel.ts";
-import type { SceneHost, XrStatus } from "../scene-host.ts";
+import { capitalize } from "../readable.ts";
+import type { SceneHost } from "../scene-host.ts";
 import type { SolarRegionProfile } from "../solar-regions.ts";
 import { findSolarStar } from "../solar-system.ts";
+import { starLight } from "../star-light.ts";
 import type { TravelPhase } from "../travel-transition.ts";
-import { useTypographySettled } from "../use-typography-settled.ts";
-import { DestinationIdentity } from "./DestinationIdentity.tsx";
-import { DestinationPanel } from "./DestinationPanel.tsx";
-import { MissionControl } from "./MissionControl.tsx";
-import sharedStyles from "./ExperienceShared.module.css";
-import hudStyles from "./DestinationHud.module.css";
-import { bindStyles } from "../styles/bind-styles.ts";
-
-const cx = bindStyles(sharedStyles, hudStyles);
+import { DestinationShell, type SceneState } from "./shell/DestinationShell.tsx";
 
 interface RegionExperienceProps {
-  chromeHidden: boolean;
   host: SceneHost | null;
-  onToggleChrome: () => void;
-  onOpenDiscover: () => void;
   onSelectStar: (star: StarProfile, cached: boolean) => void;
   region: SolarRegionProfile;
   travelPhase: TravelPhase;
@@ -29,27 +20,12 @@ const distanceLabel = (value: number): string =>
   `${value.toLocaleString("en-US", { maximumFractionDigits: 1 })}`;
 
 export const RegionExperience = ({
-  chromeHidden,
   host,
-  onToggleChrome,
-  onOpenDiscover,
   onSelectStar,
   region,
   travelPhase,
 }: RegionExperienceProps) => {
-  const [fps, setFps] = useState("--");
-  const [xrStatus, setXrStatus] = useState<XrStatus>("checking");
-  const [sceneState, setSceneState] = useState<"error" | "loading" | "ready">("loading");
-  const travelling = travelPhase === "departing" || travelPhase === "crossing";
-  const typographySettled = useTypographySettled();
-
-  useEffect(() => host?.onXrStatus(setXrStatus), [host]);
-
-  useEffect(() => {
-    if (!host) return;
-    const timer = window.setInterval(() => setFps(Math.round(host.getFps()).toString()), 1_000);
-    return () => window.clearInterval(timer);
-  }, [host]);
+  const [sceneState, setSceneState] = useState<SceneState>("loading");
 
   useEffect(() => {
     if (!host) return;
@@ -80,27 +56,26 @@ export const RegionExperience = ({
     if (sun) onSelectStar(sun, true);
   };
 
-  const evidenceLabel = region.evidence.replaceAll("-", " ").toUpperCase();
+  const evidenceLabel = capitalize(region.evidence.replaceAll("-", " "));
 
   const panel: DestinationPanelModel = {
-    footer: `ANCHOR NAIF / SPK ${region.anchorNaifId} · RETRIEVED 2026-08-23`,
+    footer: `Anchored to NAIF / SPK ${region.anchorNaifId} · retrieved 2026-08-23`,
     label: "Region data",
     links: [
       {
-        action: "VISIT PARENT ↗",
-        glyph: "☀",
+        icon: "star",
         id: "parent",
+        label: `Visit the ${region.parent}`,
         onSelect: openParent,
-        title: region.parent,
       },
     ],
     metrics: [
       { label: "Inner extent", unit: "AU", value: distanceLabel(region.distanceAu.inner) },
       { label: "Outer extent", unit: "AU", value: distanceLabel(region.distanceAu.outer) },
       { label: "Evidence", value: evidenceLabel.split(" ")[0] ?? evidenceLabel },
-      { label: "Particles", value: "SAMPLED" },
+      { label: "Particles", value: "Sampled" },
     ],
-    source: "NASA / JPL · REGIONAL MODEL",
+    source: "NASA/JPL regional model",
     tabs: [
       {
         blocks: [
@@ -138,7 +113,7 @@ export const RegionExperience = ({
               meta: `${source.source} · ${source.retrievedOn}`,
               name: source.datasetId,
             })),
-            label: "AUTHORITATIVE DATASETS",
+            label: "Authoritative datasets",
             type: "bodies",
           },
         ],
@@ -151,62 +126,29 @@ export const RegionExperience = ({
   };
 
   return (
-    <div
-      className={cx(
-        `experience-shell ${sceneState === "error" ? "scene-error" : ""} ${travelling ? "travelling" : ""} ${chromeHidden ? "chrome-hidden" : ""}`,
-      )}
-    >
-      <div className={cx("space-haze")} aria-hidden="true" />
-      <div className={cx("viewport-grid")} aria-hidden="true" />
-      <header className={cx("topbar")} data-testid="topbar">
-        <a className={cx("brand")} href="/" aria-label="Exora home">
-          <span className={cx("brand-mark")} aria-hidden="true" />
-          <span className={cx("brand-copy")}>
-            <strong>EXORA</strong>
-            <small>UNIVERSE OBSERVATORY</small>
-          </span>
-        </a>
-      </header>
-      <main className={cx("hud")} data-testid="hud">
-        <DestinationIdentity
-          category="SOLAR SYSTEM REGION"
-          classification={evidenceLabel}
-          name={region.name}
-          nameId="world-name"
-          note={region.disclosure.toUpperCase()}
-          summary={region.summary}
-          tags={[evidenceLabel, "STATISTICAL VISUALIZATION", "NON-LINEAR SCALE WHERE LABELLED"]}
-          tagsLabel="Region evidence classification"
-          tone="region"
-        />
-
-        <DestinationPanel fps={fps} model={panel} />
-      </main>
-      <MissionControl
-        chromeHidden={chromeHidden}
-        hints={[
-          { key: "DRAG", meaning: "ORBIT" },
-          { key: "SCROLL", meaning: "SCALE" },
-        ]}
-        onToggleChrome={onToggleChrome}
-        onOpenDiscover={onOpenDiscover}
-        sceneFailed={sceneState === "error"}
-        xr={{ host, status: xrStatus }}
-      />
-      {sceneState !== "error" && (sceneState === "loading" || !typographySettled) ? (
-        <div
-          className={cx(`loading-screen ${typographySettled ? "type-settled" : ""}`)}
-          role="status"
-        >
-          <div className={cx("loading-orbit")} aria-hidden="true">
-            <span />
-          </div>
-          <p>BUILDING REGIONAL SCALE MODEL</p>
-          <small>
-            {region.name.toUpperCase()} · {evidenceLabel}
-          </small>
-        </div>
-      ) : null}
-    </div>
+    <DestinationShell
+      hints={[
+        { key: "Drag", meaning: "Orbit" },
+        { key: "Scroll", meaning: "Scale" },
+        { key: "H", meaning: "Hide interface" },
+      ]}
+      host={host}
+      identity={{
+        category: "Solar System region",
+        classification: evidenceLabel,
+        name: region.name,
+        nameId: "world-name",
+        note: region.disclosure,
+        summary: region.summary,
+        tags: [evidenceLabel, "Statistical visualization", "Non-linear scale where labelled"],
+        tagsLabel: "Region evidence classification",
+        tone: "region",
+      }}
+      light={starLight(null)}
+      loading={{ detail: `${region.name} · ${evidenceLabel}`, title: "Building a scale model" }}
+      panel={panel}
+      sceneState={sceneState}
+      travelPhase={travelPhase}
+    />
   );
 };

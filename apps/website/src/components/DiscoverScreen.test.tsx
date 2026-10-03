@@ -19,85 +19,74 @@ const discoverMarkup = (initialSection?: DiscoverSection): string =>
     />,
   );
 
-test("Discover starts directly in the Exoplanet catalog", () => {
+test("Explore starts directly in the Exoplanet catalog", () => {
   const markup = discoverMarkup();
   const navigation = markup.slice(markup.indexOf("<nav"), markup.indexOf("</nav>"));
 
-  expect(markup).toContain("Solar System");
-  expect(markup).toContain("Exoplanets");
-  expect(markup).toContain("Stars");
-  expect(markup).toContain("Black Holes");
-  expect(markup).toContain("World Forge");
-  expect(markup).toContain('aria-label="Discover destinations"');
+  expect(markup).toContain('aria-label="Explore destinations"');
   expect(markup).toContain('aria-label="Exoplanet catalog"');
-  expect(markup).toContain("Find another world.");
-  expect(markup).toContain('data-icon="solar"');
-  expect(markup).toContain('data-icon="worlds"');
-  expect(markup).toContain('data-icon="stars"');
-  expect(markup).toContain('data-icon="black-holes"');
-  expect(markup).toContain('data-icon="forge"');
-  expect(markup).not.toContain("All of space. One way in.");
+  expect(markup).toContain("Find another world");
+  for (const icon of ["worlds", "stars", "solar", "black-holes", "atlas", "tours", "forge"]) {
+    expect(navigation).toContain(`data-icon="${icon}"`);
+  }
   expect(navigation).toMatch(
-    /Exoplanets[\s\S]*Stars[\s\S]*Solar System[\s\S]*Black Holes[\s\S]*World Forge/,
+    /Browse[\s\S]*Exoplanets[\s\S]*Stars[\s\S]*Solar System[\s\S]*Black Holes[\s\S]*Learn[\s\S]*Atlas[\s\S]*Guided Tours[\s\S]*Create[\s\S]*World Forge/,
   );
+  expect(navigation).toContain('aria-current="page"');
 });
 
-test("the Solar System catalog retains regions without removed feature collections", () => {
+test("the Solar System catalog keeps its regions", () => {
   const markup = discoverMarkup("solar");
 
   expect(markup).toContain("Regions · statistical populations and measured boundaries");
   expect(markup).not.toContain("Missions · optional trajectories and exploration sites");
-  expect(markup).not.toContain("Asteroids · mission encounters and targets");
-  expect(markup).not.toContain("Dwarf-planet systems · 4 unresolved moons");
   expect(markup).not.toContain("Comets · measured nuclei and simulated activity");
 });
 
-test("the black-hole destination exposes the five sourced landmarks", () => {
+test("the black-hole catalog lists the five sourced landmarks", () => {
   const markup = discoverMarkup("black-holes");
 
   expect(markup).toContain('aria-label="Black hole catalog"');
-  expect(markup).toContain("Sagittarius A*");
-  expect(markup).toContain("M87*");
-  expect(markup).toContain("TON 618");
-  expect(markup).toContain("Cygnus X-1");
-  expect(markup).toContain("Gaia BH1");
-  expect(markup).not.toContain("Where light loses the way out.");
-});
-
-test("embedded destinations omit their duplicate catalog intro panels", () => {
-  expect(discoverMarkup("worlds")).not.toContain("CURATED JOURNEYS");
-  expect(discoverMarkup("stars")).not.toContain(
-    "Large targets are designed for gaze, pointer, touch, or mouse",
-  );
-  expect(discoverMarkup("solar")).not.toContain("Known worlds. Real surfaces. Our cosmic address.");
-  expect(discoverMarkup("black-holes")).not.toContain("THE HORIZON FIVE");
-});
-
-test("search leads every searchable discovery view and contains the random action", () => {
-  for (const section of ["worlds", "stars"] as const) {
-    const markup = discoverMarkup(section);
-    const searchPosition = markup.indexOf('type="search"');
-    const tabsPosition = markup.indexOf('role="tablist"');
-
-    expect(searchPosition).toBeGreaterThan(-1);
-    expect(searchPosition).toBeLessThan(tabsPosition);
-    expect(markup.match(/type="search"/g)).toHaveLength(1);
-    expect(markup).toContain("Random world");
-    expect(markup).not.toContain("Jump to a random");
-    expect(markup).not.toContain("SURPRISE ME");
+  for (const name of ["Sagittarius A*", "M87*", "TON 618", "Cygnus X-1", "Gaia BH1"]) {
+    expect(markup).toContain(name);
   }
 });
 
-test("an embedded catalog becomes a named region inside the full-screen dialog", () => {
+test("search leads every searchable catalog, with a way to be surprised beside it", () => {
+  for (const [section, random] of [
+    ["worlds", "Random world"],
+    ["stars", "Random star"],
+    ["black-holes", "Random horizon"],
+  ] as const) {
+    const markup = discoverMarkup(section);
+    const searchPosition = markup.indexOf('type="search"');
+    const collectionsPosition = markup.indexOf("All ");
+
+    expect(searchPosition).toBeGreaterThan(-1);
+    expect(searchPosition).toBeLessThan(collectionsPosition);
+    expect(markup.match(/type="search"/g)).toHaveLength(1);
+    expect(markup).toContain(random);
+  }
+});
+
+test("collections and kinds share one rail, with everything selected first", () => {
+  const markup = discoverMarkup("worlds");
+
+  expect(markup).toContain('aria-label="Planet collections"');
+  expect(markup).toMatch(/aria-pressed="true"[^>]*>All worlds</);
+  expect(markup).toContain("Most Earth-like");
+  expect(markup).toContain("Lava worlds");
+});
+
+test("a catalog is a named region inside the full-screen dialog", () => {
   const markup = discoverMarkup("worlds");
 
   expect(markup).toContain('aria-label="Exoplanet catalog"');
-  expect(markup).toContain('role="region"');
-  expect(markup).not.toContain('aria-label="Close planet catalog"');
-  expect(markup).toContain('aria-label="Close Discover"');
+  expect(markup).not.toContain("<dialog id=");
+  expect(markup).toContain('aria-label="Close Explore"');
 });
 
-test("Discover lists the guided tours with their first and last stops", () => {
+test("Explore lists the guided tours with their first and last stops", () => {
   const markup = discoverMarkup("tours");
 
   expect(markup).toContain("Guided Tours");

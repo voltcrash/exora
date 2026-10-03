@@ -1,31 +1,40 @@
 import type { ExoplanetProfile, StarProfile } from "@exora/contracts";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useMemo, useState } from "react";
+import { capitalize } from "../readable.ts";
 import type { SolarRegionProfile } from "../solar-regions.ts";
 import { SOLAR_SYSTEM_REGIONS } from "../solar-regions.ts";
-import { SOLAR_SYSTEM_CATALOG_GROUPS, SOLAR_SYSTEM_MOONS } from "../solar-system.ts";
-import sharedStyles from "./ExperienceShared.module.css";
-import catalogStyles from "./CatalogShared.module.css";
-import { bindStyles } from "../styles/bind-styles.ts";
-
-const cx = bindStyles(sharedStyles, catalogStyles);
+import { SOLAR_SYSTEM_CATALOG_GROUPS } from "../solar-system.ts";
+import { CatalogSearch, ChipRail } from "./catalog/CatalogParts.tsx";
+import { Icon } from "./ui/Icon.tsx";
+import styles from "./catalog/catalog.module.css";
 
 interface SolarSystemCatalogProps {
-  embedded?: boolean;
-  onClose: () => void;
   onSelectPlanet: (planet: ExoplanetProfile, cached: boolean) => void;
   onSelectRegion: (region: SolarRegionProfile) => void;
   onSelectStar: (star: StarProfile, cached: boolean) => void;
 }
 
+type SolarFilter = "dwarfs" | "moons" | "planets" | "regions";
+
+const FILTERS: readonly { id: SolarFilter; label: string }[] = [
+  { id: "planets", label: "Planets" },
+  { id: "dwarfs", label: "Dwarf planets" },
+  { id: "moons", label: "Moons" },
+  { id: "regions", label: "Regions" },
+];
+
+const SURFACE_STATUS = {
+  mapped: "Surface mapped by spacecraft",
+  modeled: "Shape measured · surface unresolved",
+  unresolved: "Surface unresolved",
+} as const;
+
 export const SolarSystemCatalog = ({
-  embedded = false,
-  onClose,
   onSelectPlanet,
   onSelectRegion,
   onSelectStar,
 }: SolarSystemCatalogProps) => {
-  const dialogRef = useRef<HTMLDialogElement>(null);
-  const [filter, setFilter] = useState<"all" | "dwarfs" | "moons" | "planets" | "regions">("all");
+  const [filter, setFilter] = useState<SolarFilter | null>(null);
   const [query, setQuery] = useState("");
   const normalizedQuery = query.trim().toLocaleLowerCase();
 
@@ -38,7 +47,7 @@ export const SolarSystemCatalog = ({
           const category =
             bodyType === "moon" ? "moons" : bodyType === "dwarf-planet" ? "dwarfs" : "planets";
           return (
-            (filter === "all" || filter === category) &&
+            (filter === null || filter === category) &&
             (normalizedQuery.length === 0 ||
               entry.profile.name.toLocaleLowerCase().includes(normalizedQuery) ||
               entry.profile.solarSystem?.spkId?.includes(normalizedQuery))
@@ -52,7 +61,7 @@ export const SolarSystemCatalog = ({
     () =>
       SOLAR_SYSTEM_REGIONS.filter(
         (region) =>
-          (filter === "all" || filter === "regions") &&
+          (filter === null || filter === "regions") &&
           (normalizedQuery.length === 0 ||
             region.name.toLocaleLowerCase().includes(normalizedQuery) ||
             region.aliases.some((alias) => alias.toLocaleLowerCase().includes(normalizedQuery)) ||
@@ -63,178 +72,113 @@ export const SolarSystemCatalog = ({
     [filter, normalizedQuery],
   );
 
-  useEffect(() => {
-    const dialog = dialogRef.current;
-    if (!embedded) dialog?.showModal();
-    return () => {
-      dialog?.close();
-    };
-  }, [embedded]);
-
   return (
-    <dialog
-      ref={dialogRef}
-      className={cx(`planet-catalog solar-system-catalog${embedded ? " embedded-catalog" : ""}`)}
-      data-embedded={embedded}
-      open={embedded || undefined}
-      role={embedded ? "region" : undefined}
-      aria-label={embedded ? "Solar System catalog" : undefined}
-      aria-labelledby={embedded ? undefined : "solar-system-title"}
-      onCancel={embedded ? undefined : onClose}
-      onClose={embedded ? undefined : onClose}
-      onClick={(event) => {
-        if (!embedded && event.target === dialogRef.current) onClose();
-      }}
-    >
-      <div className={cx("catalog-scroll-region")} data-style-role="catalog-scroll-region">
-        {!embedded ? (
-          <div className={cx("catalog-header")}>
-            <div>
-              <p>HOME COORDINATES · NASA/JPL SOLAR SYSTEM DYNAMICS</p>
-              <h2 id="solar-system-title">It’s time to go home</h2>
-            </div>
-            <button
-              className={cx("catalog-close")}
-              type="button"
-              aria-label="Close Solar System catalog"
-              onClick={onClose}
-            >
-              ×
-            </button>
-          </div>
-        ) : null}
-        {!embedded ? (
-          <div className={cx("solar-system-hero")}>
-            <span>THE SOLAR SYSTEM</span>
-            <strong>Known worlds. Real surfaces. Our cosmic address.</strong>
-            <small>
-              Every body keeps its permanent JPL/NAIF identity · {SOLAR_SYSTEM_MOONS.length}{" "}
-              principal mapped moons
-            </small>
-          </div>
-        ) : null}
-        <div className={cx("solar-catalog-tools")} role="search">
-          <label>
-            <span>SEARCH HOME SYSTEM</span>
-            <span className={cx("solar-search-field")}>
-              <input
-                type="search"
-                value={query}
-                placeholder="Name or SPK ID"
-                onChange={(event) => setQuery(event.target.value)}
-              />
-            </span>
-          </label>
-          <div className={cx("solar-catalog-filters")} aria-label="Filter Solar System catalog">
-            {(["all", "planets", "dwarfs", "moons", "regions"] as const).map((option) => (
-              <button
-                className={cx(filter === option ? "active" : "")}
-                key={option}
-                type="button"
-                onClick={() => setFilter(option)}
-              >
-                {option.toUpperCase()}
-              </button>
-            ))}
-          </div>
-        </div>
-        {visibleGroups.map((group) => (
-          <section className={cx("solar-catalog-section")} key={group.label}>
-            <h3>{group.label}</h3>
-            <ol className={cx("solar-body-grid")}>
-              {group.entries.map((entry) => {
-                const identity = entry.profile.solarSystem;
-                return (
-                  <li key={entry.profile.id}>
-                    <button
-                      type="button"
-                      onClick={() => {
-                        if (entry.type === "star") onSelectStar(entry.profile, true);
-                        else onSelectPlanet(entry.profile, true);
-                      }}
-                    >
-                      <span
-                        className={cx(
-                          `solar-body-portrait${identity?.texture ? " mapped" : ""} solar-${entry.profile.name.toLocaleLowerCase().replaceAll(" ", "-")}`,
-                        )}
-                        style={
-                          identity?.texture
-                            ? { backgroundImage: `url(${identity.texture.path})` }
-                            : undefined
-                        }
-                        aria-hidden="true"
-                      />
-                      <span className={cx("solar-body-copy")}>
-                        <small>
-                          {identity?.bodyType.toUpperCase()}
-                          {identity?.parent ? ` · ${identity.parent}` : ""}
-                        </small>
-                        <strong>{entry.profile.name}</strong>
-                        <span>{identity?.summary}</span>
-                        {identity?.surfaceStatus ? (
-                          <em
-                            className={cx(
-                              `science-status science-status-${identity.surfaceStatus}`,
-                            )}
-                          >
-                            {identity.surfaceStatus === "mapped"
-                              ? "MEASURED MISSION SURFACE"
-                              : identity.surfaceStatus === "modeled"
-                                ? "MEASURED SHAPE · UNRESOLVED SURFACE"
-                                : "UNRESOLVED SURFACE"}
-                          </em>
-                        ) : null}
-                      </span>
-                      <span className={cx("solar-body-meta")}>
-                        <small>
-                          {identity?.spkId ? `SPK ${identity.spkId}` : `NAIF ${identity?.naifId}`}
-                        </small>
-                      </span>
-                    </button>
-                  </li>
-                );
-              })}
-            </ol>
-          </section>
-        ))}
-        {visibleRegions.length > 0 ? (
-          <section className={cx("solar-catalog-section")} key="solar-system-regions">
-            <h3>Regions · statistical populations and measured boundaries</h3>
-            <ol className={cx("solar-body-grid")}>
-              {visibleRegions.map((region) => (
-                <li key={region.id}>
-                  <button type="button" onClick={() => onSelectRegion(region)}>
+    <section className={styles["catalog"]} aria-label="Solar System catalog">
+      <CatalogSearch
+        label="Search the Solar System"
+        onChange={setQuery}
+        placeholder="Search by name or SPK ID"
+        value={query}
+      />
+      <ChipRail
+        active={filter}
+        allLabel="Everything"
+        groups={[{ chips: FILTERS, label: "Kinds of body" }]}
+        label="Filter the Solar System"
+        onSelect={(id) => setFilter(id as SolarFilter | null)}
+      />
+
+      {visibleGroups.map((group) => (
+        <section className={styles["section"]} key={group.label}>
+          <h3 className={styles["section-title"]}>{group.label}</h3>
+          <ol className={styles["bodies"]}>
+            {group.entries.map((entry) => {
+              const identity = entry.profile.solarSystem;
+              const slug = entry.profile.name.toLocaleLowerCase().replaceAll(" ", "-");
+              return (
+                <li key={entry.profile.id}>
+                  <button
+                    className={styles["body"]}
+                    type="button"
+                    onClick={() => {
+                      if (entry.type === "star") onSelectStar(entry.profile, true);
+                      else onSelectPlanet(entry.profile, true);
+                    }}
+                  >
                     <span
-                      className={cx(
-                        `solar-body-portrait region-portrait region-portrait-${region.kind}`,
-                      )}
+                      className={styles["portrait"]}
+                      data-body={slug}
+                      data-mapped={identity?.texture ? "" : undefined}
+                      style={
+                        identity?.texture
+                          ? { backgroundImage: `url(${identity.texture.path})` }
+                          : undefined
+                      }
                       aria-hidden="true"
-                    >
-                      ◎
-                    </span>
-                    <span className={cx("solar-body-copy")}>
-                      <small>REGION · {region.parent}</small>
-                      <strong>{region.name}</strong>
-                      <span>{region.summary}</span>
-                      <em className={cx(`science-status science-status-${region.evidence}`)}>
-                        {region.evidence.replaceAll("-", " ").toUpperCase()} · SAMPLED VISUALIZATION
-                      </em>
-                    </span>
-                    <span className={cx("solar-body-meta")}>
-                      <small>ANCHOR NAIF {region.anchorNaifId}</small>
+                    />
+                    <span className={styles["body-copy"]}>
+                      <small>
+                        {capitalize(identity?.bodyType.replace("-", " ") ?? "body")}
+                        {identity?.parent ? ` of ${identity.parent}` : ""}
+                        {" · "}
+                        {identity?.spkId
+                          ? `SPK ${identity.spkId}`
+                          : `NAIF ${String(identity?.naifId)}`}
+                      </small>
+                      <strong>{entry.profile.name}</strong>
+                      <span>{identity?.summary}</span>
+                      {identity?.surfaceStatus ? (
+                        <em className={styles["evidence"]} data-status={identity.surfaceStatus}>
+                          {SURFACE_STATUS[identity.surfaceStatus]}
+                        </em>
+                      ) : null}
                     </span>
                   </button>
                 </li>
-              ))}
-            </ol>
-          </section>
-        ) : null}
-        {visibleGroups.length === 0 && visibleRegions.length === 0 ? (
-          <p className={cx("solar-catalog-empty")} role="status">
-            NO HOME-SYSTEM OBJECTS MATCH THIS FILTER
-          </p>
-        ) : null}
-      </div>
-    </dialog>
+              );
+            })}
+          </ol>
+        </section>
+      ))}
+
+      {visibleRegions.length > 0 ? (
+        <section className={styles["section"]}>
+          <h3 className={styles["section-title"]}>
+            Regions · statistical populations and measured boundaries
+          </h3>
+          <ol className={styles["bodies"]}>
+            {visibleRegions.map((region) => (
+              <li key={region.id}>
+                <button
+                  className={styles["body"]}
+                  type="button"
+                  onClick={() => onSelectRegion(region)}
+                >
+                  <span className={styles["portrait"]} data-region={region.kind} aria-hidden="true">
+                    <Icon name="orbit" size={28} />
+                  </span>
+                  <span className={styles["body-copy"]}>
+                    <small>
+                      Region of the {region.parent} · NAIF {region.anchorNaifId}
+                    </small>
+                    <strong>{region.name}</strong>
+                    <span>{region.summary}</span>
+                    <em className={styles["evidence"]} data-status={region.evidence}>
+                      {capitalize(region.evidence.replaceAll("-", " "))} · sampled visualization
+                    </em>
+                  </span>
+                </button>
+              </li>
+            ))}
+          </ol>
+        </section>
+      ) : null}
+
+      {visibleGroups.length === 0 && visibleRegions.length === 0 ? (
+        <p className={styles["status"]} role="status">
+          Nothing in the Solar System matches that. Try another name or filter.
+        </p>
+      ) : null}
+    </section>
   );
 };

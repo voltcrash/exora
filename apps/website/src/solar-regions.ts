@@ -184,7 +184,7 @@ export const SOLAR_SYSTEM_REGIONS: readonly SolarRegionProfile[] = [
     anchorSpkId: "10",
     color: [0.55, 0.73, 1],
     disclosure:
-      "MODELED / INDIRECTLY INFERRED · NOT DIRECTLY OBSERVED. Every point is synthetic and only expresses a hypothesized spherical reservoir.",
+      "Modelled and indirectly inferred, never directly observed. Every point is synthetic and only expresses a hypothesized spherical reservoir.",
     distanceAu: {
       inner: 2_000,
       note: "The adopted 2,000–100,000 AU shell is a scale model, not a measured boundary.",

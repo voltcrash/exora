@@ -1,5 +1,5 @@
 import type { ExoplanetProfile } from "@exora/contracts";
-import { memo, useCallback, useDeferredValue, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useDeferredValue, useEffect, useMemo, useRef, useState } from "react";
 import {
   discoverPlanets,
   discoverRandomPlanet,
@@ -7,7 +7,6 @@ import {
   searchPlanets,
 } from "../api-client.ts";
 import { formatNumber, hasRenderer, planetKindLabel } from "../planet-utils.tsx";
-import { useTabList } from "../use-tab-list.ts";
 import {
   DEFAULT_PHYSICAL_PLANET_FILTERS,
   filterPlanetsByPhysicalControls,
@@ -18,24 +17,27 @@ import {
 import { appendUniqueById } from "../catalog-pagination.ts";
 import { useInfiniteScroll } from "../use-infinite-scroll.ts";
 import { PlanetCatalogVisual } from "./CatalogVisual.tsx";
-import sharedStyles from "./ExperienceShared.module.css";
-import catalogStyles from "./CatalogShared.module.css";
-import { bindStyles } from "../styles/bind-styles.ts";
-
-const cx = bindStyles(sharedStyles, catalogStyles);
+import {
+  CatalogSearch,
+  ChipRail,
+  DidYouMean,
+  ResultCard,
+  ResultList,
+  ResultState,
+  ResultToolbar,
+  type ResultView,
+} from "./catalog/CatalogParts.tsx";
+import catalogStyles from "./catalog/catalog.module.css";
+import { Button } from "./ui/Button.tsx";
+import styles from "./PlanetCatalog.module.css";
 
 interface PlanetCatalogProps {
-  embedded?: boolean;
-  onClose: () => void;
   onSelect: (planet: ExoplanetProfile, cached: boolean) => void;
 }
 
 type SearchState = "idle" | "loading" | "ready" | "error";
 type SurpriseState = "idle" | "loading" | "error";
-type PortalView = "collections" | "categories" | "filters";
 type PhysicalAxis = Exclude<keyof PhysicalPlanetFilters, "habitableZone" | "wellMeasured">;
-
-const PORTAL_VIEWS: readonly PortalView[] = ["collections", "categories", "filters"];
 
 const physicalAxes: readonly {
   high: string;
@@ -45,125 +47,81 @@ const physicalAxes: readonly {
 }[] = [
   { key: "composition", name: "Composition", low: "Rocky", high: "Gaseous" },
   { key: "temperature", name: "Temperature", low: "Cold", high: "Hot" },
-  { key: "scale", name: "World scale", low: "Earth-size", high: "Giant" },
-  { key: "distance", name: "System range", low: "Nearby", high: "Distant" },
+  { key: "scale", name: "Size", low: "Earth-size", high: "Giant" },
+  { key: "distance", name: "Distance from us", low: "Nearby", high: "Distant" },
   { key: "weather", name: "Atmosphere", low: "Calm", high: "Extreme" },
 ] as const;
 
 const axisPositionLabel = (value: number, low: string, high: string): string =>
-  value < 34 ? low : value > 66 ? high : "Broad field";
-
-const categories = [
-  { id: "earth-like", icon: "◉", label: "Earth-like candidates", note: "Familiar scale & climate" },
-  { id: "lava-worlds", icon: "△", label: "Lava worlds", note: "Molten, ultra-hot terrain" },
-  { id: "gas-giants", icon: "◒", label: "Gas giants", note: "Colossal cloud layers" },
-  {
-    id: "ocean-candidates",
-    icon: "≈",
-    label: "Ocean-world candidates",
-    note: "Possible global seas",
-  },
-  { id: "frozen-worlds", icon: "✣", label: "Frozen worlds", note: "Cold, distant frontiers" },
-  {
-    id: "extreme-weather",
-    icon: "ϟ",
-    label: "Extreme weather",
-    note: "Violent atmospheric systems",
-  },
-  {
-    id: "potentially-habitable",
-    icon: "⌾",
-    label: "Potentially habitable",
-    note: "Temperate rocky candidates",
-  },
-  {
-    id: "recently-discovered",
-    icon: "+",
-    label: "Recently discovered",
-    note: "The archive's newest worlds",
-  },
-] as const;
+  value < 34 ? low : value > 66 ? high : "Anything";
 
 const collections = [
   {
     id: "most-earth-like",
-    index: "01",
     label: "Most Earth-like",
-    note: "Rocky worlds closest to Earth's scale and estimated temperature",
-    tag: "12 DESTINATIONS",
+    note: "Rocky worlds closest to Earth's size and estimated temperature.",
   },
   {
     id: "nearest-rocky-worlds",
-    index: "02",
     label: "Nearest rocky worlds",
-    note: "The closest small planets in our galactic neighborhood",
-    tag: "BY DISTANCE",
+    note: "The closest small planets in our galactic neighbourhood, nearest first.",
   },
   {
     id: "recently-confirmed",
-    index: "03",
     label: "Recently confirmed",
-    note: "The newest confirmed additions to the exoplanet archive",
-    tag: "LATEST FINDS",
+    note: "The newest confirmed additions to the exoplanet archive.",
   },
   {
     id: "record-breakers",
-    index: "04",
     label: "Record breakers",
-    note: "The hottest and most massive worlds in the known catalog",
-    tag: "EXTREME WORLDS",
+    note: "The hottest and most massive worlds in the catalog.",
   },
 ] as const;
 
-const PlanetResult = memo(
-  ({
-    cached,
-    onSelect,
-    planet,
-  }: {
-    cached: boolean;
-    onSelect: (planet: ExoplanetProfile, cached: boolean) => void;
-    planet: ExoplanetProfile;
-  }) => {
-    const supported = hasRenderer(planet);
-    const temperature = planet.observation.equilibriumTemperatureKelvin;
-
-    return (
-      <li>
-        <button
-          className={cx("catalog-result")}
-          type="button"
-          disabled={!supported}
-          onClick={() => onSelect(planet, cached)}
-        >
-          <span className={cx("result-preview")}>
-            <PlanetCatalogVisual planet={planet} />
-          </span>
-          <span className={cx("result-marker")} aria-hidden="true" />
-          <span className={cx("result-identity")}>
-            <strong>{planet.name}</strong>
-            <small>
-              {planet.hostStar} · {planet.observation.discoveryMethod}
-            </small>
-            <span className={cx("result-trait")}>{planetNotableTrait(planet)}</span>
-          </span>
-          <span className={cx("result-metrics")}>
-            <small>{planetKindLabel(planet)}</small>
-            <strong>
-              {formatNumber(planet.observation.distanceParsecs, 1)} PC ·{" "}
-              {temperature === null ? "TEMP UNKNOWN" : `${formatNumber(temperature, 0)} K`}
-            </strong>
-          </span>
-          {supported ? null : <span className={cx("result-state")}>RENDERER PENDING</span>}
-        </button>
-      </li>
-    );
+const categories = [
+  { id: "earth-like", label: "Earth-like", note: "Familiar size and climate." },
+  {
+    id: "potentially-habitable",
+    label: "Potentially habitable",
+    note: "Temperate rocky candidates.",
   },
-);
+  { id: "ocean-candidates", label: "Ocean worlds", note: "Worlds that may hold global seas." },
+  { id: "lava-worlds", label: "Lava worlds", note: "Molten, ultra-hot surfaces." },
+  { id: "frozen-worlds", label: "Frozen worlds", note: "Cold, distant frontiers." },
+  { id: "gas-giants", label: "Gas giants", note: "Colossal layers of cloud." },
+  { id: "extreme-weather", label: "Extreme weather", note: "Violent atmospheric systems." },
+  { id: "recently-discovered", label: "Recently discovered", note: "The archive's newest worlds." },
+] as const;
 
-export const PlanetCatalog = ({ embedded = false, onClose, onSelect }: PlanetCatalogProps) => {
-  const dialogRef = useRef<HTMLDialogElement>(null);
-  const inputRef = useRef<HTMLInputElement>(null);
+const PlanetResult = ({
+  cached,
+  onSelect,
+  planet,
+}: {
+  cached: boolean;
+  onSelect: (planet: ExoplanetProfile, cached: boolean) => void;
+  planet: ExoplanetProfile;
+}) => {
+  const temperature = planet.observation.equilibriumTemperatureKelvin;
+  return (
+    <ResultCard
+      disabled={!hasRenderer(planet)}
+      facts={[
+        planetKindLabel(planet),
+        `${formatNumber(planet.observation.distanceParsecs, 1)} pc`,
+        temperature === null ? "Temperature unknown" : `${formatNumber(temperature, 0)} K`,
+      ]}
+      {...(hasRenderer(planet) ? {} : { notice: "Exora cannot draw this world yet" })}
+      onSelect={() => onSelect(planet, cached)}
+      subtitle={`${planet.hostStar} · ${planet.observation.discoveryMethod}`}
+      title={planet.name}
+      trait={planetNotableTrait(planet)}
+      visual={<PlanetCatalogVisual planet={planet} />}
+    />
+  );
+};
+
+export const PlanetCatalog = ({ onSelect }: PlanetCatalogProps) => {
   const surpriseControllerRef = useRef<AbortController | null>(null);
   const pageControllerRef = useRef<AbortController | null>(null);
   const [query, setQuery] = useState("");
@@ -173,24 +131,21 @@ export const PlanetCatalog = ({ embedded = false, onClose, onSelect }: PlanetCat
   const [cached, setCached] = useState(false);
   const [searchState, setSearchState] = useState<SearchState>("loading");
   const [activeCategory, setActiveCategory] = useState<string | null>(null);
-  const [portalView, setPortalView] = useState<PortalView>("collections");
-  const [resultView, setResultView] = useState<"gallery" | "list">("gallery");
+  const [filtersOpen, setFiltersOpen] = useState(false);
+  const [resultView, setResultView] = useState<ResultView>("gallery");
   const [surpriseState, setSurpriseState] = useState<SurpriseState>("idle");
   const [suggestion, setSuggestion] = useState<string | null>(null);
   const [physicalFilters, setPhysicalFilters] = useState<PhysicalPlanetFilters>(
     DEFAULT_PHYSICAL_PLANET_FILTERS,
   );
 
-  useEffect(() => {
-    const dialog = dialogRef.current;
-    if (!embedded) dialog?.showModal();
-
-    return () => {
+  useEffect(
+    () => () => {
       surpriseControllerRef.current?.abort();
       pageControllerRef.current?.abort();
-      dialog?.close();
-    };
-  }, [embedded]);
+    },
+    [],
+  );
 
   useEffect(() => {
     pageControllerRef.current?.abort();
@@ -199,27 +154,7 @@ export const PlanetCatalog = ({ embedded = false, onClose, onSelect }: PlanetCat
     setNextCursor(null);
 
     const normalizedQuery = query.trim();
-    if (portalView === "filters" && normalizedQuery.length < 1) {
-      setSuggestion(null);
-      const controller = new AbortController();
-      setSearchState("loading");
-      void loadPlanetFilterPool({ signal: controller.signal })
-        .then((result) => {
-          if (controller.signal.aborted) return;
-          setPlanets(result.planets);
-          setNextCursor(result.nextCursor);
-          setCached(result.cached);
-          setSearchState("ready");
-        })
-        .catch((error: unknown) => {
-          if (controller.signal.aborted) return;
-          console.error(error);
-          setPlanets([]);
-          setSearchState("error");
-        });
-      return () => controller.abort();
-    }
-    if (activeCategory) {
+    if (activeCategory && !filtersOpen) {
       setSuggestion(null);
       const controller = new AbortController();
       setSearchState("loading");
@@ -290,7 +225,7 @@ export const PlanetCatalog = ({ embedded = false, onClose, onSelect }: PlanetCat
       window.clearTimeout(delay);
       controller.abort();
     };
-  }, [activeCategory, portalView, query]);
+  }, [activeCategory, filtersOpen, query]);
 
   const loadMore = useCallback((): void => {
     if (!nextCursor || pageControllerRef.current) return;
@@ -323,26 +258,21 @@ export const PlanetCatalog = ({ embedded = false, onClose, onSelect }: PlanetCat
 
   const settledFilters = useDeferredValue(physicalFilters);
   const visiblePlanets = useMemo(
-    () =>
-      portalView === "filters" ? filterPlanetsByPhysicalControls(planets, settledFilters) : planets,
-    [planets, portalView, settledFilters],
+    () => (filtersOpen ? filterPlanetsByPhysicalControls(planets, settledFilters) : planets),
+    [filtersOpen, planets, settledFilters],
   );
 
-  const selectPortalView = useCallback((view: PortalView): void => {
-    if (view === "filters") {
-      setActiveCategory(null);
-      setQuery("");
-    }
-    setPortalView(view);
-  }, []);
+  const chooseCategory = (category: string | null): void => {
+    setQuery("");
+    setFiltersOpen(false);
+    setActiveCategory(category);
+  };
 
-  const tabs = useTabList({
-    label: "Planet discovery views",
-    list: "planet-discovery",
-    onSelect: selectPortalView,
-    value: portalView,
-    values: PORTAL_VIEWS,
-  });
+  const toggleFilters = (): void => {
+    setActiveCategory(null);
+    setQuery("");
+    setFiltersOpen((open) => !open);
+  };
 
   const activeLabel = [...collections, ...categories].find(
     (category) => category.id === activeCategory,
@@ -365,316 +295,198 @@ export const PlanetCatalog = ({ embedded = false, onClose, onSelect }: PlanetCat
       });
   };
 
+  const trimmed = query.trim();
   const status =
-    searchState === "idle"
-      ? "Loading the alphabetical planet catalog…"
-      : searchState === "loading"
-        ? query.trim()
-          ? `Scanning NASA archive for “${query.trim()}”…`
-          : portalView === "filters"
-            ? "Calibrating the physical planet field…"
+    searchState === "loading"
+      ? trimmed
+        ? `Searching the NASA Exoplanet Archive for “${trimmed}”…`
+        : filtersOpen
+          ? "Gathering worlds to filter…"
+          : activeLabel
+            ? `Opening ${activeLabel.toLowerCase()}…`
+            : "Loading the catalog…"
+      : searchState === "error"
+        ? "The NASA Exoplanet Archive did not answer. Try again in a moment."
+        : trimmed
+          ? `${String(visiblePlanets.length)} worlds match “${trimmed}”`
+          : filtersOpen
+            ? `${String(visiblePlanets.length)} worlds fit these filters`
             : activeLabel
-              ? `Opening ${activeLabel}…`
-              : "Loading the alphabetical planet catalog…"
-        : searchState === "error"
-          ? "The archive signal is unavailable. Try again shortly."
-          : "";
+              ? `${String(visiblePlanets.length)} worlds · ${activeLabel}`
+              : "Every confirmed world, A to Z";
 
   return (
-    <dialog
-      ref={dialogRef}
+    <section
       id="planet-catalog"
-      className={cx(`planet-catalog${embedded ? " embedded-catalog" : ""}`)}
+      className={catalogStyles["catalog"]}
       data-testid="planet-catalog"
-      data-embedded={embedded}
-      open={embedded || undefined}
-      role={embedded ? "region" : undefined}
-      aria-label={embedded ? "Exoplanet catalog" : undefined}
-      aria-labelledby={embedded ? undefined : "catalog-title"}
-      onCancel={embedded ? undefined : onClose}
-      onClose={embedded ? undefined : onClose}
-      onClick={(event) => {
-        if (!embedded && event.target === dialogRef.current) onClose();
-      }}
+      aria-label="Exoplanet catalog"
     >
-      <div
-        className={cx("catalog-scroll-region")}
-        data-testid="catalog-scroll-region"
-        data-style-role="catalog-scroll-region"
-      >
-        {!embedded ? (
-          <div className={cx("catalog-header")}>
-            <div>
-              <p>DISCOVERY PORTAL · NASA EXOPLANET ARCHIVE</p>
-              <h2 id="catalog-title">Choose a world to discover</h2>
-            </div>
-            <button
-              className={cx("catalog-close")}
-              type="button"
-              aria-label="Close planet catalog"
-              onClick={onClose}
+      <CatalogSearch
+        describedBy="catalog-status"
+        label="Search confirmed planets"
+        onChange={(value) => {
+          setActiveCategory(null);
+          setFiltersOpen(false);
+          setQuery(value);
+        }}
+        onRandom={takeMeSomewhere}
+        placeholder="Search by name or catalog ID — misspellings are fine"
+        randomBusy={surpriseState === "loading"}
+        randomError={surpriseState === "error"}
+        randomLabel="Random world"
+        resultsId="planet-search-results"
+        value={query}
+      />
+
+      <ChipRail
+        active={filtersOpen ? null : activeCategory}
+        allLabel="All worlds"
+        groups={[
+          { chips: collections, label: "Collections" },
+          { chips: categories, label: "Kinds of world" },
+        ]}
+        label="Planet collections"
+        onSelect={chooseCategory}
+      />
+
+      {filtersOpen ? (
+        <section className={styles["filters"]} aria-label="Filter by physics">
+          <div className={styles["filters-head"]}>
+            <h3>Filter by physics</h3>
+            <Button
+              size="sm"
+              variant="ghost"
+              icon="refresh"
+              onClick={() => setPhysicalFilters(DEFAULT_PHYSICAL_PLANET_FILTERS)}
             >
-              ×
-            </button>
+              Reset
+            </Button>
           </div>
-        ) : null}
-        <div className={cx("catalog-search")} data-style-role="catalog-search">
-          <span className={cx("search-reticle")} aria-hidden="true" />
-          <input
-            ref={inputRef}
-            type="search"
-            value={query}
-            onChange={(event) => {
-              setActiveCategory(null);
-              setQuery(event.target.value);
-            }}
-            placeholder="Type a name or catalog ID — misspellings are okay"
-            autoComplete="off"
-            minLength={1}
-            aria-autocomplete="list"
-            aria-controls="planet-search-results"
-            aria-describedby="catalog-status"
-          />
-          <button
-            className={cx("random-world")}
-            type="button"
-            disabled={surpriseState === "loading"}
-            aria-busy={surpriseState === "loading"}
-            title={surpriseState === "error" ? "Signal lost — try again" : undefined}
-            onClick={takeMeSomewhere}
-          >
-            <span aria-hidden="true">✦</span>
-            Random world
-          </button>
-        </div>
-        {!embedded ? (
-          <div className={cx("discovery-intro")}>
-            <span>
-              {portalView === "collections"
-                ? "CURATED JOURNEYS"
-                : portalView === "categories"
-                  ? "EXPLORE BY PHENOMENON"
-                  : "HOLOGRAPHIC OBSERVATORY CONSOLE"}
-            </span>
-            <small>Large targets are designed for gaze, pointer, touch, or mouse</small>
+          <div className={styles["axes"]}>
+            {physicalAxes.map((axis) => {
+              const value = physicalFilters[axis.key];
+              return (
+                <label key={axis.key} className={styles["axis"]}>
+                  <span className={styles["axis-head"]}>
+                    <strong>{axis.name}</strong>
+                    <output aria-hidden="true">
+                      {axisPositionLabel(value, axis.low, axis.high)}
+                    </output>
+                  </span>
+                  <input
+                    type="range"
+                    min="0"
+                    max="100"
+                    step="1"
+                    value={value}
+                    aria-label={axis.name}
+                    aria-valuetext={axisPositionLabel(value, axis.low, axis.high)}
+                    onChange={(event) =>
+                      setPhysicalFilters((current) => ({
+                        ...current,
+                        [axis.key]: Number(event.target.value),
+                      }))
+                    }
+                  />
+                  <span className={styles["axis-ends"]} aria-hidden="true">
+                    <small>{axis.low}</small>
+                    <small>{axis.high}</small>
+                  </span>
+                </label>
+              );
+            })}
           </div>
-        ) : null}
-        <div className={cx("discovery-tabs")} {...tabs.tabListProps}>
-          <button {...tabs.tabProps("collections")} onClick={() => selectPortalView("collections")}>
-            Curated collections
-          </button>
-          <button {...tabs.tabProps("categories")} onClick={() => selectPortalView("categories")}>
-            World types
-          </button>
-          <button {...tabs.tabProps("filters")} onClick={() => selectPortalView("filters")}>
-            Observatory controls
-          </button>
-        </div>
-        {portalView === "collections" ? (
-          <div className={cx("collection-grid")} {...tabs.panelProps("collections")}>
-            {collections.map((collection) => (
-              <button
-                key={collection.id}
-                className={cx(
-                  `collection-card${activeCategory === collection.id ? " active" : ""}`,
-                )}
-                type="button"
-                aria-pressed={activeCategory === collection.id}
-                onClick={() => {
-                  setQuery("");
-                  setActiveCategory(collection.id);
-                }}
-              >
-                <span className={cx("collection-index")}>{collection.index}</span>
-                <span className={cx("collection-copy")}>
-                  <small>{collection.tag}</small>
-                  <strong>{collection.label}</strong>
-                  <span>{collection.note}</span>
-                </span>
-              </button>
-            ))}
-          </div>
-        ) : portalView === "categories" ? (
-          <div className={cx("discovery-grid")} {...tabs.panelProps("categories")}>
-            {categories.map((category) => (
-              <button
-                key={category.id}
-                className={cx(`discovery-card${activeCategory === category.id ? " active" : ""}`)}
-                type="button"
-                aria-pressed={activeCategory === category.id}
-                onClick={() => {
-                  setQuery("");
-                  setActiveCategory(category.id);
-                }}
-              >
-                <span className={cx("discovery-icon")} aria-hidden="true">
-                  {category.icon}
-                </span>
-                <span>
-                  <strong>{category.label}</strong>
-                  <small>{category.note}</small>
-                </span>
-                <span className={cx("discovery-arrow")} aria-hidden="true">
-                  ↗
-                </span>
-              </button>
-            ))}
-          </div>
-        ) : (
-          <section className={cx("physical-console")} {...tabs.panelProps("filters")}>
-            <div className={cx("physical-console-heading")}>
+          <div className={styles["toggles"]}>
+            <label>
+              <input
+                type="checkbox"
+                checked={physicalFilters.habitableZone}
+                onChange={(event) =>
+                  setPhysicalFilters((current) => ({
+                    ...current,
+                    habitableZone: event.target.checked,
+                  }))
+                }
+              />
               <span>
-                <small>LIVE PLANET FIELD</small>
-                <strong>Shape the observatory signal</strong>
+                <strong>In the habitable zone</strong>
+                <small>Rocky, and inside its star's flux limits</small>
               </span>
-              <button
-                type="button"
-                onClick={() => setPhysicalFilters(DEFAULT_PHYSICAL_PLANET_FILTERS)}
-              >
-                RESET CONSOLE
-              </button>
-            </div>
-            <div className={cx("physical-axis-grid")}>
-              {physicalAxes.map((axis) => {
-                const value = physicalFilters[axis.key];
-                return (
-                  <label key={axis.key} className={cx("physical-axis")}>
-                    <span>
-                      <strong>{axis.name}</strong>
-                      <small aria-hidden="true">
-                        {axisPositionLabel(value, axis.low, axis.high)}
-                      </small>
-                    </span>
-                    <span className={cx("physical-axis-labels")} aria-hidden="true">
-                      <small>{axis.low}</small>
-                      <small>{axis.high}</small>
-                    </span>
-                    <input
-                      type="range"
-                      min="0"
-                      max="100"
-                      step="1"
-                      value={value}
-                      aria-label={axis.name}
-                      aria-valuetext={axisPositionLabel(value, axis.low, axis.high)}
-                      onChange={(event) =>
-                        setPhysicalFilters((current) => ({
-                          ...current,
-                          [axis.key]: Number(event.target.value),
-                        }))
-                      }
-                    />
-                  </label>
-                );
-              })}
-            </div>
-            <div className={cx("physical-toggles")}>
-              <label>
-                <input
-                  type="checkbox"
-                  checked={physicalFilters.habitableZone}
-                  onChange={(event) =>
-                    setPhysicalFilters((current) => ({
-                      ...current,
-                      habitableZone: event.target.checked,
-                    }))
-                  }
-                />
-                <span aria-hidden="true" />
-                <strong>Habitable-zone candidates</strong>
-                <small>Rocky · inside the star's flux limits</small>
-              </label>
-              <label>
-                <input
-                  type="checkbox"
-                  checked={physicalFilters.wellMeasured}
-                  onChange={(event) =>
-                    setPhysicalFilters((current) => ({
-                      ...current,
-                      wellMeasured: event.target.checked,
-                    }))
-                  }
-                />
-                <span aria-hidden="true" />
-                <strong>Confirmed data completeness</strong>
-                <small>6+ observed fields</small>
-              </label>
-            </div>
-          </section>
-        )}
-        <div className={cx("catalog-meta")}>
-          {status ? (
-            <p id="catalog-status" role="status">
-              {status}
-            </p>
-          ) : null}
-          <div className={cx("catalog-view-toggle")} role="group" aria-label="Planet result layout">
-            <button
-              type="button"
-              aria-pressed={resultView === "gallery"}
-              onClick={() => setResultView("gallery")}
-            >
-              ▦ Gallery
-            </button>
-            <button
-              type="button"
-              aria-pressed={resultView === "list"}
-              onClick={() => setResultView("list")}
-            >
-              ☰ List
-            </button>
+            </label>
+            <label>
+              <input
+                type="checkbox"
+                checked={physicalFilters.wellMeasured}
+                onChange={(event) =>
+                  setPhysicalFilters((current) => ({
+                    ...current,
+                    wellMeasured: event.target.checked,
+                  }))
+                }
+              />
+              <span>
+                <strong>Well measured</strong>
+                <small>Six or more observed properties</small>
+              </span>
+            </label>
           </div>
-        </div>
-        {suggestion && (
-          <button
-            className={cx("did-you-mean")}
-            type="button"
-            onClick={() => {
-              setSuggestion(null);
-              setQuery(suggestion);
-            }}
-          >
-            <span>DID YOU MEAN</span>
-            <strong>{suggestion}</strong>
-            <span aria-hidden="true">↗</span>
-          </button>
-        )}
-        <ol
-          id="planet-search-results"
-          className={cx(`catalog-results ${resultView}-view`)}
-          data-testid="catalog-results"
+        </section>
+      ) : null}
+
+      <ResultToolbar
+        label="Planet result layout"
+        onViewChange={setResultView}
+        status={status}
+        statusId="catalog-status"
+        view={resultView}
+      >
+        <Button
+          size="sm"
+          icon="sliders"
+          aria-expanded={filtersOpen}
+          aria-pressed={filtersOpen}
+          onClick={toggleFilters}
         >
-          {searchState === "loading" && (
-            <li className={cx("catalog-loading")}>
-              <span /> Resolving confirmed worlds
-            </li>
-          )}
-          {searchState === "error" && (
-            <li className={cx("catalog-empty")}>NASA search could not be completed.</li>
-          )}
-          {searchState === "ready" && visiblePlanets.length === 0 && (
-            <li className={cx("catalog-empty")}>
-              {portalView === "filters"
-                ? "No sampled worlds match this console configuration. Widen one or more controls."
-                : "No confirmed planets matched this signal or its nearest aliases."}
-            </li>
-          )}
-          {searchState === "ready" &&
-            visiblePlanets.map((planet) => (
+          Filters
+        </Button>
+      </ResultToolbar>
+
+      {suggestion ? (
+        <DidYouMean
+          suggestion={suggestion}
+          onAccept={() => {
+            setSuggestion(null);
+            setQuery(suggestion);
+          }}
+        />
+      ) : null}
+
+      <ResultList id="planet-search-results" testId="catalog-results" view={resultView}>
+        {searchState === "loading" ? (
+          <ResultState kind="loading">Finding confirmed worlds…</ResultState>
+        ) : null}
+        {searchState === "error" ? (
+          <ResultState kind="error">The search could not be completed.</ResultState>
+        ) : null}
+        {searchState === "ready" && visiblePlanets.length === 0 ? (
+          <ResultState kind="empty">
+            {filtersOpen
+              ? "No worlds fit every filter. Widen one or two of them."
+              : "No confirmed planet matches that name, or anything close to it."}
+          </ResultState>
+        ) : null}
+        {searchState === "ready"
+          ? visiblePlanets.map((planet) => (
               <PlanetResult key={planet.id} cached={cached} onSelect={onSelect} planet={planet} />
-            ))}
-          {searchState === "ready" && nextCursor !== null && (
-            <li
-              ref={sentinelRef}
-              className={cx("catalog-loading")}
-              data-testid="catalog-load-more"
-              aria-live="polite"
-            >
-              <span /> {loadingMore ? "Loading more worlds" : "Scroll for more worlds"}
-            </li>
-          )}
-        </ol>
-      </div>
-    </dialog>
+            ))
+          : null}
+        {searchState === "ready" && nextCursor !== null ? (
+          <ResultState kind="more" ref={sentinelRef} testId="catalog-load-more">
+            {loadingMore ? "Loading more worlds…" : "Scroll for more worlds"}
+          </ResultState>
+        ) : null}
+      </ResultList>
+    </section>
   );
 };

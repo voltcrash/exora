@@ -10,7 +10,8 @@ test("a result carries its catalog identity, family, status and measured mass", 
 
   expect(markup).toContain("Sagittarius A*");
   expect(markup).toContain("Sgr A*");
-  expect(markup).toContain("SUPERMASSIVE · CONFIRMED");
+  expect(markup).toContain("Supermassive");
+  expect(markup).toContain("Sgr A* · Confirmed");
   expect(markup).toContain("4.3 million M☉");
 });
 
@@ -31,7 +32,7 @@ test("an observed candidate with unknown mass renders an honest unavailable stat
   const markup = renderToStaticMarkup(<BlackHoleResult blackHole={candidate} onSelect={vi.fn()} />);
 
   expect(markup).toContain("Mass unavailable");
-  expect(markup).toContain("CANDIDATE");
+  expect(markup).toContain("Candidate");
   expect(markup).not.toContain("NaN");
   expect(markup).not.toContain("undefined");
 });

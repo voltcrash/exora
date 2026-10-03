@@ -18,6 +18,7 @@
     "@babylonjs/core": "catalog:",
     "@exora/contracts": "workspace:*",
     "@exora/worldgen": "workspace:*",
+    "@fontsource-variable/archivo": "catalog:",
     "@vercel/analytics": "catalog:",
     "@vercel/speed-insights": "catalog:",
     "react": "catalog:",
