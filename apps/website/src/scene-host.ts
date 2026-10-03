@@ -38,7 +38,7 @@ import { createSceneHostRegistry } from "./scene-host-registry.ts";
 import { createPersistentScene, resetPersistentScene } from "./scene-lifecycle.ts";
 import { createRenderLifecycle } from "./scene-render-lifecycle.ts";
 import { createXrIntegration, type XrStatus } from "./scene-xr-integration.ts";
-import { getVariantLaunchUrl, onVariantLaunchReady, type ImmersiveMode } from "./variant-launch.ts";
+import { getVariantLaunchUrl, onVariantLaunchReady } from "./variant-launch.ts";
 import { VIRTUAL_BACKGROUND_LAYER_MASK } from "./virtual-background.ts";
 import type * as XrRuntime from "./xr-runtime.ts";
 
@@ -68,7 +68,6 @@ export interface SceneHost {
   getFps: () => number;
   isArSupported: () => boolean;
   isInXr: () => boolean;
-  isVrSupported: () => boolean;
   onTravelPhase: (listener: (phase: TravelPhase) => void) => () => void;
   mountWorld: <World extends MountedWorld>(
     build: () => Promise<World> | World,
@@ -120,7 +119,6 @@ const createSceneHost = (canvas: HTMLCanvasElement): SceneHost => {
   let veilAlpha = 0;
   let veilTarget = 0;
   let settleVeil: (() => void) | null = null;
-  let rigAwaitingWorld = false;
 
   const resolveVeil = (): void => {
     const settle = settleVeil;
@@ -144,7 +142,7 @@ const createSceneHost = (canvas: HTMLCanvasElement): SceneHost => {
     });
   };
 
-  let activeImmersiveMode: ImmersiveMode | null = null;
+  let arActive = false;
   let xrCameraLayerMask = 0x0fff_ffff;
   let disposed = false;
   let xr: WebXRDefaultExperience | null = null;
@@ -171,11 +169,6 @@ const createSceneHost = (canvas: HTMLCanvasElement): SceneHost => {
 
   scene.onBeforeRenderObservable.add(() => {
     const deltaSeconds = Math.min(engine.getDeltaTime() / 1_000, 0.05);
-
-    if (rigAwaitingWorld && isInXr && activeImmersiveMode === "vr") {
-      rigAwaitingWorld = false;
-      worldMount.current?.focusXrRig(false);
-    }
 
     if (veilAlpha !== veilTarget || veil.isEnabled()) {
       const step = deltaSeconds / VEIL_FADE_SECONDS;
@@ -401,7 +394,6 @@ const createSceneHost = (canvas: HTMLCanvasElement): SceneHost => {
     if (!world) return null;
 
     arPresentation.setWorld(worldMount.scope?.presentation ?? null);
-    rigAwaitingWorld = isInXr && activeImmersiveMode === "vr";
     void fadeVeil(0);
     arriveAtWorld(token);
     if (!renderLifecycle.isRunning) renderLifecycle.renderFrame();
@@ -437,10 +429,6 @@ const createSceneHost = (canvas: HTMLCanvasElement): SceneHost => {
       }
 
       xr = createdXr;
-      createdXr.baseExperience.onInitialXRPoseSetObservable.add(() => {
-        if (activeImmersiveMode === "vr") worldMount.current?.focusXrRig(true);
-      });
-
       createdXr.baseExperience.onStateChangedObservable.add((state) => {
         if (disposed) return;
         if (state === runtime.WebXRState.ENTERING_XR) xrIntegration.markEntering();
@@ -454,16 +442,14 @@ const createSceneHost = (canvas: HTMLCanvasElement): SceneHost => {
           xrIntegration.markInXr();
         }
         if (state === runtime.WebXRState.NOT_IN_XR) {
-          const endedMode = activeImmersiveMode;
           isInXr = false;
           if (renderLifecycle.suspensionCount > 0) renderLifecycle.stop();
-          rigAwaitingWorld = false;
           veilTarget = 0;
           veilAlpha = 0;
           veilMaterial.alpha = 0;
           veil.setEnabled(false);
           resolveVeil();
-          if (endedMode === "ar") {
+          if (arActive) {
             arPresentation.end();
             createdXr.baseExperience.camera.layerMask = xrCameraLayerMask;
             createdXr.baseExperience.featuresManager.disableFeature(
@@ -473,7 +459,7 @@ const createSceneHost = (canvas: HTMLCanvasElement): SceneHost => {
               runtime.WebXRFeatureName.DOM_OVERLAY,
             );
           }
-          activeImmersiveMode = null;
+          arActive = false;
           worldMount.current?.restoreDesktopView();
           xrIntegration.markReady();
         }
@@ -506,7 +492,6 @@ const createSceneHost = (canvas: HTMLCanvasElement): SceneHost => {
     getFps: () => engine.getFps(),
     isArSupported: xrIntegration.isArSupported,
     isInXr: () => isInXr,
-    isVrSupported: xrIntegration.isVrSupported,
     mountWorld,
     suspendRendering: renderLifecycle.suspend,
     xrCamera: () => xr?.baseExperience.camera ?? null,
@@ -528,16 +513,7 @@ const createSceneHost = (canvas: HTMLCanvasElement): SceneHost => {
       const runtime = xrRuntime;
       if (!readyXr || !runtime) return;
 
-      activeImmersiveMode = destination.mode;
-      if (destination.mode === "vr") {
-        await readyXr.baseExperience.enterXRAsync(
-          "immersive-vr",
-          "local-floor",
-          readyXr.renderTarget,
-        );
-        return;
-      }
-
+      arActive = true;
       const features = readyXr.baseExperience.featuresManager;
       try {
         const hitTest = features.enableFeature(
@@ -573,7 +549,7 @@ const createSceneHost = (canvas: HTMLCanvasElement): SceneHost => {
         readyXr.baseExperience.camera.layerMask = xrCameraLayerMask;
         features.disableFeature(runtime.WebXRFeatureName.HIT_TEST);
         features.disableFeature(runtime.WebXRFeatureName.DOM_OVERLAY);
-        activeImmersiveMode = null;
+        arActive = false;
         xrIntegration.markReady();
         throw error;
       }

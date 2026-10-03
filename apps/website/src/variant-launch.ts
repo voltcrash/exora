@@ -1,5 +1,3 @@
-export type ImmersiveMode = "ar" | "vr";
-
 interface VariantLaunchSdk {
   getLaunchUrl: (targetUrl: string) => string;
 }
@@ -20,19 +18,16 @@ declare global {
 export interface ImmersiveSupport {
   ar: boolean;
   launchUrl: string | null;
-  vr: boolean;
 }
 
-export type ImmersiveDestination = { launchUrl: string | null; mode: ImmersiveMode } | null;
+export type ImmersiveDestination = { launchUrl: string | null } | null;
 
 export const chooseImmersiveDestination = ({
   ar,
   launchUrl,
-  vr,
 }: ImmersiveSupport): ImmersiveDestination => {
-  if (vr) return { launchUrl: null, mode: "vr" };
-  if (ar) return { launchUrl: null, mode: "ar" };
-  return launchUrl ? { launchUrl, mode: "ar" } : null;
+  if (ar) return { launchUrl: null };
+  return launchUrl ? { launchUrl } : null;
 };
 
 export const getVariantLaunchUrl = (): string | null => {

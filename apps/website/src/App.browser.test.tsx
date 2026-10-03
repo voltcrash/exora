@@ -41,7 +41,6 @@ vi.mock("./scene-host.ts", () => {
     getFps: () => 60,
     isArSupported: () => false,
     isInXr: () => insideHeadset,
-    isVrSupported: () => false,
     prefersReducedMotion: () => false,
     mountWorld: async (build: () => unknown) => build(),
     onRendererStatus: (listener: (status: string) => void) => {
@@ -53,7 +52,7 @@ vi.mock("./scene-host.ts", () => {
       return () => undefined;
     },
     onXrStatus: (listener: (status: string) => void) => {
-      listener("ready-vr");
+      listener("ready-ar");
       return () => undefined;
     },
     profile: { hardwareScalingLevel: 1, tier: "desktop" },
@@ -1120,7 +1119,7 @@ desktopTest(
 );
 
 desktopTest(
-  "VR presents the active destination without a console and exits to the same browser view",
+  "AR presents the active destination without a console and exits to the same browser view",
   async () => {
     stubArchive();
     mountApp();
@@ -1128,7 +1127,7 @@ desktopTest(
     await expect.element(destination).toBeVisible();
     const destinationName = destination.element().textContent;
 
-    await userEvent.click(page.getByRole("button", { name: "Enter VR" }));
+    await userEvent.click(page.getByRole("button", { name: "View in AR" }));
     expect(page.getByRole("dialog")).not.toBeInTheDocument();
 
     stubbedHost().setInXr(false);

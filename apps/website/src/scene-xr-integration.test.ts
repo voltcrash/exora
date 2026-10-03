@@ -6,7 +6,7 @@ const settle = async (): Promise<void> => {
   await Promise.resolve();
 };
 
-test("prefers native VR and keeps session status stable during capability refresh", async () => {
+test("prefers native AR and keeps session status stable during capability refresh", async () => {
   let launchReady = (): void => undefined;
   const integration = createXrIntegration({
     getLaunchUrl: () => "https://example.test/ar",
@@ -14,14 +14,14 @@ test("prefers native VR and keeps session status stable during capability refres
       launchReady = listener;
       return vi.fn();
     },
-    xrSystem: () => ({ isSessionSupported: (mode) => Promise.resolve(mode === "immersive-vr") }),
+    xrSystem: () => ({ isSessionSupported: (mode) => Promise.resolve(mode === "immersive-ar") }),
   });
   const statuses: string[] = [];
   integration.onStatus((status) => statuses.push(status));
   await settle();
 
-  expect(integration.destination?.mode).toBe("vr");
-  expect(statuses.at(-1)).toBe("ready-vr");
+  expect(integration.destination).toEqual({ launchUrl: null });
+  expect(statuses.at(-1)).toBe("ready-ar");
   integration.markInXr();
   launchReady();
   await settle();
@@ -37,10 +37,7 @@ test("uses the AR launch handoff and releases its readiness listener", async () 
   });
   await settle();
 
-  expect(integration.destination).toEqual({
-    launchUrl: "https://example.test/ar",
-    mode: "ar",
-  });
+  expect(integration.destination).toEqual({ launchUrl: "https://example.test/ar" });
   integration.dispose();
   expect(stopWatching).toHaveBeenCalledOnce();
 });

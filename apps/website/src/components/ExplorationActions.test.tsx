@@ -105,7 +105,6 @@ test("the star view offers the same controls under the same names", () => {
 });
 
 test.each([
-  ["ready-vr", "Enter VR"],
   ["ready-ar", "View in AR"],
   ["ready-ar-launch", "View in AR"],
 ] as const)("the immersive control appears once %s is ready", (status, label) => {
