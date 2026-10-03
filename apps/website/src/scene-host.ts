@@ -7,7 +7,6 @@ import { Mesh } from "@babylonjs/core/Meshes/mesh.js";
 import { MeshBuilder } from "@babylonjs/core/Meshes/meshBuilder.js";
 import "@babylonjs/core/Meshes/instancedMesh.js";
 import { Scene } from "@babylonjs/core/scene.js";
-import type { WebXRCamera } from "@babylonjs/core/XR/webXRCamera.js";
 import type { WebXRDefaultExperience } from "@babylonjs/core/XR/webXRDefaultExperience.js";
 import { createArPresentation } from "./ar-presentation.ts";
 import {
@@ -50,7 +49,6 @@ const VEIL_FADE_SECONDS = 0.22;
 export interface MountedWorld {
   farthestView?: () => number | undefined;
   dispose: () => void;
-  focusXrRig: (initial: boolean) => void;
   restoreDesktopView: () => void;
 }
 
@@ -76,7 +74,6 @@ export interface SceneHost {
   onRendererStatus: (listener: (status: RendererStatus) => void) => () => void;
   prefersReducedMotion: () => boolean;
   suspendRendering: () => () => void;
-  xrCamera: () => WebXRCamera | null;
 }
 
 const createSceneHost = (canvas: HTMLCanvasElement): SceneHost => {
@@ -494,7 +491,6 @@ const createSceneHost = (canvas: HTMLCanvasElement): SceneHost => {
     isInXr: () => isInXr,
     mountWorld,
     suspendRendering: renderLifecycle.suspend,
-    xrCamera: () => xr?.baseExperience.camera ?? null,
     onXrStatus: xrIntegration.onStatus,
     onRendererStatus: renderLifecycle.onStatus,
     onTravelPhase: (listener) => {

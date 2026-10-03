@@ -35,7 +35,6 @@ import {
 } from "./travel-transition.ts";
 
 const PLANET_POSITION = new Vector3(0, 1.35, 9.5);
-const XR_ORBIT_STAND = new Vector3(0, 0, -7.4);
 const LIGHT_DIRECTION = new Vector3(-0.82, 0.3, -0.38).normalize();
 const DESKTOP_MOVE_SPEED = 5.2;
 const SURFACE_GROUND_ORIGIN_Z = 18;
@@ -50,7 +49,6 @@ const SURFACE_RESTING_RADIUS = 12.8;
 const ORBIT_CLIMB_RADIUS = 21.6;
 const ORBIT_ENTRY_RADIUS = 10.6;
 const ORBIT_RETURN_RADIUS = 12.2;
-const XR_SURFACE_STAND = new Vector3(0, 0, 12);
 const SURFACE_RESTING_BETA = 1.37;
 const SURFACE_FIELD_OF_VIEW = 1.02;
 const ORBIT_FIELD_OF_VIEW = 0.8;
@@ -2013,6 +2011,7 @@ export const createPlanetWorld = (
     const movementZ =
       Number(pressedMovementKeys.has("KeyW")) - Number(pressedMovementKeys.has("KeyS"));
     if (
+      !isInXr &&
       (movementX !== 0 || movementZ !== 0) &&
       viewState !== "entering" &&
       viewState !== "leaving"
@@ -2030,23 +2029,13 @@ export const createPlanetWorld = (
         .normalize()
         .scaleInPlace(DESKTOP_MOVE_SPEED * deltaSeconds);
 
-      if (isInXr) {
-        activeCamera.position.addInPlace(movementDelta);
-        const rig = host.xrCamera();
-        if (rig && viewState === "surface") {
-          const standing =
-            surfaceEnvironment.groundHeightAt(rig.position.x, rig.position.z) + rig.realWorldHeight;
-          rig.position.y += (standing - rig.position.y) * Math.min(1, deltaSeconds * 6);
-        }
+      camera.target.addInPlace(movementDelta);
+      if (viewState === "surface") {
+        camera.target.x = Math.min(55, Math.max(-55, camera.target.x));
+        camera.target.z = Math.min(76, Math.max(-40, camera.target.z));
+        surfaceTarget.copyFrom(camera.target);
       } else {
-        camera.target.addInPlace(movementDelta);
-        if (viewState === "surface") {
-          camera.target.x = Math.min(55, Math.max(-55, camera.target.x));
-          camera.target.z = Math.min(76, Math.max(-40, camera.target.z));
-          surfaceTarget.copyFrom(camera.target);
-        } else {
-          orbitTarget.copyFrom(camera.target);
-        }
+        orbitTarget.copyFrom(camera.target);
       }
     }
 
@@ -2131,20 +2120,6 @@ export const createPlanetWorld = (
     }
   });
 
-  const placeXrCamera = (surface: boolean, initial: boolean): void => {
-    const rig = host.xrCamera();
-    if (!rig) return;
-    const headOffset = initial ? 0 : rig.realWorldHeight;
-    if (surface) {
-      const groundY = surfaceEnvironment.groundHeightAt(XR_SURFACE_STAND.x, XR_SURFACE_STAND.z);
-      rig.position.set(XR_SURFACE_STAND.x, groundY + headOffset, XR_SURFACE_STAND.z);
-      rig.setTarget(new Vector3(XR_SURFACE_STAND.x, groundY + 1.4, XR_SURFACE_STAND.z + 18));
-    } else {
-      rig.position.set(XR_ORBIT_STAND.x, XR_ORBIT_STAND.y + headOffset, XR_ORBIT_STAND.z);
-      rig.setTarget(PLANET_POSITION);
-    }
-  };
-
   const syncDesktopCamera = (surface: boolean): void => {
     camera.fov = surface ? SURFACE_FIELD_OF_VIEW : ORBIT_FIELD_OF_VIEW;
     camera.lowerRadiusLimit = surface ? 7.5 : 10.5;
@@ -2158,17 +2133,8 @@ export const createPlanetWorld = (
     camera.attachControl(canvas, true);
   };
 
-  const applyXrView = (surface: boolean, initial: boolean): void => {
-    viewState = surface ? "surface" : "orbit";
-    viewTransitionSeconds = 0;
-    applyViewEnvironment(surface);
-    placeXrCamera(surface, initial);
-    onViewModeChange(surface ? "surface" : "orbit");
-  };
-
   return {
     farthestView: () => (viewState === "surface" ? SURFACE_DEPARTURE_RADIUS : undefined),
-    focusXrRig: (initial) => applyXrView(viewState === "surface", initial),
     restoreDesktopView: () => syncDesktopCamera(viewState === "surface"),
     dispose: () => {
       camera.fov = ORBIT_FIELD_OF_VIEW;

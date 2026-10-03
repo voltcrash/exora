@@ -431,16 +431,8 @@ export const createSubsystemWorld = (
   });
   const firstFrameObserver = scene.onAfterRenderObservable.addOnce(onFirstFrame);
 
-  const placeXrCamera = (initial: boolean): void => {
-    const rig = host.xrCamera();
-    if (!rig) return;
-    rig.position.set(0, initial ? 0 : rig.realWorldHeight, -outerOrbit * 1.55);
-    rig.setTarget(Vector3.Zero());
-  };
-
   return {
     farthestView: () => camera.upperRadiusLimit ?? undefined,
-    focusXrRig: placeXrCamera,
     restoreDesktopView: () => camera.attachControl(canvas, true),
     dispose: () => {
       scene.onBeforeRenderObservable.remove(renderObserver);

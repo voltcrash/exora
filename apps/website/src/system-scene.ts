@@ -40,9 +40,6 @@ import {
 } from "./system-layout.ts";
 
 const SYSTEM_CENTRE = new Vector3(0, 1.4, 0);
-const XR_SYSTEM_STAND = new Vector3(0, 0, -16.5);
-const XR_SYSTEM_ELEVATION_RADIANS = (14 * Math.PI) / 180;
-const NOMINAL_EYE_HEIGHT = 1.6;
 const ORBIT_THICKNESS = 0.011;
 const HABITABLE_ZONE_COLOR = new Color3(0.36, 0.86, 0.58);
 const HABITABLE_ZONE_ALPHA = 0.16;
@@ -497,19 +494,7 @@ export const createSystemWorld = (
 
   const firstFrameObserver = scene.onAfterRenderObservable.addOnce(onFirstFrame);
 
-  const placeXrCamera = (initial: boolean, elevation = XR_SYSTEM_ELEVATION_RADIANS): void => {
-    const rig = host.xrCamera();
-    if (!rig) return;
-    const headOffset = initial ? 0 : rig.realWorldHeight;
-    const standoff = Math.max(XR_SYSTEM_STAND.z, -(outerReach + 3.5));
-    const eyeHeight = SYSTEM_CENTRE.y + Math.abs(standoff - SYSTEM_CENTRE.z) * Math.tan(elevation);
-    const deckY = eyeHeight - NOMINAL_EYE_HEIGHT + headOffset;
-    rig.position.set(XR_SYSTEM_STAND.x, deckY, standoff);
-    rig.setTarget(new Vector3(XR_SYSTEM_STAND.x, deckY, SYSTEM_CENTRE.z));
-  };
-
   return {
-    focusXrRig: placeXrCamera,
     layout,
     onSightlineCrossing: (listener) => {
       crossingListeners.add(listener);

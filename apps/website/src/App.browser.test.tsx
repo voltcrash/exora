@@ -20,7 +20,6 @@ const planetSceneStub = vi.hoisted(() => ({
 
 const mountedWorld = () => ({
   dispose: () => undefined,
-  focusXrRig: () => undefined,
   restoreDesktopView: () => undefined,
   setEphemeris: () => undefined,
   setEphemerisTime: () => undefined,
@@ -71,7 +70,6 @@ vi.mock("./scene-host.ts", () => {
       };
     },
     scene: null,
-    xrCamera: () => null,
   };
 
   return { acquireSceneHost: () => host, recreateSceneHost: () => host };

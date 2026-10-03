@@ -181,7 +181,6 @@ const createHarness = (
     isInXr: () => insideHeadset,
     prefersReducedMotion: () => false,
     onTravelPhase: () => () => undefined,
-    xrCamera: () => null,
   } as unknown as SceneHost;
 
   return { engine, host, scene };
