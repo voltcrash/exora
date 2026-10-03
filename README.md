@@ -19,8 +19,9 @@ The system diorama is where that discipline is most visible, because a picture o
 - **Where to look:** The constellation from the IAU boundaries (Roman 1987), the season it crosses the meridian at midnight, the latitudes that never see it rise or set, the instrument its magnitude needs, and how long Voyager 1 would take to get there.
 - **Hertzsprung–Russell diagram:** Each star placed from its own measured temperature, magnitude and distance among the naked-eye stars Exora already ships for its sky.
 - **Diorama clock and sonification:** Hold, reverse or speed up a system's orbits, and listen to them. Each world plucks a note pitched to its orbital frequency as it crosses Earth's line of sight, so a resonant chain like TRAPPIST-1's is heard as rhythm, and each neighbouring pair's period ratio is named.
-- **Go anywhere:** ⌘K, Ctrl+K or `/` opens a palette ranking every bundled world, moon, region, black hole and tour instantly, with planets, host systems and stars from the archives merged in as you type. Planet search matches names whatever separates their parts.
-- **Guided tours:** Narrated journeys through real destinations, each step an ordinary shareable URL, started from Discover or the palette.
+- **One interface for every destination, lit by its star:** A world, a star, a black hole, a diorama and a region all use the same layout: actions across the top, the destination's name and the places it leads to at the lower left, and its readings in an inspector on the right. On a phone the name and readings share one bottom sheet that rests at a peek and is dragged, flicked or tapped open. The interface's single accent colour is the blackbody colour of the star lighting the destination, so a red dwarf's world reads warm and Sirius reads cold.
+- **Go anywhere:** The search field in the top bar, ⌘K, Ctrl+K or `/` opens a palette ranking every bundled world, moon, region, black hole and tour instantly, with planets, host systems and stars from the archives merged in as you type. Planet search matches names whatever separates their parts.
+- **Guided tours:** Narrated journeys through real destinations, each step an ordinary shareable URL, started from Explore or the palette.
 - **Offline:** A service worker keeps the shell, hashed assets, textures and sky catalogue after the first visit, and serves the last good archive answer only when the network fails.
 - **Stellar catalog:** Resolve stars by exact identifier through SIMBAD's keyless TAP service, with twelve stellar collections spanning nearby stars, solar analogs, blue giants, binaries, variables, and stellar remnants.
 - **Deterministic world recipes:** A shared, versioned `worldgen` package maps an object's physical properties to a visual class, palette family, terrain, cloud, and ring recipe. The same catalog row always produces the same world, and `WORLDGEN_VERSION` invalidates persisted recipes when the rules change.
@@ -30,10 +31,21 @@ The system diorama is where that discipline is most visible, because a picture o
 - **World Forge:** A seeded, reproducible builder for procedural planets, custom stars, and black holes, using the same recipe engines as the catalogs.
 - **Persistent immersive session:** The engine, scene, camera, and WebXR session outlive the active destination, so entering and leaving VR does not rebuild the viewing context.
 - **iPhone and Android AR:** The same immersive control prefers the established Meta Quest VR session, selects native `immersive-ar` on an AR-only phone, and uses Variant Launch's App Clip handoff on iPhone. AR presents the existing Babylon world at tabletop scale over camera passthrough, with hit-tested placement, drag repositioning, and pinch scaling — no GLB or USDZ export path.
-- **Direct Quest shortcuts:** The controller trigger can enter or exit immersive VR when the runtime exposes it. Discover and World Forge remain browser-only; no browser UI is captured or rendered inside VR.
+- **Direct Quest shortcuts:** The controller trigger can enter or exit immersive VR when the runtime exposes it. Explore and World Forge remain browser-only; no browser UI is captured or rendered inside VR.
 - **Adaptive rendering budget:** Separate desktop, mobile, and Quest profiles govern shader octaves, sphere tessellation, star count, texture detail, and render scale. Immersive sessions raise fixed foveation after three seconds below 62 FPS and relax it again above 70.
 - **Desktop WebXR emulation:** An opt-in Immersive Web Emulation Runtime installs a synthetic Quest over `navigator.xr`, so the immersive path runs unmodified in a normal tab.
 - **Graceful degradation:** A six-hour planet cache, a twelve-hour star cache, and a bundled local profile keep the experience alive when NASA, SIMBAD, or the API is unreachable.
+
+## Keyboard
+
+| Key                   | Does                                           |
+| --------------------- | ---------------------------------------------- |
+| ⌘K, Ctrl+K or `/`     | Go anywhere by name                            |
+| Backspace             | Open or close Explore                          |
+| H                     | Hide or show the interface                     |
+| Esc                   | Close whatever is open                         |
+| Drag, scroll, W A S D | Orbit, zoom or land, and walk on a surface     |
+| Tab                   | Move between controls; it is never intercepted |
 
 ## Stack
 
@@ -117,6 +129,20 @@ apps/website         React interface and the Babylon.js scene host
 packages/contracts   Shared API, exoplanet, and star types
 packages/worldgen    Deterministic data-to-world recipe engine
 ```
+
+Inside `apps/website/src`, the interface is built from a small set of parts:
+
+```text
+styles/tokens.css          Colour, type scale, spacing, radii and motion; nothing else defines them
+star-light.ts              The local star's light, which every destination sets as the accent
+readable.ts                Sentence case for readings still produced in capitals
+components/ui              Button, Icon, TabBar, Segmented, Kbd, Spinner
+components/shell           The chrome every destination shares: top bar, sheet, loading, hints
+components/catalog         Search, collection rail and result cards shared by every catalog
+```
+
+A destination describes itself to `DestinationShell` through an identity and a `DestinationPanelModel`
+and never lays out chrome of its own; Explore's catalogs are assembled from `components/catalog`.
 
 `packages/worldgen` is the only place a catalog row becomes an appearance, so the API and browser renderer describe an object the same way. Texture provenance and licensing for the close-range detail maps are recorded in [THIRD_PARTY_ASSETS.md](THIRD_PARTY_ASSETS.md).
 
