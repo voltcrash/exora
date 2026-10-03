@@ -31,7 +31,6 @@ The system diorama is where that discipline is most visible, because a picture o
 - **World Forge:** A seeded, reproducible builder for procedural planets, custom stars, and black holes, using the same recipe engines as the catalogs.
 - **Persistent immersive session:** The engine, scene, camera, and WebXR session outlive the active destination, so entering and leaving VR does not rebuild the viewing context.
 - **iPhone and Android AR:** The same immersive control prefers the established Meta Quest VR session, selects native `immersive-ar` on an AR-only phone, and uses Variant Launch's App Clip handoff on iPhone. AR presents the existing Babylon world at tabletop scale over camera passthrough, with hit-tested placement, drag repositioning, and pinch scaling — no GLB or USDZ export path.
-- **Direct Quest shortcuts:** The controller trigger can enter or exit immersive VR when the runtime exposes it. Explore and World Forge remain browser-only; no browser UI is captured or rendered inside VR.
 - **Adaptive rendering budget:** Separate desktop, mobile, and Quest profiles govern shader octaves, sphere tessellation, star count, texture detail, and render scale. Immersive sessions raise fixed foveation after three seconds below 62 FPS and relax it again above 70.
 - **Graceful degradation:** A six-hour planet cache, a twelve-hour star cache, and a bundled local profile keep the experience alive when NASA, SIMBAD, or the API is unreachable.
 

@@ -2002,12 +2002,6 @@ export const createPlanetWorld = (
     onViewModeChange("transition");
   };
 
-  planet.metadata = {
-    ...planet.metadata,
-    exoraXrPrimaryAction: () => {
-      if (host.isInXr() && viewState === "orbit") applyXrView(true, false);
-    },
-  };
   const renderObserver = scene.onBeforeRenderObservable.add(() => {
     const isInXr = host.isInXr();
     const realDeltaSeconds = engine.getDeltaTime() / 1_000;

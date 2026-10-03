@@ -1,18 +1,13 @@
 import { ArcRotateCamera } from "@babylonjs/core/Cameras/arcRotateCamera.js";
 import "@babylonjs/core/Culling/ray.js";
-import { Ray } from "@babylonjs/core/Culling/ray.js";
 import type { Engine } from "@babylonjs/core/Engines/engine.js";
 import { Color3 } from "@babylonjs/core/Maths/math.color.js";
-import { Vector3 } from "@babylonjs/core/Maths/math.vector.js";
 import { StandardMaterial } from "@babylonjs/core/Materials/standardMaterial.js";
 import { Mesh } from "@babylonjs/core/Meshes/mesh.js";
 import { MeshBuilder } from "@babylonjs/core/Meshes/meshBuilder.js";
 import "@babylonjs/core/Meshes/instancedMesh.js";
 import { Scene } from "@babylonjs/core/scene.js";
 import type { WebXRCamera } from "@babylonjs/core/XR/webXRCamera.js";
-import type { WebXRAbstractMotionController } from "@babylonjs/core/XR/motionController/webXRAbstractMotionController.js";
-import type { WebXRControllerComponent } from "@babylonjs/core/XR/motionController/webXRControllerComponent.js";
-import type { WebXRInputSource } from "@babylonjs/core/XR/webXRInputSource.js";
 import type { WebXRDefaultExperience } from "@babylonjs/core/XR/webXRDefaultExperience.js";
 import { createArPresentation } from "./ar-presentation.ts";
 import {
@@ -38,7 +33,6 @@ import {
   TRAVEL_RECALL_MS,
   type TravelPhase,
 } from "./travel-transition.ts";
-import { advanceXrButtonPressGate, xrControllerAction } from "./xr-controller-input.ts";
 import { createSceneMountSlot } from "./scene-mount.ts";
 import { createSceneHostRegistry } from "./scene-host-registry.ts";
 import { createPersistentScene, resetPersistentScene } from "./scene-lifecycle.ts";
@@ -51,7 +45,6 @@ import type * as XrRuntime from "./xr-runtime.ts";
 export type { XrStatus } from "./scene-xr-integration.ts";
 
 // One host owns the WebGL context across every destination and WebXR session.
-const XR_MOVE_SPEED = 2.2;
 const VEIL_FADE_SECONDS = 0.22;
 
 export interface MountedWorld {
@@ -157,9 +150,6 @@ const createSceneHost = (canvas: HTMLCanvasElement): SceneHost => {
   let xr: WebXRDefaultExperience | null = null;
   let xrRuntime: typeof XrRuntime | null = null;
   let xrInitialization: Promise<WebXRDefaultExperience | null> | null = null;
-  const boundXrControllers = new WeakSet<WebXRInputSource>();
-  const boundXrMotionControllers = new WeakSet<WebXRAbstractMotionController>();
-  const xrImmersiveButtonArmed = new WeakMap<WebXRControllerComponent, boolean>();
   let mountToken = 0;
   let sessionFoveation = profile.xrFixedFoveation;
   let qualitySampleSeconds = 0;
@@ -177,18 +167,6 @@ const createSceneHost = (canvas: HTMLCanvasElement): SceneHost => {
     if (next === sessionFoveation) return;
     sessionFoveation = next;
     sessionManager.fixedFoveation = next;
-  };
-
-  const xrPrimaryRay = new Ray(Vector3.Zero(), Vector3.Forward(), 100);
-  const activateXrPrimary = (controller: WebXRInputSource): void => {
-    if (!isInXr || activeImmersiveMode !== "vr") return;
-    controller.getWorldPointerRayToRef(xrPrimaryRay);
-    const pick = scene.pickWithRay(xrPrimaryRay);
-    const metadata = pick?.pickedMesh?.metadata as
-      | { exoraXrPrimaryAction?: () => void }
-      | null
-      | undefined;
-    metadata?.exoraXrPrimaryAction?.();
   };
 
   scene.onBeforeRenderObservable.add(() => {
@@ -438,12 +416,11 @@ const createSceneHost = (canvas: HTMLCanvasElement): SceneHost => {
       xrRuntime = runtime;
       const createdXr = await runtime.WebXRDefaultExperience.CreateAsync(scene, {
         disableDefaultUI: true,
+        disableHandTracking: true,
         disableNearInteraction: true,
         disablePointerSelection: true,
         disableTeleportation: true,
-        handSupportOptions: { handMeshes: { disableDefaultMeshes: true } },
         inputOptions: { doNotLoadControllerMeshes: true },
-        optionalFeatures: ["hand-tracking"],
         outputCanvasOptions: {
           canvasOptions: {
             alpha: true,
@@ -460,88 +437,6 @@ const createSceneHost = (canvas: HTMLCanvasElement): SceneHost => {
       }
 
       xr = createdXr;
-      createdXr.baseExperience.featuresManager.enableFeature(
-        runtime.WebXRFeatureName.MOVEMENT,
-        "latest",
-        {
-          movementEnabled: true,
-          movementOrientationFollowsController: false,
-          movementOrientationFollowsViewerPose: true,
-          movementSpeed: XR_MOVE_SPEED,
-          movementThreshold: 0.16,
-          rotationEnabled: true,
-          rotationSpeed: 0.42,
-          rotationThreshold: 0.18,
-          xrInput: createdXr.input,
-        },
-      );
-      let changingVr = false;
-      const toggleVr = async (): Promise<void> => {
-        if (changingVr) return;
-        changingVr = true;
-        try {
-          if (isInXr) {
-            if (activeImmersiveMode === "vr") {
-              await createdXr.baseExperience.sessionManager.exitXRAsync();
-            }
-            return;
-          }
-          if (!xrIntegration.isVrSupported()) return;
-          activeImmersiveMode = "vr";
-          await createdXr.baseExperience.enterXRAsync(
-            "immersive-vr",
-            "local-floor",
-            createdXr.renderTarget,
-          );
-        } catch (error) {
-          activeImmersiveMode = null;
-          xrIntegration.markReady();
-          console.error("[xr] controller VR toggle failed", error);
-        } finally {
-          changingVr = false;
-        }
-      };
-      const bindXrMotionController = (
-        controller: WebXRInputSource,
-        motionController: WebXRAbstractMotionController,
-      ): void => {
-        if (boundXrMotionControllers.has(motionController)) return;
-        boundXrMotionControllers.add(motionController);
-        for (const id of motionController.getComponentIds()) {
-          const component = motionController.getComponent(id);
-          if (!component) continue;
-          const action = xrControllerAction(id);
-          if (action !== "immersive" && action !== "primary") continue;
-          if (action === "immersive") xrImmersiveButtonArmed.set(component, !component.pressed);
-          component.onButtonStateChangedObservable.add((changed) => {
-            const pressed = changed.changes.pressed?.current;
-            if (id === "a-button" || id === "x-button") {
-              if (pressed === true) activateXrPrimary(controller);
-              return;
-            }
-            if (action === "immersive" && pressed !== undefined) {
-              const gate = advanceXrButtonPressGate(
-                xrImmersiveButtonArmed.get(component) ?? false,
-                pressed,
-              );
-              xrImmersiveButtonArmed.set(component, gate.armed);
-              if (gate.activate) void toggleVr();
-              return;
-            }
-          });
-        }
-      };
-      const bindXrController = (controller: WebXRInputSource): void => {
-        if (boundXrControllers.has(controller)) return;
-        boundXrControllers.add(controller);
-        const motionController = controller.motionController;
-        if (motionController) bindXrMotionController(controller, motionController);
-        controller.onMotionControllerInitObservable.add((initializedMotionController) =>
-          bindXrMotionController(controller, initializedMotionController),
-        );
-      };
-      for (const controller of createdXr.input.controllers) bindXrController(controller);
-      createdXr.input.onControllerAddedObservable.add(bindXrController);
       createdXr.baseExperience.onInitialXRPoseSetObservable.add(() => {
         if (activeImmersiveMode === "vr") worldMount.current?.focusXrRig(true);
       });
