@@ -6,7 +6,11 @@ import {
   type PaletteEntry,
   type PaletteTarget,
 } from "../command-palette.ts";
+import { planetKindLabel } from "../planet-utils.tsx";
 import { TOURS } from "../tours.ts";
+import { Icon, type IconName } from "./ui/Icon.tsx";
+import { Kbd, MODIFIER_KEY } from "./ui/Kbd.tsx";
+import { Spinner } from "./ui/Spinner.tsx";
 import styles from "./CommandPalette.module.css";
 import { bindStyles } from "../styles/bind-styles.ts";
 
@@ -19,16 +23,16 @@ const ACTIONS: readonly PaletteEntry[] = [
     detail: "Browse every catalogue, the Solar System and World Forge",
     group: "Actions",
     id: "action-discover",
-    keywords: ["browse", "catalog", "catalogue", "search", "forge", "create"],
-    name: "Open Discover",
+    keywords: ["browse", "catalog", "catalogue", "search", "forge", "create", "discover"],
+    name: "Open Explore",
     target: { action: "discover", type: "action" },
   },
   {
     detail: "Hide or restore the interface over the view",
     group: "Actions",
     id: "action-clear-view",
-    keywords: ["hide", "interface", "screenshot", "chrome", "tab"],
-    name: "Toggle clear view",
+    keywords: ["hide", "interface", "screenshot", "chrome", "clear", "view"],
+    name: "Hide or show the interface",
     target: { action: "clear-view", type: "action" },
   },
   {
@@ -41,15 +45,24 @@ const ACTIONS: readonly PaletteEntry[] = [
   },
 ];
 
-const GLYPHS: Record<PaletteTarget["type"], string> = {
-  action: "⌘",
-  "black-hole": "◐",
-  planet: "◍",
-  region: "◌",
-  star: "✦",
-  system: "◎",
-  tour: "↝",
+const ICONS: Record<PaletteTarget["type"], IconName> = {
+  action: "arrow-right",
+  "black-hole": "black-hole",
+  planet: "planet",
+  region: "sparkle",
+  star: "star",
+  system: "orbit",
+  tour: "route",
 };
+
+const ACTION_ICONS: Record<string, IconName> = {
+  "clear-view": "eye-off",
+  discover: "compass",
+  home: "home",
+};
+
+const iconFor = (target: PaletteTarget): IconName =>
+  target.type === "action" ? (ACTION_ICONS[target.action] ?? "arrow-right") : ICONS[target.type];
 
 let localEntriesRequest: Promise<PaletteEntry[]> | null = null;
 
@@ -169,7 +182,7 @@ export const CommandPalette = ({ onClose, onSelect }: CommandPaletteProps) => {
         setRemote({
           entries: [
             ...planetResults.map((planet): PaletteEntry => ({
-              detail: `${planet.kind.replace("-", " ")} · ${planet.hostStar} · ${planet.observation.discoveryMethod}`,
+              detail: `${planetKindLabel(planet)} · ${planet.hostStar} · ${planet.observation.discoveryMethod}`,
               group: "Exoplanets",
               id: `planet-${planet.id}`,
               keywords: [planet.hostStar],
@@ -274,7 +287,7 @@ export const CommandPalette = ({ onClose, onSelect }: CommandPaletteProps) => {
     >
       <div className={cx("palette-card")}>
         <div className={cx("palette-field")}>
-          <span aria-hidden="true">⌕</span>
+          {searching ? <Spinner size={18} /> : <Icon name="search" size={18} />}
           <input
             ref={inputRef}
             role="combobox"
@@ -290,7 +303,7 @@ export const CommandPalette = ({ onClose, onSelect }: CommandPaletteProps) => {
             onChange={(event) => setQuery(event.target.value)}
             onKeyDown={onKeyDown}
           />
-          <kbd>ESC</kbd>
+          <Kbd label="Escape closes">Esc</Kbd>
         </div>
 
         <div className={cx("palette-results")} id={listId} role="listbox" aria-label="Destinations">
@@ -312,16 +325,16 @@ export const CommandPalette = ({ onClose, onSelect }: CommandPaletteProps) => {
                     onClick={() => choose(entry)}
                   >
                     <span className={cx("palette-glyph")} aria-hidden="true">
-                      {GLYPHS[entry.target.type]}
+                      <Icon name={iconFor(entry.target)} size={18} />
                     </span>
                     <span className={cx("palette-copy")}>
                       <strong>{entry.name}</strong>
                       <small>{entry.detail}</small>
                     </span>
                     {index === activeIndex ? (
-                      <kbd className={cx("palette-enter")} aria-hidden="true">
-                        ↵
-                      </kbd>
+                      <span className={cx("palette-enter")} aria-hidden="true">
+                        <Kbd>↵</Kbd>
+                      </span>
                     ) : null}
                   </div>
                 );
@@ -330,15 +343,30 @@ export const CommandPalette = ({ onClose, onSelect }: CommandPaletteProps) => {
           ))}
           {flat.length === 0 ? (
             <p className={cx("palette-empty")} role="status">
-              {searching ? "Asking the archives…" : "Nothing by that name yet."}
+              {searching
+                ? "Asking the archives…"
+                : "Nothing by that name. Try a catalog ID, like Kepler-22 b or HD 209458."}
             </p>
           ) : null}
         </div>
 
         <p className={cx("palette-footer")} role="status">
-          {searching
-            ? "Searching the NASA Exoplanet Archive and SIMBAD…"
-            : "↑↓ to move · ↵ to travel · ⌘K or / to open anywhere"}
+          {searching ? (
+            "Searching the NASA Exoplanet Archive and SIMBAD…"
+          ) : (
+            <>
+              <span>
+                <Kbd>↑</Kbd>
+                <Kbd>↓</Kbd> move
+              </span>
+              <span>
+                <Kbd>↵</Kbd> travel
+              </span>
+              <span>
+                <Kbd>{`${MODIFIER_KEY} K`}</Kbd> or <Kbd>/</Kbd> opens this anywhere
+              </span>
+            </>
+          )}
         </p>
       </div>
     </dialog>
