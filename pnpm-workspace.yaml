@@ -12,8 +12,8 @@ catalog:
   "@lhci/cli": ^0.15.1
   "@tanstack/redact": ^0.2.0
   "@types/node": ^24.13.3
-  "@types/react": ^19.2.18
-  "@types/react-dom": ^19.2.5
+  "@types/react": ^19.3.0
+  "@types/react-dom": ^19.3.0
   "@vercel/analytics": ^2.0.1
   "@vercel/speed-insights": ^2.0.0
   "@vitejs/plugin-react": ^6.1.2
