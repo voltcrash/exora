@@ -29,7 +29,7 @@ test("Forge updates its deferred preview and generates from the latest controls"
     />,
   );
 
-  await page.getByLabelText("Kind of world").selectOptions("gas-giant");
+  await page.getByLabelText("Kind of world", { exact: false }).selectOptions("gas-giant");
   await expect
     .poll(() => container?.querySelector("[data-renderer]")?.getAttribute("data-renderer"))
     .toBe("gas-giant");

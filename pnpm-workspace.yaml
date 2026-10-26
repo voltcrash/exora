@@ -6,40 +6,43 @@ packages:
 catalogMode: prefer
 
 catalog:
-  "@babylonjs/core": ^9.23.0
+  "@babylonjs/core": ^9.32.0
   "@fontsource-variable/archivo": ^5.3.0
-  "@hono/node-server": ^2.1.1
+  "@hono/node-server": ^2.1.5
   "@lhci/cli": ^0.15.1
   "@tanstack/redact": ^0.2.0
-  "@types/node": ^24.13.3
-  "@types/react": ^19.2.18
-  "@types/react-dom": ^19.2.5
+  "@types/node": ^24.19.2
+  "@types/react": ^19.3.0
+  "@types/react-dom": ^19.3.0
   "@vercel/analytics": ^2.0.1
   "@vercel/speed-insights": ^2.0.0
-  "@vitejs/plugin-react": ^6.1.0
+  "@vitejs/plugin-react": ^6.1.2
   # Vite+ requires optional browser providers to match its bundled Vitest exactly.
-  "@vitest/browser-playwright": 4.1.11
-  hono: ^4.13.5
-  playwright: ^1.62.1
-  react: ^19.2.8
-  react-dom: ^19.2.8
+  "@vitest/browser-playwright": 5.0.5
+  hono: ^4.13.14
+  playwright: ^1.64.1
+  react: ^19.3.1
+  react-dom: ^19.3.1
   typescript: ^7.0.2
-  vite: npm:@voidzero-dev/vite-plus-core@0.3.0
-  vite-plus: 0.3.0
+  vite: npm:@voidzero-dev/vite-plus-core@1.4.0
+  vite-plus: 1.4.0
   zod: ^4.6.7
+  vitest: 5.0.5
 overrides:
-  vite: "catalog:"
   # Advisory patches for transitive development tooling still used by Vite+ and Lighthouse.
   # Drop an entry once its dependents ship the fixed version on their own.
   esbuild@0.27: ^0.28.2
   tmp: ^0.2.7
+  vite@*: "catalog:"
+  vitest@*: "catalog:"
 peerDependencyRules:
   allowAny:
     - vite
+    - vitest
   allowedVersions:
     vite: "*"
+    vitest: "*"
 allowBuilds:
   esbuild: true
 minimumReleaseAgeExclude:
-  - "@babylonjs/core@9.23.0"
   - "@tanstack/redact@0.2.0"

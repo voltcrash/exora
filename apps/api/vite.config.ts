@@ -6,7 +6,9 @@ export default defineConfig({
       dev: "node --env-file-if-exists=../../.env --use-system-ca --watch src/index.ts",
       start: {
         command: "node --use-system-ca dist/index.mjs",
-        env: ["PORT"],
+        cache: {
+          env: ["PORT"],
+        },
       },
     },
   },

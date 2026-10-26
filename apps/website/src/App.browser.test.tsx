@@ -479,7 +479,7 @@ desktopTest("a deep link to a named world resolves to that world", async () => {
   stubArchive();
   mountApp("?planet=Kepler-22%20b");
 
-  await expect.element(page.getByRole("heading", { level: 1 })).toHaveTextContent("Kepler-22");
+  await expect.element(page.getByRole("heading", { level: 1 })).toMatchTextContent("Kepler-22");
   expect(document.querySelector('link[rel="canonical"]')?.getAttribute("href")).toContain(
     "?planet=Kepler-22%20b",
   );
@@ -489,14 +489,14 @@ desktopTest("a deep link to a named star resolves to that star", async () => {
   stubArchive();
   mountApp("?star=Sirius");
 
-  await expect.element(page.getByRole("heading", { level: 1 })).toHaveTextContent("Sirius");
+  await expect.element(page.getByRole("heading", { level: 1 })).toMatchTextContent("Sirius");
 });
 
 desktopTest("a black-hole deep link resolves without an archive request", async () => {
   const calls = stubArchive();
   mountApp("?blackHole=M87*");
 
-  await expect.element(page.getByRole("heading", { level: 1 })).toHaveTextContent("M87*");
+  await expect.element(page.getByRole("heading", { level: 1 })).toMatchTextContent("M87*");
   await expect.element(page.getByText(/interpretive model of gravitational lensing/)).toBeVisible();
   expect(window.location.search).toBe("?blackHole=M87*");
   expect(document.querySelector('link[rel="canonical"]')?.getAttribute("href")).toContain(
@@ -509,7 +509,7 @@ desktopTest("an observed BlackCAT deep link resolves through the Exora API", asy
   const calls = stubArchive();
   mountApp("?blackHole=GS%202023%2B338");
 
-  await expect.element(page.getByRole("heading", { level: 1 })).toHaveTextContent("GS 2023+338");
+  await expect.element(page.getByRole("heading", { level: 1 })).toMatchTextContent("GS 2023+338");
   await expect.element(page.getByText("Observed black hole")).toBeVisible();
   expect(calls.some((path) => path.includes("/api/black-holes/GS%202023%2B338"))).toBe(true);
 });
@@ -522,7 +522,7 @@ desktopTest(
 
     await expect
       .element(page.getByRole("heading", { level: 1 }))
-      .toHaveTextContent("EXORA SYNTHETIC 0007");
+      .toMatchTextContent("EXORA SYNTHETIC 0007");
     await expect.element(page.getByText("Procedural black hole")).toBeVisible();
     expect(calls.filter((path) => path.includes("/api/")).length).toBe(0);
   },
@@ -534,7 +534,7 @@ desktopTest(
     stubArchive();
     mountApp("?system=Kepler-90");
 
-    await expect.element(page.getByRole("heading", { level: 1 })).toHaveTextContent("Kepler-90");
+    await expect.element(page.getByRole("heading", { level: 1 })).toMatchTextContent("Kepler-90");
     expect(document.querySelector('link[rel="canonical"]')?.getAttribute("href")).toContain(
       "?system=Kepler-90",
     );
@@ -555,12 +555,12 @@ desktopTest(
     await expandPanel();
     await userEvent.click(page.getByRole("button", { name: /Kepler-90 c/ }));
 
-    await expect.element(page.getByRole("heading", { level: 1 })).toHaveTextContent("Kepler-90 c");
+    await expect.element(page.getByRole("heading", { level: 1 })).toMatchTextContent("Kepler-90 c");
     expect(window.location.search).toBe("?planet=Kepler-90%20c");
 
     await userEvent.click(page.getByRole("button", { name: /Whole system/ }));
 
-    await expect.element(page.getByRole("heading", { level: 1 })).toHaveTextContent("Kepler-90");
+    await expect.element(page.getByRole("heading", { level: 1 })).toMatchTextContent("Kepler-90");
     expect(window.location.search).toBe("?system=Kepler-90");
   },
 );
@@ -592,7 +592,7 @@ desktopTest(
 
     await userEvent.click(page.getByRole("button", { name: "Go to the featured world" }));
 
-    await expect.element(page.getByRole("heading", { level: 1 })).toHaveTextContent("GJ 674");
+    await expect.element(page.getByRole("heading", { level: 1 })).toMatchTextContent("GJ 674");
     expect(window.location.pathname).toBe("/");
     expect(window.location.search).toBe("");
   },
@@ -612,7 +612,7 @@ desktopTest("the catalog opens, searches, and travels to a result", async () => 
 
   await userEvent.click(result);
 
-  await expect.element(page.getByRole("heading", { level: 1 })).toHaveTextContent("TRAPPIST-1 e");
+  await expect.element(page.getByRole("heading", { level: 1 })).toMatchTextContent("TRAPPIST-1 e");
   expect(window.location.search).toBe("?planet=TRAPPIST-1%20e");
   expect(calls.some((path) => path.includes("q=TRAPPIST-1"))).toBe(true);
 });
@@ -629,7 +629,7 @@ desktopTest("the star catalog opens and travels to a star", async () => {
   await expect.element(result).toBeVisible();
   await userEvent.click(result);
 
-  await expect.element(page.getByRole("heading", { level: 1 })).toHaveTextContent("Sirius");
+  await expect.element(page.getByRole("heading", { level: 1 })).toMatchTextContent("Sirius");
   await expandPanel();
   await expect.element(page.getByRole("button", { name: /Sirius b/ })).toBeVisible();
   await expect.element(page.getByRole("button", { name: /Sirius c/ })).toBeVisible();
@@ -642,8 +642,8 @@ desktopTest("the star catalog preloads destinations alphabetically", async () =>
 
   await openDiscoverSection("Stars");
   const destinations = page.getByRole("list").getByRole("button");
-  await expect.element(destinations.nth(0)).toHaveTextContent(/Altair/);
-  await expect.element(destinations.nth(1)).toHaveTextContent(/Sirius/);
+  await expect.element(destinations.nth(0)).toMatchTextContent(/Altair/);
+  await expect.element(destinations.nth(1)).toMatchTextContent(/Sirius/);
 });
 
 desktopTest("the black-hole atlas opens and travels to a sourced horizon", async () => {
@@ -658,7 +658,9 @@ desktopTest("the black-hole atlas opens and travels to a sourced horizon", async
   await expect.element(destination).toBeVisible();
   await userEvent.click(destination);
 
-  await expect.element(page.getByRole("heading", { level: 1 })).toHaveTextContent("Sagittarius A*");
+  await expect
+    .element(page.getByRole("heading", { level: 1 }))
+    .toMatchTextContent("Sagittarius A*");
   const title = document.querySelector<HTMLElement>("#black-hole-name");
   expect(title).not.toBeNull();
   expect(title?.scrollWidth).toBeLessThanOrEqual(title?.clientWidth ?? 0);
@@ -703,7 +705,9 @@ desktopTest("the atlas search resolves a horizon by its catalog alias", async ()
   await expect.element(page.getByRole("button", { name: /TON 618/ })).not.toBeInTheDocument();
 
   await userEvent.click(destination);
-  await expect.element(page.getByRole("heading", { level: 1 })).toHaveTextContent("Sagittarius A*");
+  await expect
+    .element(page.getByRole("heading", { level: 1 }))
+    .toMatchTextContent("Sagittarius A*");
 });
 
 /*
@@ -717,7 +721,9 @@ test("a long destination name stays inside its column before the webfont arrives
   document.documentElement.style.fontFamily = "Verdana, DejaVu Sans, sans-serif";
   mountApp("?blackHole=Sagittarius%20A*");
 
-  await expect.element(page.getByRole("heading", { level: 1 })).toHaveTextContent("Sagittarius A*");
+  await expect
+    .element(page.getByRole("heading", { level: 1 }))
+    .toMatchTextContent("Sagittarius A*");
   const title = document.querySelector<HTMLElement>("#black-hole-name");
   expect(title).not.toBeNull();
   expect(title?.scrollWidth).toBeLessThanOrEqual(title?.clientWidth ?? 0);
@@ -736,10 +742,10 @@ desktopTest(
     await expect.element(oortCloud).toBeVisible();
     await userEvent.click(oortCloud);
 
-    await expect.element(page.getByRole("heading", { level: 1 })).toHaveTextContent("Oort Cloud");
+    await expect.element(page.getByRole("heading", { level: 1 })).toMatchTextContent("Oort Cloud");
     await expect.element(page.getByText(/never directly observed/).first()).toBeVisible();
     await expandPanel();
-    await expect.element(page.getByLabelText("Region data")).toHaveTextContent("NAIF 10");
+    await expect.element(page.getByLabelText("Region data")).toMatchTextContent("NAIF 10");
     expect(window.location.search).toBe("?region=Oort%20Cloud");
   },
 );
@@ -750,7 +756,7 @@ desktopTest(
     stubArchive();
     mountApp("?planet=Jupiter");
 
-    await expect.element(page.getByRole("heading", { level: 1 })).toHaveTextContent("Jupiter");
+    await expect.element(page.getByRole("heading", { level: 1 })).toMatchTextContent("Jupiter");
     const subsystem = page.getByRole("button", { name: "Explore Jupiter's moons" });
     await expect.element(subsystem).toBeVisible();
     await userEvent.click(subsystem);
@@ -781,7 +787,7 @@ desktopTest(
     stubArchive();
     mountApp("?system=Sun");
 
-    await expect.element(page.getByRole("heading", { level: 1 })).toHaveTextContent("Sun");
+    await expect.element(page.getByRole("heading", { level: 1 })).toMatchTextContent("Sun");
     await openPanelSection("Time");
     await expect
       .element(page.getByText("Simplified catalog orbits", { exact: true }))
@@ -808,13 +814,13 @@ desktopTest("the Sun's complete world list scrolls inside the destination panel"
   mountApp("?star=Sun");
 
   const telemetry = page.getByLabelText("Observed star data");
-  await expect.element(telemetry).toHaveTextContent(/Earth distance\s*1\s*AU/);
-  await expect.element(telemetry).toHaveTextContent(/Diameter\s*1,391,400\s*km/);
-  await expect.element(telemetry).toHaveTextContent(/Temperature\s*5,772\s*K/);
+  await expect.element(telemetry).toMatchTextContent(/Earth distance\s*1\s*AU/);
+  await expect.element(telemetry).toMatchTextContent(/Diameter\s*1,391,400\s*km/);
+  await expect.element(telemetry).toMatchTextContent(/Temperature\s*5,772\s*K/);
 
   await openPanelSection("Record");
-  await expect.element(telemetry).toHaveTextContent("25.38 d sidereal");
-  await expect.element(telemetry).toHaveTextContent(/Axial tilt 7.25°/);
+  await expect.element(telemetry).toMatchTextContent("25.38 d sidereal");
+  await expect.element(telemetry).toMatchTextContent(/Axial tilt 7.25°/);
 
   await openPanelSection("Worlds");
   const worlds = document.querySelector<HTMLElement>('[data-testid="panel-body"]');
@@ -882,14 +888,14 @@ desktopTest("the World Forge builds a black hole with a reloadable recipe", asyn
   await userEvent.fill(page.getByLabelText("Name", { exact: true }), "Umbra Prime");
   await userEvent.click(page.getByRole("button", { name: /GENERATE BLACK HOLE/i }));
 
-  await expect.element(page.getByRole("heading", { level: 1 })).toHaveTextContent("Umbra Prime");
+  await expect.element(page.getByRole("heading", { level: 1 })).toMatchTextContent("Umbra Prime");
   const sharedSearch = window.location.search;
   expect(sharedSearch).toMatch(/^\?customBlackHole=[A-Za-z0-9_-]+$/);
   await expect.element(page.getByLabelText(/Procedural visualization/i)).toBeVisible();
 
   remountAppAtCurrentUrl();
 
-  await expect.element(page.getByRole("heading", { level: 1 })).toHaveTextContent("Umbra Prime");
+  await expect.element(page.getByRole("heading", { level: 1 })).toMatchTextContent("Umbra Prime");
   expect(window.location.search).toBe(sharedSearch);
 });
 
@@ -900,13 +906,13 @@ desktopTest("a generated world survives a reload and its URL opens as a deep lin
   await openDiscoverSection("World Forge");
   await userEvent.fill(page.getByLabelText("Name", { exact: true }), "Reloadia");
   await userEvent.click(page.getByRole("button", { name: /GENERATE PLANET/i }));
-  await expect.element(page.getByRole("heading", { level: 1 })).toHaveTextContent("Reloadia");
+  await expect.element(page.getByRole("heading", { level: 1 })).toMatchTextContent("Reloadia");
   const sharedSearch = window.location.search;
   expect(sharedSearch).toMatch(/^\?custom=[A-Za-z0-9_-]+$/);
 
   remountAppAtCurrentUrl();
 
-  await expect.element(page.getByRole("heading", { level: 1 })).toHaveTextContent("Reloadia");
+  await expect.element(page.getByRole("heading", { level: 1 })).toMatchTextContent("Reloadia");
   expect(window.location.search).toBe(sharedSearch);
   await expect.element(page.getByText("Generated world")).toBeVisible();
 });
@@ -931,22 +937,22 @@ desktopTest("back and forward restore generated planets and stars", async () => 
   await openDiscoverSection("World Forge");
   await userEvent.fill(page.getByLabelText("Name", { exact: true }), "History World");
   await userEvent.click(page.getByRole("button", { name: /GENERATE PLANET/i }));
-  await expect.element(page.getByRole("heading", { level: 1 })).toHaveTextContent("History World");
+  await expect.element(page.getByRole("heading", { level: 1 })).toMatchTextContent("History World");
   const planetSearch = window.location.search;
 
   await openDiscoverSection("World Forge");
   await userEvent.click(page.getByRole("tab", { exact: true, name: "Star" }));
   await userEvent.fill(page.getByLabelText("Name", { exact: true }), "History Star");
   await userEvent.click(page.getByRole("button", { name: /GENERATE STAR/i }));
-  await expect.element(page.getByRole("heading", { level: 1 })).toHaveTextContent("History Star");
+  await expect.element(page.getByRole("heading", { level: 1 })).toMatchTextContent("History Star");
   const starSearch = window.location.search;
 
   window.history.back();
-  await expect.element(page.getByRole("heading", { level: 1 })).toHaveTextContent("History World");
+  await expect.element(page.getByRole("heading", { level: 1 })).toMatchTextContent("History World");
   expect(window.location.search).toBe(planetSearch);
 
   window.history.forward();
-  await expect.element(page.getByRole("heading", { level: 1 })).toHaveTextContent("History Star");
+  await expect.element(page.getByRole("heading", { level: 1 })).toMatchTextContent("History Star");
   expect(window.location.search).toBe(starSearch);
 });
 
@@ -1086,7 +1092,9 @@ desktopTest("the search pill opens the palette, which travels by name", async ()
   await expect.element(option).toBeVisible();
   await userEvent.click(option);
 
-  await expect.element(page.getByRole("heading", { level: 1 })).toHaveTextContent("Sagittarius A*");
+  await expect
+    .element(page.getByRole("heading", { level: 1 }))
+    .toMatchTextContent("Sagittarius A*");
 });
 
 desktopTest(
