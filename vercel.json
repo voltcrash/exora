@@ -1,5 +1,11 @@
 {
   "$schema": "https://openapi.vercel.sh/vercel.json",
+  "git": {
+    "deploymentEnabled": {
+      "**": false,
+      "main": true
+    }
+  },
   "framework": "vite",
   "buildCommand": "vp run website#build && vp run @exora/api#build",
   "outputDirectory": "apps/website/dist",
