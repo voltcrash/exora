@@ -26,7 +26,7 @@ catalog:
   typescript: ^7.0.2
   vite: npm:@voidzero-dev/vite-plus-core@0.3.0
   vite-plus: 0.3.0
-  zod: ^4.4.3
+  zod: ^4.6.7
 overrides:
   vite: "catalog:"
   # Advisory patches for transitive development tooling still used by Vite+ and Lighthouse.
