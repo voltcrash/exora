@@ -20,7 +20,7 @@ catalog:
   # Vite+ requires optional browser providers to match its bundled Vitest exactly.
   "@vitest/browser-playwright": 4.1.11
   hono: ^4.13.14
-  playwright: ^1.62.1
+  playwright: ^1.64.1
   react: ^19.3.1
   react-dom: ^19.3.1
   typescript: ^7.0.2
