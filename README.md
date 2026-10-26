@@ -48,7 +48,7 @@ The system diorama is where that discipline is most visible, because a picture o
 ## Stack
 
 - **Toolchain and monorepo:** Vite+ (`vp`), pnpm workspaces with a version catalog, TypeScript
-- **Web:** React 19, Vite, Babylon.js 9 (WebGL2 + WebXR)
+- **Web:** React 19 APIs with the TanStack Redact runtime, Vite, Babylon.js 9 (WebGL2 + WebXR)
 - **API:** Hono on Node 24
 - **Data sources:** NASA Exoplanet Archive TAP, SIMBAD TAP (CDS, Strasbourg), and NASA/JPL APIs
 - **Hosting:** Vercel static output plus a Vercel Function, with Analytics and Speed Insights
@@ -145,8 +145,8 @@ and never lays out chrome of its own; Explore's catalogs are assembled from `com
 
 ## Current deployment architecture
 
-Vercel's Git integration is the supported deployment workflow. Push a branch or open a pull
-request to create a Preview deployment, and merge to `main` to create the Production deployment.
+Vercel's Git integration deploys only `main`. Preview deployments are disabled for every other
+branch, including branches with slashes in their names. Merge to `main` to deploy to Production.
 Vercel reads the committed `vercel.json`, which keeps the website and API build, function bundle,
 region, rewrites, and response headers under version control.
 
@@ -154,7 +154,6 @@ The repository does not install Vercel CLI. If a deployment must be started manu
 latest CLI as a one-off command instead of adding it to the workspace:
 
 ```sh
-pnpm dlx vercel@latest         # Preview
 pnpm dlx vercel@latest --prod  # Production
 ```
 
