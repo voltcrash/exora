@@ -36,3 +36,4 @@ dist-ssr
 !.vscode/extensions.json
 .vercel
 .lighthouseci
+.vitest/

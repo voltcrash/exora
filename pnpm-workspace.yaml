@@ -18,26 +18,30 @@ catalog:
   "@vercel/speed-insights": ^2.0.0
   "@vitejs/plugin-react": ^6.1.2
   # Vite+ requires optional browser providers to match its bundled Vitest exactly.
-  "@vitest/browser-playwright": 4.1.11
+  "@vitest/browser-playwright": 5.0.5
   hono: ^4.13.14
   playwright: ^1.64.1
   react: ^19.3.1
   react-dom: ^19.3.1
   typescript: ^7.0.2
-  vite: npm:@voidzero-dev/vite-plus-core@0.3.3
-  vite-plus: 0.3.3
+  vite: npm:@voidzero-dev/vite-plus-core@1.4.0
+  vite-plus: 1.4.0
   zod: ^4.6.7
+  vitest: 5.0.5
 overrides:
-  vite: "catalog:"
   # Advisory patches for transitive development tooling still used by Vite+ and Lighthouse.
   # Drop an entry once its dependents ship the fixed version on their own.
   esbuild@0.27: ^0.28.2
   tmp: ^0.2.7
+  vite@*: "catalog:"
+  vitest@*: "catalog:"
 peerDependencyRules:
   allowAny:
     - vite
+    - vitest
   allowedVersions:
     vite: "*"
+    vitest: "*"
 allowBuilds:
   esbuild: true
 minimumReleaseAgeExclude:
