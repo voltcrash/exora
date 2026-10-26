@@ -6,7 +6,7 @@ packages:
 catalogMode: prefer
 
 catalog:
-  "@babylonjs/core": ^9.23.0
+  "@babylonjs/core": ^9.32.0
   "@fontsource-variable/archivo": ^5.3.0
   "@hono/node-server": ^2.1.5
   "@lhci/cli": ^0.15.1
