@@ -1209,6 +1209,7 @@ test("the navigation deck keeps an even gap between every control", async () => 
   stubArchive();
   mountApp();
   await expect.element(page.getByRole("heading", { level: 1 })).toBeVisible();
+  await expect.element(page.getByRole("button", { name: "View in AR" })).toBeVisible();
 
   const discover = document
     .querySelector<HTMLElement>('[data-testid="discover-trigger"]')!
