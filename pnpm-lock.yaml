@@ -43,8 +43,8 @@ catalogs:
       specifier: 4.1.11
       version: 4.1.11
     hono:
-      specifier: ^4.13.5
-      version: 4.13.5
+      specifier: ^4.13.14
+      version: 4.13.14
     playwright:
       specifier: ^1.62.1
       version: 1.62.1
@@ -93,10 +93,10 @@ importers:
         version: link:../../packages/contracts
       '@hono/node-server':
         specifier: 'catalog:'
-        version: 2.1.5(hono@4.13.5)
+        version: 2.1.5(hono@4.13.14)
       hono:
         specifier: 'catalog:'
-        version: 4.13.5
+        version: 4.13.14
       zod:
         specifier: 'catalog:'
         version: 4.6.7
@@ -1802,8 +1802,8 @@ packages:
     resolution: {integrity: sha512-T2UbfbBEF32wiepXIsMlTW9+dDYC6wMh/t/vYA4tuOMKqWz/n3vr1NFSxQiyP+zk2mXsoMA/i/7qV6LKut1t1A==}
     engines: {node: '>= 0.4'}
 
-  hono@4.13.5:
-    resolution: {integrity: sha512-O6+/eCYRkzzzy0rPWwKLiGBR1nFuUPZynnwjxN1MBA62NNqbT0wQEzQyK2gSO5yDIDB336sXQleAhOHrzlYyKw==}
+  hono@4.13.14:
+    resolution: {integrity: sha512-yhRLQ21U6qa9Hsu2N7Qcbh8tE+WKEcoErjIo56LeSGiGXGp9sA7UpE86Ui9uexb61KakiGwuHMn2QdV7w6i6kQ==}
     engines: {node: '>=16.9.0'}
 
   http-errors@2.0.1:
@@ -2865,9 +2865,9 @@ snapshots:
     dependencies:
       tslib: 2.8.1
 
-  '@hono/node-server@2.1.5(hono@4.13.5)':
+  '@hono/node-server@2.1.5(hono@4.13.14)':
     dependencies:
-      hono: 4.13.5
+      hono: 4.13.14
 
   '@jridgewell/sourcemap-codec@1.5.5': {}
 
@@ -3967,7 +3967,7 @@ snapshots:
     dependencies:
       function-bind: 1.1.2
 
-  hono@4.13.5: {}
+  hono@4.13.14: {}
 
   http-errors@2.0.1:
     dependencies:
