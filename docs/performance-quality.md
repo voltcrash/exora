@@ -1,5 +1,18 @@
 # Performance quality gates
 
+## React runtime
+
+The website uses [TanStack Redact](https://tanstack.com/redact/latest) through its Vite plugin.
+Keep the React packages, types, imports, and React Vite plugin: Redact redirects runtime imports
+for development, production builds, and the website's unit and browser test projects.
+
+The default `redact()` preset preserves context, Suspense, lazy views, memoization, and class
+error boundaries. Do not switch to `nano` without explicitly enabling the features the app uses.
+Redact renders synchronously; `useDeferredValue` still retains stale results, but rendering cannot
+be interrupted. Check Forge controls and catalog filters on mobile when updating the runtime.
+
+## Lighthouse
+
 Exora runs Lighthouse CI against the production website build in two profiles. Desktop uses the
 host connection and desktop Lighthouse preset. Mobile uses a 393 × 823 viewport, 4× CPU slowdown,
 and simulated mobile networking. Each profile collects one report and writes it to its own
