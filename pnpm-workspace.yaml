@@ -45,5 +45,4 @@ peerDependencyRules:
 allowBuilds:
   esbuild: true
 minimumReleaseAgeExclude:
-  - "@babylonjs/core@9.23.0"
   - "@tanstack/redact@0.2.0"
