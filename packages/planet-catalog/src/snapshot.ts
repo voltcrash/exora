@@ -90,19 +90,31 @@ export const decodePlanetCatalog = (snapshot: PlanetCatalogSnapshot): ExoplanetP
   if (snapshot.format !== PLANET_CATALOG_FORMAT || !Array.isArray(snapshot.rows)) {
     throw new Error("Unsupported planet catalog snapshot format.");
   }
-  const paths = snapshot.fields.map(fieldPath);
-  const source = {
-    archive: snapshot.source.archive,
-    table: snapshot.source.table,
-    retrievedOn: snapshot.generatedAt.slice(0, 10),
-  };
+  const { archive, table } = snapshot.source;
+  const retrievedOn = snapshot.generatedAt.slice(0, 10);
+  // Resolve each field to its containing object once, so rows are only assignments.
+  const containers = [""];
+  const columns = snapshot.fields.map((field) => {
+    const path = fieldPath(field);
+    for (let depth = 1; depth < path.length; depth += 1) {
+      const container = path.slice(0, depth).join(".");
+      if (!containers.includes(container)) containers.push(container);
+    }
+    return { container: containers.indexOf(path.slice(0, -1).join(".")), key: path.at(-1)! };
+  });
+  const links = containers.slice(1).map((container) => {
+    const path = fieldPath(container);
+    return { parent: containers.indexOf(path.slice(0, -1).join(".")), key: path.at(-1)! };
+  });
   return snapshot.rows.map((row) => {
-    const profile: NestedRecord = {};
-    paths.forEach((path, column) => {
-      let target = profile;
-      for (const key of path.slice(0, -1)) target = (target[key] ??= {}) as NestedRecord;
-      target[path.at(-1)!] = row[column] ?? null;
+    const objects: NestedRecord[] = containers.map(() => ({}));
+    links.forEach(({ parent, key }, index) => {
+      objects[parent]![key] = objects[index + 1];
     });
-    return { ...profile, source: { ...source } } as unknown as ExoplanetProfile;
+    columns.forEach(({ container, key }, column) => {
+      objects[container]![key] = row[column] ?? null;
+    });
+    objects[0]!["source"] = { archive, table, retrievedOn } as unknown as NestedRecord;
+    return objects[0] as unknown as ExoplanetProfile;
   });
 };
