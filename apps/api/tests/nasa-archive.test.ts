@@ -5,10 +5,8 @@ import {
   NasaPlanetRepository,
   type NasaPlanetRepositoryOptions,
   normalizeNasaPlanet,
-  planetNamePattern,
-  planetNamePrefixes,
-  rankPlanetMatches,
 } from "../src/nasa-archive.ts";
+import { planetNamePattern, planetNamePrefixes } from "../src/planet-search.ts";
 
 type Fetcher = NonNullable<NasaPlanetRepositoryOptions["fetcher"]>;
 const liveQueriesOnly =
@@ -374,16 +372,6 @@ test("whole names are tried with a hyphen, a space and nothing between the parts
     "kepler18 %",
   ]);
   expect(planetNamePrefixes("wasp")).toEqual(["wasp", "wasp %"]);
-});
-
-test("the planet a reader means outranks longer names that merely contain it", () => {
-  const named = (name: string) => normalizeNasaPlanet({ ...nasaRow, pl_name: name })!;
-  const ranked = rankPlanetMatches(
-    "kepler 18",
-    ["Kepler-1018 b", "Kepler-187 b", "Kepler-18 c", "Kepler-18 b"].map(named),
-  ).map(({ name }) => name);
-
-  expect(ranked).toEqual(["Kepler-18 b", "Kepler-18 c", "Kepler-187 b", "Kepler-1018 b"]);
 });
 
 test("exact-name lookups share a complete snapshot and missing names remain null", async () => {

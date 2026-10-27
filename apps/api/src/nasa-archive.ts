@@ -1,17 +1,15 @@
 import {
+  browseLimit,
   browsePlanetCatalog,
   compareCatalogNames,
   findCatalogPlanet,
-  searchPlanetCatalog,
-} from "./planet-catalog.ts";
-import { createPlanetCatalogSnapshot } from "./planet-catalog-snapshot.ts";
-import {
-  escapeAdqlLiteral,
-  planetNamePattern,
-  planetNamePrefixes,
+  MAX_PLANET_NAME_LENGTH,
   rankPlanetMatches,
-} from "./planet-search.ts";
-export { planetNamePattern, planetNamePrefixes, rankPlanetMatches } from "./planet-search.ts";
+  searchLimit,
+  searchPlanetCatalog,
+} from "@exora/planet-catalog";
+import { createPlanetCatalogSnapshot } from "./planet-catalog-snapshot.ts";
+import { escapeAdqlLiteral, planetNamePattern, planetNamePrefixes } from "./planet-search.ts";
 import {
   exoplanetProfileSchema,
   type DetectionSignal,
@@ -350,16 +348,12 @@ export class NasaPlanetRepository implements PlanetRepository {
   }
 
   async browse(limit: number, cursor?: string): Promise<RepositoryPage<ExoplanetProfile[]>> {
-    const safeLimit = Math.max(12, Math.min(Math.trunc(limit), 120));
-    const after = cursor?.trim().slice(0, 100);
+    const safeLimit = browseLimit(limit);
+    const after = cursor?.trim().slice(0, MAX_PLANET_NAME_LENGTH);
     const snapshot = await this.#snapshot.ready();
     if (snapshot) {
-      const value = browsePlanetCatalog(snapshot.value, safeLimit, after);
-      return {
-        cached: snapshot.cached,
-        value,
-        nextCursor: value.length === safeLimit ? (value.at(-1)?.name ?? null) : null,
-      };
+      const page = browsePlanetCatalog(snapshot.value, safeLimit, after);
+      return { cached: snapshot.cached, value: page.planets, nextCursor: page.nextCursor };
     }
     const keyset = after ? ` and pl_name > '${escapeAdqlCursor(after)}'` : "";
     const result = await this.#query(
@@ -386,7 +380,7 @@ export class NasaPlanetRepository implements PlanetRepository {
   }
 
   async findByName(name: string): Promise<RepositoryResult<ExoplanetProfile | null>> {
-    const normalizedName = name.trim().slice(0, 100);
+    const normalizedName = name.trim().slice(0, MAX_PLANET_NAME_LENGTH);
     const snapshot = this.#snapshot();
     if (snapshot)
       return { cached: snapshot.cached, value: findCatalogPlanet(snapshot.value, normalizedName) };
@@ -409,7 +403,7 @@ export class NasaPlanetRepository implements PlanetRepository {
   async search(query: string, limit: number): Promise<RepositoryResult<ExoplanetProfile[]>> {
     const pattern = planetNamePattern(query);
     if (pattern === null) return { cached: true, value: [] };
-    const safeLimit = Math.max(1, Math.min(Math.trunc(limit), 24));
+    const safeLimit = searchLimit(limit);
     const snapshot = this.#snapshot();
     if (snapshot)
       return {

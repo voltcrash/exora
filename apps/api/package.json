@@ -9,6 +9,7 @@
   },
   "dependencies": {
     "@exora/contracts": "workspace:*",
+    "@exora/planet-catalog": "workspace:*",
     "@hono/node-server": "catalog:",
     "@vercel/functions": "catalog:",
     "hono": "catalog:",

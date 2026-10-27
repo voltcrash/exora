@@ -16,7 +16,7 @@ export default defineConfig({
     entry: ["src/index.ts", "src/vercel.ts"],
     deps: {
       // Vercel cannot follow workspace source symlinks from the generated function.
-      alwaysBundle: [/^hono(?:\/.*)?$/, "@exora/contracts"],
+      alwaysBundle: [/^hono(?:\/.*)?$/, "@exora/contracts", /^@exora\/planet-catalog(?:\/.*)?$/],
       onlyBundle: ["hono"],
     },
     format: ["esm"],
