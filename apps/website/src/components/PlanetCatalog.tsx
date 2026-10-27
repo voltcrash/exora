@@ -4,6 +4,7 @@ import {
   discoverPlanets,
   discoverRandomPlanet,
   loadPlanetFilterPool,
+  preloadPlanetCatalog,
   searchPlanets,
 } from "../api-client.ts";
 import { formatNumber, hasRenderer, planetKindLabel } from "../planet-utils.tsx";
@@ -139,13 +140,13 @@ export const PlanetCatalog = ({ onSelect }: PlanetCatalogProps) => {
     DEFAULT_PHYSICAL_PLANET_FILTERS,
   );
 
-  useEffect(
-    () => () => {
+  useEffect(() => {
+    void preloadPlanetCatalog();
+    return () => {
       surpriseControllerRef.current?.abort();
       pageControllerRef.current?.abort();
-    },
-    [],
-  );
+    };
+  }, []);
 
   useEffect(() => {
     pageControllerRef.current?.abort();
