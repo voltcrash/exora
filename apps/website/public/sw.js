@@ -60,6 +60,7 @@ const networkFirst = async (event, cacheName, fallbackUrl, limit) => {
 
 const cacheFirst = async (event, cacheName, limit, revalidate) => {
   const cached = await caches.match(event.request);
+  if (cached && !revalidate) return cached;
   const refresh = fetch(event.request).then(async (response) => {
     await store(cacheName, event.request, response.clone(), limit);
     return response;

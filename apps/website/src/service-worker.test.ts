@@ -84,6 +84,7 @@ test("requests are routed by what they are", async () => {
 
   expect(route("/?planet=Earth", "navigate")).toBe("shell");
   expect(route("/assets/index-abc123.js", "no-cors")).toBe("immutable");
+  expect(route("/assets/terrain.worker-abc123.js", "same-origin")).toBe("immutable");
   expect(route("/api/planets/TRAPPIST-1%20e", "cors")).toBe("archive");
   expect(route("/sky/hyg-v44-vmag65.bin", "cors")).toBe("media");
   expect(route("/textures/earth.ktx2", "cors")).toBe("media");
@@ -140,4 +141,17 @@ test("activation removes caches from earlier versions only", async () => {
 
   expect(worker.stores.has("exora-assets-v0")).toBe(false);
   expect(worker.stores.has("another-app")).toBe(true);
+});
+
+test("a hashed terrain worker chunk is reused offline without another network request", async () => {
+  let calls = 0;
+  const worker = await createWorker(async () => {
+    calls += 1;
+    if (calls > 1) throw new TypeError("offline");
+    return new Response("worker source");
+  });
+  const request = () => new Request("https://exora.test/assets/terrain.worker-abc123.js");
+  expect(await (await worker.dispatch("fetch", request()))?.text()).toBe("worker source");
+  expect(await (await worker.dispatch("fetch", request()))?.text()).toBe("worker source");
+  expect(calls).toBe(1);
 });
