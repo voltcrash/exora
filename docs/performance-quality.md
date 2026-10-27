@@ -74,3 +74,14 @@ Solar System/geology catalogs, custom-link helpers, development XR emulator, and
 The remaining desktop coverage estimate is about 95 kB: roughly 59 kB in Babylon mesh/math paths and
 36 kB in the React/application chunk. Those values are diagnostic rather than budgets because the
 exact coverage depends on how many initial renderer tasks finish inside Lighthouse's sampling window.
+
+## Terrain CPU benchmark
+
+Run `vpx apps/website/scripts/benchmark-terrain.ts` from the repository root to sample 100,000
+Mars terrain heights over six runs (the first warms the runtime). On Node 24.22.1 on an
+Icestorm-M1 CPU, the five warmed runs at commit `7e2af576` took 249.65, 248.73, 248.74,
+248.62, and 248.90 ms. Precomputing the eight fixed noise gradients took 99.88, 99.19,
+100.52, 99.30, and 99.29 ms, a 60% reduction in the median. The checksum was
+2328.326724431223 in both versions; a separate direct comparison of all 100,000 heights matched
+exactly. This measures terrain sampling, not end-to-end loading or frame rate. Initial JavaScript
+remained 295,205 bytes in both production builds.
