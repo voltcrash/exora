@@ -1668,13 +1668,14 @@ const createSurfaceSky = (
   return { horizonColor, material, mesh, zenithColor };
 };
 
-const createSurfaceEnvironment = (
+const createSurfaceEnvironment = async (
   scene: Scene,
   recipe: WorldRecipe,
   geology: SurfaceGeology | null,
   profile: RenderQualityProfile,
   onSelectHostStar?: () => void,
-): {
+  signal?: AbortSignal,
+): Promise<{
   cloudLayers: Mesh[];
   groundHeightAt: (x: number, z: number) => number;
   meshes: AbstractMesh[];
@@ -1684,7 +1685,7 @@ const createSurfaceEnvironment = (
   skyAnchor: TransformNode;
   star: StellarSurface;
   vista: SurfaceVista | null;
-} => {
+} | null> => {
   const root = new TransformNode("surfaceEnvironment", scene);
   const skyAnchor = new TransformNode("surfaceSkyAnchor", scene);
   skyAnchor.parent = root;
@@ -1695,26 +1696,31 @@ const createSurfaceEnvironment = (
   let motes: SurfaceMotes | null = null;
 
   const vista = geology
-    ? createSurfaceVista(scene, {
-        geology,
-        liquid:
-          geology.liquidLevel !== null && recipe.renderer === "rocky"
-            ? {
-                deepColor: geology.liquidColor,
-                shallowColor: geology.liquidShallowColor,
-                waveHeight: 0.5 + geology.hazeDensity * 1.4,
-              }
-            : null,
-        origin: new Vector3(0, SURFACE_GROUND_BASE_Y, SURFACE_GROUND_ORIGIN_Z),
-        parent: root,
-        profile,
-        skyHorizonColor: surfaceSky.horizonColor,
-        skyZenithColor: surfaceSky.zenithColor,
-        sunColor: toColor3(recipe.star.color),
-        sunDirection: SURFACE_STAR_DIRECTION,
-        sunIntensity: Math.min(2.6, Math.max(0.85, recipe.star.intensity)),
-      })
+    ? await createSurfaceVista(
+        scene,
+        {
+          geology,
+          liquid:
+            geology.liquidLevel !== null && recipe.renderer === "rocky"
+              ? {
+                  deepColor: geology.liquidColor,
+                  shallowColor: geology.liquidShallowColor,
+                  waveHeight: 0.5 + geology.hazeDensity * 1.4,
+                }
+              : null,
+          origin: new Vector3(0, SURFACE_GROUND_BASE_Y, SURFACE_GROUND_ORIGIN_Z),
+          parent: root,
+          profile,
+          skyHorizonColor: surfaceSky.horizonColor,
+          skyZenithColor: surfaceSky.zenithColor,
+          sunColor: toColor3(recipe.star.color),
+          sunDirection: SURFACE_STAR_DIRECTION,
+          sunIntensity: Math.min(2.6, Math.max(0.85, recipe.star.intensity)),
+        },
+        signal,
+      )
     : null;
+  if (signal?.aborted || scene.isDisposed) return null;
 
   if (vista && geology) {
     meshes.push(vista.mesh);
@@ -1891,13 +1897,15 @@ export const createPlanetWorld = async (
           }
         : null,
     ) ?? cloudDeckGeology(recipe);
-  const surfaceEnvironment = createSurfaceEnvironment(
+  const surfaceEnvironment = await createSurfaceEnvironment(
     scene,
     recipe,
     surfaceGeology,
     profile,
     onSelectHostStar,
+    signal,
   );
+  if (!surfaceEnvironment || cancelled()) return emptyWorld;
 
   let elapsedSeconds = 0;
   // A locked world turns once per orbit, so it takes the same measured-period path as the Moon.

@@ -10,7 +10,7 @@ import type { Rgb } from "@exora/worldgen";
 import type { RenderQualityProfile } from "./render-quality.ts";
 import type { SurfaceGeology } from "./surface-geology.ts";
 import { createTerrainField, createTerrainSample } from "./surface-terrain.ts";
-import { buildSurfaceTerrain } from "./surface-terrain-kernel.ts";
+import { runTerrainJob } from "./terrain-worker-client.ts";
 import { getSurfaceDetailTextures } from "./texture-cache.ts";
 import {
   SURFACE_GRID_RESOLUTION,
@@ -446,7 +446,7 @@ export interface SurfaceVista {
   update: (elapsedSeconds: number, cameraPosition: Vector3) => void;
 }
 
-export const createSurfaceVista = (
+export const createSurfaceVista = async (
   scene: Scene,
   {
     geology,
@@ -460,7 +460,8 @@ export const createSurfaceVista = (
     sunDirection,
     sunIntensity,
   }: SurfaceVistaOptions,
-): SurfaceVista => {
+  signal?: AbortSignal,
+): Promise<SurfaceVista | null> => {
   Effect.ShadersStore.exoraGroundVertexShader = GROUND_VERTEX_SHADER;
   Effect.ShadersStore.exoraGroundFragmentShader = GROUND_FRAGMENT_SHADER;
 
@@ -469,8 +470,21 @@ export const createSurfaceVista = (
   const stride = resolution + 1;
   const vertexCount = stride * stride;
 
+  const result = await runTerrainJob(
+    {
+      kind: "surface",
+      input: {
+        geology,
+        resolution,
+        sunDirection: { x: sunDirection.x, y: sunDirection.y, z: sunDirection.z },
+      },
+    },
+    signal,
+  );
+  if (result?.kind !== "surface" || signal?.aborted || scene.isDisposed || parent.isDisposed())
+    return null;
   const { positions, colors, shade, heights, indices, occlusion, visibility, low, high } =
-    buildSurfaceTerrain({ geology, resolution, sunDirection });
+    result.data;
 
   const normals = new Float32Array(vertexCount * 3);
   VertexData.ComputeNormals(positions, indices, normals);
