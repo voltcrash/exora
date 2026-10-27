@@ -12,6 +12,7 @@ import { Scene, ScenePerformancePriority } from "@babylonjs/core/scene.js";
 import type { ExoplanetProfile, StarProfile } from "@exora/contracts";
 import { deriveWorldRecipe } from "@exora/worldgen";
 import { afterEach, beforeEach, expect, test, vi } from "vite-plus/test";
+import { executeTerrainJob, type TerrainRequest, type TerrainResult } from "./terrain-jobs.ts";
 import { createPlanetWorld } from "./planet-scene.ts";
 import type { RenderQualityProfile } from "./render-quality.ts";
 import type { SceneHost } from "./scene-host.ts";
@@ -326,6 +327,61 @@ test.each(planets)(
   },
   30_000,
 );
+
+test("rocky world terrain jobs start together and both finish before mounting", async () => {
+  const workers: PendingWorker[] = [];
+  class PendingWorker {
+    onmessage?: (event: { data: TerrainResult }) => void;
+    terminate = vi.fn();
+    request!: TerrainRequest;
+    constructor() {
+      workers.push(this);
+    }
+    postMessage(request: TerrainRequest) {
+      this.request = request;
+    }
+  }
+  vi.stubGlobal("Worker", PendingWorker);
+  vi.stubGlobal("window", new EventTarget());
+  const { engine, host, scene } = createHarness();
+  const scope = openWorldScope(scene);
+  const planet = planets[0]!;
+  let mounted = false;
+  const building = createPlanetWorld(host, {
+    onFirstFrame: vi.fn(),
+    onViewModeChange: vi.fn(),
+    planet,
+    recipe: deriveWorldRecipe(planet),
+  }).then((world) => {
+    mounted = true;
+    return world;
+  });
+  try {
+    expect(workers.map(({ request }) => request.kind)).toEqual(["planet", "surface"]);
+    const update = vi.spyOn(scene.getMeshByName("planet")!, "updateVerticesData");
+    const displacement = workers[0]!;
+    const surface = workers[1]!;
+    surface.onmessage!({ data: executeTerrainJob(surface.request) });
+    await Promise.resolve();
+    expect(mounted).toBe(false);
+    const expected = executeTerrainJob(displacement.request);
+    if (expected.kind !== "planet") throw new Error("Expected planet terrain.");
+    displacement.onmessage!({ data: expected });
+    const world = await building;
+    await scope.seal();
+    expect(update).toHaveBeenCalledExactlyOnceWith(
+      "position",
+      expected.positions instanceof Float32Array
+        ? expected.positions
+        : Array.from(expected.positions),
+    );
+    expect(workers.every((worker) => worker.terminate.mock.calls.length === 1)).toBe(true);
+    world.dispose();
+  } finally {
+    scope.dispose();
+    engine.dispose();
+  }
+});
 
 test("a displaced rocky world keeps one shared normal per position instead of flat-shading", async () => {
   vi.stubGlobal("window", new EventTarget());

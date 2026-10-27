@@ -1878,10 +1878,6 @@ export const createPlanetWorld = async (
     ringSystem,
     shader,
   } = createPlanet(scene, recipe, profile, planetProfile);
-  if (recipe.renderer === "rocky" && !planetProfile.solarSystem?.texture) {
-    await displaceRockyPlanet(planet, recipe, signal);
-    if (cancelled()) return emptyWorld;
-  }
   const hostStar = createHostStar(scene, recipe, profile, orbitalRoot, onSelectHostStar);
   orbitalMeshes.push(...hostStar.meshes);
   orbitalMeshes.push(starfield.mesh);
@@ -1897,14 +1893,12 @@ export const createPlanetWorld = async (
           }
         : null,
     ) ?? cloudDeckGeology(recipe);
-  const surfaceEnvironment = await createSurfaceEnvironment(
-    scene,
-    recipe,
-    surfaceGeology,
-    profile,
-    onSelectHostStar,
-    signal,
-  );
+  const [, surfaceEnvironment] = await Promise.all([
+    recipe.renderer === "rocky" && !planetProfile.solarSystem?.texture
+      ? displaceRockyPlanet(planet, recipe, signal)
+      : undefined,
+    createSurfaceEnvironment(scene, recipe, surfaceGeology, profile, onSelectHostStar, signal),
+  ]);
   if (!surfaceEnvironment || cancelled()) return emptyWorld;
 
   let elapsedSeconds = 0;
