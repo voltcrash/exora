@@ -4,8 +4,8 @@
 
 Exora does not currently need a durable application-level rate-limit store. The API is public,
 read-only, and unauthenticated, so there is no paid-user quota or authorization boundary that must
-be exact. Planet reads use the live NASA Exoplanet Archive, and cacheable successful GET responses
-carry shared-CDN freshness and stale-serving policies. The NASA, SIMBAD, and JPL adapters use
+be exact. Planet search, browse, and exact-name reads use a per-instance NASA Exoplanet Archive
+snapshot, and cacheable successful GET responses carry shared-CDN freshness and stale-serving policies. The NASA, SIMBAD, and JPL adapters use
 bounded per-instance caches, coalesce identical misses within an instance, and have tighter
 per-route request budgets where an upstream miss is relatively expensive.
 
@@ -56,6 +56,33 @@ concurrent misses are coalesced only within that instance. Across instances, the
 cache for HTTP responses. Adding a distributed archive-result cache would duplicate the CDN for
 repeatable GETs and would introduce invalidation, serialization, availability, and operating-cost
 concerns.
+
+## Planet catalog snapshot
+
+Search, browse, and exact-name lookup share one full `pscomppars` download containing the existing
+profile columns. The loader reuses `archive-cache.ts` for a single-entry, six-hour snapshot cache
+and one coalesced in-flight load per instance. Concurrent readers with different queries therefore
+cause one TAP request, and subsequent keystrokes, pages, and names are answered in memory. A cold
+or different instance loads its own snapshot. Refresh happens on demand after expiry; no cron,
+external store, credentials, or production service configuration is required.
+
+The same row validation and normalization apply to snapshots and live queries. Fields NASA did not
+report remain `null`. Search uses the same ordered name tokens and exact-name ranking as the live
+path; browse retains its distance/temperature/radius filters, lexical name ordering, limit bounds,
+and last-name keyset cursor. `meta.cached` reports reuse of the adapter's snapshot or query cache;
+it does not imply a global or durable cache. HTTP response schemas and CDN policies are unchanged.
+
+If a snapshot load fails, each reader falls back to its previous live TAP query. The loader waits
+60 seconds before retrying the full download, so every keystroke does not repeat a failing large
+request. Live-query misses still coalesce and use the bounded query cache. Discovery collections
+and host-system queries retain their live-query caches, while the atlas's compact population
+endpoint retains its separate twelve-hour cache. General and route request budgets in `app.ts`
+continue to apply to every API request, including reads answered from a snapshot.
+
+One live smoke test from the aarch64 development container completed concurrent search, browse,
+and exact-name lookup in 3,869 ms using one successful TAP request. A different search then took
+1.60 ms from the same snapshot without another upstream request. These are single local samples,
+not measurements of Vercel deployment latency or service-level guarantees.
 
 ## Escalation path
 
