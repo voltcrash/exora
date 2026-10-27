@@ -3,6 +3,10 @@ import { defineConfig } from "vite-plus";
 export default defineConfig({
   run: {
     tasks: {
+      "planet-catalog": {
+        command: "vpx scripts/build-planet-catalog.ts",
+        cache: false,
+      },
       dev: "node --env-file-if-exists=../../.env --use-system-ca --watch src/index.ts",
       start: {
         command: "node --use-system-ca dist/index.mjs",
