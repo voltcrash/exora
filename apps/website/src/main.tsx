@@ -1,8 +1,7 @@
-import { Analytics } from "@vercel/analytics/react";
-import { SpeedInsights } from "@vercel/speed-insights/react";
 import { createRoot } from "react-dom/client";
 import { App } from "./App.tsx";
 import { ApplicationErrorBoundary } from "./components/ApplicationErrorBoundary.tsx";
+import { DeferredTelemetry } from "./components/DeferredTelemetry.tsx";
 import { loadWebFonts } from "./web-fonts.ts";
 import "./styles/tokens.css";
 import "./styles/globals.css";
@@ -15,8 +14,7 @@ const render = (): void => {
     <ApplicationErrorBoundary>
       <>
         <App />
-        <Analytics />
-        <SpeedInsights />
+        <DeferredTelemetry />
       </>
     </ApplicationErrorBoundary>,
   );
