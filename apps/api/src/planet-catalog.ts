@@ -1,5 +1,5 @@
 import type { ExoplanetProfile } from "@exora/contracts";
-import { escapeAdqlLiteral, planetNameTokens, rankPlanetMatches } from "./planet-search.ts";
+import { planetNameTokens, rankPlanetMatches } from "./planet-search.ts";
 
 export const compareCatalogNames = (left: ExoplanetProfile, right: ExoplanetProfile): number =>
   left.name < right.name ? -1 : left.name > right.name ? 1 : 0;
@@ -23,7 +23,7 @@ export const findCatalogPlanet = (
   planets: readonly ExoplanetProfile[],
   name: string,
 ): ExoplanetProfile | null => {
-  const needle = escapeAdqlLiteral(name).replaceAll("''", "'").toLowerCase();
+  const needle = name.replaceAll(/[%_]/g, "").toLowerCase();
   return planets.find((planet) => planet.name.toLowerCase() === needle) ?? null;
 };
 
