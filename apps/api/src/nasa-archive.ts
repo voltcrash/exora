@@ -1,14 +1,12 @@
 import {
   browseLimit,
   browsePlanetCatalog,
-  compareCatalogNames,
   findCatalogPlanet,
   MAX_PLANET_NAME_LENGTH,
   rankPlanetMatches,
   searchLimit,
   searchPlanetCatalog,
 } from "@exora/planet-catalog";
-import { createPlanetCatalogSnapshot } from "./planet-catalog-snapshot.ts";
 import { escapeAdqlLiteral, planetNamePattern, planetNamePrefixes } from "./planet-search.ts";
 import {
   exoplanetProfileSchema,
@@ -171,10 +169,11 @@ export interface PlanetRepository {
 
 export interface NasaPlanetRepositoryOptions {
   cacheTtlMs?: number;
+  /** The committed catalog snapshot, sorted by name. Without one, every read is a live query. */
+  catalog?: () => readonly ExoplanetProfile[];
   fetcher?: Fetcher;
   now?: () => number;
   timeoutMs?: number;
-  waitUntil?: (promise: Promise<unknown>) => void;
 }
 
 export class NasaArchiveError extends UpstreamError {
@@ -373,26 +372,22 @@ export class NasaPlanetRepository implements PlanetRepository {
   readonly #now: () => number;
   readonly #requests = createRequestCoalescer<RepositoryResult<ExoplanetProfile[]>>();
   readonly #timeoutMs: number;
-  readonly #snapshot: ReturnType<typeof createPlanetCatalogSnapshot>;
+  readonly #catalog: (() => readonly ExoplanetProfile[]) | undefined;
 
   constructor(options: NasaPlanetRepositoryOptions = {}) {
     this.#cacheTtlMs = options.cacheTtlMs ?? 1000 * 60 * 60 * 6;
+    this.#catalog = options.catalog;
     this.#fetcher = options.fetcher ?? fetch;
     this.#now = options.now ?? Date.now;
     this.#timeoutMs = options.timeoutMs ?? 10_000;
-    this.#snapshot = createPlanetCatalogSnapshot(
-      async () => (await this.#load(PLANET_CATALOG_QUERY)).sort(compareCatalogNames),
-      { cacheTtlMs: this.#cacheTtlMs, now: this.#now, waitUntil: options.waitUntil },
-    );
   }
 
   async browse(limit: number, cursor?: string): Promise<RepositoryPage<ExoplanetProfile[]>> {
     const safeLimit = browseLimit(limit);
     const after = cursor?.trim().slice(0, MAX_PLANET_NAME_LENGTH);
-    const snapshot = await this.#snapshot.ready();
-    if (snapshot) {
-      const page = browsePlanetCatalog(snapshot.value, safeLimit, after);
-      return { cached: snapshot.cached, value: page.planets, nextCursor: page.nextCursor };
+    if (this.#catalog) {
+      const page = browsePlanetCatalog(this.#catalog(), safeLimit, after);
+      return { cached: true, value: page.planets, nextCursor: page.nextCursor };
     }
     const keyset = after ? ` and pl_name > '${escapeAdqlCursor(after)}'` : "";
     const result = await this.#query(
@@ -420,9 +415,9 @@ export class NasaPlanetRepository implements PlanetRepository {
 
   async findByName(name: string): Promise<RepositoryResult<ExoplanetProfile | null>> {
     const normalizedName = name.trim().slice(0, MAX_PLANET_NAME_LENGTH);
-    const snapshot = this.#snapshot();
-    if (snapshot)
-      return { cached: snapshot.cached, value: findCatalogPlanet(snapshot.value, normalizedName) };
+    const known = this.#catalog && findCatalogPlanet(this.#catalog(), normalizedName);
+    // A miss may be a planet confirmed after the snapshot was generated.
+    if (known) return { cached: true, value: known };
     const escapedName = escapeAdqlLiteral(normalizedName);
     const adql = `select top 1 ${NASA_COLUMNS} from pscomppars where lower(pl_name)=lower('${escapedName}')`;
     const result = await this.#query(adql);
@@ -443,12 +438,8 @@ export class NasaPlanetRepository implements PlanetRepository {
     const pattern = planetNamePattern(query);
     if (pattern === null) return { cached: true, value: [] };
     const safeLimit = searchLimit(limit);
-    const snapshot = this.#snapshot();
-    if (snapshot)
-      return {
-        cached: snapshot.cached,
-        value: searchPlanetCatalog(snapshot.value, query, safeLimit),
-      };
+    const known = this.#catalog ? searchPlanetCatalog(this.#catalog(), query, safeLimit) : [];
+    if (known.length > 0) return { cached: true, value: known };
     const prefixes = planetNamePrefixes(query)
       .map((prefix) => `lower(pl_name) like '${prefix}'`)
       .join(" or ");
@@ -476,17 +467,13 @@ export class NasaPlanetRepository implements PlanetRepository {
     if (cached) return { cached: true, value: cached };
 
     return this.#requests.run(adql, async () => {
-      const planets = await this.#load(adql, requestTime);
+      const planets = await loadNasaPlanets(adql, {
+        fetcher: this.#fetcher,
+        retrievedOn: new Date(requestTime).toISOString().slice(0, 10),
+        timeoutMs: this.#timeoutMs,
+      });
       this.#cache.set(adql, planets, requestTime + this.#cacheTtlMs);
       return { cached: false, value: planets };
-    });
-  }
-
-  #load(adql: string, requestTime = this.#now()): Promise<ExoplanetProfile[]> {
-    return loadNasaPlanets(adql, {
-      fetcher: this.#fetcher,
-      retrievedOn: new Date(requestTime).toISOString().slice(0, 10),
-      timeoutMs: this.#timeoutMs,
     });
   }
 }
