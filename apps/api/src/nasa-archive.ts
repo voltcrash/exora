@@ -1,4 +1,4 @@
-import { compareCatalogNames, findCatalogPlanet } from "./planet-catalog.ts";
+import { compareCatalogNames, findCatalogPlanet, searchPlanetCatalog } from "./planet-catalog.ts";
 import { createPlanetCatalogSnapshot } from "./planet-catalog-snapshot.ts";
 import {
   escapeAdqlLiteral,
@@ -395,6 +395,12 @@ export class NasaPlanetRepository implements PlanetRepository {
     const pattern = planetNamePattern(query);
     if (pattern === null) return { cached: true, value: [] };
     const safeLimit = Math.max(1, Math.min(Math.trunc(limit), 24));
+    const snapshot = await this.#snapshot();
+    if (snapshot)
+      return {
+        cached: snapshot.cached,
+        value: searchPlanetCatalog(snapshot.value, query, safeLimit),
+      };
     const prefixes = planetNamePrefixes(query)
       .map((prefix) => `lower(pl_name) like '${prefix}'`)
       .join(" or ");

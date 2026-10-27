@@ -404,3 +404,56 @@ test("exact-name lookups share a complete snapshot and missing names remain null
   expect(queries[0]).toContain("from pscomppars order by pl_name");
   expect(queries[0]).not.toContain("where");
 });
+
+test("snapshot searches match separated name parts and retain exact-name ranking", async () => {
+  const names = [
+    "Kepler-1018 b",
+    "Kepler-187 b",
+    "Kepler-18 c",
+    "Kepler-18 b",
+    "TRAPPIST-1 e",
+    "51 Peg b",
+    "O'Neil-1 b",
+  ];
+  let requests = 0;
+  const repository = new NasaPlanetRepository({
+    fetcher: async () => {
+      requests += 1;
+      return Response.json(names.map((pl_name) => ({ ...nasaRow, pl_name })));
+    },
+  });
+  for (const query of ["kepler 18", "Kepler18", "kepler-18"]) {
+    const result = await repository.search(query, 24);
+    expect(result.value.map(({ name }) => name)).toEqual([
+      "Kepler-18 b",
+      "Kepler-18 c",
+      "Kepler-187 b",
+      "Kepler-1018 b",
+    ]);
+  }
+  expect((await repository.search("trappist1e", 12)).value[0]?.name).toBe("TRAPPIST-1 e");
+  expect((await repository.search("51_peg%b", 12)).value[0]?.name).toBe("51 Peg b");
+  expect((await repository.search("o'neil_%", 12)).value[0]?.name).toBe("O'Neil-1 b");
+  expect((await repository.search("Kepler18", 2)).value).toHaveLength(2);
+  expect(await repository.search("unknown", 12)).toEqual({ cached: true, value: [] });
+  expect(requests).toBe(1);
+});
+
+test("failed snapshot searches retain the two live queries and their cache", async () => {
+  let requests = 0;
+  const queries: string[] = [];
+  const repository = new NasaPlanetRepository({
+    fetcher: liveQueriesOnly(async (input) => {
+      requests += 1;
+      queries.push(
+        new URL(input instanceof Request ? input.url : input).searchParams.get("query")!,
+      );
+      return Response.json([nasaRow]);
+    }),
+  });
+  expect((await repository.search("HIP", 12)).value[0]?.name).toBe(nasaRow.pl_name);
+  expect((await repository.search("HIP", 12)).cached).toBe(true);
+  expect(requests).toBe(2);
+  expect(queries[0]).toContain("lower(pl_name) like 'hip'");
+  expect(queries[1]).toContain("lower(pl_name) like '%hip%'");
+});
