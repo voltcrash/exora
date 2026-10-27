@@ -410,39 +410,43 @@ export class NasaPlanetRepository implements PlanetRepository {
     if (cached) return { cached: true, value: cached };
 
     return this.#requests.run(adql, async () => {
-      const url = new URL(NASA_TAP_ENDPOINT);
-      url.searchParams.set("query", adql);
-      url.searchParams.set("format", "json");
-
-      try {
-        const response = await this.#fetcher(url, {
-          headers: { accept: "application/json" },
-          signal: AbortSignal.timeout(this.#timeoutMs),
-        });
-
-        if (!response.ok) {
-          throw new NasaArchiveError(`NASA TAP responded with status ${response.status}.`);
-        }
-
-        const payload: unknown = await response.json();
-
-        const rows = nasaPlanetRowsSchema.safeParse(payload);
-        if (!rows.success)
-          throw new NasaArchiveError("NASA TAP returned an unexpected response shape.");
-
-        const retrievedOn = new Date(requestTime).toISOString().slice(0, 10);
-        const planets = rows.data
-          .map((row) => normalizeNasaPlanet(row, retrievedOn))
-          .filter((planet): planet is ExoplanetProfile => planet !== null)
-          .map((planet) => exoplanetProfileSchema.parse(planet));
-
-        this.#cache.set(adql, planets, requestTime + this.#cacheTtlMs);
-
-        return { cached: false, value: planets };
-      } catch (error) {
-        if (error instanceof NasaArchiveError) throw error;
-        throw new NasaArchiveError("NASA TAP request failed.", { cause: error });
-      }
+      const planets = await this.#load(adql, requestTime);
+      this.#cache.set(adql, planets, requestTime + this.#cacheTtlMs);
+      return { cached: false, value: planets };
     });
+  }
+
+  async #load(adql: string, requestTime = this.#now()): Promise<ExoplanetProfile[]> {
+    const url = new URL(NASA_TAP_ENDPOINT);
+    url.searchParams.set("query", adql);
+    url.searchParams.set("format", "json");
+
+    try {
+      const response = await this.#fetcher(url, {
+        headers: { accept: "application/json" },
+        signal: AbortSignal.timeout(this.#timeoutMs),
+      });
+
+      if (!response.ok) {
+        throw new NasaArchiveError(`NASA TAP responded with status ${response.status}.`);
+      }
+
+      const payload: unknown = await response.json();
+
+      const rows = nasaPlanetRowsSchema.safeParse(payload);
+      if (!rows.success)
+        throw new NasaArchiveError("NASA TAP returned an unexpected response shape.");
+
+      const retrievedOn = new Date(requestTime).toISOString().slice(0, 10);
+      const planets = rows.data
+        .map((row) => normalizeNasaPlanet(row, retrievedOn))
+        .filter((planet): planet is ExoplanetProfile => planet !== null)
+        .map((planet) => exoplanetProfileSchema.parse(planet));
+
+      return planets;
+    } catch (error) {
+      if (error instanceof NasaArchiveError) throw error;
+      throw new NasaArchiveError("NASA TAP request failed.", { cause: error });
+    }
   }
 }
