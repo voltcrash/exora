@@ -1016,6 +1016,7 @@ void main(void) {
 export type ViewMode = "orbit" | "subsystem" | "surface" | "transition";
 
 interface PlanetWorldOptions {
+  signal?: AbortSignal;
   onFirstFrame: () => void;
   onViewModeChange: (mode: ViewMode) => void;
   onSelectHostStar?: () => void;
@@ -1226,10 +1227,6 @@ const createPlanet = (
   planet.rotation.z = axialTilt;
   planet.isPickable = true;
   orbitalMeshes.push(planet);
-
-  if (recipe.renderer === "rocky" && !knownTexture) {
-    displaceRockyPlanet(planet, recipe);
-  }
 
   let shader: ShaderMaterial;
 
@@ -1825,7 +1822,7 @@ const setEnvironmentEnabled = (
   }
 };
 
-export const createPlanetWorld = (
+export const createPlanetWorld = async (
   host: SceneHost,
   {
     onFirstFrame,
@@ -1833,9 +1830,16 @@ export const createPlanetWorld = (
     onViewModeChange,
     planet: planetProfile,
     recipe,
+    signal,
   }: PlanetWorldOptions,
-): MountedWorld => {
+): Promise<MountedWorld> => {
   const { camera, canvas, engine, profile, scene } = host;
+  const cancelled = (): boolean => !!signal?.aborted || scene.isDisposed;
+  const emptyWorld: MountedWorld = {
+    dispose: () => undefined,
+    restoreDesktopView: () => undefined,
+  };
+  if (cancelled()) return emptyWorld;
 
   scene.setRenderingAutoClearDepthStencil(1, false, true, true);
 
@@ -1868,6 +1872,10 @@ export const createPlanetWorld = (
     ringSystem,
     shader,
   } = createPlanet(scene, recipe, profile, planetProfile);
+  if (recipe.renderer === "rocky" && !planetProfile.solarSystem?.texture) {
+    await displaceRockyPlanet(planet, recipe, signal);
+    if (cancelled()) return emptyWorld;
+  }
   const hostStar = createHostStar(scene, recipe, profile, orbitalRoot, onSelectHostStar);
   orbitalMeshes.push(...hostStar.meshes);
   orbitalMeshes.push(starfield.mesh);

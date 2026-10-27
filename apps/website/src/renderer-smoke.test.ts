@@ -305,7 +305,7 @@ test.each(planets)(
     const firstFrame = vi.fn();
     const scope = openWorldScope(scene);
     const recipe = deriveWorldRecipe(planet);
-    const world = createPlanetWorld(host, {
+    const world = await createPlanetWorld(host, {
       onFirstFrame: firstFrame,
       onViewModeChange: () => undefined,
       planet,
@@ -332,7 +332,7 @@ test("a displaced rocky world keeps one shared normal per position instead of fl
   const { engine, host, scene } = createHarness();
   const scope = openWorldScope(scene);
   const planet = planets[0]!;
-  const world = createPlanetWorld(host, {
+  const world = await createPlanetWorld(host, {
     onFirstFrame: vi.fn(),
     onViewModeChange: () => undefined,
     planet,
@@ -660,7 +660,7 @@ test("a world sends a visitor to the star hanging in its sky", async () => {
   const scope = openWorldScope(scene);
   const planet = planets[0]!;
   const visitStar = vi.fn();
-  const world = createPlanetWorld(host, {
+  const world = await createPlanetWorld(host, {
     onFirstFrame: vi.fn(),
     onSelectHostStar: visitStar,
     onViewModeChange: () => undefined,
@@ -689,7 +689,7 @@ test("a world built with no host star to reach draws nothing that looks clickabl
   const { engine, host, scene } = createHarness();
   const scope = openWorldScope(scene);
   const planet = planets[0]!;
-  const world = createPlanetWorld(host, {
+  const world = await createPlanetWorld(host, {
     onFirstFrame: vi.fn(),
     onViewModeChange: () => undefined,
     planet,
@@ -850,7 +850,7 @@ test("a seven-world diorama costs less than the one world it travels to", async 
   const planetScope = openWorldScope(planetHarness.scene);
   const rocky = planets[0];
   if (!rocky) throw new Error("Expected a rocky fixture.");
-  const planetWorld = createPlanetWorld(planetHarness.host, {
+  const planetWorld = await createPlanetWorld(planetHarness.host, {
     onFirstFrame: () => undefined,
     onViewModeChange: () => undefined,
     planet: rocky,
@@ -903,7 +903,7 @@ test("the surface star holds one place in the sky wherever the viewer walks", as
   const planet = planets[0];
   if (!planet) throw new Error("Expected a rocky fixture.");
   let mode = "orbit";
-  const world = createPlanetWorld(host, {
+  const world = await createPlanetWorld(host, {
     onFirstFrame: () => undefined,
     onViewModeChange: (next) => {
       mode = next;

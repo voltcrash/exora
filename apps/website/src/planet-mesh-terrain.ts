@@ -3,7 +3,7 @@ import type { Mesh } from "@babylonjs/core/Meshes/mesh.js";
 import { VertexData } from "@babylonjs/core/Meshes/mesh.vertexData.js";
 import type { FloatArray } from "@babylonjs/core/types.js";
 import type { RockyWorldRecipe } from "@exora/worldgen";
-import { displacePlanetPositions } from "./planet-terrain-kernel.ts";
+import { runTerrainJob } from "./terrain-worker-client.ts";
 
 export const weldTerrainNormals = (positions: FloatArray, normals: Float32Array): void => {
   const vertexCount = normals.length / 3;
@@ -39,16 +39,37 @@ export const weldTerrainNormals = (positions: FloatArray, normals: Float32Array)
   }
 };
 
-export const displaceRockyPlanet = (planet: Mesh, recipe: RockyWorldRecipe): void => {
+export const displaceRockyPlanet = async (
+  planet: Mesh,
+  recipe: RockyWorldRecipe,
+  signal?: AbortSignal,
+): Promise<void> => {
   const positions = planet.getVerticesData(VertexBuffer.PositionKind);
   const indices = planet.getIndices();
   if (!positions || !indices) return;
 
-  displacePlanetPositions(positions, recipe);
+  const result = await runTerrainJob(
+    {
+      kind: "planet",
+      positions:
+        positions instanceof Float32Array ? positions.slice() : Float64Array.from(positions),
+      recipe,
+    },
+    signal,
+  );
+  if (
+    result?.kind !== "planet" ||
+    signal?.aborted ||
+    planet.isDisposed() ||
+    planet.getScene().isDisposed
+  )
+    return;
+  const displaced =
+    result.positions instanceof Float32Array ? result.positions : Array.from(result.positions);
 
   const normals = new Float32Array(positions.length);
-  VertexData.ComputeNormals(positions, indices, normals);
-  weldTerrainNormals(positions, normals);
-  planet.updateVerticesData(VertexBuffer.PositionKind, positions);
+  VertexData.ComputeNormals(displaced, indices, normals);
+  weldTerrainNormals(displaced, normals);
+  planet.updateVerticesData(VertexBuffer.PositionKind, displaced);
   planet.setVerticesData(VertexBuffer.NormalKind, normals);
 };
