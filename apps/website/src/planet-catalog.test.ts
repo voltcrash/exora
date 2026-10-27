@@ -94,7 +94,9 @@ test("a failed snapshot leaves the API in charge and is retried after a pause", 
     expect(api).toHaveBeenCalledOnce();
 
     vi.advanceTimersByTime(60_000);
-    expect(await client.preloadPlanetCatalog(assets)).not.toBeNull();
+    const retry = client.preloadPlanetCatalog(assets);
+    await vi.runAllTimersAsync();
+    expect(await retry).not.toBeNull();
     expect(assets).toHaveBeenCalledTimes(2);
   } finally {
     vi.useRealTimers();

@@ -22,7 +22,10 @@ export const loadPlanetCatalog = async (fetcher: Fetcher = fetch): Promise<Plane
   // Low priority so the snapshot never competes with the scene's own downloads.
   const response = await fetcher(snapshotUrl, { priority: "low" });
   if (!response.ok) throw new Error(`Planet catalog failed with status ${response.status}.`);
-  const planets = decodePlanetCatalog((await response.json()) as PlanetCatalogSnapshot);
+  const snapshot = (await response.json()) as PlanetCatalogSnapshot;
+  // Parse and decode in separate tasks, so neither is long enough to delay input.
+  await new Promise((resolve) => setTimeout(resolve));
+  const planets = decodePlanetCatalog(snapshot);
   return {
     browse: (limit, cursor) => browsePlanetCatalog(planets, limit, cursor),
     find: (name) => findCatalogPlanet(planets, name),
