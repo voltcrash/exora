@@ -440,3 +440,56 @@ constellation by a single ordered scan.
 | Changes     | None to the values; reformatted from fixed-width text to TS |
 
 The row corrected by Nancy G. Roman on 1999-12-30 (#229) is included as distributed.
+
+## Encoded Solar System colour mosaics
+
+These files reuse the mission sources, credits, licenses, coverage limits, and shipped JPEG inputs
+documented above. Preparation: the existing JPG was decoded without resampling, then encoded as
+KTX2 ETC1S/BasisLZ (q220, clevel 5), or UASTC (quality 3, RDO lambda 0.5, Zstandard 18) for Ceres.
+Every file has sRGB colour and a full Lanczos-4 mip chain. See
+[the exact commands and quality comparison](docs/texture-compression.md). The Ceres topography
+JPG is height data and remains unchanged.
+
+| Shipped file                                  | Encoding              | JPEG input SHA-256                                                 |
+| --------------------------------------------- | --------------------- | ------------------------------------------------------------------ |
+| `textures/solar-system/ariel.ktx2`            | ETC1S/BasisLZ q220    | `57cc7e4110fa7bd5c26f8b4d8cb319f0ae5a54bded1e443099f1a7617889f645` |
+| `textures/solar-system/callisto-mobile.ktx2`  | ETC1S/BasisLZ q220    | `b26f67359f2f298dd5d6f3a5c663a79949dfc11b8a4b62474cc105f979dc221f` |
+| `textures/solar-system/callisto.ktx2`         | ETC1S/BasisLZ q220    | `a70852d2e7483ae580fb624db228cc67c487fc8e267c4bbf8eae7e69dc2c25f0` |
+| `textures/solar-system/ceres.ktx2`            | UASTC RDO + Zstandard | `12fe5bf219161b4cc39a9d72040f7400b57b8ae9dd6cb8073ab1b7b26403e73c` |
+| `textures/solar-system/charon.ktx2`           | ETC1S/BasisLZ q220    | `6c6dab4e5db78e8066f3d14fc2463eea8f463bec85a3f41f1fe0f46bd2b97c07` |
+| `textures/solar-system/deimos.ktx2`           | ETC1S/BasisLZ q220    | `92d6da19f017f3189e9d51ab359134a0fbb715d630de53882c966ff0265a56f0` |
+| `textures/solar-system/dione-mobile.ktx2`     | ETC1S/BasisLZ q220    | `43c2211f7c63f84548c6b3dc201d59e2b940b1b0def3568a56eaa09ea49b27a9` |
+| `textures/solar-system/dione.ktx2`            | ETC1S/BasisLZ q220    | `ad7466c8030133d24fe5fe7eef3da45b803f806415f9d990d00a14c8008d9948` |
+| `textures/solar-system/earth.ktx2`            | ETC1S/BasisLZ q220    | `d4dc80a6ef571939d0abe04a9bed3d3d1e6cd63e59514be1c5e43a6b069e6f1e` |
+| `textures/solar-system/enceladus-mobile.ktx2` | ETC1S/BasisLZ q220    | `5c012b22786b0f227a2d48fed1d25b7af2da05faa702de85bcbf62030c8c28a5` |
+| `textures/solar-system/enceladus.ktx2`        | ETC1S/BasisLZ q220    | `ae55668d1ac4406527df6a4aac88151ad855672f9a8f1d563aac2aea93535e43` |
+| `textures/solar-system/europa-mobile.ktx2`    | ETC1S/BasisLZ q220    | `69afc49826ec2ad0fb7db6de109b3ecf269b2235f391a213be351b910b3269b3` |
+| `textures/solar-system/europa.ktx2`           | ETC1S/BasisLZ q220    | `e1f12cf873ef143351eee89b7004cbd60c3bc0f14cef04a327e477a2e72c66a1` |
+| `textures/solar-system/ganymede-mobile.ktx2`  | ETC1S/BasisLZ q220    | `63a398ee05f408b67d11e8be4ca724e8fbe1a70a3f5e7cbf3e33286afd8a4581` |
+| `textures/solar-system/ganymede.ktx2`         | ETC1S/BasisLZ q220    | `1b7679dda5eb96670695c34005f48412898a9459b8f75739184a6b9bc1cab104` |
+| `textures/solar-system/iapetus.ktx2`          | ETC1S/BasisLZ q220    | `20f85ebeddbd65b50e961b58714ec9a88640e4f9b8cd33ca885494f28f8d7f1e` |
+| `textures/solar-system/io.ktx2`               | ETC1S/BasisLZ q220    | `4a85a0a28c13f006c3d6e2b40b3b2af9a07b21e552f9a08f1da5851e407d303d` |
+| `textures/solar-system/jupiter.ktx2`          | ETC1S/BasisLZ q220    | `ed354659717b7ec90a3612b7a793cc92f9833a5b972a8290d02760c5f425fb52` |
+| `textures/solar-system/mars-mobile.ktx2`      | ETC1S/BasisLZ q220    | `b144bbf743ce01896475efa612a8967ddc87c954891e7724241e05463667ae55` |
+| `textures/solar-system/mars.ktx2`             | ETC1S/BasisLZ q220    | `12ec6bf02ebd42a246edc778cb2ce8c595b4d9f0892badf0bfff8abb2303c780` |
+| `textures/solar-system/mercury-mobile.ktx2`   | ETC1S/BasisLZ q220    | `2999f76818f38920c3a6467026818df0284168f1deec793fccac2d878ce21071` |
+| `textures/solar-system/mercury.ktx2`          | ETC1S/BasisLZ q220    | `975efc313f5c04658dd3094b316b813e0cff58d4fdf1854e5895a4c4b6d9664d` |
+| `textures/solar-system/mimas-mobile.ktx2`     | ETC1S/BasisLZ q220    | `dde0b9a95ee090f1a27206ea63559534e25ffa8e2cdaae1c704dcf2ca7965b52` |
+| `textures/solar-system/mimas.ktx2`            | ETC1S/BasisLZ q220    | `098a5eb991b93bef0e37d72faaf4db6eeda20072433fefbe318d5b2db41f2b9f` |
+| `textures/solar-system/miranda.ktx2`          | ETC1S/BasisLZ q220    | `620cddacc704e89ca32bd97d102d2370082869fa00c556181a06c4c73be0a453` |
+| `textures/solar-system/moon.ktx2`             | ETC1S/BasisLZ q220    | `f7130a1822681fa7512d7dcfd40db8c10b9ba4f06777910348698260ed7a2170` |
+| `textures/solar-system/neptune.ktx2`          | ETC1S/BasisLZ q220    | `e9bb2b7bcfb98d3f1adc6f2e20e833a00c11e9677238d8a00ae7431214ca70aa` |
+| `textures/solar-system/oberon.ktx2`           | ETC1S/BasisLZ q220    | `380a70c9fc11a8f4291b1f018e9038b114afcf05ca5e1207acfe5896d78bde2e` |
+| `textures/solar-system/phobos.ktx2`           | ETC1S/BasisLZ q220    | `d0162f04cc69c970f3c6815f6f1a29edd17d0b8778c9519eabe77e8857be5390` |
+| `textures/solar-system/pluto.ktx2`            | ETC1S/BasisLZ q220    | `4804c8793def600b6e4565226d379590132cf480ab33483076cb3ae5f479fc92` |
+| `textures/solar-system/rhea-mobile.ktx2`      | ETC1S/BasisLZ q220    | `b790677188a1eb524d60a196ff5ac1e0430471dcb86c942c631db124dd3fdf38` |
+| `textures/solar-system/rhea.ktx2`             | ETC1S/BasisLZ q220    | `f33eb34d048f06ba2581e6d835953ed9f7745d757081aac84203726faf69e94e` |
+| `textures/solar-system/saturn.ktx2`           | ETC1S/BasisLZ q220    | `d959a239e3d87630daf08e2a688dcbf315fe01b1fd474e55522770108f40aca7` |
+| `textures/solar-system/tethys-mobile.ktx2`    | ETC1S/BasisLZ q220    | `ab62a76d5a09f8de2480eb7a0986d8648a3e6d7a95e8ce5e10fffc5e6b19e8e9` |
+| `textures/solar-system/tethys.ktx2`           | ETC1S/BasisLZ q220    | `019ccaf51bbc90e0de3fe1a6fc214ca116cdda4f18c003a0cde143aabf331f3d` |
+| `textures/solar-system/titan.ktx2`            | ETC1S/BasisLZ q220    | `f402aad29c6340b3b4809441a6685efce6c34e6a0dbe427b90194339adec7f5c` |
+| `textures/solar-system/titania.ktx2`          | ETC1S/BasisLZ q220    | `2296fe1c5d083edca60aec477cf15beee6f75592615103be9f1f953cd13dac42` |
+| `textures/solar-system/triton.ktx2`           | ETC1S/BasisLZ q220    | `9d245e3bd6aa96ac460367afa7857d82819fa4a3afa0441d7c35a9945e454b47` |
+| `textures/solar-system/umbriel.ktx2`          | ETC1S/BasisLZ q220    | `df46a395f18d4d7b529d01a29b9fc3810ac9fc643f32343ac39c0c21c9d7a95e` |
+| `textures/solar-system/venus-mobile.ktx2`     | ETC1S/BasisLZ q220    | `4b985f633ab55cbb5e81f85de954a3d95ff09eb9ef32657f3dee0895bcc4dda5` |
+| `textures/solar-system/venus.ktx2`            | ETC1S/BasisLZ q220    | `e395bced59e95339efbdd002d4a0bbbf81fe323a6694f3a4039120560c80e789` |
