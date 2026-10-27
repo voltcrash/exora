@@ -35,11 +35,13 @@ import { capitalize } from "../readable.ts";
 import type { SceneHost } from "../scene-host.ts";
 import { starLight } from "../star-light.ts";
 import { SURFACE_TRANSITION_MS, type TravelPhase } from "../travel-transition.ts";
-import { MassRadiusDiagram } from "./MassRadiusDiagram.tsx";
 import { DestinationShell, type SceneState } from "./shell/DestinationShell.tsx";
 
 const SignalCurves = lazy(() =>
   import("./SignalCurves.tsx").then((module) => ({ default: module.SignalCurves })),
+);
+const MassRadiusDiagram = lazy(() =>
+  import("./MassRadiusDiagram.tsx").then((module) => ({ default: module.MassRadiusDiagram })),
 );
 
 const TRANSIT_DATE_FORMAT = new Intl.DateTimeFormat(undefined, {
@@ -618,7 +620,9 @@ export const PlanetExperience = ({
                 blocks: [
                   {
                     content: composition ? (
-                      <MassRadiusDiagram name={planet.name} reading={composition} />
+                      <Suspense fallback={null}>
+                        <MassRadiusDiagram name={planet.name} reading={composition} />
+                      </Suspense>
                     ) : null,
                     type: "custom" as const,
                   },

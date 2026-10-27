@@ -439,6 +439,17 @@ desktopTest("the landing page reaches a rendered world", async () => {
   await expect.element(page.getByRole("button", { name: "Go anywhere" })).toBeVisible();
 });
 
+test("the mass-radius diagram loads when Physics opens after the world is ready", async () => {
+  stubArchive();
+  mountApp();
+
+  await expect.element(page.getByRole("heading", { level: 1 })).toMatchTextContent("GJ 674 b");
+  expect(container?.textContent).not.toContain("Mass against radius");
+  await openPanelSection("Physics");
+  await expect.element(page.getByRole("img", { name: /Mass against radius/ })).toBeVisible();
+  await expect.element(page.getByRole("heading", { level: 1 })).toMatchTextContent("GJ 674 b");
+});
+
 test("signal curves load when their tab opens after the world is ready", async () => {
   stubArchive({
     planetOverride: {
