@@ -87,7 +87,7 @@ test("requests are routed by what they are", async () => {
   expect(route("/assets/terrain.worker-abc123.js", "same-origin")).toBe("immutable");
   expect(route("/api/planets/TRAPPIST-1%20e", "cors")).toBe("archive");
   expect(route("/sky/hyg-v44-vmag65.bin", "cors")).toBe("media");
-  expect(route("/textures/earth.ktx2", "cors")).toBe("media");
+  expect(route("/textures/solar-system/earth.ktx2", "cors")).toBe("media");
   expect(route("/_vercel/insights/view", "cors")).toBeNull();
   expect(route("/sw.js", "cors")).toBeNull();
 });
@@ -154,4 +154,24 @@ test("a hashed terrain worker chunk is reused offline without another network re
   expect(await (await worker.dispatch("fetch", request()))?.text()).toBe("worker source");
   expect(await (await worker.dispatch("fetch", request()))?.text()).toBe("worker source");
   expect(calls).toBe(1);
+});
+
+test.each([
+  "/textures/solar-system/earth.ktx2",
+  "/textures/solar-system/ganymede-mobile.ktx2",
+  "/ktx2/msc_basis_transcoder.wasm",
+])("cached binary media remains intact offline: %s", async (path) => {
+  let online = true;
+  const bytes = new Uint8Array([0, 127, 128, 255]);
+  const worker = await createWorker(async () => {
+    if (!online) throw new TypeError("offline");
+    return new Response(bytes);
+  });
+  const request = () => new Request(`https://exora.test${path}`);
+  const first = await worker.dispatch("fetch", request());
+  expect(new Uint8Array(await first!.arrayBuffer())).toEqual(bytes);
+
+  online = false;
+  const cached = await worker.dispatch("fetch", request());
+  expect(new Uint8Array(await cached!.arrayBuffer())).toEqual(bytes);
 });
