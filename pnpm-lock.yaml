@@ -287,6 +287,9 @@ importers:
       '@exora/contracts':
         specifier: workspace:*
         version: link:../../packages/contracts
+      '@exora/planet-catalog':
+        specifier: workspace:*
+        version: link:../../packages/planet-catalog
       '@exora/worldgen':
         specifier: workspace:*
         version: link:../../packages/worldgen
