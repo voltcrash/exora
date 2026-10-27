@@ -28,7 +28,7 @@ import {
   type PlanetDiscoveryCategory,
 } from "./discovery-categories.ts";
 
-const NASA_TAP_ENDPOINT = "https://exoplanetarchive.ipac.caltech.edu/TAP/sync";
+export const NASA_TAP_ENDPOINT = "https://exoplanetarchive.ipac.caltech.edu/TAP/sync";
 const NASA_COLUMNS = [
   "pl_name",
   "hostname",
@@ -65,7 +65,7 @@ const NASA_COLUMNS = [
   "pl_orbpererr2",
 ].join(",");
 
-const CATALOG_QUERY = `select ${NASA_COLUMNS} from pscomppars order by pl_name`;
+export const PLANET_CATALOG_QUERY = `select ${NASA_COLUMNS} from pscomppars order by pl_name`;
 
 export {
   PLANET_DISCOVERY_CATEGORIES,
@@ -324,6 +324,45 @@ export const normalizeNasaPlanet = (
   };
 };
 
+/** Runs one TAP query and returns the rows that normalize into valid profiles. */
+export const loadNasaPlanets = async (
+  adql: string,
+  {
+    fetcher = fetch,
+    retrievedOn = new Date().toISOString().slice(0, 10),
+    timeoutMs,
+  }: { fetcher?: Fetcher; retrievedOn?: string; timeoutMs: number },
+): Promise<ExoplanetProfile[]> => {
+  const url = new URL(NASA_TAP_ENDPOINT);
+  url.searchParams.set("query", adql);
+  url.searchParams.set("format", "json");
+
+  try {
+    const response = await fetcher(url, {
+      headers: { accept: "application/json" },
+      signal: AbortSignal.timeout(timeoutMs),
+    });
+
+    if (!response.ok) {
+      throw new NasaArchiveError(`NASA TAP responded with status ${response.status}.`);
+    }
+
+    const payload: unknown = await response.json();
+
+    const rows = nasaPlanetRowsSchema.safeParse(payload);
+    if (!rows.success)
+      throw new NasaArchiveError("NASA TAP returned an unexpected response shape.");
+
+    return rows.data
+      .map((row) => normalizeNasaPlanet(row, retrievedOn))
+      .filter((planet): planet is ExoplanetProfile => planet !== null)
+      .map((planet) => exoplanetProfileSchema.parse(planet));
+  } catch (error) {
+    if (error instanceof NasaArchiveError) throw error;
+    throw new NasaArchiveError("NASA TAP request failed.", { cause: error });
+  }
+};
+
 // Keyset cursors are compared, not pattern matched, so wildcards stay intact.
 const escapeAdqlCursor = (value: string): string => value.replaceAll("'", "''");
 
@@ -342,7 +381,7 @@ export class NasaPlanetRepository implements PlanetRepository {
     this.#now = options.now ?? Date.now;
     this.#timeoutMs = options.timeoutMs ?? 10_000;
     this.#snapshot = createPlanetCatalogSnapshot(
-      async () => (await this.#load(CATALOG_QUERY)).sort(compareCatalogNames),
+      async () => (await this.#load(PLANET_CATALOG_QUERY)).sort(compareCatalogNames),
       { cacheTtlMs: this.#cacheTtlMs, now: this.#now, waitUntil: options.waitUntil },
     );
   }
@@ -443,37 +482,11 @@ export class NasaPlanetRepository implements PlanetRepository {
     });
   }
 
-  async #load(adql: string, requestTime = this.#now()): Promise<ExoplanetProfile[]> {
-    const url = new URL(NASA_TAP_ENDPOINT);
-    url.searchParams.set("query", adql);
-    url.searchParams.set("format", "json");
-
-    try {
-      const response = await this.#fetcher(url, {
-        headers: { accept: "application/json" },
-        signal: AbortSignal.timeout(this.#timeoutMs),
-      });
-
-      if (!response.ok) {
-        throw new NasaArchiveError(`NASA TAP responded with status ${response.status}.`);
-      }
-
-      const payload: unknown = await response.json();
-
-      const rows = nasaPlanetRowsSchema.safeParse(payload);
-      if (!rows.success)
-        throw new NasaArchiveError("NASA TAP returned an unexpected response shape.");
-
-      const retrievedOn = new Date(requestTime).toISOString().slice(0, 10);
-      const planets = rows.data
-        .map((row) => normalizeNasaPlanet(row, retrievedOn))
-        .filter((planet): planet is ExoplanetProfile => planet !== null)
-        .map((planet) => exoplanetProfileSchema.parse(planet));
-
-      return planets;
-    } catch (error) {
-      if (error instanceof NasaArchiveError) throw error;
-      throw new NasaArchiveError("NASA TAP request failed.", { cause: error });
-    }
+  #load(adql: string, requestTime = this.#now()): Promise<ExoplanetProfile[]> {
+    return loadNasaPlanets(adql, {
+      fetcher: this.#fetcher,
+      retrievedOn: new Date(requestTime).toISOString().slice(0, 10),
+      timeoutMs: this.#timeoutMs,
+    });
   }
 }
