@@ -159,7 +159,7 @@ const planet = ({
             ...(texture.license ? { license: texture.license } : {}),
             ...(texture.mission ? { mission: texture.mission } : {}),
             ...(texture.originalUrl ? { originalUrl: texture.originalUrl } : {}),
-            path: `/textures/solar-system/${id}.jpg`,
+            path: `/textures/solar-system/${id}.ktx2`,
             retrievedOn: "2026-08-23",
             sourceUrl: texture.page,
             ...(texture.topography

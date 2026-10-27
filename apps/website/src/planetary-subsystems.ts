@@ -72,7 +72,7 @@ export interface PlanetarySubsystem {
 }
 
 const mappedTexture = (name: string): string =>
-  `/textures/solar-system/${name.toLocaleLowerCase().replaceAll(" ", "-")}.jpg`;
+  `/textures/solar-system/${name.toLocaleLowerCase().replaceAll(" ", "-")}.ktx2`;
 
 const moon = (
   name: string,

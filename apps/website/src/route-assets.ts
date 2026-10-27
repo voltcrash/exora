@@ -12,20 +12,20 @@ export const initialSceneAssetForSearch = (search: string): InitialSceneAsset =>
 };
 
 const CONSTRAINED_SOLAR_MOSAICS = new Set([
-  "/textures/solar-system/callisto.jpg",
-  "/textures/solar-system/dione.jpg",
-  "/textures/solar-system/enceladus.jpg",
-  "/textures/solar-system/europa.jpg",
-  "/textures/solar-system/ganymede.jpg",
-  "/textures/solar-system/mars.jpg",
-  "/textures/solar-system/mercury.jpg",
-  "/textures/solar-system/mimas.jpg",
-  "/textures/solar-system/rhea.jpg",
-  "/textures/solar-system/tethys.jpg",
-  "/textures/solar-system/venus.jpg",
+  "/textures/solar-system/callisto.ktx2",
+  "/textures/solar-system/dione.ktx2",
+  "/textures/solar-system/enceladus.ktx2",
+  "/textures/solar-system/europa.ktx2",
+  "/textures/solar-system/ganymede.ktx2",
+  "/textures/solar-system/mars.ktx2",
+  "/textures/solar-system/mercury.ktx2",
+  "/textures/solar-system/mimas.ktx2",
+  "/textures/solar-system/rhea.ktx2",
+  "/textures/solar-system/tethys.ktx2",
+  "/textures/solar-system/venus.ktx2",
 ]);
 
 export const solarMosaicPathForTier = (path: string, tier: RenderQualityTier): string =>
   tier === "desktop" || !CONSTRAINED_SOLAR_MOSAICS.has(path)
     ? path
-    : path.replace(/\.jpg$/, "-mobile.jpg");
+    : path.replace(/\.ktx2$/, "-mobile.ktx2");

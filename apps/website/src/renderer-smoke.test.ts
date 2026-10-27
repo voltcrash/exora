@@ -285,7 +285,7 @@ test("a planetary subsystem renders measured tracks and releases every explanato
 
   expect(sceneCounts(scene).meshes).toBeGreaterThan(before.meshes + subsystem.moons.length * 2);
   expect(scene.getMeshByName("Io-mapped-mission-mosaic")).not.toBeNull();
-  const ganymedeMosaic = scene.getTextureByName("/textures/solar-system/ganymede-mobile.jpg");
+  const ganymedeMosaic = scene.getTextureByName("/textures/solar-system/ganymede-mobile.ktx2");
   expect(ganymedeMosaic).toMatchObject({
     anisotropicFilteringLevel: testProfile.anisotropicFiltering,
     gammaSpace: true,
