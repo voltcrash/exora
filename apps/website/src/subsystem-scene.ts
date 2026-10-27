@@ -5,7 +5,6 @@ import { HemisphericLight } from "@babylonjs/core/Lights/hemisphericLight.js";
 import { Color3, Color4 } from "@babylonjs/core/Maths/math.color.js";
 import { Vector3 } from "@babylonjs/core/Maths/math.vector.js";
 import { StandardMaterial } from "@babylonjs/core/Materials/standardMaterial.js";
-import { Texture } from "@babylonjs/core/Materials/Textures/texture.js";
 import { Mesh } from "@babylonjs/core/Meshes/mesh.js";
 import { MeshBuilder } from "@babylonjs/core/Meshes/meshBuilder.js";
 import { TransformNode } from "@babylonjs/core/Meshes/transformNode.js";
@@ -19,6 +18,7 @@ import {
   type SubsystemMoon,
 } from "./planetary-subsystems.ts";
 import { createStarfield } from "./star-visuals.ts";
+import { createSolarMosaicTexture } from "./solar-mosaic-texture.ts";
 
 export interface SubsystemWorldOptions {
   onFirstFrame: () => void;
@@ -160,7 +160,7 @@ export const createSubsystemWorld = (
   );
   const primaryTexture = planet.solarSystem?.texture?.path;
   if (primaryTexture) {
-    primaryMaterial.diffuseTexture = new Texture(primaryTexture, scene, true, false);
+    primaryMaterial.diffuseTexture = createSolarMosaicTexture(primaryTexture, scene, profile);
   }
   primary.material = primaryMaterial;
   primary.rotation.z = ((planet.solarSystem?.axialTiltDegrees ?? 0) * Math.PI) / 180;
@@ -238,7 +238,11 @@ export const createSubsystemWorld = (
       descriptor.surface === "mapped" ? new Color3(0.74, 0.7, 0.64) : new Color3(0.34, 0.38, 0.4),
     );
     if (descriptor.texturePath) {
-      moonMaterial.diffuseTexture = new Texture(descriptor.texturePath, scene, true, false);
+      moonMaterial.diffuseTexture = createSolarMosaicTexture(
+        descriptor.texturePath,
+        scene,
+        profile,
+      );
     }
     body.material = moonMaterial;
     body.parent = orbitalRoot;

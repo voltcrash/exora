@@ -5,7 +5,7 @@ import type { Scene } from "@babylonjs/core/scene.js";
 import type { ExoplanetProfile } from "@exora/contracts";
 import type { Rgb, RockyWorldRecipe, WorldRecipe } from "@exora/worldgen";
 import type { RenderQualityProfile } from "./render-quality.ts";
-import { solarMosaicPathForTier } from "./route-assets.ts";
+import { createSolarMosaicTexture } from "./solar-mosaic-texture.ts";
 import { getSurfaceDetailTextures, surfaceDetailSelectionForPalette } from "./texture-cache.ts";
 
 const toColor3 = ([red, green, blue]: Rgb): Color3 => new Color3(red, green, blue);
@@ -19,16 +19,8 @@ const bindMeasuredSurface = (
 ): void => {
   const knownTexture = planet.solarSystem?.texture;
   if (!knownTexture) return;
-  const surfaceMap = new Texture(
-    solarMosaicPathForTier(knownTexture.path, profile.tier),
-    scene,
-    true,
-    false,
-  );
+  const surfaceMap = createSolarMosaicTexture(knownTexture.path, scene, profile);
   surfaceMap.name = `${planet.id}-spacecraft-mosaic`;
-  surfaceMap.anisotropicFilteringLevel = profile.anisotropicFiltering;
-  surfaceMap.wrapU = Texture.WRAP_ADDRESSMODE;
-  surfaceMap.wrapV = Texture.CLAMP_ADDRESSMODE;
   shader.setTexture("surfaceMap", surfaceMap);
 
   const topography = knownTexture.topography;

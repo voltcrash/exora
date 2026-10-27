@@ -285,6 +285,12 @@ test("a planetary subsystem renders measured tracks and releases every explanato
 
   expect(sceneCounts(scene).meshes).toBeGreaterThan(before.meshes + subsystem.moons.length * 2);
   expect(scene.getMeshByName("Io-mapped-mission-mosaic")).not.toBeNull();
+  const ganymedeMosaic = scene.getTextureByName("/textures/solar-system/ganymede-mobile.jpg");
+  expect(ganymedeMosaic).toMatchObject({
+    anisotropicFilteringLevel: testProfile.anisotropicFiltering,
+    gammaSpace: true,
+    noMipmap: false,
+  });
   expect(scene.getMeshByName("Metis-unresolved-neutral-silhouette")).not.toBeNull();
   expect(scene.getMeshByName("jupiter-measured-io-plasma-torus")).not.toBeNull();
   expect(scene.getMeshByName("Europa-tentative-simulated-plume")).not.toBeNull();
