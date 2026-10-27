@@ -261,11 +261,11 @@ test("queries confirmed worlds by their exact host system", async () => {
 test("bounds the physical-control browsing field", async () => {
   let requestedUrl = "";
   const repository = new NasaPlanetRepository({
-    fetcher: async (input) => {
+    fetcher: liveQueriesOnly(async (input) => {
       requestedUrl =
         typeof input === "string" ? input : input instanceof URL ? input.href : input.url;
       return Response.json([nasaRow]);
-    },
+    }),
   });
 
   const result = await repository.browse(500);
@@ -280,11 +280,11 @@ test("bounds the physical-control browsing field", async () => {
 test("pages the browsing field with a keyset cursor", async () => {
   let requestedUrl = "";
   const repository = new NasaPlanetRepository({
-    fetcher: async (input) => {
+    fetcher: liveQueriesOnly(async (input) => {
       requestedUrl =
         typeof input === "string" ? input : input instanceof URL ? input.href : input.url;
       return Response.json(Array.from({ length: 12 }, () => nasaRow));
-    },
+    }),
   });
 
   const result = await repository.browse(12, "Kepler-11 b");
@@ -456,4 +456,42 @@ test("failed snapshot searches retain the two live queries and their cache", asy
   expect(requests).toBe(2);
   expect(queries[0]).toContain("lower(pl_name) like 'hip'");
   expect(queries[1]).toContain("lower(pl_name) like '%hip%'");
+});
+
+test("snapshot browsing preserves bounds, null filters, order and keyset cursors", async () => {
+  let requests = 0;
+  const rows = Array.from({ length: 130 }, (_, index) => ({
+    ...nasaRow,
+    pl_name: `World ${String(index).padStart(3, "0")} b`,
+  }));
+  const repository = new NasaPlanetRepository({
+    fetcher: async () => {
+      requests += 1;
+      return Response.json([
+        ...rows.toReversed(),
+        { ...nasaRow, pl_name: "A missing distance", sy_dist: null },
+        { ...nasaRow, pl_name: "B missing temperature", pl_eqt: null },
+        { ...nasaRow, pl_name: "C missing radii", pl_rade: null, pl_radj: null },
+      ]);
+    },
+  });
+  const first = await repository.browse(500);
+  expect(first.cached).toBe(false);
+  expect(first.value.map(({ name }) => name)).toEqual(
+    rows.slice(0, 120).map(({ pl_name }) => pl_name),
+  );
+  expect(first.nextCursor).toBe("World 119 b");
+  const last = await repository.browse(12, first.nextCursor!);
+  expect(last.value.map(({ name }) => name)).toEqual(rows.slice(120).map(({ pl_name }) => pl_name));
+  expect(last.nextCursor).toBeNull();
+  expect(last.cached).toBe(true);
+  const minimum = await repository.browse(1);
+  expect(minimum.value).toHaveLength(12);
+  expect(minimum.nextCursor).toBe("World 011 b");
+  expect((await repository.findByName("C missing radii")).value?.observation).toMatchObject({
+    radiusEarth: null,
+    radiusJupiter: null,
+  });
+  expect((await repository.search("World119", 12)).value[0]?.name).toBe("World 119 b");
+  expect(requests).toBe(1);
 });

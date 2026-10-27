@@ -1,4 +1,9 @@
-import { compareCatalogNames, findCatalogPlanet, searchPlanetCatalog } from "./planet-catalog.ts";
+import {
+  browsePlanetCatalog,
+  compareCatalogNames,
+  findCatalogPlanet,
+  searchPlanetCatalog,
+} from "./planet-catalog.ts";
 import { createPlanetCatalogSnapshot } from "./planet-catalog-snapshot.ts";
 import {
   escapeAdqlLiteral,
@@ -346,6 +351,15 @@ export class NasaPlanetRepository implements PlanetRepository {
   async browse(limit: number, cursor?: string): Promise<RepositoryPage<ExoplanetProfile[]>> {
     const safeLimit = Math.max(12, Math.min(Math.trunc(limit), 120));
     const after = cursor?.trim().slice(0, 100);
+    const snapshot = await this.#snapshot();
+    if (snapshot) {
+      const value = browsePlanetCatalog(snapshot.value, safeLimit, after);
+      return {
+        cached: snapshot.cached,
+        value,
+        nextCursor: value.length === safeLimit ? (value.at(-1)?.name ?? null) : null,
+      };
+    }
     const keyset = after ? ` and pl_name > '${escapeAdqlCursor(after)}'` : "";
     const result = await this.#query(
       `select top ${safeLimit} ${NASA_COLUMNS} from pscomppars where sy_dist is not null and pl_eqt is not null and (pl_rade is not null or pl_radj is not null)${keyset} order by pl_name`,
