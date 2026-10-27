@@ -1,6 +1,5 @@
 import { defineConfig, loadEnv, type Plugin } from "vite-plus";
 import react from "@vitejs/plugin-react";
-import { redact } from "@tanstack/redact/vite";
 import { playwright } from "vite-plus/test/browser-playwright";
 import { NOTABLE_PLANET_NAMES, NOTABLE_STAR_NAMES } from "./src/search-discovery.ts";
 import { FEATURED_REGION_NAMES } from "./src/solar-regions.ts";
@@ -137,13 +136,7 @@ export default defineConfig(({ mode }) => {
         },
       },
     },
-    plugins: [
-      variantLaunchSdk(variantLaunchKey),
-      react(),
-      redact(),
-      dropWebGpuShaders(),
-      emitSitemap(),
-    ],
+    plugins: [variantLaunchSdk(variantLaunchKey), react(), dropWebGpuShaders(), emitSitemap()],
     server: {
       proxy: {
         "/api": {
