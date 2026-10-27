@@ -1,4 +1,3 @@
-import type { Vector3 } from "@babylonjs/core/Maths/math.vector.js";
 import type { RenderQualityProfile } from "./render-quality.ts";
 
 export const SURFACE_HALF_EXTENT = 240;
@@ -25,7 +24,7 @@ export const SURFACE_GRID_RESOLUTION: Readonly<Record<RenderQualityProfile["tier
 export const bakeSurfaceSunVisibility = (
   heights: Float32Array,
   resolution: number,
-  sunDirection: Vector3,
+  sunDirection: { x: number; y: number; z: number },
   reliefScale: number,
 ): Float32Array => {
   const stride = resolution + 1;

@@ -1,6 +1,7 @@
 import { serve } from "@hono/node-server";
-import { app } from "./runtime.ts";
+import { createRuntimeApp } from "./runtime.ts";
 
+const app = createRuntimeApp();
 const configuredPort = Number.parseInt(process.env.PORT ?? "8787", 10);
 const port = Number.isFinite(configuredPort) ? configuredPort : 8787;
 const server = serve({ fetch: app.fetch, port }, (info) => {

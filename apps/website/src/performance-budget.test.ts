@@ -18,3 +18,12 @@ test("budgets the final emitted files and the initial HTML path", () => {
     "Initial JavaScript is 900,000 bytes; the emitted initial-path budget is 850,000 bytes.",
   ]);
 });
+
+test("terrain workers have a file budget but do not count toward initial JavaScript", () => {
+  const artifacts = [
+    { bytes: 250_000, path: "assets/index-abc.js" },
+    { bytes: 300_000, path: "assets/terrain.worker-def.js" },
+  ];
+  expect(budgetViolations(artifacts, new Set([artifacts[0]!.path]))).toEqual([]);
+  expect(budgetViolations([{ ...artifacts[1]!, bytes: 400_001 }], new Set())).toHaveLength(1);
+});

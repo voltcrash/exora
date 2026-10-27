@@ -16,4 +16,6 @@ for (const module of modules) {
   }
 }
 
-console.log(`[deployment] verified ${modules.length} self-contained API modules`);
+await import(new URL("vercel.mjs", outputDirectory).href);
+
+console.log(`[deployment] verified ${modules.length} API modules and Vercel entry dependencies`);

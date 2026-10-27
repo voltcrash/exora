@@ -1016,6 +1016,7 @@ void main(void) {
 export type ViewMode = "orbit" | "subsystem" | "surface" | "transition";
 
 interface PlanetWorldOptions {
+  signal?: AbortSignal;
   onFirstFrame: () => void;
   onViewModeChange: (mode: ViewMode) => void;
   onSelectHostStar?: () => void;
@@ -1226,10 +1227,6 @@ const createPlanet = (
   planet.rotation.z = axialTilt;
   planet.isPickable = true;
   orbitalMeshes.push(planet);
-
-  if (recipe.renderer === "rocky" && !knownTexture) {
-    displaceRockyPlanet(planet, recipe);
-  }
 
   let shader: ShaderMaterial;
 
@@ -1671,13 +1668,14 @@ const createSurfaceSky = (
   return { horizonColor, material, mesh, zenithColor };
 };
 
-const createSurfaceEnvironment = (
+const createSurfaceEnvironment = async (
   scene: Scene,
   recipe: WorldRecipe,
   geology: SurfaceGeology | null,
   profile: RenderQualityProfile,
   onSelectHostStar?: () => void,
-): {
+  signal?: AbortSignal,
+): Promise<{
   cloudLayers: Mesh[];
   groundHeightAt: (x: number, z: number) => number;
   meshes: AbstractMesh[];
@@ -1687,7 +1685,7 @@ const createSurfaceEnvironment = (
   skyAnchor: TransformNode;
   star: StellarSurface;
   vista: SurfaceVista | null;
-} => {
+} | null> => {
   const root = new TransformNode("surfaceEnvironment", scene);
   const skyAnchor = new TransformNode("surfaceSkyAnchor", scene);
   skyAnchor.parent = root;
@@ -1698,26 +1696,31 @@ const createSurfaceEnvironment = (
   let motes: SurfaceMotes | null = null;
 
   const vista = geology
-    ? createSurfaceVista(scene, {
-        geology,
-        liquid:
-          geology.liquidLevel !== null && recipe.renderer === "rocky"
-            ? {
-                deepColor: geology.liquidColor,
-                shallowColor: geology.liquidShallowColor,
-                waveHeight: 0.5 + geology.hazeDensity * 1.4,
-              }
-            : null,
-        origin: new Vector3(0, SURFACE_GROUND_BASE_Y, SURFACE_GROUND_ORIGIN_Z),
-        parent: root,
-        profile,
-        skyHorizonColor: surfaceSky.horizonColor,
-        skyZenithColor: surfaceSky.zenithColor,
-        sunColor: toColor3(recipe.star.color),
-        sunDirection: SURFACE_STAR_DIRECTION,
-        sunIntensity: Math.min(2.6, Math.max(0.85, recipe.star.intensity)),
-      })
+    ? await createSurfaceVista(
+        scene,
+        {
+          geology,
+          liquid:
+            geology.liquidLevel !== null && recipe.renderer === "rocky"
+              ? {
+                  deepColor: geology.liquidColor,
+                  shallowColor: geology.liquidShallowColor,
+                  waveHeight: 0.5 + geology.hazeDensity * 1.4,
+                }
+              : null,
+          origin: new Vector3(0, SURFACE_GROUND_BASE_Y, SURFACE_GROUND_ORIGIN_Z),
+          parent: root,
+          profile,
+          skyHorizonColor: surfaceSky.horizonColor,
+          skyZenithColor: surfaceSky.zenithColor,
+          sunColor: toColor3(recipe.star.color),
+          sunDirection: SURFACE_STAR_DIRECTION,
+          sunIntensity: Math.min(2.6, Math.max(0.85, recipe.star.intensity)),
+        },
+        signal,
+      )
     : null;
+  if (signal?.aborted || scene.isDisposed) return null;
 
   if (vista && geology) {
     meshes.push(vista.mesh);
@@ -1825,7 +1828,7 @@ const setEnvironmentEnabled = (
   }
 };
 
-export const createPlanetWorld = (
+export const createPlanetWorld = async (
   host: SceneHost,
   {
     onFirstFrame,
@@ -1833,9 +1836,16 @@ export const createPlanetWorld = (
     onViewModeChange,
     planet: planetProfile,
     recipe,
+    signal,
   }: PlanetWorldOptions,
-): MountedWorld => {
+): Promise<MountedWorld> => {
   const { camera, canvas, engine, profile, scene } = host;
+  const cancelled = (): boolean => !!signal?.aborted || scene.isDisposed;
+  const emptyWorld: MountedWorld = {
+    dispose: () => undefined,
+    restoreDesktopView: () => undefined,
+  };
+  if (cancelled()) return emptyWorld;
 
   scene.setRenderingAutoClearDepthStencil(1, false, true, true);
 
@@ -1883,13 +1893,13 @@ export const createPlanetWorld = (
           }
         : null,
     ) ?? cloudDeckGeology(recipe);
-  const surfaceEnvironment = createSurfaceEnvironment(
-    scene,
-    recipe,
-    surfaceGeology,
-    profile,
-    onSelectHostStar,
-  );
+  const [, surfaceEnvironment] = await Promise.all([
+    recipe.renderer === "rocky" && !planetProfile.solarSystem?.texture
+      ? displaceRockyPlanet(planet, recipe, signal)
+      : undefined,
+    createSurfaceEnvironment(scene, recipe, surfaceGeology, profile, onSelectHostStar, signal),
+  ]);
+  if (!surfaceEnvironment || cancelled()) return emptyWorld;
 
   let elapsedSeconds = 0;
   // A locked world turns once per orbit, so it takes the same measured-period path as the Moon.

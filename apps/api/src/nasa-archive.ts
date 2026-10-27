@@ -1,4 +1,18 @@
 import {
+  browsePlanetCatalog,
+  compareCatalogNames,
+  findCatalogPlanet,
+  searchPlanetCatalog,
+} from "./planet-catalog.ts";
+import { createPlanetCatalogSnapshot } from "./planet-catalog-snapshot.ts";
+import {
+  escapeAdqlLiteral,
+  planetNamePattern,
+  planetNamePrefixes,
+  rankPlanetMatches,
+} from "./planet-search.ts";
+export { planetNamePattern, planetNamePrefixes, rankPlanetMatches } from "./planet-search.ts";
+import {
   exoplanetProfileSchema,
   type DetectionSignal,
   type ExoplanetProfile,
@@ -52,6 +66,8 @@ const NASA_COLUMNS = [
   "pl_orbpererr1",
   "pl_orbpererr2",
 ].join(",");
+
+const CATALOG_QUERY = `select ${NASA_COLUMNS} from pscomppars order by pl_name`;
 
 export {
   PLANET_DISCOVERY_CATEGORIES,
@@ -160,6 +176,7 @@ export interface NasaPlanetRepositoryOptions {
   fetcher?: Fetcher;
   now?: () => number;
   timeoutMs?: number;
+  waitUntil?: (promise: Promise<unknown>) => void;
 }
 
 export class NasaArchiveError extends UpstreamError {
@@ -309,75 +326,6 @@ export const normalizeNasaPlanet = (
   };
 };
 
-const escapeAdqlLiteral = (value: string): string =>
-  value.replaceAll("%", "").replaceAll("_", "").replaceAll("'", "''");
-
-const nameTokens = (query: string): string[] =>
-  query
-    .trim()
-    .toLowerCase()
-    .slice(0, 80)
-    .split(/[^\p{L}\p{N}]+/u)
-    .flatMap((token) => token.split(/(?<=\p{L})(?=\p{N})|(?<=\p{N})(?=\p{L})/u))
-    .map(escapeAdqlLiteral)
-    .filter((token) => token.length > 0);
-
-/**
- * A LIKE pattern that matches a planet name whatever separates its parts, so "kepler 18",
- * "kepler-18" and "Kepler18" all reach "Kepler-18 b". Null when nothing searchable is left.
- */
-export const planetNamePattern = (query: string): string | null => {
-  const tokens = nameTokens(query);
-  return tokens.length > 0 ? `%${tokens.join("%")}%` : null;
-};
-
-/**
- * The query as a whole name the ways archives write one — hyphen, space or neither between its
- * parts — alone or followed by a planet letter, so "kepler 18" is answered by Kepler-18 b itself
- * rather than by whichever of the hundreds of Kepler-18xx names the archive returns first.
- */
-export const planetNamePrefixes = (query: string): string[] => {
-  const tokens = nameTokens(query);
-  if (tokens.length === 0) return [];
-  return [...new Set(["-", " ", ""].map((separator) => tokens.join(separator)))].flatMap((name) => [
-    name,
-    `${name} %`,
-  ]);
-};
-
-const compactName = (value: string): string =>
-  value.toLowerCase().replaceAll(/[^\p{L}\p{N}]/gu, "");
-
-/**
- * Orders matches the way a reader means them: the exact name, then names the query begins at a
- * word boundary ("kepler 18" → Kepler-18 b before Kepler-187 b), then other prefixes, then the rest.
- */
-export const rankPlanetMatches = (
-  query: string,
-  planets: readonly ExoplanetProfile[],
-): ExoplanetProfile[] => {
-  const needle = compactName(query);
-  const rank = (name: string): number => {
-    const compact = compactName(name);
-    if (compact === needle) return 0;
-    if (compact.startsWith(needle)) {
-      const next = compact.charAt(needle.length);
-      const last = needle.charAt(needle.length - 1);
-      return /\p{N}/u.test(next) && /\p{N}/u.test(last) ? 2 : 1;
-    }
-    return compact.includes(needle) ? 3 : 4;
-  };
-  return planets
-    .map((planet) => ({ planet, rank: rank(planet.name) }))
-    .sort(
-      (left, right) =>
-        left.rank - right.rank ||
-        left.planet.name.length - right.planet.name.length ||
-        left.planet.name.localeCompare(right.planet.name, "en"),
-    )
-    .map(({ planet }) => planet);
-};
-
 // Keyset cursors are compared, not pattern matched, so wildcards stay intact.
 const escapeAdqlCursor = (value: string): string => value.replaceAll("'", "''");
 
@@ -388,17 +336,31 @@ export class NasaPlanetRepository implements PlanetRepository {
   readonly #now: () => number;
   readonly #requests = createRequestCoalescer<RepositoryResult<ExoplanetProfile[]>>();
   readonly #timeoutMs: number;
+  readonly #snapshot: ReturnType<typeof createPlanetCatalogSnapshot>;
 
   constructor(options: NasaPlanetRepositoryOptions = {}) {
     this.#cacheTtlMs = options.cacheTtlMs ?? 1000 * 60 * 60 * 6;
     this.#fetcher = options.fetcher ?? fetch;
     this.#now = options.now ?? Date.now;
     this.#timeoutMs = options.timeoutMs ?? 10_000;
+    this.#snapshot = createPlanetCatalogSnapshot(
+      async () => (await this.#load(CATALOG_QUERY)).sort(compareCatalogNames),
+      { cacheTtlMs: this.#cacheTtlMs, now: this.#now, waitUntil: options.waitUntil },
+    );
   }
 
   async browse(limit: number, cursor?: string): Promise<RepositoryPage<ExoplanetProfile[]>> {
     const safeLimit = Math.max(12, Math.min(Math.trunc(limit), 120));
     const after = cursor?.trim().slice(0, 100);
+    const snapshot = await this.#snapshot.ready();
+    if (snapshot) {
+      const value = browsePlanetCatalog(snapshot.value, safeLimit, after);
+      return {
+        cached: snapshot.cached,
+        value,
+        nextCursor: value.length === safeLimit ? (value.at(-1)?.name ?? null) : null,
+      };
+    }
     const keyset = after ? ` and pl_name > '${escapeAdqlCursor(after)}'` : "";
     const result = await this.#query(
       `select top ${safeLimit} ${NASA_COLUMNS} from pscomppars where sy_dist is not null and pl_eqt is not null and (pl_rade is not null or pl_radj is not null)${keyset} order by pl_name`,
@@ -425,6 +387,9 @@ export class NasaPlanetRepository implements PlanetRepository {
 
   async findByName(name: string): Promise<RepositoryResult<ExoplanetProfile | null>> {
     const normalizedName = name.trim().slice(0, 100);
+    const snapshot = this.#snapshot();
+    if (snapshot)
+      return { cached: snapshot.cached, value: findCatalogPlanet(snapshot.value, normalizedName) };
     const escapedName = escapeAdqlLiteral(normalizedName);
     const adql = `select top 1 ${NASA_COLUMNS} from pscomppars where lower(pl_name)=lower('${escapedName}')`;
     const result = await this.#query(adql);
@@ -445,6 +410,12 @@ export class NasaPlanetRepository implements PlanetRepository {
     const pattern = planetNamePattern(query);
     if (pattern === null) return { cached: true, value: [] };
     const safeLimit = Math.max(1, Math.min(Math.trunc(limit), 24));
+    const snapshot = this.#snapshot();
+    if (snapshot)
+      return {
+        cached: snapshot.cached,
+        value: searchPlanetCatalog(snapshot.value, query, safeLimit),
+      };
     const prefixes = planetNamePrefixes(query)
       .map((prefix) => `lower(pl_name) like '${prefix}'`)
       .join(" or ");
@@ -472,39 +443,43 @@ export class NasaPlanetRepository implements PlanetRepository {
     if (cached) return { cached: true, value: cached };
 
     return this.#requests.run(adql, async () => {
-      const url = new URL(NASA_TAP_ENDPOINT);
-      url.searchParams.set("query", adql);
-      url.searchParams.set("format", "json");
-
-      try {
-        const response = await this.#fetcher(url, {
-          headers: { accept: "application/json" },
-          signal: AbortSignal.timeout(this.#timeoutMs),
-        });
-
-        if (!response.ok) {
-          throw new NasaArchiveError(`NASA TAP responded with status ${response.status}.`);
-        }
-
-        const payload: unknown = await response.json();
-
-        const rows = nasaPlanetRowsSchema.safeParse(payload);
-        if (!rows.success)
-          throw new NasaArchiveError("NASA TAP returned an unexpected response shape.");
-
-        const retrievedOn = new Date(requestTime).toISOString().slice(0, 10);
-        const planets = rows.data
-          .map((row) => normalizeNasaPlanet(row, retrievedOn))
-          .filter((planet): planet is ExoplanetProfile => planet !== null)
-          .map((planet) => exoplanetProfileSchema.parse(planet));
-
-        this.#cache.set(adql, planets, requestTime + this.#cacheTtlMs);
-
-        return { cached: false, value: planets };
-      } catch (error) {
-        if (error instanceof NasaArchiveError) throw error;
-        throw new NasaArchiveError("NASA TAP request failed.", { cause: error });
-      }
+      const planets = await this.#load(adql, requestTime);
+      this.#cache.set(adql, planets, requestTime + this.#cacheTtlMs);
+      return { cached: false, value: planets };
     });
+  }
+
+  async #load(adql: string, requestTime = this.#now()): Promise<ExoplanetProfile[]> {
+    const url = new URL(NASA_TAP_ENDPOINT);
+    url.searchParams.set("query", adql);
+    url.searchParams.set("format", "json");
+
+    try {
+      const response = await this.#fetcher(url, {
+        headers: { accept: "application/json" },
+        signal: AbortSignal.timeout(this.#timeoutMs),
+      });
+
+      if (!response.ok) {
+        throw new NasaArchiveError(`NASA TAP responded with status ${response.status}.`);
+      }
+
+      const payload: unknown = await response.json();
+
+      const rows = nasaPlanetRowsSchema.safeParse(payload);
+      if (!rows.success)
+        throw new NasaArchiveError("NASA TAP returned an unexpected response shape.");
+
+      const retrievedOn = new Date(requestTime).toISOString().slice(0, 10);
+      const planets = rows.data
+        .map((row) => normalizeNasaPlanet(row, retrievedOn))
+        .filter((planet): planet is ExoplanetProfile => planet !== null)
+        .map((planet) => exoplanetProfileSchema.parse(planet));
+
+      return planets;
+    } catch (error) {
+      if (error instanceof NasaArchiveError) throw error;
+      throw new NasaArchiveError("NASA TAP request failed.", { cause: error });
+    }
   }
 }

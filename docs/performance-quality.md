@@ -85,3 +85,26 @@ Icestorm-M1 CPU, the five warmed runs at commit `7e2af576` took 249.65, 248.73, 
 2328.326724431223 in both versions; a separate direct comparison of all 100,000 heights matched
 exactly. This measures terrain sampling, not end-to-end loading or frame rate. Initial JavaScript
 remained 295,205 bytes in both production builds.
+
+Planet displacement and surface heightfield/material-channel sampling, far-field filtering,
+occlusion, and sunlight baking now run in a module worker. The worker returns transferable typed
+arrays; Babylon normal computation, mesh updates, materials, and scatter placement stay on the main
+thread. The synchronous fallback uses the same kernels and arithmetic, including Float64 positions
+when Babylon supplied JavaScript numbers. `WORLDGEN_VERSION` is unchanged. Cancellation terminates
+the job, and scene/parent disposal guards prevent late results from creating or updating meshes.
+Worker startup, execution, message, or timeout failures retry synchronously.
+
+`vp run website#test:browser:desktop` includes real Chromium module-worker comparisons for Earth,
+Mars, Mercury, and Venus. Every returned array is compared byte for byte with the synchronous path.
+The desktop Mars bake test also reports synchronous main-thread time, worker dispatch main-thread
+time, and worker wall time separately. One headless Chromium development-test run on the aarch64
+container with Node 24.22.1 measured 104.30 ms, 0.20 ms, and 155.10 ms respectively for a 208 × 208
+cell grid. This single sample includes worker startup/module loading in wall time and excludes
+Babylon mesh construction, return-message handling, and frame scheduling. It demonstrates removal
+of the blocking numerical loop, not an end-to-end loading or frame-rate improvement; rerun locally
+for representative hardware measurements.
+
+Vite emits `terrain.worker-<hash>.js` under `/assets/`. The service worker caches it with other
+immutable hashed assets after first use. The performance-budget script counts every emitted worker
+against the per-file limit, while only JavaScript referenced by the initial HTML counts against the
+initial-load limit. No worker chunk is added to the initial HTML.

@@ -3,9 +3,7 @@ import type { Mesh } from "@babylonjs/core/Meshes/mesh.js";
 import { VertexData } from "@babylonjs/core/Meshes/mesh.vertexData.js";
 import type { FloatArray } from "@babylonjs/core/types.js";
 import type { RockyWorldRecipe } from "@exora/worldgen";
-import { buildCraterField, sampleTerrainHeight } from "./planet-terrain.ts";
-
-const TERRAIN_DISPLAY_EXAGGERATION = 0.5;
+import { runTerrainJob } from "./terrain-worker-client.ts";
 
 export const weldTerrainNormals = (positions: FloatArray, normals: Float32Array): void => {
   const vertexCount = normals.length / 3;
@@ -41,36 +39,37 @@ export const weldTerrainNormals = (positions: FloatArray, normals: Float32Array)
   }
 };
 
-export const displaceRockyPlanet = (planet: Mesh, recipe: RockyWorldRecipe): void => {
+export const displaceRockyPlanet = async (
+  planet: Mesh,
+  recipe: RockyWorldRecipe,
+  signal?: AbortSignal,
+): Promise<void> => {
   const positions = planet.getVerticesData(VertexBuffer.PositionKind);
   const indices = planet.getIndices();
   if (!positions || !indices) return;
 
-  const craters = buildCraterField(
-    recipe.seed,
-    recipe.terrain.craterDensity,
-    recipe.terrain.craterScale,
+  const result = await runTerrainJob(
+    {
+      kind: "planet",
+      positions:
+        positions instanceof Float32Array ? positions.slice() : Float64Array.from(positions),
+      recipe,
+    },
+    signal,
   );
-  const radius = recipe.radiusSceneUnits;
-
-  for (let vertex = 0; vertex < positions.length; vertex += 3) {
-    const x = positions[vertex]!;
-    const y = positions[vertex + 1]!;
-    const z = positions[vertex + 2]!;
-    const length = Math.hypot(x, y, z) || 1;
-    const direction = { x: x / length, y: y / length, z: z / length };
-    const { height } = sampleTerrainHeight(direction, recipe.terrain, recipe.seed, craters);
-    const rawOffset = height * recipe.surface.elevation * TERRAIN_DISPLAY_EXAGGERATION;
-    const offset = Math.min(radius * 0.4, Math.max(-radius * 0.4, rawOffset));
-    const displaced = radius + offset;
-    positions[vertex] = direction.x * displaced;
-    positions[vertex + 1] = direction.y * displaced;
-    positions[vertex + 2] = direction.z * displaced;
-  }
+  if (
+    result?.kind !== "planet" ||
+    signal?.aborted ||
+    planet.isDisposed() ||
+    planet.getScene().isDisposed
+  )
+    return;
+  const displaced =
+    result.positions instanceof Float32Array ? result.positions : Array.from(result.positions);
 
   const normals = new Float32Array(positions.length);
-  VertexData.ComputeNormals(positions, indices, normals);
-  weldTerrainNormals(positions, normals);
-  planet.updateVerticesData(VertexBuffer.PositionKind, positions);
+  VertexData.ComputeNormals(displaced, indices, normals);
+  weldTerrainNormals(displaced, normals);
+  planet.updateVerticesData(VertexBuffer.PositionKind, displaced);
   planet.setVerticesData(VertexBuffer.NormalKind, normals);
 };

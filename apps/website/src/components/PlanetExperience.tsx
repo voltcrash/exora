@@ -236,6 +236,7 @@ export const PlanetExperience = ({
     if (!host) return;
 
     let abandoned = false;
+    const generation = new AbortController();
     setSceneState("loading");
     setViewMode(subsystemActive ? "subsystem" : "orbit");
 
@@ -258,6 +259,7 @@ export const PlanetExperience = ({
       : import("../planet-scene.ts").then(({ createPlanetWorld }) =>
           host.mountWorld(() =>
             createPlanetWorld(host, {
+              signal: generation.signal,
               planet,
               recipe,
               onViewModeChange: setViewMode,
@@ -276,6 +278,7 @@ export const PlanetExperience = ({
 
     return () => {
       abandoned = true;
+      generation.abort();
     };
   }, [
     custom,

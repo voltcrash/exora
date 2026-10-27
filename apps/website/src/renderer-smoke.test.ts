@@ -12,6 +12,7 @@ import { Scene, ScenePerformancePriority } from "@babylonjs/core/scene.js";
 import type { ExoplanetProfile, StarProfile } from "@exora/contracts";
 import { deriveWorldRecipe } from "@exora/worldgen";
 import { afterEach, beforeEach, expect, test, vi } from "vite-plus/test";
+import { executeTerrainJob, type TerrainRequest, type TerrainResult } from "./terrain-jobs.ts";
 import { createPlanetWorld } from "./planet-scene.ts";
 import type { RenderQualityProfile } from "./render-quality.ts";
 import type { SceneHost } from "./scene-host.ts";
@@ -305,7 +306,7 @@ test.each(planets)(
     const firstFrame = vi.fn();
     const scope = openWorldScope(scene);
     const recipe = deriveWorldRecipe(planet);
-    const world = createPlanetWorld(host, {
+    const world = await createPlanetWorld(host, {
       onFirstFrame: firstFrame,
       onViewModeChange: () => undefined,
       planet,
@@ -327,12 +328,67 @@ test.each(planets)(
   30_000,
 );
 
+test("rocky world terrain jobs start together and both finish before mounting", async () => {
+  const workers: PendingWorker[] = [];
+  class PendingWorker {
+    onmessage?: (event: { data: TerrainResult }) => void;
+    terminate = vi.fn();
+    request!: TerrainRequest;
+    constructor() {
+      workers.push(this);
+    }
+    postMessage(request: TerrainRequest) {
+      this.request = request;
+    }
+  }
+  vi.stubGlobal("Worker", PendingWorker);
+  vi.stubGlobal("window", new EventTarget());
+  const { engine, host, scene } = createHarness();
+  const scope = openWorldScope(scene);
+  const planet = planets[0]!;
+  let mounted = false;
+  const building = createPlanetWorld(host, {
+    onFirstFrame: vi.fn(),
+    onViewModeChange: vi.fn(),
+    planet,
+    recipe: deriveWorldRecipe(planet),
+  }).then((world) => {
+    mounted = true;
+    return world;
+  });
+  try {
+    expect(workers.map(({ request }) => request.kind)).toEqual(["planet", "surface"]);
+    const update = vi.spyOn(scene.getMeshByName("planet")!, "updateVerticesData");
+    const displacement = workers[0]!;
+    const surface = workers[1]!;
+    surface.onmessage!({ data: executeTerrainJob(surface.request) });
+    await Promise.resolve();
+    expect(mounted).toBe(false);
+    const expected = executeTerrainJob(displacement.request);
+    if (expected.kind !== "planet") throw new Error("Expected planet terrain.");
+    displacement.onmessage!({ data: expected });
+    const world = await building;
+    await scope.seal();
+    expect(update).toHaveBeenCalledExactlyOnceWith(
+      "position",
+      expected.positions instanceof Float32Array
+        ? expected.positions
+        : Array.from(expected.positions),
+    );
+    expect(workers.every((worker) => worker.terminate.mock.calls.length === 1)).toBe(true);
+    world.dispose();
+  } finally {
+    scope.dispose();
+    engine.dispose();
+  }
+});
+
 test("a displaced rocky world keeps one shared normal per position instead of flat-shading", async () => {
   vi.stubGlobal("window", new EventTarget());
   const { engine, host, scene } = createHarness();
   const scope = openWorldScope(scene);
   const planet = planets[0]!;
-  const world = createPlanetWorld(host, {
+  const world = await createPlanetWorld(host, {
     onFirstFrame: vi.fn(),
     onViewModeChange: () => undefined,
     planet,
@@ -660,7 +716,7 @@ test("a world sends a visitor to the star hanging in its sky", async () => {
   const scope = openWorldScope(scene);
   const planet = planets[0]!;
   const visitStar = vi.fn();
-  const world = createPlanetWorld(host, {
+  const world = await createPlanetWorld(host, {
     onFirstFrame: vi.fn(),
     onSelectHostStar: visitStar,
     onViewModeChange: () => undefined,
@@ -689,7 +745,7 @@ test("a world built with no host star to reach draws nothing that looks clickabl
   const { engine, host, scene } = createHarness();
   const scope = openWorldScope(scene);
   const planet = planets[0]!;
-  const world = createPlanetWorld(host, {
+  const world = await createPlanetWorld(host, {
     onFirstFrame: vi.fn(),
     onViewModeChange: () => undefined,
     planet,
@@ -850,7 +906,7 @@ test("a seven-world diorama costs less than the one world it travels to", async 
   const planetScope = openWorldScope(planetHarness.scene);
   const rocky = planets[0];
   if (!rocky) throw new Error("Expected a rocky fixture.");
-  const planetWorld = createPlanetWorld(planetHarness.host, {
+  const planetWorld = await createPlanetWorld(planetHarness.host, {
     onFirstFrame: () => undefined,
     onViewModeChange: () => undefined,
     planet: rocky,
@@ -903,7 +959,7 @@ test("the surface star holds one place in the sky wherever the viewer walks", as
   const planet = planets[0];
   if (!planet) throw new Error("Expected a rocky fixture.");
   let mode = "orbit";
-  const world = createPlanetWorld(host, {
+  const world = await createPlanetWorld(host, {
     onFirstFrame: () => undefined,
     onViewModeChange: (next) => {
       mode = next;

@@ -13,7 +13,7 @@
     "api/index.js": {
       "includeFiles": "apps/api/dist/vercel.mjs",
       "maxDuration": 30,
-      "regions": ["sin1"]
+      "regions": ["sfo1"]
     }
   },
   "rewrites": [

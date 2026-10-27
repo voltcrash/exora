@@ -1,3 +1,4 @@
-import { app } from "./runtime.ts";
+import { waitUntil } from "@vercel/functions";
+import { createRuntimeApp } from "./runtime.ts";
 
-export default app;
+export default createRuntimeApp({ waitUntil });

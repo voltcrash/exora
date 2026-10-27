@@ -32,7 +32,7 @@ The system diorama is where that discipline is most visible, because a picture o
 - **Persistent immersive session:** The engine, scene, camera, and WebXR session outlive the active destination, so entering and leaving AR does not rebuild the viewing context.
 - **iPhone and Android AR:** The immersive control selects native `immersive-ar` on a phone that supports it and uses Variant Launch's App Clip handoff on iPhone. AR presents the existing Babylon world at tabletop scale over camera passthrough, with hit-tested placement, drag repositioning, and pinch scaling — no GLB or USDZ export path.
 - **Adaptive rendering budget:** Separate desktop and mobile profiles govern shader octaves, sphere tessellation, star count, texture detail, and render scale.
-- **Graceful degradation:** A six-hour planet cache, a twelve-hour star cache, and a bundled local profile keep the experience alive when NASA, SIMBAD, or the API is unreachable.
+- **Graceful degradation:** A six-hour planet catalog snapshot with live-query fallback, a twelve-hour star cache, and a bundled local profile keep the experience alive when NASA, SIMBAD, or the API is unreachable.
 
 ## Keyboard
 
@@ -157,11 +157,11 @@ latest CLI as a one-off command instead of adding it to the workspace:
 pnpm dlx vercel@latest --prod  # Production
 ```
 
-The website builds to static output served from Vercel's edge, and the Hono application is bundled into a single Vercel Function pinned to `sin1`. A rewrite sends every `/api/*` path to that one function, which keeps routing inside Hono rather than splitting it across per-route handlers.
+The website builds to static output served from Vercel's edge, and the Hono application is bundled into a single Vercel Function pinned to `sfo1`. A rewrite sends every `/api/*` path to that one function, which keeps routing inside Hono rather than splitting it across per-route handlers.
 
 The function always loads planets from the live NASA Exoplanet Archive. Stars resolve through SIMBAD, which needs no registration or key; Solar System ephemerides resolve through NASA/JPL services.
 
-The upstream adapters wrap their queries in bounded in-memory caches with request timeouts, including six hours for planets and twelve for stars. Responses also carry `Cache-Control` with `stale-while-revalidate` so Vercel's CDN absorbs repeated reads.
+Planet search, browse pages, and exact-name lookups share a six-hour in-memory snapshot of the full confirmed NASA catalog, loaded in one coalesced TAP request per warm API instance. They retain the same name matching, ranking, pagination, and nullable measurements. A failed snapshot load falls back to the existing cached live queries and retries the full download after a one-minute cooldown. Discovery collections and host-system queries keep their live-query caches. Stars use a twelve-hour cache, and all upstream requests have timeouts. Responses also carry `Cache-Control` with `stale-while-revalidate` so Vercel's CDN absorbs repeated reads.
 
 The in-process caches and request budgets are intentionally per-instance safeguards, not global
 quotas. See [API rate limiting and caching](docs/api-rate-limiting-and-caching.md) for the trust
@@ -185,7 +185,7 @@ flowchart TB
 
     subgraph Vercel["Vercel"]
         Static["Static site<br/>apps/website/dist"]
-        Fn["API Function<br/>Hono, sin1, /api/*"]
+        Fn["API Function<br/>Hono, sfo1, /api/*"]
     end
 
     subgraph Archives["Archives"]
