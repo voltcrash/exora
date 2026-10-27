@@ -2,9 +2,10 @@
  * EXORA OFFLINE
  *
  * The app shell and everything with a content hash are kept after the first visit, so Exora opens
- * without a network. Textures, transcoders and the sky catalogue are served from cache and
- * refreshed behind the scenes. Archive answers are always asked for fresh, and only when the
- * network fails is the last good answer used — the panels already say when data is cached.
+ * without a network; that includes the planet catalogue snapshot, so search and browse work too.
+ * Textures, transcoders and the sky catalogue are served from cache and refreshed behind the
+ * scenes. Archive answers are always asked for fresh, and only when the network fails is the last
+ * good answer used — the panels already say when data is cached.
  */
 
 const VERSION = "v1";
@@ -16,6 +17,8 @@ const CACHES = [SHELL_CACHE, ASSET_CACHE, MEDIA_CACHE, ARCHIVE_CACHE];
 const MEDIA_LIMIT = 160;
 const ARCHIVE_LIMIT = 240;
 const SHELL = ["/", "/manifest.webmanifest", "/exora-orbit.svg", "/icon-192.png"];
+// Each refresh of the planet catalogue gets a new hash; only the newest is worth its megabytes.
+const PLANET_CATALOG = /\/assets\/pscomppars-[^/]+\.json$/;
 
 /** Which strategy a same-origin GET takes, or null to leave it to the network untouched. */
 const routeFor = (pathname, mode) => {
@@ -41,6 +44,15 @@ const store = async (cacheName, request, response, limit) => {
   const cache = await caches.open(cacheName);
   await cache.put(request, response);
   if (limit) await trim(cacheName, limit);
+  const url = typeof request === "string" ? request : request.url;
+  if (PLANET_CATALOG.test(url)) {
+    const keys = await cache.keys();
+    await Promise.all(
+      keys
+        .filter((key) => key.url !== url && PLANET_CATALOG.test(key.url))
+        .map((key) => cache.delete(key)),
+    );
+  }
 };
 
 const networkFirst = async (event, cacheName, fallbackUrl, limit) => {

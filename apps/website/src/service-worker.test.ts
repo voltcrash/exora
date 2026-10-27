@@ -42,7 +42,7 @@ const createWorker = async (network: (request: Request) => Promise<Response>) =>
           for (const url of urls) store.set(keyOf(url), new Response(`shell ${url}`));
         },
         delete: async (request: Request | string) => store.delete(keyOf(request)),
-        keys: async () => [...store.keys()],
+        keys: async () => [...store.keys()].map((url) => new Request(url)),
         put: async (request: Request | string, response: Response) => {
           store.set(keyOf(request), response);
         },
@@ -85,6 +85,7 @@ test("requests are routed by what they are", async () => {
   expect(route("/?planet=Earth", "navigate")).toBe("shell");
   expect(route("/assets/index-abc123.js", "no-cors")).toBe("immutable");
   expect(route("/assets/terrain.worker-abc123.js", "same-origin")).toBe("immutable");
+  expect(route("/assets/pscomppars-abc123.json", "cors")).toBe("immutable");
   expect(route("/api/planets/TRAPPIST-1%20e", "cors")).toBe("archive");
   expect(route("/sky/hyg-v44-vmag65.bin", "cors")).toBe("media");
   expect(route("/textures/solar-system/earth.ktx2", "cors")).toBe("media");
@@ -154,6 +155,27 @@ test("a hashed terrain worker chunk is reused offline without another network re
   expect(await (await worker.dispatch("fetch", request()))?.text()).toBe("worker source");
   expect(await (await worker.dispatch("fetch", request()))?.text()).toBe("worker source");
   expect(calls).toBe(1);
+});
+
+test("the planet catalogue snapshot is kept offline and only its newest version is retained", async () => {
+  let online = true;
+  const worker = await createWorker(async (request) => {
+    if (!online) throw new TypeError("offline");
+    return Response.json({ url: request.url });
+  });
+  const snapshot = (hash: string) =>
+    new Request(`https://exora.test/assets/pscomppars-${hash}.json`);
+  await worker.dispatch("fetch", snapshot("old111"));
+  await worker.dispatch("fetch", new Request("https://exora.test/assets/index-abc123.js"));
+  await worker.dispatch("fetch", snapshot("new222"));
+  expect([...worker.stores.get("exora-assets-v1")!.keys()]).toEqual([
+    "https://exora.test/assets/index-abc123.js",
+    "https://exora.test/assets/pscomppars-new222.json",
+  ]);
+  online = false;
+  expect(await (await worker.dispatch("fetch", snapshot("new222")))?.json()).toEqual({
+    url: "https://exora.test/assets/pscomppars-new222.json",
+  });
 });
 
 test.each([
