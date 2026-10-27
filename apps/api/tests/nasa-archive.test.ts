@@ -200,10 +200,10 @@ test("caches identical TAP queries", async () => {
   let requests = 0;
   const repository = new NasaPlanetRepository({
     now: () => Date.parse("2026-08-13T00:00:00Z"),
-    fetcher: async () => {
+    fetcher: liveQueriesOnly(async () => {
       requests += 1;
       return Response.json([nasaRow]);
-    },
+    }),
   });
 
   const first = await repository.findByName("HIP 65426 b");
@@ -222,10 +222,10 @@ test("coalesces identical TAP queries while the first request is unresolved", as
     release = resolve;
   });
   const repository = new NasaPlanetRepository({
-    fetcher: () => {
+    fetcher: liveQueriesOnly(() => {
       requests += 1;
       return response;
-    },
+    }),
   });
 
   const first = repository.findByName("HIP 65426 b");
@@ -396,10 +396,11 @@ test("exact-name lookups share a complete snapshot and missing names remain null
       return Response.json([nasaRow, { ...nasaRow, pl_name: "Kepler-18 b" }]);
     },
   });
+  await repository.findByName(nasaRow.pl_name);
   expect((await repository.findByName("kepler-18 B")).value?.name).toBe("Kepler-18 b");
   expect(await repository.findByName("unknown")).toEqual({ cached: true, value: null });
   expect((await repository.findByName("HIP 65426 b")).cached).toBe(true);
-  expect(queries).toHaveLength(1);
+  expect(queries).toHaveLength(2);
   expect(queries[0]).toMatch(/^select pl_name,hostname,/);
   expect(queries[0]).toContain("from pscomppars order by pl_name");
   expect(queries[0]).not.toContain("where");
@@ -422,6 +423,7 @@ test("snapshot searches match separated name parts and retain exact-name ranking
       return Response.json(names.map((pl_name) => ({ ...nasaRow, pl_name })));
     },
   });
+  await repository.findByName(nasaRow.pl_name);
   for (const query of ["kepler 18", "Kepler18", "kepler-18"]) {
     const result = await repository.search(query, 24);
     expect(result.value.map(({ name }) => name)).toEqual([
@@ -436,7 +438,7 @@ test("snapshot searches match separated name parts and retain exact-name ranking
   expect((await repository.search("o'neil_%", 12)).value[0]?.name).toBe("O'Neil-1 b");
   expect((await repository.search("Kepler18", 2)).value).toHaveLength(2);
   expect(await repository.search("unknown", 12)).toEqual({ cached: true, value: [] });
-  expect(requests).toBe(1);
+  expect(requests).toBe(2);
 });
 
 test("failed snapshot searches retain the two live queries and their cache", async () => {
@@ -475,8 +477,9 @@ test("snapshot browsing preserves bounds, null filters, order and keyset cursors
       ]);
     },
   });
+  await repository.findByName(nasaRow.pl_name);
   const first = await repository.browse(500);
-  expect(first.cached).toBe(false);
+  expect(first.cached).toBe(true);
   expect(first.value.map(({ name }) => name)).toEqual(
     rows.slice(0, 120).map(({ pl_name }) => pl_name),
   );
@@ -493,34 +496,50 @@ test("snapshot browsing preserves bounds, null filters, order and keyset cursors
     radiusJupiter: null,
   });
   expect((await repository.search("World119", 12)).value[0]?.name).toBe("World 119 b");
-  expect(requests).toBe(1);
+  expect(requests).toBe(2);
 });
 
-test("concurrent search, browse and lookup coalesce into one full catalog request", async () => {
-  let requests = 0;
+test("cold search, browse and lookup answer live while sharing one background catalog load", async () => {
+  let snapshots = 0;
+  let live = 0;
   let release!: (response: Response) => void;
   const response = new Promise<Response>((resolve) => {
     release = resolve;
   });
   const repository = new NasaPlanetRepository({
-    fetcher: async () => {
-      requests += 1;
-      return response;
+    fetcher: async (input) => {
+      const query = new URL(input instanceof Request ? input.url : input).searchParams.get(
+        "query",
+      )!;
+      if (!query.startsWith("select top ")) {
+        snapshots += 1;
+        return response;
+      }
+      live += 1;
+      return Response.json([nasaRow]);
     },
   });
-  const search = repository.search("HIP65426", 12);
-  const browse = repository.browse(12);
-  const named = repository.findByName("HIP 65426 b");
-  await Promise.resolve();
-  expect(requests).toBe(1);
-  release(Response.json([nasaRow]));
-  const results = await Promise.all([search, browse, named]);
+  const results = await Promise.all([
+    repository.search("HIP65426", 12),
+    repository.browse(12),
+    repository.findByName(nasaRow.pl_name),
+  ]);
   expect(results.every(({ cached }) => !cached)).toBe(true);
   expect(results[0].value[0]?.name).toBe(nasaRow.pl_name);
   expect(results[1].value[0]?.name).toBe(nasaRow.pl_name);
   expect(results[2].value?.name).toBe(nasaRow.pl_name);
-  expect((await repository.search("65426b", 12)).cached).toBe(true);
-  expect(requests).toBe(1);
+  expect(snapshots).toBe(1);
+  expect(live).toBe(4);
+  release(Response.json([nasaRow, { ...nasaRow, pl_name: "Kepler-18 b" }]));
+  await new Promise((resolve) => setTimeout(resolve, 0));
+  expect(await repository.findByName("Kepler-18 b")).toMatchObject({
+    cached: true,
+    value: { name: "Kepler-18 b" },
+  });
+  expect((await repository.search("Kepler18", 12)).value[0]?.name).toBe("Kepler-18 b");
+  expect((await repository.browse(12)).value).toHaveLength(2);
+  expect(snapshots).toBe(1);
+  expect(live).toBe(4);
 });
 
 test.each(["http", "json", "schema", "network", "timeout"])(
@@ -555,9 +574,68 @@ test.each(["http", "json", "schema", "network", "timeout"])(
     expect(live).toBe(4);
     expect((await repository.findByName(nasaRow.pl_name)).cached).toBe(true);
     now = 60_000;
-    expect((await repository.findByName(nasaRow.pl_name)).cached).toBe(false);
-    expect((await repository.search("HIP", 12)).cached).toBe(true);
+    expect((await repository.findByName(nasaRow.pl_name)).cached).toBe(true);
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    expect((await repository.search("65426b", 12)).cached).toBe(true);
     expect(snapshots).toBe(2);
     expect(live).toBe(4);
+  },
+);
+
+test.each(["findByName", "search", "browse"] as const)(
+  "%s serves stale data during refresh and after a failed refresh",
+  async (method) => {
+    let now = 0;
+    let snapshots = 0;
+    let live = 0;
+    let release!: (response: Response) => void;
+    const repository = new NasaPlanetRepository({
+      cacheTtlMs: 100,
+      now: () => now,
+      fetcher: async (input) => {
+        const query = new URL(input instanceof Request ? input.url : input).searchParams.get(
+          "query",
+        )!;
+        if (query.startsWith("select top ")) {
+          live += 1;
+          return Response.json([nasaRow]);
+        }
+        snapshots += 1;
+        if (snapshots === 1) return Response.json([nasaRow]);
+        return new Promise<Response>((resolve) => {
+          release = resolve;
+        });
+      },
+    });
+    const read = () =>
+      method === "findByName"
+        ? repository.findByName(nasaRow.pl_name)
+        : method === "search"
+          ? repository.search("HIP", 12)
+          : repository.browse(12);
+    await read();
+    const stale = await read();
+    expect(stale.cached).toBe(true);
+    const initialLive = live;
+    now = 100;
+    expect(await read()).toEqual(stale);
+    expect(await read()).toEqual(stale);
+    expect(snapshots).toBe(2);
+    expect(live).toBe(initialLive);
+    release(new Response(null, { status: 503 }));
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    now = 60_099;
+    expect(await read()).toEqual(stale);
+    expect(snapshots).toBe(2);
+    now = 60_100;
+    expect(await read()).toEqual(stale);
+    expect(snapshots).toBe(3);
+    release(Response.json([{ ...nasaRow, pl_eqt: 1234 }]));
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    const refreshed = await read();
+    expect(refreshed.cached).toBe(true);
+    const planet = Array.isArray(refreshed.value) ? refreshed.value[0] : refreshed.value;
+    expect(planet?.observation.equilibriumTemperatureKelvin).toBe(1234);
+    expect(live).toBe(initialLive);
   },
 );

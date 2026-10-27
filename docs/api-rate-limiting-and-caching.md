@@ -60,11 +60,14 @@ concerns.
 ## Planet catalog snapshot
 
 Search, browse, and exact-name lookup share one full `pscomppars` download containing the existing
-profile columns. The loader reuses `archive-cache.ts` for a single-entry, six-hour snapshot cache
-and one coalesced in-flight load per instance. Concurrent readers with different queries therefore
-cause one TAP request, and subsequent keystrokes, pages, and names are answered in memory. A cold
-or different instance loads its own snapshot. Refresh happens on demand after expiry; no cron,
-external store, credentials, or production service configuration is required.
+profile columns. The loader keeps one six-hour snapshot and uses `archive-cache.ts` to coalesce
+background loads per instance. On a cold instance, readers start one background catalog download
+and immediately use their existing small live TAP queries. Once loaded, subsequent keystrokes,
+pages, and names are answered in memory. After expiry, readers keep using the stale snapshot while
+one background refresh runs. A cold or different instance loads its own snapshot; no cron,
+external store, credentials, or production service configuration is required. The current Vercel
+entry point has no execution context and the API has no `@vercel/functions` dependency, so these
+background loads are best effort on the warm instance, without a function-lifetime guarantee.
 
 The same row validation and normalization apply to snapshots and live queries. Fields NASA did not
 report remain `null`. Search uses the same ordered name tokens and exact-name ranking as the live
@@ -72,15 +75,16 @@ path; browse retains its distance/temperature/radius filters, lexical name order
 and last-name keyset cursor. `meta.cached` reports reuse of the adapter's snapshot or query cache;
 it does not imply a global or durable cache. HTTP response schemas and CDN policies are unchanged.
 
-If a snapshot load fails, each reader falls back to its previous live TAP query. The loader waits
-60 seconds before retrying the full download, so every keystroke does not repeat a failing large
-request. Live-query misses still coalesce and use the bounded query cache. Discovery collections
+If a cold snapshot load fails, readers continue using live TAP queries. If a refresh fails, the
+previous snapshot remains available. Background failures are caught, and the loader waits 60 seconds
+before retrying the full download, so every keystroke does not repeat a failing large request. Live-query misses still coalesce and use the bounded query cache. Discovery collections
 and host-system queries retain their live-query caches, while the atlas's compact population
 endpoint retains its separate twelve-hour cache. General and route request budgets in `app.ts`
 continue to apply to every API request, including reads answered from a snapshot.
 
-One live smoke test from the aarch64 development container completed concurrent search, browse,
-and exact-name lookup in 3,869 ms using one successful TAP request. A different search then took
+Before background loading, one live smoke test from the aarch64 development container blocked
+concurrent search, browse, and exact-name lookup for 3,869 ms on the full TAP download. Cold reads
+now use live queries while that download runs in the background. A different search then took
 1.60 ms from the same snapshot without another upstream request. These are single local samples,
 not measurements of Vercel deployment latency or service-level guarantees.
 

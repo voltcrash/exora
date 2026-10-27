@@ -351,7 +351,7 @@ export class NasaPlanetRepository implements PlanetRepository {
   async browse(limit: number, cursor?: string): Promise<RepositoryPage<ExoplanetProfile[]>> {
     const safeLimit = Math.max(12, Math.min(Math.trunc(limit), 120));
     const after = cursor?.trim().slice(0, 100);
-    const snapshot = await this.#snapshot();
+    const snapshot = this.#snapshot();
     if (snapshot) {
       const value = browsePlanetCatalog(snapshot.value, safeLimit, after);
       return {
@@ -386,7 +386,7 @@ export class NasaPlanetRepository implements PlanetRepository {
 
   async findByName(name: string): Promise<RepositoryResult<ExoplanetProfile | null>> {
     const normalizedName = name.trim().slice(0, 100);
-    const snapshot = await this.#snapshot();
+    const snapshot = this.#snapshot();
     if (snapshot)
       return { cached: snapshot.cached, value: findCatalogPlanet(snapshot.value, normalizedName) };
     const escapedName = escapeAdqlLiteral(normalizedName);
@@ -409,7 +409,7 @@ export class NasaPlanetRepository implements PlanetRepository {
     const pattern = planetNamePattern(query);
     if (pattern === null) return { cached: true, value: [] };
     const safeLimit = Math.max(1, Math.min(Math.trunc(limit), 24));
-    const snapshot = await this.#snapshot();
+    const snapshot = this.#snapshot();
     if (snapshot)
       return {
         cached: snapshot.cached,
