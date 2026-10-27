@@ -499,7 +499,7 @@ test("snapshot browsing preserves bounds, null filters, order and keyset cursors
   expect(requests).toBe(2);
 });
 
-test("cold search, browse and lookup answer live while sharing one background catalog load", async () => {
+test("cold search and lookup answer live while browse waits for their shared catalog load", async () => {
   let snapshots = 0;
   let live = 0;
   let release!: (response: Response) => void;
@@ -519,19 +519,18 @@ test("cold search, browse and lookup answer live while sharing one background ca
       return Response.json([nasaRow]);
     },
   });
+  const browse = repository.browse(12);
   const results = await Promise.all([
     repository.search("HIP65426", 12),
-    repository.browse(12),
     repository.findByName(nasaRow.pl_name),
   ]);
   expect(results.every(({ cached }) => !cached)).toBe(true);
   expect(results[0].value[0]?.name).toBe(nasaRow.pl_name);
-  expect(results[1].value[0]?.name).toBe(nasaRow.pl_name);
-  expect(results[2].value?.name).toBe(nasaRow.pl_name);
+  expect(results[1].value?.name).toBe(nasaRow.pl_name);
   expect(snapshots).toBe(1);
-  expect(live).toBe(4);
+  expect(live).toBe(3);
   release(Response.json([nasaRow, { ...nasaRow, pl_name: "Kepler-18 b" }]));
-  await new Promise((resolve) => setTimeout(resolve, 0));
+  expect(await browse).toMatchObject({ cached: true, value: [{}, {}] });
   expect(await repository.findByName("Kepler-18 b")).toMatchObject({
     cached: true,
     value: { name: "Kepler-18 b" },
@@ -539,7 +538,40 @@ test("cold search, browse and lookup answer live while sharing one background ca
   expect((await repository.search("Kepler18", 12)).value[0]?.name).toBe("Kepler-18 b");
   expect((await repository.browse(12)).value).toHaveLength(2);
   expect(snapshots).toBe(1);
-  expect(live).toBe(4);
+  expect(live).toBe(3);
+});
+
+test("a cold browse and its warm cursor page are contiguous in global catalog order", async () => {
+  const rows = Array.from({ length: 20 }, (_, index) => ({
+    ...nasaRow,
+    pl_name: `World ${String(index).padStart(3, "0")} b`,
+  }));
+  const queries: string[] = [];
+  let release!: (response: Response) => void;
+  const pending = new Promise<Response>((resolve) => {
+    release = resolve;
+  });
+  const repository = new NasaPlanetRepository({
+    fetcher: async (input) => {
+      const query = new URL(input instanceof Request ? input.url : input).searchParams.get(
+        "query",
+      )!;
+      queries.push(query);
+      // Model TAP choosing TOP rows before sorting them.
+      return query.startsWith("select top ") ? Response.json(rows.slice(8)) : pending;
+    },
+  });
+  const cold = repository.browse(12);
+  release(Response.json(rows.toReversed()));
+  const first = await cold;
+  expect(first.nextCursor).toBe("World 011 b");
+  const second = await repository.browse(12, first.nextCursor!);
+  expect([...first.value, ...second.value].map(({ name }) => name)).toEqual(
+    rows.map(({ pl_name }) => pl_name),
+  );
+  expect(second.nextCursor).toBeNull();
+  expect(queries).toHaveLength(1);
+  expect(queries[0]).not.toContain("select top ");
 });
 
 test.each(["http", "json", "schema", "network", "timeout"])(

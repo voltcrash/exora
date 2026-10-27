@@ -49,6 +49,34 @@ test("failed cold loads have a cooldown before background recovery", async () =>
   expect(load).toHaveBeenCalledTimes(2);
 });
 
+test("ready joins a cold load and respects the failure cooldown before starting another", async () => {
+  let now = 0;
+  let release!: (value: ExoplanetProfile[]) => void;
+  const load = vi
+    .fn<() => Promise<ExoplanetProfile[]>>()
+    .mockRejectedValueOnce(new Error("offline"))
+    .mockImplementation(
+      () =>
+        new Promise((resolve) => {
+          release = resolve;
+        }),
+    );
+  const snapshot = createPlanetCatalogSnapshot(load, { cacheTtlMs: 100, now: () => now });
+  expect(await snapshot.ready()).toBeNull();
+  now = 59_999;
+  expect(await snapshot.ready()).toBeNull();
+  expect(load).toHaveBeenCalledOnce();
+  now = 60_000;
+  expect(snapshot()).toBeNull();
+  const first = snapshot.ready();
+  const second = snapshot.ready();
+  await Promise.resolve();
+  expect(load).toHaveBeenCalledTimes(2);
+  release([]);
+  expect(await first).toEqual({ cached: true, value: [] });
+  expect(await second).toEqual(await first);
+});
+
 test("a failed refresh retains the stale snapshot through backoff and recovery", async () => {
   let now = 0;
   const first: ExoplanetProfile[] = [];

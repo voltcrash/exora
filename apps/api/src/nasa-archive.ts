@@ -351,7 +351,7 @@ export class NasaPlanetRepository implements PlanetRepository {
   async browse(limit: number, cursor?: string): Promise<RepositoryPage<ExoplanetProfile[]>> {
     const safeLimit = Math.max(12, Math.min(Math.trunc(limit), 120));
     const after = cursor?.trim().slice(0, 100);
-    const snapshot = this.#snapshot();
+    const snapshot = await this.#snapshot.ready();
     if (snapshot) {
       const value = browsePlanetCatalog(snapshot.value, safeLimit, after);
       return {

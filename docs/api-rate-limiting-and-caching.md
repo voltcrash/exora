@@ -61,8 +61,11 @@ concerns.
 
 Search, browse, and exact-name lookup share one full `pscomppars` download containing the existing
 profile columns. The loader keeps one six-hour snapshot and uses `archive-cache.ts` to coalesce
-background loads per instance. On a cold instance, readers start one background catalog download
-and immediately use their existing small live TAP queries. Once loaded, subsequent keystrokes,
+background loads per instance. On a cold instance, search and exact-name readers start one background
+catalog download and immediately use their existing small live TAP queries. Browse waits for that
+coalesced download so its first page and subsequent cursor pages use the same globally sorted catalog;
+NASA TAP applies `TOP` before `ORDER BY`, making the live subset unsuitable for consistent paging.
+Once loaded, subsequent keystrokes,
 pages, and names are answered in memory. After expiry, readers keep using the stale snapshot while
 one background refresh runs. A cold or different instance loads its own snapshot; no cron,
 external store, credentials, or production service configuration is required. The current Vercel
@@ -84,7 +87,8 @@ continue to apply to every API request, including reads answered from a snapshot
 
 Before background loading, one live smoke test from the aarch64 development container blocked
 concurrent search, browse, and exact-name lookup for 3,869 ms on the full TAP download. Cold reads
-now use live queries while that download runs in the background. A different search then took
+for search and exact-name lookup now use live queries while that download runs in the background;
+browse waits for the catalog. A different search then took
 1.60 ms from the same snapshot without another upstream request. These are single local samples,
 not measurements of Vercel deployment latency or service-level guarantees.
 

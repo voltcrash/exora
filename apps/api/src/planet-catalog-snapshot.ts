@@ -9,16 +9,16 @@ export const createPlanetCatalogSnapshot = (
     now,
     retryMs = 60_000,
   }: { cacheTtlMs: number; now: () => number; retryMs?: number },
-): (() => RepositoryResult<ExoplanetProfile[]> | null) => {
+) => {
   const requests = createRequestCoalescer<void>();
   let value: ExoplanetProfile[] | undefined;
   let expiresAt = Number.NEGATIVE_INFINITY;
   let retryAt = Number.NEGATIVE_INFINITY;
 
-  return () => {
+  const refresh = () => {
     const requestTime = now();
     if (requestTime >= expiresAt && requestTime >= retryAt) {
-      void requests.run("catalog", async () => {
+      return requests.run("catalog", async () => {
         try {
           value = await load();
           expiresAt = now() + cacheTtlMs;
@@ -28,6 +28,22 @@ export const createPlanetCatalogSnapshot = (
         }
       });
     }
-    return value ? { cached: true, value } : null;
   };
+
+  const read = (): RepositoryResult<ExoplanetProfile[]> | null =>
+    value ? { cached: true, value } : null;
+
+  return Object.assign(
+    () => {
+      void refresh();
+      return read();
+    },
+    {
+      async ready() {
+        const pending = refresh();
+        if (!value) await pending;
+        return read();
+      },
+    },
+  );
 };
