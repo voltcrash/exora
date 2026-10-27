@@ -9,6 +9,7 @@ interface HeaderRule {
 }
 
 interface VercelConfig {
+  functions: Record<string, { regions: string[] }>;
   headers: HeaderRule[];
 }
 
@@ -65,4 +66,11 @@ test("the service worker is always revalidated so an update reaches every visito
     key: "Cache-Control",
     value: "public, max-age=0, must-revalidate",
   });
+});
+
+test("the API runs near its Pasadena archive upstreams", async () => {
+  const config = JSON.parse(
+    await readFile(new URL("../../../vercel.json", import.meta.url), "utf8"),
+  ) as VercelConfig;
+  expect(config.functions["api/index.js"]?.regions).toEqual(["sfo1"]);
 });

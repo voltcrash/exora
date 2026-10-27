@@ -157,7 +157,7 @@ latest CLI as a one-off command instead of adding it to the workspace:
 pnpm dlx vercel@latest --prod  # Production
 ```
 
-The website builds to static output served from Vercel's edge, and the Hono application is bundled into a single Vercel Function pinned to `sin1`. A rewrite sends every `/api/*` path to that one function, which keeps routing inside Hono rather than splitting it across per-route handlers.
+The website builds to static output served from Vercel's edge, and the Hono application is bundled into a single Vercel Function pinned to `sfo1`. A rewrite sends every `/api/*` path to that one function, which keeps routing inside Hono rather than splitting it across per-route handlers.
 
 The function always loads planets from the live NASA Exoplanet Archive. Stars resolve through SIMBAD, which needs no registration or key; Solar System ephemerides resolve through NASA/JPL services.
 
@@ -185,7 +185,7 @@ flowchart TB
 
     subgraph Vercel["Vercel"]
         Static["Static site<br/>apps/website/dist"]
-        Fn["API Function<br/>Hono, sin1, /api/*"]
+        Fn["API Function<br/>Hono, sfo1, /api/*"]
     end
 
     subgraph Archives["Archives"]
