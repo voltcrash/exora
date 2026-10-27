@@ -1,3 +1,5 @@
+import { compareCatalogNames, findCatalogPlanet } from "./planet-catalog.ts";
+import { createPlanetCatalogSnapshot } from "./planet-catalog-snapshot.ts";
 import {
   escapeAdqlLiteral,
   planetNamePattern,
@@ -59,6 +61,8 @@ const NASA_COLUMNS = [
   "pl_orbpererr1",
   "pl_orbpererr2",
 ].join(",");
+
+const CATALOG_QUERY = `select ${NASA_COLUMNS} from pscomppars order by pl_name`;
 
 export {
   PLANET_DISCOVERY_CATEGORIES,
@@ -326,12 +330,17 @@ export class NasaPlanetRepository implements PlanetRepository {
   readonly #now: () => number;
   readonly #requests = createRequestCoalescer<RepositoryResult<ExoplanetProfile[]>>();
   readonly #timeoutMs: number;
+  readonly #snapshot: ReturnType<typeof createPlanetCatalogSnapshot>;
 
   constructor(options: NasaPlanetRepositoryOptions = {}) {
     this.#cacheTtlMs = options.cacheTtlMs ?? 1000 * 60 * 60 * 6;
     this.#fetcher = options.fetcher ?? fetch;
     this.#now = options.now ?? Date.now;
     this.#timeoutMs = options.timeoutMs ?? 10_000;
+    this.#snapshot = createPlanetCatalogSnapshot(
+      async () => (await this.#load(CATALOG_QUERY)).sort(compareCatalogNames),
+      { cacheTtlMs: this.#cacheTtlMs, now: this.#now },
+    );
   }
 
   async browse(limit: number, cursor?: string): Promise<RepositoryPage<ExoplanetProfile[]>> {
@@ -363,6 +372,9 @@ export class NasaPlanetRepository implements PlanetRepository {
 
   async findByName(name: string): Promise<RepositoryResult<ExoplanetProfile | null>> {
     const normalizedName = name.trim().slice(0, 100);
+    const snapshot = await this.#snapshot();
+    if (snapshot)
+      return { cached: snapshot.cached, value: findCatalogPlanet(snapshot.value, normalizedName) };
     const escapedName = escapeAdqlLiteral(normalizedName);
     const adql = `select top 1 ${NASA_COLUMNS} from pscomppars where lower(pl_name)=lower('${escapedName}')`;
     const result = await this.#query(adql);

@@ -3,11 +3,22 @@ import { DEFAULT_MAX_ENTRIES } from "../src/archive-cache.ts";
 import {
   NasaArchiveError,
   NasaPlanetRepository,
+  type NasaPlanetRepositoryOptions,
   normalizeNasaPlanet,
   planetNamePattern,
   planetNamePrefixes,
   rankPlanetMatches,
 } from "../src/nasa-archive.ts";
+
+type Fetcher = NonNullable<NasaPlanetRepositoryOptions["fetcher"]>;
+const liveQueriesOnly =
+  (fetcher: Fetcher): Fetcher =>
+  async (input, init) => {
+    const url = new URL(input instanceof Request ? input.url : input);
+    return url.searchParams.get("query")?.startsWith("select top ")
+      ? fetcher(input, init)
+      : new Response(null, { status: 503 });
+  };
 
 const nasaRow = {
   pl_name: "HIP 65426 b",
@@ -286,12 +297,12 @@ test("pages the browsing field with a keyset cursor", async () => {
 test("resolves a planet by name whatever casing the caller used", async () => {
   const requestedQueries: string[] = [];
   const repository = new NasaPlanetRepository({
-    fetcher: async (input) => {
+    fetcher: liveQueriesOnly(async (input) => {
       const href =
         typeof input === "string" ? input : input instanceof URL ? input.href : input.url;
       requestedQueries.push(new URL(href).searchParams.get("query") ?? "");
       return Response.json([nasaRow]);
-    },
+    }),
   });
 
   const exact = await repository.findByName("HIP 65426 b");
@@ -308,10 +319,10 @@ test("the query cache is bounded, so arbitrary searches cannot grow it without l
   let requests = 0;
   const repository = new NasaPlanetRepository({
     now: () => 0,
-    fetcher: async () => {
+    fetcher: liveQueriesOnly(async () => {
       requests += 1;
       return Response.json([nasaRow]);
-    },
+    }),
   });
 
   await repository.findByName("first");
@@ -373,4 +384,23 @@ test("the planet a reader means outranks longer names that merely contain it", (
   ).map(({ name }) => name);
 
   expect(ranked).toEqual(["Kepler-18 b", "Kepler-18 c", "Kepler-187 b", "Kepler-1018 b"]);
+});
+
+test("exact-name lookups share a complete snapshot and missing names remain null", async () => {
+  const queries: string[] = [];
+  const repository = new NasaPlanetRepository({
+    fetcher: async (input) => {
+      queries.push(
+        new URL(input instanceof Request ? input.url : input).searchParams.get("query")!,
+      );
+      return Response.json([nasaRow, { ...nasaRow, pl_name: "Kepler-18 b" }]);
+    },
+  });
+  expect((await repository.findByName("kepler-18 B")).value?.name).toBe("Kepler-18 b");
+  expect(await repository.findByName("unknown")).toEqual({ cached: true, value: null });
+  expect((await repository.findByName("HIP 65426 b")).cached).toBe(true);
+  expect(queries).toHaveLength(1);
+  expect(queries[0]).toMatch(/^select pl_name,hostname,/);
+  expect(queries[0]).toContain("from pscomppars order by pl_name");
+  expect(queries[0]).not.toContain("where");
 });
