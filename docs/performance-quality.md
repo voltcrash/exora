@@ -1,15 +1,26 @@
 # Performance quality gates
 
-## React runtime
+## Startup code
 
-The website uses [TanStack Redact](https://tanstack.com/redact/latest) through its Vite plugin.
-Keep the React packages, types, imports, and React Vite plugin: Redact redirects runtime imports
-for development, production builds, and the website's unit and browser test projects.
+The website uses React 19 and React DOM through the standard React Vite plugin in development,
+production builds, and the unit and browser test projects.
 
-The default `redact()` preset preserves context, Suspense, lazy views, memoization, and class
-error boundaries. Do not switch to `nano` without explicitly enabling the features the app uses.
-Redact renders synchronously; `useDeferredValue` still retains stale results, but rendering cannot
-be interrupted. Check Forge controls and catalog filters on mobile when updating the runtime.
+Code that does not contribute to the initial destination is loaded on demand. Vercel Analytics
+and Speed Insights mount after a paint during browser idle time, with a two-second timeout for
+busy browsers and a timed fallback when the idle callback API is unavailable. An optional telemetry
+chunk failing to load does not prevent the application from rendering.
+
+The planet mass-radius diagram and signal curves load when their Physics or Signal tab opens;
+their Suspense boundaries cover only the charts. Guided-tour data and controls load when a tour
+starts or its URL opens. The scene host, initial scene preload, world mounting, and first-frame
+callbacks do not wait for any of these features. Browser regressions cover telemetry scheduling,
+opening both chart tabs after the world is ready, and restoring, advancing, and leaving a tour.
+
+With React DOM and these deferrals, the October 2026 production build emits 447,506 bytes of initial
+JavaScript across ten files, or 143,242 bytes after gzipping each file and summing the results.
+The largest emitted JavaScript file is 375,542 bytes. Both the 450 kB initial limit and 400 kB
+per-file limit remain unchanged. These are build-output sizes, not total route transfer or
+first-scene timings; the latter also depend on dynamically loaded renderer assets and the device.
 
 ## Lighthouse
 
