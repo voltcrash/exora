@@ -574,6 +574,52 @@ test("a cold browse and its warm cursor page are contiguous in global catalog or
   expect(queries[0]).not.toContain("select top ");
 });
 
+test("waitUntil receives shared warmup and refresh promises without delaying immediate reads", async () => {
+  let now = 0;
+  let release!: (response: Response) => void;
+  const background: Promise<unknown>[] = [];
+  const repository = new NasaPlanetRepository({
+    cacheTtlMs: 100,
+    now: () => now,
+    waitUntil: (promise) => {
+      background.push(promise);
+    },
+    fetcher: async (input) => {
+      const query = new URL(input instanceof Request ? input.url : input).searchParams.get(
+        "query",
+      )!;
+      return query.startsWith("select top ")
+        ? Response.json([nasaRow])
+        : new Promise<Response>((resolve) => {
+            release = resolve;
+          });
+    },
+  });
+  const cold = await Promise.all([
+    repository.search("HIP", 12),
+    repository.findByName(nasaRow.pl_name),
+  ]);
+  expect(cold.every(({ cached }) => !cached)).toBe(true);
+  expect(background).toHaveLength(2);
+  expect(background[0]).toBeInstanceOf(Promise);
+  expect(background[1]).toBe(background[0]);
+  release(Response.json([nasaRow]));
+  await background[0];
+  const warm = await repository.browse(12);
+  expect(warm.cached).toBe(true);
+  expect(background).toHaveLength(2);
+  now = 100;
+  expect(await repository.browse(12)).toEqual(warm);
+  expect((await repository.findByName(nasaRow.pl_name)).cached).toBe(true);
+  expect(background).toHaveLength(4);
+  expect(background[2]).not.toBe(background[0]);
+  expect(background[3]).toBe(background[2]);
+  release(new Response(null, { status: 503 }));
+  await expect(background[2]).resolves.toBeUndefined();
+  expect(await repository.browse(12)).toEqual(warm);
+  expect(background).toHaveLength(4);
+});
+
 test.each(["http", "json", "schema", "network", "timeout"])(
   "a %s snapshot failure falls back for every reader and recovers after cooldown",
   async (failure) => {

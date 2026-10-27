@@ -68,9 +68,11 @@ NASA TAP applies `TOP` before `ORDER BY`, making the live subset unsuitable for 
 Once loaded, subsequent keystrokes,
 pages, and names are answered in memory. After expiry, readers keep using the stale snapshot while
 one background refresh runs. A cold or different instance loads its own snapshot; no cron,
-external store, credentials, or production service configuration is required. The current Vercel
-entry point has no execution context and the API has no `@vercel/functions` dependency, so these
-background loads are best effort on the warm instance, without a function-lifetime guarantee.
+external store, credentials, or production service configuration is required. The Vercel entry
+injects `waitUntil` from `@vercel/functions` and registers each coalesced catalog load, extending the
+request lifetime through background warmup or refresh without delaying immediate reads. Local and
+Node runtimes leave this hook unset. The helper is a production dependency; the deployment check
+imports the built Vercel entry to verify its dependencies resolve.
 
 The same row validation and normalization apply to snapshots and live queries. Fields NASA did not
 report remain `null`. Search uses the same ordered name tokens and exact-name ranking as the live

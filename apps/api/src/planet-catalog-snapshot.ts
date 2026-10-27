@@ -8,7 +8,13 @@ export const createPlanetCatalogSnapshot = (
     cacheTtlMs,
     now,
     retryMs = 60_000,
-  }: { cacheTtlMs: number; now: () => number; retryMs?: number },
+    waitUntil,
+  }: {
+    cacheTtlMs: number;
+    now: () => number;
+    retryMs?: number;
+    waitUntil?: ((promise: Promise<unknown>) => void) | undefined;
+  },
 ) => {
   const requests = createRequestCoalescer<void>();
   let value: ExoplanetProfile[] | undefined;
@@ -18,7 +24,7 @@ export const createPlanetCatalogSnapshot = (
   const refresh = () => {
     const requestTime = now();
     if (requestTime >= expiresAt && requestTime >= retryAt) {
-      return requests.run("catalog", async () => {
+      const pending = requests.run("catalog", async () => {
         try {
           value = await load();
           expiresAt = now() + cacheTtlMs;
@@ -27,6 +33,8 @@ export const createPlanetCatalogSnapshot = (
           retryAt = now() + retryMs;
         }
       });
+      waitUntil?.(pending);
+      return pending;
     }
   };
 

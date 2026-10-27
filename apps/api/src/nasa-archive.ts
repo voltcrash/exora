@@ -176,6 +176,7 @@ export interface NasaPlanetRepositoryOptions {
   fetcher?: Fetcher;
   now?: () => number;
   timeoutMs?: number;
+  waitUntil?: (promise: Promise<unknown>) => void;
 }
 
 export class NasaArchiveError extends UpstreamError {
@@ -344,7 +345,7 @@ export class NasaPlanetRepository implements PlanetRepository {
     this.#timeoutMs = options.timeoutMs ?? 10_000;
     this.#snapshot = createPlanetCatalogSnapshot(
       async () => (await this.#load(CATALOG_QUERY)).sort(compareCatalogNames),
-      { cacheTtlMs: this.#cacheTtlMs, now: this.#now },
+      { cacheTtlMs: this.#cacheTtlMs, now: this.#now, waitUntil: options.waitUntil },
     );
   }
 
