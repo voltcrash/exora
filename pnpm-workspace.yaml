@@ -27,12 +27,10 @@ catalog:
   vite-plus: 1.4.0
   zod: ^4.6.7
   vitest: 5.0.5
-  "@vercel/functions": ^3.10.3
 overrides:
-  # Advisory patches for transitive dependencies still used by Vite+, Lighthouse and @vercel/functions.
+  # Advisory patches for transitive development tooling still used by Vite+ and Lighthouse.
   # Drop an entry once its dependents ship the fixed version on their own.
   esbuild@0.27: ^0.28.2
-  zod@4.1: ^4.6.7
   tmp: ^0.2.7
   vite@*: "catalog:"
   vitest@*: "catalog:"
