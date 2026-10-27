@@ -39,6 +39,11 @@ const hash2 = (xi: number, zi: number, seed: number): number => {
 
 const fade = (t: number): number => t * t * t * (t * (t * 6 - 15) + 10);
 
+const gradients = Array.from({ length: 8 }, (_, index) => {
+  const angle = index * 0.785_398_163;
+  return { x: Math.cos(angle), z: Math.sin(angle) };
+});
+
 const gradientNoise = (x: number, z: number, seed: number): number => {
   const x0 = Math.floor(x);
   const z0 = Math.floor(z);
@@ -48,8 +53,8 @@ const gradientNoise = (x: number, z: number, seed: number): number => {
   const v = fade(dz);
 
   const dot = (xi: number, zi: number, fx: number, fz: number): number => {
-    const angle = (hash2(xi, zi, seed) & 7) * 0.785_398_163;
-    return Math.cos(angle) * fx + Math.sin(angle) * fz;
+    const gradient = gradients[hash2(xi, zi, seed) & 7]!;
+    return gradient.x * fx + gradient.z * fz;
   };
 
   const n00 = dot(x0, z0, dx, dz);
