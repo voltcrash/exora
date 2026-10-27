@@ -1,17 +1,7 @@
-import type { ExoplanetProfile } from "@exora/contracts";
+import { planetNameTokens } from "@exora/planet-catalog";
 
 export const escapeAdqlLiteral = (value: string): string =>
   value.replaceAll("%", "").replaceAll("_", "").replaceAll("'", "''");
-
-export const planetNameTokens = (query: string): string[] =>
-  query
-    .trim()
-    .toLowerCase()
-    .slice(0, 80)
-    .split(/[^\p{L}\p{N}]+/u)
-    .flatMap((token) => token.split(/(?<=\p{L})(?=\p{N})|(?<=\p{N})(?=\p{L})/u))
-    .map(escapeAdqlLiteral)
-    .filter((token) => token.length > 0);
 
 /**
  * A LIKE pattern that matches a planet name whatever separates its parts, so "kepler 18",
@@ -34,37 +24,4 @@ export const planetNamePrefixes = (query: string): string[] => {
     name,
     `${name} %`,
   ]);
-};
-
-const compactName = (value: string): string =>
-  value.toLowerCase().replaceAll(/[^\p{L}\p{N}]/gu, "");
-
-/**
- * Orders matches the way a reader means them: the exact name, then names the query begins at a
- * word boundary ("kepler 18" → Kepler-18 b before Kepler-187 b), then other prefixes, then the rest.
- */
-export const rankPlanetMatches = (
-  query: string,
-  planets: readonly ExoplanetProfile[],
-): ExoplanetProfile[] => {
-  const needle = compactName(query);
-  const rank = (name: string): number => {
-    const compact = compactName(name);
-    if (compact === needle) return 0;
-    if (compact.startsWith(needle)) {
-      const next = compact.charAt(needle.length);
-      const last = needle.charAt(needle.length - 1);
-      return /\p{N}/u.test(next) && /\p{N}/u.test(last) ? 2 : 1;
-    }
-    return compact.includes(needle) ? 3 : 4;
-  };
-  return planets
-    .map((planet) => ({ planet, rank: rank(planet.name) }))
-    .sort(
-      (left, right) =>
-        left.rank - right.rank ||
-        left.planet.name.length - right.planet.name.length ||
-        left.planet.name.localeCompare(right.planet.name, "en"),
-    )
-    .map(({ planet }) => planet);
 };

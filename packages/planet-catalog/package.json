@@ -1,0 +1,22 @@
+{
+  "name": "@exora/planet-catalog",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "sideEffects": false,
+  "exports": {
+    ".": "./src/index.ts",
+    "./snapshot.json": "./data/pscomppars.json"
+  },
+  "scripts": {
+    "test": "vp test"
+  },
+  "dependencies": {
+    "@exora/contracts": "workspace:*"
+  },
+  "devDependencies": {
+    "typescript": "catalog:",
+    "vite": "catalog:",
+    "vite-plus": "catalog:"
+  }
+}

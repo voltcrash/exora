@@ -4,8 +4,9 @@
 
 Exora does not currently need a durable application-level rate-limit store. The API is public,
 read-only, and unauthenticated, so there is no paid-user quota or authorization boundary that must
-be exact. Planet search, browse, and exact-name reads use a per-instance NASA Exoplanet Archive
-snapshot, and cacheable successful GET responses carry shared-CDN freshness and stale-serving policies. The NASA, SIMBAD, and JPL adapters use
+be exact. Planet search, browse, and exact-name reads use a committed NASA Exoplanet Archive
+snapshot bundled into the function, and cacheable successful GET responses carry shared-CDN
+freshness and stale-serving policies. The NASA, SIMBAD, and JPL adapters use
 bounded per-instance caches, coalesce identical misses within an instance, and have tighter
 per-route request budgets where an upstream miss is relatively expensive.
 
@@ -59,40 +60,61 @@ concerns.
 
 ## Planet catalog snapshot
 
-Search, browse, and exact-name lookup share one full `pscomppars` download containing the existing
-profile columns. The loader keeps one six-hour snapshot and uses `archive-cache.ts` to coalesce
-background loads per instance. On a cold instance, search and exact-name readers start one background
-catalog download and immediately use their existing small live TAP queries. Browse waits for that
-coalesced download so its first page and subsequent cursor pages use the same globally sorted catalog;
-NASA TAP applies `TOP` before `ORDER BY`, making the live subset unsuitable for consistent paging.
-Once loaded, subsequent keystrokes,
-pages, and names are answered in memory. After expiry, readers keep using the stale snapshot while
-one background refresh runs. A cold or different instance loads its own snapshot; no cron,
-external store, credentials, or production service configuration is required. The Vercel entry
-injects `waitUntil` from `@vercel/functions` and registers each coalesced catalog load, extending the
-request lifetime through background warmup or refresh without delaying immediate reads. Local and
-Node runtimes leave this hook unset. The helper is a production dependency; the deployment check
-imports the built Vercel entry to verify its dependencies resolve.
+Search, browse, and exact-name lookup read one committed snapshot of the `pscomppars` table,
+`packages/planet-catalog/data/pscomppars.json`. `vp run @exora/api#planet-catalog` regenerates it
+with the API's own TAP columns, row validation, and normalization (`loadNasaPlanets` in
+`nasa-archive.ts`). It sorts planets by name and writes a header of field paths plus one array of
+values per planet, with the generation time and source query. Fields NASA did not report stay
+`null`. If only the timestamp would change, the generator keeps the old file, so an unchanged
+archive produces no diff. It refuses to write a catalog of fewer than 1,000 planets. The
+October 2026 snapshot holds 6,451 planets: 1,766,258 bytes raw, 510,445 gzip, and 408,147 brotli.
 
-The same row validation and normalization apply to snapshots and live queries. Fields NASA did not
-report remain `null`. Search uses the same ordered name tokens and exact-name ranking as the live
-path; browse retains its distance/temperature/radius filters, lexical name ordering, limit bounds,
-and last-name keyset cursor. `meta.cached` reports reuse of the adapter's snapshot or query cache;
-it does not imply a global or durable cache. HTTP response schemas and CDN policies are unchanged.
+The `Refresh planet catalog` workflow regenerates the snapshot every Monday and on demand. It
+validates the snapshot with the `@exora/planet-catalog` tests, then opens or force-updates the
+`chore/refresh-planet-catalog` pull request when the data changed. It needs the repository setting
+"Allow GitHub Actions to create and approve pull requests". Pull requests opened with
+`GITHUB_TOKEN` do not start the Quality workflow, so close and reopen the pull request, or push to
+its branch, before merging. The snapshot ships when the pull request merges and `main` deploys.
 
-If a cold snapshot load fails, readers continue using live TAP queries. If a refresh fails, the
-previous snapshot remains available. Background failures are caught, and the loader waits 60 seconds
-before retrying the full download, so every keystroke does not repeat a failing large request. Live-query misses still coalesce and use the bounded query cache. Discovery collections
-and host-system queries retain their live-query caches, while the atlas's compact population
-endpoint retains its separate twelve-hour cache. General and route request budgets in `app.ts`
-continue to apply to every API request, including reads answered from a snapshot.
+The name matching, ranking, browse filters (distance, temperature, and a radius), lexical name
+order, limit bounds, and last-name keyset cursor live in `@exora/planet-catalog`. The API and the
+website run the same code, so a page fetched from either source continues correctly from the
+other.
 
-Before background loading, one live smoke test from the aarch64 development container blocked
-concurrent search, browse, and exact-name lookup for 3,869 ms on the full TAP download. Cold reads
-for search and exact-name lookup now use live queries while that download runs in the background;
-browse waits for the catalog. A different search then took
-1.60 ms from the same snapshot without another upstream request. These are single local samples,
-not measurements of Vercel deployment latency or service-level guarantees.
+**API.** The build bundles the snapshot into the function as a compact `JSON.parse` string, which
+is decoded on the first planet read. No instance downloads the catalog, and there is no refresh,
+background load, or `waitUntil`. Live TAP queries remain only as fallbacks: an exact name the
+snapshot lacks (for example a planet confirmed after it was generated), a search with no snapshot
+match, and a repository created without a snapshot. Those queries keep the bounded, coalesced
+query cache. Snapshot answers report `meta.cached: true`. Discovery collections, host-system
+queries, and the atlas's population endpoint (twelve-hour cache) are unchanged and still query
+NASA. General and route request budgets in `app.ts` apply to every API request, including reads
+answered from the snapshot. HTTP response schemas and CDN policies are unchanged.
+
+**Website.** The build emits the snapshot as a hashed, immutable asset
+(`/assets/pscomppars-<hash>.json`) that is not part of the initial JavaScript. A lazy chunk of
+about 2 kB fetches it at low priority, parses it, yields, and decodes it. The download starts
+after the first destination scene has rendered and the browser is idle, unless the connection
+reports save-data or 2G. Opening the planet catalog or the command palette starts it immediately.
+Until the snapshot has loaded, and if it fails, `api-client.ts` answers through the API, so the
+first keystroke never waits. A failed load is retried after a minute. Once loaded, search, browse
+pages, and exact-name lookups are answered in the browser. An exact-name miss or a search with no
+match still asks the API. The service worker keeps the snapshot with the other hashed assets for
+offline use and deletes older snapshots when a new one is stored.
+
+Local measurements, taken on an aarch64 development machine with the production builds and
+headless Chromium. These are samples, not service-level guarantees:
+
+- Before this design, a cold instance blocked concurrent search, browse, and exact-name lookup for
+  3,869 ms on the full TAP download. Now a fresh Node process imports the built function in
+  58–95 ms, answers its first search, including the decode, in 53–66 ms, and answers later
+  searches in about 2 ms, with no outbound request.
+- In the browser, with a 4x CPU slowdown: JSON parsing takes about 20 ms, decoding about 38 ms,
+  and no task during loading exceeds 50 ms. A search takes 1–6 ms, a browse page under 1 ms, and an
+  exact-name lookup under 1 ms. These costs did not justify a worker, whose result would have to
+  be copied back to the main thread anyway.
+- On a Fast 3G-like profile with a 4x CPU slowdown, the first scene settled in a median of about
+  5.3 s whether the snapshot download was allowed or blocked.
 
 ## Escalation path
 

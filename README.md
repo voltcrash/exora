@@ -10,7 +10,7 @@ The system diorama is where that discipline is most visible, because a picture o
 
 ## Features
 
-- **Confirmed-planet catalog:** Search, browse, and switch worlds live against the NASA Exoplanet Archive, with twelve curated discovery collections from `earth-like` and `ocean-candidates` through `lava-worlds` and `record-breakers`.
+- **Confirmed-planet catalog:** Search, browse, and switch worlds across a weekly snapshot of the NASA Exoplanet Archive, answered in the browser once loaded and backed by live archive queries for newer planets, with twelve curated discovery collections from `earth-like` and `ocean-candidates` through `lava-worlds` and `record-breakers`.
 - **System diorama:** A whole host system as a place to stand inside — the star at the centre, every confirmed world on the orbit the archive measured for it, turning at its own measured period. Orbit radii span decades within one host and bodies are four orders of magnitude smaller again, so both scales are compressed logarithmically and the interface prints exactly what it did; an orbit whose shape or plane was never solved for is drawn circular and coplanar and says so, and a world the archive places nowhere is named rather than given an orbit.
 - **The signal each world was found in:** A Signal tab reads the transit depth, duration and chord, the star's velocity wobble, reflex orbit and astrometric shift, the odds the orbit transits at all, and the dip one atmospheric scale height would add. It draws them as the limb-darkened light curve and velocity curve an instrument records, with the floor pinned to the archive's measured depth.
 - **Next transit:** From the archive's ephemeris, the next crossing in the reader's own time zone, converted from barycentric time to an Earth clock, with an error that grows by the period uncertainty every orbit. A prediction whose error rivals the transit itself is flagged.
@@ -22,7 +22,7 @@ The system diorama is where that discipline is most visible, because a picture o
 - **One interface for every destination, lit by its star:** A world, a star, a black hole, a diorama and a region all use the same layout: actions across the top, the destination's name and the places it leads to at the lower left, and its readings in an inspector on the right. On a phone the name and readings share one bottom sheet that rests at a peek and is dragged, flicked or tapped open. The interface's single accent colour is the blackbody colour of the star lighting the destination, so a red dwarf's world reads warm and Sirius reads cold.
 - **Go anywhere:** The search field in the top bar, ⌘K, Ctrl+K or `/` opens a palette ranking every bundled world, moon, region, black hole and tour instantly, with planets, host systems and stars from the archives merged in as you type. Planet search matches names whatever separates their parts.
 - **Guided tours:** Narrated journeys through real destinations, each step an ordinary shareable URL, started from Explore or the palette.
-- **Offline:** A service worker keeps the shell, hashed assets, textures and sky catalogue after the first visit, and serves the last good archive answer only when the network fails.
+- **Offline:** A service worker keeps the shell, hashed assets (including the planet catalog snapshot, so planet search and browse keep working), textures and sky catalogue after the first visit, and serves the last good archive answer only when the network fails.
 - **Stellar catalog:** Resolve stars by exact identifier through SIMBAD's keyless TAP service, with twelve stellar collections spanning nearby stars, solar analogs, blue giants, binaries, variables, and stellar remnants.
 - **Deterministic world recipes:** A shared, versioned `worldgen` package maps an object's physical properties to a visual class, palette family, terrain, cloud, and ring recipe. The same catalog row always produces the same world, and `WORLDGEN_VERSION` invalidates persisted recipes when the rules change.
 - **Physically motivated renderers:** Procedural gas-giant bands and storms, methane-hazed ice giants with ring systems, and displaced rocky terrain with oceans, ice caps, and lava driven by inferred chemistry.
@@ -32,7 +32,7 @@ The system diorama is where that discipline is most visible, because a picture o
 - **Persistent immersive session:** The engine, scene, camera, and WebXR session outlive the active destination, so entering and leaving AR does not rebuild the viewing context.
 - **iPhone and Android AR:** The immersive control selects native `immersive-ar` on a phone that supports it and uses Variant Launch's App Clip handoff on iPhone. AR presents the existing Babylon world at tabletop scale over camera passthrough, with hit-tested placement, drag repositioning, and pinch scaling — no GLB or USDZ export path.
 - **Adaptive rendering budget:** Separate desktop and mobile profiles govern shader octaves, sphere tessellation, star count, texture detail, and render scale.
-- **Graceful degradation:** A six-hour planet catalog snapshot with live-query fallback, a twelve-hour star cache, and a bundled local profile keep the experience alive when NASA, SIMBAD, or the API is unreachable.
+- **Graceful degradation:** A committed planet catalog snapshot, bundled into the API and loaded by the browser, answers planet search, browse and exact-name reads without reaching NASA, and the browser uses the API until it has loaded. A twelve-hour star cache and a bundled local profile keep the experience alive when SIMBAD or the API is unreachable.
 
 ## Keyboard
 
@@ -121,10 +121,11 @@ Follow the [iPhone AR deployment and smoke-test guide](docs/iphone-ar.md) for Va
 ## Workspace
 
 ```text
-apps/api             Hono API with NASA, SIMBAD, and JPL adapters
-apps/website         React interface and the Babylon.js scene host
-packages/contracts   Shared API, exoplanet, and star types
-packages/worldgen    Deterministic data-to-world recipe engine
+apps/api                 Hono API with NASA, SIMBAD, and JPL adapters
+apps/website             React interface and the Babylon.js scene host
+packages/contracts       Shared API, exoplanet, and star types
+packages/planet-catalog  Committed NASA catalog snapshot and the planet search code both apps share
+packages/worldgen        Deterministic data-to-world recipe engine
 ```
 
 Inside `apps/website/src`, the interface is built from a small set of parts:
@@ -159,9 +160,9 @@ pnpm dlx vercel@latest --prod  # Production
 
 The website builds to static output served from Vercel's edge, and the Hono application is bundled into a single Vercel Function pinned to `sfo1`. A rewrite sends every `/api/*` path to that one function, which keeps routing inside Hono rather than splitting it across per-route handlers.
 
-The function always loads planets from the live NASA Exoplanet Archive. Stars resolve through SIMBAD, which needs no registration or key; Solar System ephemerides resolve through NASA/JPL services.
+The function answers planet search, browse, and exact-name reads from a committed snapshot of the NASA Exoplanet Archive and queries the live archive for everything else. Stars resolve through SIMBAD, which needs no registration or key; Solar System ephemerides resolve through NASA/JPL services.
 
-Planet search, browse pages, and exact-name lookups share a six-hour in-memory snapshot of the full confirmed NASA catalog, loaded in one coalesced TAP request per warm API instance. They retain the same name matching, ranking, pagination, and nullable measurements. A failed snapshot load falls back to the existing cached live queries and retries the full download after a one-minute cooldown. Discovery collections and host-system queries keep their live-query caches. Stars use a twelve-hour cache, and all upstream requests have timeouts. Responses also carry `Cache-Control` with `stale-while-revalidate` so Vercel's CDN absorbs repeated reads.
+Planet search, browse pages, and exact-name lookups read `packages/planet-catalog/data/pscomppars.json`, a snapshot of the confirmed NASA catalog that a weekly workflow regenerates and proposes as a pull request. The API bundles it, so no instance downloads the catalog. The website loads it as a hashed asset after the first scene, or when search opens, and then answers those reads itself with the same matching, ranking, pagination, and nullable measurements. Until it loads, or if it fails, the website uses the API. Names and searches the snapshot lacks fall back to cached live TAP queries. Discovery collections and host-system queries keep their live-query caches. Stars use a twelve-hour cache, and all upstream requests have timeouts. Responses also carry `Cache-Control` with `stale-while-revalidate` so Vercel's CDN absorbs repeated reads.
 
 The in-process caches and request budgets are intentionally per-instance safeguards, not global
 quotas. See [API rate limiting and caching](docs/api-rate-limiting-and-caching.md) for the trust

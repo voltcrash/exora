@@ -1,5 +1,5 @@
 import { useEffect, useId, useMemo, useRef, useState, type KeyboardEvent } from "react";
-import { searchPlanets, searchStars } from "../api-client.ts";
+import { preloadPlanetCatalog, searchPlanets, searchStars } from "../api-client.ts";
 import {
   groupEntries,
   rankPaletteEntries,
@@ -157,6 +157,7 @@ export const CommandPalette = ({ onClose, onSelect }: CommandPaletteProps) => {
     dialog?.showModal();
     inputRef.current?.focus();
     void localEntries().then(setLocal);
+    void preloadPlanetCatalog();
     return () => {
       dialog?.close();
       previousFocus?.focus();

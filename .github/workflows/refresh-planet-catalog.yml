@@ -1,0 +1,69 @@
+# Opening the pull request needs the repository setting
+# "Allow GitHub Actions to create and approve pull requests" (Settings → Actions → General).
+# Pull requests opened with GITHUB_TOKEN do not start other workflows; close and reopen the pull
+# request, or push to its branch, to run the Quality checks on it.
+name: Refresh planet catalog
+
+on:
+  schedule:
+    - cron: "17 5 * * 1"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: refresh-planet-catalog
+  cancel-in-progress: false
+
+jobs:
+  refresh:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    permissions:
+      contents: write
+      pull-requests: write
+    env:
+      BRANCH: chore/refresh-planet-catalog
+      SNAPSHOT: packages/planet-catalog/data/pscomppars.json
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Set up Vite+
+        uses: voidzero-dev/setup-vp@cab1ab9eaff52d4857875f4f2c016e36af8f2c76 # v1.22.0
+        with:
+          node-version: "24"
+          cache: true
+
+      - name: Install dependencies
+        run: vp install --frozen-lockfile
+
+      - name: Regenerate the snapshot from the NASA Exoplanet Archive
+        run: vp run @exora/api#planet-catalog
+
+      - name: Validate the snapshot
+        run: vp run @exora/planet-catalog#test
+
+      - name: Open or update the refresh pull request
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          if git diff --quiet -- "$SNAPSHOT"; then
+            echo "The archive has not changed since the committed snapshot."
+            exit 0
+          fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git switch --create "$BRANCH"
+          git commit --quiet --message "chore: refresh the planet catalog snapshot" \
+            --message "The NASA Exoplanet Archive changed since the committed snapshot. Regenerated it with the scheduled refresh workflow." \
+            -- "$SNAPSHOT"
+          git push --force origin "$BRANCH"
+          if [ -n "$(gh pr list --head "$BRANCH" --state open --json number --jq '.[].number')" ]; then
+            echo "Updated the open refresh pull request."
+          else
+            gh pr create --base "${{ github.event.repository.default_branch }}" --head "$BRANCH" \
+              --title "chore: refresh the planet catalog snapshot" \
+              --body "The scheduled refresh found changes in the NASA Exoplanet Archive pscomppars table and regenerated \`$SNAPSHOT\`. Review the row diff, then merge to ship it to the website and API."
+          fi

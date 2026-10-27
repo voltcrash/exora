@@ -2,6 +2,8 @@ import { defineConfig } from "vite-plus";
 
 // Preserve vendored KTX2 artifacts byte-for-byte.
 const VENDORED_PATTERNS = ["apps/website/public/ktx2/**"];
+// Written one planet per line by apps/api/scripts/build-planet-catalog.ts.
+const GENERATED_PATTERNS = ["packages/planet-catalog/data/**"];
 
 export default defineConfig({
   test: {
@@ -18,7 +20,7 @@ export default defineConfig({
   staged: {
     "*": "vp check --fix",
   },
-  fmt: { ignorePatterns: VENDORED_PATTERNS },
+  fmt: { ignorePatterns: [...VENDORED_PATTERNS, ...GENERATED_PATTERNS] },
   lint: {
     ignorePatterns: VENDORED_PATTERNS,
     jsPlugins: [{ name: "vite-plus", specifier: "vite-plus/oxlint-plugin" }],

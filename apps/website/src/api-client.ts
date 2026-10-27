@@ -11,11 +11,14 @@ import {
   type StarResponse,
 } from "@exora/contracts";
 import { appendUniqueById } from "./catalog-pagination.ts";
+import type { PlanetCatalog } from "./planet-catalog.ts";
 import { requestDeadline } from "./request-deadline.ts";
 
 type Fetcher = (input: string | URL | Request, init?: RequestInit) => Promise<Response>;
 
 const OBJECT_LOOKUP_TIMEOUT_MS = 8_000;
+const PLANET_CATALOG_RETRY_MS = 60_000;
+const MAX_PLANET_NAME_LENGTH = 100;
 
 const PLANET_COLLECTION_TIMEOUT_MS = 8_000;
 const STAR_COLLECTION_TIMEOUT_MS = 10_000;
@@ -113,6 +116,42 @@ const requestStarCollection = (
     query: meta.query,
     stars: appendUniqueById([], data),
   }));
+
+let planetCatalog: PlanetCatalog | null = null;
+let planetCatalogLoad: Promise<PlanetCatalog | null> | null = null;
+
+/**
+ * Starts the one download of the archive snapshot. Planet search, browse and name lookups use the
+ * API until it has loaded, and keep using it if it fails.
+ */
+export const preloadPlanetCatalog = (fetcher?: Fetcher): Promise<PlanetCatalog | null> =>
+  (planetCatalogLoad ??= import("./planet-catalog.ts")
+    .then(({ loadPlanetCatalog }) => loadPlanetCatalog(fetcher))
+    .then((catalog) => (planetCatalog = catalog))
+    .catch((error: unknown) => {
+      console.warn("Exora could not load its planet catalog; asking the archive instead.", error);
+      setTimeout(() => {
+        planetCatalogLoad = null;
+      }, PLANET_CATALOG_RETRY_MS);
+      return null;
+    }));
+
+/** Fetches the catalog once the browser is idle, unless the connection asks to save data. */
+export const prefetchPlanetCatalogWhenIdle = (): (() => void) => {
+  const { connection } = navigator as Navigator & {
+    connection?: { effectiveType?: string; saveData?: boolean };
+  };
+  if (planetCatalogLoad || connection?.saveData || connection?.effectiveType?.endsWith("2g")) {
+    return () => undefined;
+  }
+  const prefetch = (): void => void preloadPlanetCatalog();
+  if (typeof window.requestIdleCallback === "function") {
+    const idleId = window.requestIdleCallback(prefetch, { timeout: 10_000 });
+    return () => window.cancelIdleCallback(idleId);
+  }
+  const timeoutId = window.setTimeout(prefetch, 2_000);
+  return () => window.clearTimeout(timeoutId);
+};
 
 export interface PlanetLoadResult {
   cached: boolean;
@@ -277,6 +316,9 @@ export const loadPlanetByName = async (
   name: string,
   fetcher: Fetcher = fetch,
 ): Promise<PlanetLoadResult | null> => {
+  // A name missing from the snapshot may be a planet confirmed since, so the API still decides.
+  const known = name.trim().length <= MAX_PLANET_NAME_LENGTH ? planetCatalog?.find(name) : null;
+  if (known) return { cached: true, mode: "live", planet: known };
   const payload = await requestPlanet(`/api/planets/${encodeURIComponent(name)}`, fetcher);
 
   return payload ? { cached: payload.meta.cached, mode: "live", planet: payload.data } : null;
@@ -289,6 +331,16 @@ export const searchPlanets = async (
   const normalizedQuery = query.trim();
   if (normalizedQuery.length < 1) {
     return { cached: false, nextCursor: null, planets: [], query: normalizedQuery };
+  }
+
+  const known = planetCatalog?.search(normalizedQuery, 12) ?? [];
+  if (known.length > 0) {
+    return {
+      cached: true,
+      nextCursor: null,
+      planets: appendUniqueById([], known),
+      query: normalizedQuery,
+    };
   }
 
   return requestPlanetCollection(
@@ -338,12 +390,22 @@ export const loadPlanetFilterPool = async ({
   cursor,
   limit = PLANET_PAGE_SIZE,
   ...options
-}: PageOptions = {}): Promise<PlanetSearchResult> =>
-  requestPlanetCollection(
+}: PageOptions = {}): Promise<PlanetSearchResult> => {
+  if (planetCatalog) {
+    const page = planetCatalog.browse(limit, cursor);
+    return {
+      cached: true,
+      nextCursor: page.nextCursor,
+      planets: appendUniqueById([], page.planets),
+      query: "physical-controls",
+    };
+  }
+  return requestPlanetCollection(
     `/api/planets?browse=physical-controls${pageQuery(limit, cursor)}`,
     options,
     "Planet discovery",
   );
+};
 
 export const browseStars = async ({
   cursor,
