@@ -136,6 +136,23 @@ export const preloadPlanetCatalog = (fetcher?: Fetcher): Promise<PlanetCatalog |
       return null;
     }));
 
+/** Fetches the catalog once the browser is idle, unless the connection asks to save data. */
+export const prefetchPlanetCatalogWhenIdle = (): (() => void) => {
+  const { connection } = navigator as Navigator & {
+    connection?: { effectiveType?: string; saveData?: boolean };
+  };
+  if (planetCatalogLoad || connection?.saveData || connection?.effectiveType?.endsWith("2g")) {
+    return () => undefined;
+  }
+  const prefetch = (): void => void preloadPlanetCatalog();
+  if (typeof window.requestIdleCallback === "function") {
+    const idleId = window.requestIdleCallback(prefetch, { timeout: 10_000 });
+    return () => window.cancelIdleCallback(idleId);
+  }
+  const timeoutId = window.setTimeout(prefetch, 2_000);
+  return () => window.clearTimeout(timeoutId);
+};
+
 export interface PlanetLoadResult {
   cached: boolean;
   mode: "custom" | "fallback" | "live" | "solar";

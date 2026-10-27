@@ -1,4 +1,5 @@
 import { useEffect, type CSSProperties, type ReactNode } from "react";
+import { prefetchPlanetCatalogWhenIdle } from "../../api-client.ts";
 import { useChrome } from "../../chrome-context.ts";
 import type { DestinationPanelModel } from "../../destination-panel.ts";
 import type { SceneHost } from "../../scene-host.ts";
@@ -69,6 +70,12 @@ export const DestinationShell = ({
     (sceneState === "ready" && typographySettled) ||
     sceneState === "error" ||
     travelPhase !== "idle";
+
+  // The planet catalog waits for the first scene, so it never competes with its downloads.
+  useEffect(
+    () => (sceneState === "loading" ? undefined : prefetchPlanetCatalogWhenIdle()),
+    [sceneState],
+  );
 
   // Overlays opened over this destination — Explore, the palette, a tour — read the same light.
   useEffect(() => {
