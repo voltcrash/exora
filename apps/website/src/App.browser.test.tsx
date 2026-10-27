@@ -205,7 +205,10 @@ const observedBlackHole: BlackHoleProfile = {
   status: "candidate",
 };
 
-const stubArchive = ({ missing = [] as string[] } = {}) => {
+const stubArchive = ({
+  missing = [],
+  planetOverride,
+}: { missing?: string[]; planetOverride?: ExoplanetProfile } = {}) => {
   const calls: string[] = [];
 
   const planetList = (query: string, planets: ExoplanetProfile[]): Response =>
@@ -277,7 +280,8 @@ const stubArchive = ({ missing = [] as string[] } = {}) => {
 
     if (url.pathname.startsWith("/api/planets/")) {
       return Response.json({
-        data: requested === "featured" ? featuredPlanet : namedPlanet(requested),
+        data:
+          planetOverride ?? (requested === "featured" ? featuredPlanet : namedPlanet(requested)),
         meta: { cached: false, source: "NASA Exoplanet Archive" },
       });
     }
@@ -433,6 +437,22 @@ desktopTest("the landing page reaches a rendered world", async () => {
   await expect.element(page.getByRole("heading", { level: 1 })).toBeVisible();
   await expect.element(page.getByRole("button", { exact: true, name: "Explore" })).toBeVisible();
   await expect.element(page.getByRole("button", { name: "Go anywhere" })).toBeVisible();
+});
+
+test("signal curves load when their tab opens after the world is ready", async () => {
+  stubArchive({
+    planetOverride: {
+      ...namedPlanet("Chart b"),
+      observation: { ...featuredPlanet.observation, orbitalEccentricity: 0 },
+    },
+  });
+  mountApp("?planet=Chart%20b");
+
+  await expect.element(page.getByRole("heading", { level: 1 })).toMatchTextContent("Chart b");
+  expect(container?.textContent).not.toContain("Velocity curve");
+  await openPanelSection("Signal");
+  await expect.element(page.getByRole("img", { name: /Velocity curve/ })).toBeVisible();
+  await expect.element(page.getByRole("heading", { level: 1 })).toMatchTextContent("Chart b");
 });
 
 desktopTest("the browser test server exposes the production sky catalog", async () => {
