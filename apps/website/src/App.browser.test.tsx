@@ -466,6 +466,25 @@ test("signal curves load when their tab opens after the world is ready", async (
   await expect.element(page.getByRole("heading", { level: 1 })).toMatchTextContent("Chart b");
 });
 
+test("guided tour controls restore, advance, and exit without replacing the world", async () => {
+  stubArchive();
+  mountApp("?planet=Earth&tour=home-to-the-edge&step=1");
+
+  await expect.element(page.getByRole("heading", { level: 1 })).toMatchTextContent("Earth");
+  await expect.element(page.getByText("Stop 1 of 8", { exact: true })).toBeVisible();
+  await userEvent.click(page.getByRole("button", { name: "Next: Moon" }));
+  await expect.element(page.getByRole("heading", { level: 1 })).toMatchTextContent("Moon");
+  await expect.element(page.getByText("Stop 2 of 8", { exact: true })).toBeVisible();
+
+  remountAppAtCurrentUrl();
+  await expect.element(page.getByRole("heading", { level: 1 })).toMatchTextContent("Moon");
+  await expect.element(page.getByText("Stop 2 of 8", { exact: true })).toBeVisible();
+  await userEvent.click(page.getByRole("button", { name: "Leave the tour" }));
+  await expect.poll(() => document.querySelector('section[aria-label^="Guided tour:"]')).toBeNull();
+  expect(window.location.search).toBe("?planet=Moon");
+  await expect.element(page.getByRole("heading", { level: 1 })).toMatchTextContent("Moon");
+});
+
 desktopTest("the browser test server exposes the production sky catalog", async () => {
   stubArchive();
   const response = await fetch("/sky/hyg-v44-vmag65.bin");
