@@ -33,6 +33,7 @@ const pendingWorker = () => {
 
 afterEach(() => {
   vi.unstubAllGlobals();
+  vi.restoreAllMocks();
   vi.useRealTimers();
   PendingWorker.instances = [];
 });
@@ -121,4 +122,20 @@ test.each(["abort", "dispose"])("a planet cannot apply results after %s", async 
   expect(update).not.toHaveBeenCalled();
   scene.dispose();
   engine.dispose();
+});
+
+test("a kernel failure rejects consistently rather than reporting a cancelled job", async () => {
+  const input = planetTerrainFixture(MARS);
+  if (input.kind !== "planet") throw new Error("Expected planet input.");
+  Object.defineProperty(input.recipe, "terrain", {
+    get: () => {
+      throw new Error("invalid terrain");
+    },
+  });
+  vi.stubGlobal("Worker", undefined);
+  await expect(runTerrainJob(input)).rejects.toThrow("invalid terrain");
+  vi.stubGlobal("Worker", PendingWorker);
+  const task = runTerrainJob(input);
+  PendingWorker.instances.at(-1)!.onmessageerror!();
+  await expect(task).rejects.toThrow("invalid terrain");
 });

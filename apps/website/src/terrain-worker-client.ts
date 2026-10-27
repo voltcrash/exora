@@ -1,6 +1,6 @@
 import { executeTerrainJob, type TerrainRequest, type TerrainResult } from "./terrain-jobs.ts";
 
-export const runTerrainJob = (
+export const runTerrainJob = async (
   request: TerrainRequest,
   signal?: AbortSignal,
 ): Promise<TerrainResult | null> => {
@@ -12,13 +12,14 @@ export const runTerrainJob = (
     let timeout: ReturnType<typeof setTimeout> | undefined;
     let settled = false;
 
-    const finish = (result: TerrainResult | null): void => {
+    const finish = (result: TerrainResult | null, failure?: unknown): void => {
       if (settled) return;
       settled = true;
       clearTimeout(timeout);
       signal?.removeEventListener("abort", cancel);
       worker?.terminate();
-      resolve(result);
+      if (failure !== undefined) reject(failure);
+      else resolve(result);
     };
     const cancel = (): void => finish(null);
     const fallback = (): void => {
@@ -27,8 +28,7 @@ export const runTerrainJob = (
       try {
         finish(executeTerrainJob(request));
       } catch (error) {
-        finish(null);
-        reject(error);
+        finish(null, error);
       }
     };
 
