@@ -495,3 +495,69 @@ test("snapshot browsing preserves bounds, null filters, order and keyset cursors
   expect((await repository.search("World119", 12)).value[0]?.name).toBe("World 119 b");
   expect(requests).toBe(1);
 });
+
+test("concurrent search, browse and lookup coalesce into one full catalog request", async () => {
+  let requests = 0;
+  let release!: (response: Response) => void;
+  const response = new Promise<Response>((resolve) => {
+    release = resolve;
+  });
+  const repository = new NasaPlanetRepository({
+    fetcher: async () => {
+      requests += 1;
+      return response;
+    },
+  });
+  const search = repository.search("HIP65426", 12);
+  const browse = repository.browse(12);
+  const named = repository.findByName("HIP 65426 b");
+  await Promise.resolve();
+  expect(requests).toBe(1);
+  release(Response.json([nasaRow]));
+  const results = await Promise.all([search, browse, named]);
+  expect(results.every(({ cached }) => !cached)).toBe(true);
+  expect(results[0].value[0]?.name).toBe(nasaRow.pl_name);
+  expect(results[1].value[0]?.name).toBe(nasaRow.pl_name);
+  expect(results[2].value?.name).toBe(nasaRow.pl_name);
+  expect((await repository.search("65426b", 12)).cached).toBe(true);
+  expect(requests).toBe(1);
+});
+
+test.each(["http", "json", "schema", "network", "timeout"])(
+  "a %s snapshot failure falls back for every reader and recovers after cooldown",
+  async (failure) => {
+    let now = 0;
+    let snapshots = 0;
+    let live = 0;
+    const repository = new NasaPlanetRepository({
+      now: () => now,
+      fetcher: async (input) => {
+        const query = new URL(input instanceof Request ? input.url : input).searchParams.get(
+          "query",
+        )!;
+        if (!query.startsWith("select top ")) {
+          snapshots += 1;
+          if (snapshots === 1) {
+            if (failure === "http") return new Response(null, { status: 503 });
+            if (failure === "json") return new Response("{invalid JSON");
+            if (failure === "schema") return Response.json([{ ...nasaRow, pl_eqt: "unknown" }]);
+            if (failure === "timeout") throw new DOMException("Timed out", "TimeoutError");
+            throw new TypeError("offline");
+          }
+        } else live += 1;
+        return Response.json([nasaRow]);
+      },
+    });
+    expect((await repository.findByName(nasaRow.pl_name)).value?.name).toBe(nasaRow.pl_name);
+    expect((await repository.browse(12)).value[0]?.name).toBe(nasaRow.pl_name);
+    expect((await repository.search("HIP", 12)).value[0]?.name).toBe(nasaRow.pl_name);
+    expect(snapshots).toBe(1);
+    expect(live).toBe(4);
+    expect((await repository.findByName(nasaRow.pl_name)).cached).toBe(true);
+    now = 60_000;
+    expect((await repository.findByName(nasaRow.pl_name)).cached).toBe(false);
+    expect((await repository.search("HIP", 12)).cached).toBe(true);
+    expect(snapshots).toBe(2);
+    expect(live).toBe(4);
+  },
+);
