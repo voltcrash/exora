@@ -205,7 +205,10 @@ const observedBlackHole: BlackHoleProfile = {
   status: "candidate",
 };
 
-const stubArchive = ({ missing = [] as string[] } = {}) => {
+const stubArchive = ({
+  missing = [],
+  planetOverride,
+}: { missing?: string[]; planetOverride?: ExoplanetProfile } = {}) => {
   const calls: string[] = [];
 
   const planetList = (query: string, planets: ExoplanetProfile[]): Response =>
@@ -277,7 +280,8 @@ const stubArchive = ({ missing = [] as string[] } = {}) => {
 
     if (url.pathname.startsWith("/api/planets/")) {
       return Response.json({
-        data: requested === "featured" ? featuredPlanet : namedPlanet(requested),
+        data:
+          planetOverride ?? (requested === "featured" ? featuredPlanet : namedPlanet(requested)),
         meta: { cached: false, source: "NASA Exoplanet Archive" },
       });
     }
@@ -433,6 +437,52 @@ desktopTest("the landing page reaches a rendered world", async () => {
   await expect.element(page.getByRole("heading", { level: 1 })).toBeVisible();
   await expect.element(page.getByRole("button", { exact: true, name: "Explore" })).toBeVisible();
   await expect.element(page.getByRole("button", { name: "Go anywhere" })).toBeVisible();
+});
+
+test("the mass-radius diagram loads when Physics opens after the world is ready", async () => {
+  stubArchive();
+  mountApp();
+
+  await expect.element(page.getByRole("heading", { level: 1 })).toMatchTextContent("GJ 674 b");
+  expect(container?.textContent).not.toContain("Mass against radius");
+  await openPanelSection("Physics");
+  await expect.element(page.getByRole("img", { name: /Mass against radius/ })).toBeVisible();
+  await expect.element(page.getByRole("heading", { level: 1 })).toMatchTextContent("GJ 674 b");
+});
+
+test("signal curves load when their tab opens after the world is ready", async () => {
+  stubArchive({
+    planetOverride: {
+      ...namedPlanet("Chart b"),
+      observation: { ...featuredPlanet.observation, orbitalEccentricity: 0 },
+    },
+  });
+  mountApp("?planet=Chart%20b");
+
+  await expect.element(page.getByRole("heading", { level: 1 })).toMatchTextContent("Chart b");
+  expect(container?.textContent).not.toContain("Velocity curve");
+  await openPanelSection("Signal");
+  await expect.element(page.getByRole("img", { name: /Velocity curve/ })).toBeVisible();
+  await expect.element(page.getByRole("heading", { level: 1 })).toMatchTextContent("Chart b");
+});
+
+test("guided tour controls restore, advance, and exit without replacing the world", async () => {
+  stubArchive();
+  mountApp("?planet=Earth&tour=home-to-the-edge&step=1");
+
+  await expect.element(page.getByRole("heading", { level: 1 })).toMatchTextContent("Earth");
+  await expect.element(page.getByText("Stop 1 of 8", { exact: true })).toBeVisible();
+  await userEvent.click(page.getByRole("button", { name: "Next: Moon" }));
+  await expect.element(page.getByRole("heading", { level: 1 })).toMatchTextContent("Moon");
+  await expect.element(page.getByText("Stop 2 of 8", { exact: true })).toBeVisible();
+
+  remountAppAtCurrentUrl();
+  await expect.element(page.getByRole("heading", { level: 1 })).toMatchTextContent("Moon");
+  await expect.element(page.getByText("Stop 2 of 8", { exact: true })).toBeVisible();
+  await userEvent.click(page.getByRole("button", { name: "Leave the tour" }));
+  await expect.poll(() => document.querySelector('section[aria-label^="Guided tour:"]')).toBeNull();
+  expect(window.location.search).toBe("?planet=Moon");
+  await expect.element(page.getByRole("heading", { level: 1 })).toMatchTextContent("Moon");
 });
 
 desktopTest("the browser test server exposes the production sky catalog", async () => {

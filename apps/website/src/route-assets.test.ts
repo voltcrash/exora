@@ -13,13 +13,13 @@ test("initial routes preload the scene module they will mount", () => {
 });
 
 test("constrained tiers select smaller variants only for oversized route mosaics", () => {
-  expect(solarMosaicPathForTier("/textures/solar-system/dione.jpg", "mobile")).toBe(
-    "/textures/solar-system/dione-mobile.jpg",
+  expect(solarMosaicPathForTier("/textures/solar-system/dione.ktx2", "mobile")).toBe(
+    "/textures/solar-system/dione-mobile.ktx2",
   );
-  expect(solarMosaicPathForTier("/textures/solar-system/dione.jpg", "desktop")).toBe(
-    "/textures/solar-system/dione.jpg",
+  expect(solarMosaicPathForTier("/textures/solar-system/dione.ktx2", "desktop")).toBe(
+    "/textures/solar-system/dione.ktx2",
   );
-  expect(solarMosaicPathForTier("/textures/solar-system/earth.jpg", "mobile")).toBe(
-    "/textures/solar-system/earth.jpg",
+  expect(solarMosaicPathForTier("/textures/solar-system/earth.ktx2", "mobile")).toBe(
+    "/textures/solar-system/earth.ktx2",
   );
 });

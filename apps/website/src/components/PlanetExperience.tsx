@@ -5,7 +5,7 @@ import {
   WORLDGEN_VERSION,
   type WorldRecipe,
 } from "@exora/worldgen";
-import { useEffect, useMemo, useRef, useState, type CSSProperties } from "react";
+import { lazy, Suspense, useEffect, useMemo, useRef, useState, type CSSProperties } from "react";
 import type { PlanetLoadResult } from "../api-client.ts";
 import {
   present,
@@ -35,9 +35,14 @@ import { capitalize } from "../readable.ts";
 import type { SceneHost } from "../scene-host.ts";
 import { starLight } from "../star-light.ts";
 import { SURFACE_TRANSITION_MS, type TravelPhase } from "../travel-transition.ts";
-import { MassRadiusDiagram } from "./MassRadiusDiagram.tsx";
-import { SignalCurves } from "./SignalCurves.tsx";
 import { DestinationShell, type SceneState } from "./shell/DestinationShell.tsx";
+
+const SignalCurves = lazy(() =>
+  import("./SignalCurves.tsx").then((module) => ({ default: module.SignalCurves })),
+);
+const MassRadiusDiagram = lazy(() =>
+  import("./MassRadiusDiagram.tsx").then((module) => ({ default: module.MassRadiusDiagram })),
+);
 
 const TRANSIT_DATE_FORMAT = new Intl.DateTimeFormat(undefined, {
   day: "numeric",
@@ -615,7 +620,9 @@ export const PlanetExperience = ({
                 blocks: [
                   {
                     content: composition ? (
-                      <MassRadiusDiagram name={planet.name} reading={composition} />
+                      <Suspense fallback={null}>
+                        <MassRadiusDiagram name={planet.name} reading={composition} />
+                      </Suspense>
                     ) : null,
                     type: "custom" as const,
                   },
@@ -636,12 +643,14 @@ export const PlanetExperience = ({
                   { facts: present([nextTransit]), type: "facts" as const },
                   {
                     content: (
-                      <SignalCurves
-                        eccentricity={observation.orbitalEccentricity}
-                        periodDays={observation.orbitalPeriodDays}
-                        transit={detection.transit}
-                        velocity={detection.velocity}
-                      />
+                      <Suspense fallback={null}>
+                        <SignalCurves
+                          eccentricity={observation.orbitalEccentricity}
+                          periodDays={observation.orbitalPeriodDays}
+                          transit={detection.transit}
+                          velocity={detection.velocity}
+                        />
+                      </Suspense>
                     ),
                     type: "custom" as const,
                   },

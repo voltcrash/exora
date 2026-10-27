@@ -48,7 +48,7 @@ The system diorama is where that discipline is most visible, because a picture o
 ## Stack
 
 - **Toolchain and monorepo:** Vite+ (`vp`), pnpm workspaces with a version catalog, TypeScript
-- **Web:** React 19 APIs with the TanStack Redact runtime, Vite, Babylon.js 9 (WebGL2 + WebXR)
+- **Web:** React 19 with React DOM, Vite, Babylon.js 9 (WebGL2 + WebXR)
 - **API:** Hono on Node 24
 - **Data sources:** NASA Exoplanet Archive TAP, SIMBAD TAP (CDS, Strasbourg), and NASA/JPL APIs
 - **Hosting:** Vercel static output plus a Vercel Function, with Analytics and Speed Insights

@@ -59,7 +59,7 @@ describe("the local Solar System catalog", () => {
       "Makemake",
     ]);
     expect(pluto?.solarSystem).toMatchObject({ bodyType: "dwarf-planet", naifId: 999 });
-    expect(pluto?.solarSystem?.texture?.path).toBe("/textures/solar-system/pluto.jpg");
+    expect(pluto?.solarSystem?.texture?.path).toBe("/textures/solar-system/pluto.ktx2");
   });
 
   it("uses Dawn imagery and topography for Ceres without hiding coverage limits", () => {
@@ -70,7 +70,7 @@ describe("the local Solar System catalog", () => {
       spkId: "20000001",
       surfaceStatus: "mapped",
     });
-    expect(ceres?.solarSystem?.texture?.path).toBe("/textures/solar-system/ceres.jpg");
+    expect(ceres?.solarSystem?.texture?.path).toBe("/textures/solar-system/ceres.ktx2");
     expect(ceres?.solarSystem?.texture?.topography?.path).toBe(
       "/textures/solar-system/ceres-topography.jpg",
     );

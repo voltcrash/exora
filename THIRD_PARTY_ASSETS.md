@@ -12,26 +12,28 @@ published full-resolution mosaic itself rather than shipping a small browse deri
 for every such file is identical and is recorded once here: the source GeoTIFF is downloaded from
 the USGS Astrogeology PDS Annex (`asc-pds-services.s3.us-west-2.amazonaws.com/mosaic/`) or from
 NASA's Photojournal asset host, then resampled once to the shipped pixel size with a Lanczos-3
-kernel and encoded as MozJPEG. No sharpening, level stretch, gap fill, tint, or colourisation is
-applied at any point, so a shipped map differs from its source only in sample count and in JPEG
-quantisation.
+kernel and encoded as MozJPEG. Those shipped JPEG pixels were then encoded as KTX2 ETC1S/BasisLZ
+(q220, clevel 5), with full sRGB Lanczos-4 mip chains. Ceres uses UASTC quality 3 with RDO lambda
+0.5 and Zstandard level 18 to preserve its small crater mosaic. No sharpening, level stretch, gap
+fill, tint, or colourisation is applied; the differences from the mission products are resampling
+and lossy encoding. The exact commands and comparisons are in [texture compression](docs/texture-compression.md).
 
-| Body    | Shipped file                        | Source data / preparation                                       | Source page                                                                    |
-| ------- | ----------------------------------- | --------------------------------------------------------------- | ------------------------------------------------------------------------------ |
-| Mercury | `textures/solar-system/mercury.jpg` | MESSENGER MDIS 250 m global mosaic / USGS Astrogeology          | `astrogeology.usgs.gov/search/map/mercury_messenger_mdis_global_mosaic_250m`   |
-| Venus   | `textures/solar-system/venus.jpg`   | Magellan radar / NASA JPL-Caltech                               | `science.nasa.gov/3d-resources/venus/`                                         |
-| Earth   | `textures/solar-system/earth.jpg`   | MODIS Blue Marble / NASA Goddard                                | `visibleearth.nasa.gov/images/57723/the-blue-marble`                           |
-| Mars    | `textures/solar-system/mars.jpg`    | Viking imagery / USGS / NASA JPL-Caltech                        | `science.nasa.gov/3d-resources/mars/`                                          |
-| Jupiter | `textures/solar-system/jupiter.jpg` | Cassini ISS cylindrical map (PIA07782) / NASA JPL-Caltech / SSI | `science.nasa.gov/photojournal/cassinis-best-maps-of-jupiter-cylindrical-map/` |
-| Saturn  | `textures/solar-system/saturn.jpg`  | NASA/JPL Solar System Simulator visualization                   | `science.nasa.gov/3d-resources/saturn/`                                        |
-| Neptune | `textures/solar-system/neptune.jpg` | NASA/JPL Solar System Simulator visualization                   | `science.nasa.gov/3d-resources/neptune/`                                       |
-| Pluto   | `textures/solar-system/pluto.jpg`   | New Horizons MVIC global color map / NASA/JHUAPL                | `science.nasa.gov/resource/pluto-global-color-map/`                            |
+| Body    | Shipped file                         | Source data / preparation                                       | Source page                                                                    |
+| ------- | ------------------------------------ | --------------------------------------------------------------- | ------------------------------------------------------------------------------ |
+| Mercury | `textures/solar-system/mercury.ktx2` | MESSENGER MDIS 250 m global mosaic / USGS Astrogeology          | `astrogeology.usgs.gov/search/map/mercury_messenger_mdis_global_mosaic_250m`   |
+| Venus   | `textures/solar-system/venus.ktx2`   | Magellan radar / NASA JPL-Caltech                               | `science.nasa.gov/3d-resources/venus/`                                         |
+| Earth   | `textures/solar-system/earth.ktx2`   | MODIS Blue Marble / NASA Goddard                                | `visibleearth.nasa.gov/images/57723/the-blue-marble`                           |
+| Mars    | `textures/solar-system/mars.ktx2`    | Viking imagery / USGS / NASA JPL-Caltech                        | `science.nasa.gov/3d-resources/mars/`                                          |
+| Jupiter | `textures/solar-system/jupiter.ktx2` | Cassini ISS cylindrical map (PIA07782) / NASA JPL-Caltech / SSI | `science.nasa.gov/photojournal/cassinis-best-maps-of-jupiter-cylindrical-map/` |
+| Saturn  | `textures/solar-system/saturn.ktx2`  | NASA/JPL Solar System Simulator visualization                   | `science.nasa.gov/3d-resources/saturn/`                                        |
+| Neptune | `textures/solar-system/neptune.ktx2` | NASA/JPL Solar System Simulator visualization                   | `science.nasa.gov/3d-resources/neptune/`                                       |
+| Pluto   | `textures/solar-system/pluto.ktx2`   | New Horizons MVIC global color map / NASA/JHUAPL                | `science.nasa.gov/resource/pluto-global-color-map/`                            |
 
-Mobile routes use 1024×512 JPEG derivatives of only the source mosaics larger than
-900 kB. They preserve the source pixels and coverage with no retouching: `callisto-mobile.jpg`,
-`dione-mobile.jpg`, `enceladus-mobile.jpg`, `europa-mobile.jpg`, `ganymede-mobile.jpg`,
-`mars-mobile.jpg`, `mercury-mobile.jpg`, `mimas-mobile.jpg`, `rhea-mobile.jpg`,
-`tethys-mobile.jpg`, and `venus-mobile.jpg`.
+Mobile routes use 1024×512 KTX2 derivatives of only the source mosaics larger than
+900 kB. They retain the existing mobile JPEG dimensions and coverage without further resampling or retouching: `callisto-mobile.ktx2`,
+`dione-mobile.ktx2`, `enceladus-mobile.ktx2`, `europa-mobile.ktx2`, `ganymede-mobile.ktx2`,
+`mars-mobile.ktx2`, `mercury-mobile.ktx2`, `mimas-mobile.ktx2`, `rhea-mobile.ktx2`,
+`tethys-mobile.ktx2`, and `venus-mobile.ktx2`.
 
 ### Principal moon mosaics
 
@@ -44,34 +46,34 @@ Mission coverage gaps remain visible instead of being filled with invented geogr
 unimaged northern hemisphere, Europa's unimaged polar caps, and Ganymede's polar seams read as
 absent data rather than as terrain.
 
-| System  | Shipped files                                                          | Source data / preparation                                             | Source pages                                                                 |
-| ------- | ---------------------------------------------------------------------- | --------------------------------------------------------------------- | ---------------------------------------------------------------------------- |
-| Earth   | `moon.jpg`                                                             | LRO WAC 2025 global color map / NASA GSFC SVS                         | `svs.gsfc.nasa.gov/4720/`                                                    |
-| Mars    | `phobos.jpg`, `deimos.jpg`                                             | Viking mission maps / NASA JPL-Caltech                                | `science.nasa.gov/3d-resources/`                                             |
-| Jupiter | `io.jpg`, `europa.jpg`, `ganymede.jpg`, `callisto.jpg`                 | Galileo SSI and Voyager controlled mosaics / USGS Astrogeology        | `astrogeology.usgs.gov/search/map/` (per-body slugs below)                   |
-| Saturn  | `enceladus.jpg`, `tethys.jpg`, `dione.jpg`, `rhea.jpg`                 | Cassini ISS (Voyager gap fill) controlled mosaics / USGS Astrogeology | `astrogeology.usgs.gov/search/map/` (per-body slugs below)                   |
-| Saturn  | `mimas.jpg`                                                            | Cassini ISS semi-controlled basemap / DLR                             | `science.nasa.gov/resource/mimas-global-map-june-2017/`                      |
-| Saturn  | `titan.jpg`, `iapetus.jpg`                                             | Cassini mission mosaics / NASA JPL-Caltech SSI                        | `science.nasa.gov/3d-resources/`                                             |
-| Uranus  | `miranda.jpg`, `ariel.jpg`, `umbriel.jpg`, `titania.jpg`, `oberon.jpg` | Voyager 2 mission mosaics / NASA JPL-Caltech                          | `science.nasa.gov/3d-resources/`                                             |
-| Neptune | `triton.jpg`                                                           | Voyager 2 global color mosaic / USGS Astrogeology                     | `astrogeology.usgs.gov/search/map/triton_voyager_2_global_color_mosaic_600m` |
-| Pluto   | `charon.jpg`                                                           | New Horizons mission mosaic / NASA JHUAPL SwRI                        | `science.nasa.gov/3d-resources/`                                             |
+| System  | Shipped files                                                               | Source data / preparation                                             | Source pages                                                                 |
+| ------- | --------------------------------------------------------------------------- | --------------------------------------------------------------------- | ---------------------------------------------------------------------------- |
+| Earth   | `moon.ktx2`                                                                 | LRO WAC 2025 global color map / NASA GSFC SVS                         | `svs.gsfc.nasa.gov/4720/`                                                    |
+| Mars    | `phobos.ktx2`, `deimos.ktx2`                                                | Viking mission maps / NASA JPL-Caltech                                | `science.nasa.gov/3d-resources/`                                             |
+| Jupiter | `io.ktx2`, `europa.ktx2`, `ganymede.ktx2`, `callisto.ktx2`                  | Galileo SSI and Voyager controlled mosaics / USGS Astrogeology        | `astrogeology.usgs.gov/search/map/` (per-body slugs below)                   |
+| Saturn  | `enceladus.ktx2`, `tethys.ktx2`, `dione.ktx2`, `rhea.ktx2`                  | Cassini ISS (Voyager gap fill) controlled mosaics / USGS Astrogeology | `astrogeology.usgs.gov/search/map/` (per-body slugs below)                   |
+| Saturn  | `mimas.ktx2`                                                                | Cassini ISS semi-controlled basemap / DLR                             | `science.nasa.gov/resource/mimas-global-map-june-2017/`                      |
+| Saturn  | `titan.ktx2`, `iapetus.ktx2`                                                | Cassini mission mosaics / NASA JPL-Caltech SSI                        | `science.nasa.gov/3d-resources/`                                             |
+| Uranus  | `miranda.ktx2`, `ariel.ktx2`, `umbriel.ktx2`, `titania.ktx2`, `oberon.ktx2` | Voyager 2 mission mosaics / NASA JPL-Caltech                          | `science.nasa.gov/3d-resources/`                                             |
+| Neptune | `triton.ktx2`                                                               | Voyager 2 global color mosaic / USGS Astrogeology                     | `astrogeology.usgs.gov/search/map/triton_voyager_2_global_color_mosaic_600m` |
+| Pluto   | `charon.ktx2`                                                               | New Horizons mission mosaic / NASA JHUAPL SwRI                        | `science.nasa.gov/3d-resources/`                                             |
 
 The USGS Astrogeology mosaics are the source products behind each Astropedia entry, retrieved from
 the PDS Annex and resampled as described above. Every one is a US Government work published without
 additional licence terms; Astropedia asks users to cite the product authors, which the per-body
 credit line in `solar-moons.ts` does.
 
-| Shipped file    | Astropedia product                                       | Source GeoTIFF under `mosaic/`                           | Shipped size |
-| --------------- | -------------------------------------------------------- | -------------------------------------------------------- | ------------ |
-| `io.jpg`        | `io_galileo_ssi_global_color_merge_mosaic_1km`           | `Io_Galileo_SSI_Global_Mosaic_ClrMerge_1km.tif`          | 4096 × 2048  |
-| `europa.jpg`    | `europa_voyager_galileo_ssi_global_mosaic_500m`          | `Europa_Voyager_GalileoSSI_global_mosaic_500m.tif`       | 4096 × 2048  |
-| `ganymede.jpg`  | `ganymede_voyager_galileo_ssi_color_global_mosaic_1_4km` | `Ganymede_Voyager_GalileoSSI_Global_ClrMosaic_1435m.tif` | 4096 × 2048  |
-| `callisto.jpg`  | `callisto_galileo_voyager_global_mosaic_1km`             | `Callisto_Voyager_GalileoSSI_global_mosaic_1km.tif`      | 4096 × 2048  |
-| `enceladus.jpg` | `enceladus_cassini_global_mosaic_110m`                   | `Enceladus_Cassini_mosaic_global_110m.tif`               | 4096 × 2048  |
-| `tethys.jpg`    | `tethys_cassini_global_mosaic_293m`                      | `Tethys_Cassini_mosaic_global_293m.tif`                  | 4096 × 2048  |
-| `dione.jpg`     | `dione_cassini_voyager_global_mosaic_154m`               | `Dione_Cassini_Voyager_mosaic_global_154m.tif`           | 4096 × 2048  |
-| `rhea.jpg`      | `rhea_cassini_voyager_global_mosaic_417m`                | `Rhea_Cassini_Voyager_mosaic_global_417m.tif`            | 4096 × 2048  |
-| `triton.jpg`    | `triton_voyager_2_global_color_mosaic_600m`              | `Triton_Voyager2_ClrMosaic_GlobalFill_600m.tif`          | 4096 × 2048  |
+| Shipped file     | Astropedia product                                       | Source GeoTIFF under `mosaic/`                           | Shipped size |
+| ---------------- | -------------------------------------------------------- | -------------------------------------------------------- | ------------ |
+| `io.ktx2`        | `io_galileo_ssi_global_color_merge_mosaic_1km`           | `Io_Galileo_SSI_Global_Mosaic_ClrMerge_1km.tif`          | 4096 × 2048  |
+| `europa.ktx2`    | `europa_voyager_galileo_ssi_global_mosaic_500m`          | `Europa_Voyager_GalileoSSI_global_mosaic_500m.tif`       | 4096 × 2048  |
+| `ganymede.ktx2`  | `ganymede_voyager_galileo_ssi_color_global_mosaic_1_4km` | `Ganymede_Voyager_GalileoSSI_Global_ClrMosaic_1435m.tif` | 4096 × 2048  |
+| `callisto.ktx2`  | `callisto_galileo_voyager_global_mosaic_1km`             | `Callisto_Voyager_GalileoSSI_global_mosaic_1km.tif`      | 4096 × 2048  |
+| `enceladus.ktx2` | `enceladus_cassini_global_mosaic_110m`                   | `Enceladus_Cassini_mosaic_global_110m.tif`               | 4096 × 2048  |
+| `tethys.ktx2`    | `tethys_cassini_global_mosaic_293m`                      | `Tethys_Cassini_mosaic_global_293m.tif`                  | 4096 × 2048  |
+| `dione.ktx2`     | `dione_cassini_voyager_global_mosaic_154m`               | `Dione_Cassini_Voyager_mosaic_global_154m.tif`           | 4096 × 2048  |
+| `rhea.ktx2`      | `rhea_cassini_voyager_global_mosaic_417m`                | `Rhea_Cassini_Voyager_mosaic_global_417m.tif`            | 4096 × 2048  |
+| `triton.ktx2`    | `triton_voyager_2_global_color_mosaic_600m`              | `Triton_Voyager2_ClrMosaic_GlobalFill_600m.tif`          | 4096 × 2048  |
 
 Mimas is the one moon in that group with no Astropedia entry of its own. Its map is the DLR
 semi-controlled Cassini ISS basemap `MI_170630_DLR_basemap.tif` (5760 x 2880) from
@@ -112,7 +114,7 @@ silently treating one numbering scheme as the other.
 
 | Body / data                              | Mission or archive                                                       | Shipped asset / dataset                                                                                                                                            | Permanent NAIF / SPK ID        | Credit                                               | License / use terms                                                                             | Original URL                                                                                                                                                                      |
 | ---------------------------------------- | ------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------ | ------------------------------ | ---------------------------------------------------- | ----------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Ceres global image mosaic                | Dawn FC, HAMO / USGS Astropedia                                          | `textures/solar-system/ceres.jpg` (1024×512 browse derivative; SHA-256 `12fe5bf219161b4cc39a9d72040f7400b57b8ae9dd6cb8073ab1b7b26403e73c`)                         | NAIF `2000001`; SPK `20000001` | NASA/JPL-Caltech/UCLA/MPS/DLR/IDA; USGS Astrogeology | US Government work; Astropedia asks users to cite the product authors                           | https://astrogeology.usgs.gov/ckan/dataset/6ad84c9a-1fad-4869-b4f6-b52c5c2ace36/resource/9f757a65-8d8a-4349-a72d-8062387574b3/download/ceres_dawn_fc_dlr_global_feb2016_1024.jpg  |
+| Ceres global image mosaic                | Dawn FC, HAMO / USGS Astropedia                                          | `textures/solar-system/ceres.ktx2` (1024×512 KTX2 from the browse derivative; SHA-256 `0c58b61ab96f8d9a9980114d8084e12ae02b17aef97671ad3fe7d4f79a65f918`)          | NAIF `2000001`; SPK `20000001` | NASA/JPL-Caltech/UCLA/MPS/DLR/IDA; USGS Astrogeology | US Government work; Astropedia asks users to cite the product authors                           | https://astrogeology.usgs.gov/ckan/dataset/6ad84c9a-1fad-4869-b4f6-b52c5c2ace36/resource/9f757a65-8d8a-4349-a72d-8062387574b3/download/ceres_dawn_fc_dlr_global_feb2016_1024.jpg  |
 | Ceres global topography                  | Dawn FC2, HAMO stereo-photogrammetry / DLR / USGS Astropedia             | `textures/solar-system/ceres-topography.jpg` (1024×512 browse derivative of 137 m DTM; SHA-256 `3f5b7d16ef80f155fd4c776a3f6cfab0e421372c1466aea52a689c10e593d4d7`) | NAIF `2000001`; SPK `20000001` | F. Preusker et al.; DLR; Dawn FC2; USGS Astrogeology | US Government work; cite Preusker et al. (2016) and dataset `DAWN-A-FC2-5-CERESHAMODTMSPG-V1.0` | https://astrogeology.usgs.gov/ckan/dataset/1a165f71-5f31-44b6-b770-63e53b53902e/resource/a407b289-19ab-451d-bd3d-e423b9949a08/download/ceres_dawn_fc_hamo_dtm_dlr_global_1024.jpg |
 | Ceres physical and orbital parameters    | JPL SSD planetary parameters; JPL SBDB API 1.3                           | Authored catalog values; no binary asset                                                                                                                           | NAIF `2000001`; SPK `20000001` | NASA/JPL Solar System Dynamics                       | NASA/JPL data; no additional license asserted                                                   | https://ssd-api.jpl.nasa.gov/sbdb.api?sstr=1&phys-par=1&full-prec=1                                                                                                               |
 | Eris physical and orbital parameters     | JPL SSD planetary parameters; JPL SBDB API 1.3                           | Authored catalog values; no surface asset                                                                                                                          | SPK `20136199`                 | NASA/JPL Solar System Dynamics                       | NASA/JPL data; no additional license asserted                                                   | https://ssd-api.jpl.nasa.gov/sbdb.api?sstr=136199&phys-par=1&full-prec=1                                                                                                          |
@@ -440,3 +442,58 @@ constellation by a single ordered scan.
 | Changes     | None to the values; reformatted from fixed-width text to TS |
 
 The row corrected by Nancy G. Roman on 1999-12-30 (#229) is included as distributed.
+
+## Encoded Solar System colour mosaics
+
+These files reuse the mission sources, credits, licenses, coverage limits, and shipped JPEG inputs
+documented above. The hashes below identify the historical JPEG inputs, recoverable from commit
+`04388c099ea3c4b5ccb019503f0ccb6993e77da4`; those colour JPGs are no longer shipped. Preparation:
+the existing JPG was decoded without resampling, then encoded as
+KTX2 ETC1S/BasisLZ (q220, clevel 5), or UASTC (quality 3, RDO lambda 0.5, Zstandard 18) for Ceres.
+Every file has sRGB colour and a full Lanczos-4 mip chain. See
+[the exact commands and quality comparison](docs/texture-compression.md). The Ceres topography
+JPG is height data and remains unchanged.
+
+| Shipped file                                  | Encoding              | JPEG input SHA-256                                                 |
+| --------------------------------------------- | --------------------- | ------------------------------------------------------------------ |
+| `textures/solar-system/ariel.ktx2`            | ETC1S/BasisLZ q220    | `57cc7e4110fa7bd5c26f8b4d8cb319f0ae5a54bded1e443099f1a7617889f645` |
+| `textures/solar-system/callisto-mobile.ktx2`  | ETC1S/BasisLZ q220    | `b26f67359f2f298dd5d6f3a5c663a79949dfc11b8a4b62474cc105f979dc221f` |
+| `textures/solar-system/callisto.ktx2`         | ETC1S/BasisLZ q220    | `a70852d2e7483ae580fb624db228cc67c487fc8e267c4bbf8eae7e69dc2c25f0` |
+| `textures/solar-system/ceres.ktx2`            | UASTC RDO + Zstandard | `12fe5bf219161b4cc39a9d72040f7400b57b8ae9dd6cb8073ab1b7b26403e73c` |
+| `textures/solar-system/charon.ktx2`           | ETC1S/BasisLZ q220    | `6c6dab4e5db78e8066f3d14fc2463eea8f463bec85a3f41f1fe0f46bd2b97c07` |
+| `textures/solar-system/deimos.ktx2`           | ETC1S/BasisLZ q220    | `92d6da19f017f3189e9d51ab359134a0fbb715d630de53882c966ff0265a56f0` |
+| `textures/solar-system/dione-mobile.ktx2`     | ETC1S/BasisLZ q220    | `43c2211f7c63f84548c6b3dc201d59e2b940b1b0def3568a56eaa09ea49b27a9` |
+| `textures/solar-system/dione.ktx2`            | ETC1S/BasisLZ q220    | `ad7466c8030133d24fe5fe7eef3da45b803f806415f9d990d00a14c8008d9948` |
+| `textures/solar-system/earth.ktx2`            | ETC1S/BasisLZ q220    | `d4dc80a6ef571939d0abe04a9bed3d3d1e6cd63e59514be1c5e43a6b069e6f1e` |
+| `textures/solar-system/enceladus-mobile.ktx2` | ETC1S/BasisLZ q220    | `5c012b22786b0f227a2d48fed1d25b7af2da05faa702de85bcbf62030c8c28a5` |
+| `textures/solar-system/enceladus.ktx2`        | ETC1S/BasisLZ q220    | `ae55668d1ac4406527df6a4aac88151ad855672f9a8f1d563aac2aea93535e43` |
+| `textures/solar-system/europa-mobile.ktx2`    | ETC1S/BasisLZ q220    | `69afc49826ec2ad0fb7db6de109b3ecf269b2235f391a213be351b910b3269b3` |
+| `textures/solar-system/europa.ktx2`           | ETC1S/BasisLZ q220    | `e1f12cf873ef143351eee89b7004cbd60c3bc0f14cef04a327e477a2e72c66a1` |
+| `textures/solar-system/ganymede-mobile.ktx2`  | ETC1S/BasisLZ q220    | `63a398ee05f408b67d11e8be4ca724e8fbe1a70a3f5e7cbf3e33286afd8a4581` |
+| `textures/solar-system/ganymede.ktx2`         | ETC1S/BasisLZ q220    | `1b7679dda5eb96670695c34005f48412898a9459b8f75739184a6b9bc1cab104` |
+| `textures/solar-system/iapetus.ktx2`          | ETC1S/BasisLZ q220    | `20f85ebeddbd65b50e961b58714ec9a88640e4f9b8cd33ca885494f28f8d7f1e` |
+| `textures/solar-system/io.ktx2`               | ETC1S/BasisLZ q220    | `4a85a0a28c13f006c3d6e2b40b3b2af9a07b21e552f9a08f1da5851e407d303d` |
+| `textures/solar-system/jupiter.ktx2`          | ETC1S/BasisLZ q220    | `ed354659717b7ec90a3612b7a793cc92f9833a5b972a8290d02760c5f425fb52` |
+| `textures/solar-system/mars-mobile.ktx2`      | ETC1S/BasisLZ q220    | `b144bbf743ce01896475efa612a8967ddc87c954891e7724241e05463667ae55` |
+| `textures/solar-system/mars.ktx2`             | ETC1S/BasisLZ q220    | `12ec6bf02ebd42a246edc778cb2ce8c595b4d9f0892badf0bfff8abb2303c780` |
+| `textures/solar-system/mercury-mobile.ktx2`   | ETC1S/BasisLZ q220    | `2999f76818f38920c3a6467026818df0284168f1deec793fccac2d878ce21071` |
+| `textures/solar-system/mercury.ktx2`          | ETC1S/BasisLZ q220    | `975efc313f5c04658dd3094b316b813e0cff58d4fdf1854e5895a4c4b6d9664d` |
+| `textures/solar-system/mimas-mobile.ktx2`     | ETC1S/BasisLZ q220    | `dde0b9a95ee090f1a27206ea63559534e25ffa8e2cdaae1c704dcf2ca7965b52` |
+| `textures/solar-system/mimas.ktx2`            | ETC1S/BasisLZ q220    | `098a5eb991b93bef0e37d72faaf4db6eeda20072433fefbe318d5b2db41f2b9f` |
+| `textures/solar-system/miranda.ktx2`          | ETC1S/BasisLZ q220    | `620cddacc704e89ca32bd97d102d2370082869fa00c556181a06c4c73be0a453` |
+| `textures/solar-system/moon.ktx2`             | ETC1S/BasisLZ q220    | `f7130a1822681fa7512d7dcfd40db8c10b9ba4f06777910348698260ed7a2170` |
+| `textures/solar-system/neptune.ktx2`          | ETC1S/BasisLZ q220    | `e9bb2b7bcfb98d3f1adc6f2e20e833a00c11e9677238d8a00ae7431214ca70aa` |
+| `textures/solar-system/oberon.ktx2`           | ETC1S/BasisLZ q220    | `380a70c9fc11a8f4291b1f018e9038b114afcf05ca5e1207acfe5896d78bde2e` |
+| `textures/solar-system/phobos.ktx2`           | ETC1S/BasisLZ q220    | `d0162f04cc69c970f3c6815f6f1a29edd17d0b8778c9519eabe77e8857be5390` |
+| `textures/solar-system/pluto.ktx2`            | ETC1S/BasisLZ q220    | `4804c8793def600b6e4565226d379590132cf480ab33483076cb3ae5f479fc92` |
+| `textures/solar-system/rhea-mobile.ktx2`      | ETC1S/BasisLZ q220    | `b790677188a1eb524d60a196ff5ac1e0430471dcb86c942c631db124dd3fdf38` |
+| `textures/solar-system/rhea.ktx2`             | ETC1S/BasisLZ q220    | `f33eb34d048f06ba2581e6d835953ed9f7745d757081aac84203726faf69e94e` |
+| `textures/solar-system/saturn.ktx2`           | ETC1S/BasisLZ q220    | `d959a239e3d87630daf08e2a688dcbf315fe01b1fd474e55522770108f40aca7` |
+| `textures/solar-system/tethys-mobile.ktx2`    | ETC1S/BasisLZ q220    | `ab62a76d5a09f8de2480eb7a0986d8648a3e6d7a95e8ce5e10fffc5e6b19e8e9` |
+| `textures/solar-system/tethys.ktx2`           | ETC1S/BasisLZ q220    | `019ccaf51bbc90e0de3fe1a6fc214ca116cdda4f18c003a0cde143aabf331f3d` |
+| `textures/solar-system/titan.ktx2`            | ETC1S/BasisLZ q220    | `f402aad29c6340b3b4809441a6685efce6c34e6a0dbe427b90194339adec7f5c` |
+| `textures/solar-system/titania.ktx2`          | ETC1S/BasisLZ q220    | `2296fe1c5d083edca60aec477cf15beee6f75592615103be9f1f953cd13dac42` |
+| `textures/solar-system/triton.ktx2`           | ETC1S/BasisLZ q220    | `9d245e3bd6aa96ac460367afa7857d82819fa4a3afa0441d7c35a9945e454b47` |
+| `textures/solar-system/umbriel.ktx2`          | ETC1S/BasisLZ q220    | `df46a395f18d4d7b529d01a29b9fc3810ac9fc643f32343ac39c0c21c9d7a95e` |
+| `textures/solar-system/venus-mobile.ktx2`     | ETC1S/BasisLZ q220    | `4b985f633ab55cbb5e81f85de954a3d95ff09eb9ef32657f3dee0895bcc4dda5` |
+| `textures/solar-system/venus.ktx2`            | ETC1S/BasisLZ q220    | `e395bced59e95339efbdd002d4a0bbbf81fe323a6694f3a4039120560c80e789` |

@@ -10,7 +10,6 @@ catalog:
   "@fontsource-variable/archivo": ^5.3.0
   "@hono/node-server": ^2.1.5
   "@lhci/cli": ^0.15.1
-  "@tanstack/redact": ^0.2.0
   "@types/node": ^24.19.2
   "@types/react": ^19.3.0
   "@types/react-dom": ^19.3.0
@@ -46,5 +45,3 @@ peerDependencyRules:
     vitest: "*"
 allowBuilds:
   esbuild: true
-minimumReleaseAgeExclude:
-  - "@tanstack/redact@0.2.0"

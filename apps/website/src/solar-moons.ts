@@ -83,7 +83,7 @@ const moon = ({
     summary,
     texture: {
       credit,
-      path: `/textures/solar-system/${id}.jpg`,
+      path: `/textures/solar-system/${id}.ktx2`,
       sourceUrl: textureSourceUrl ?? `https://science.nasa.gov/3d-resources/${sourceSlug}/`,
     },
   },

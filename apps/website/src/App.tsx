@@ -29,7 +29,6 @@ import { reachStar, reachSystem } from "./destination-cache.ts";
 import { PlanetExperience } from "./components/PlanetExperience.tsx";
 import { OfflineNotice } from "./components/OfflineNotice.tsx";
 import { RecoveryScreen } from "./components/RecoveryScreen.tsx";
-import { TourBar } from "./components/TourBar.tsx";
 import { featuredPlanet } from "./planet-profile.ts";
 import { hasRenderer } from "./planet-utils.tsx";
 import { canonicalUrlForSearch } from "./canonical-url.ts";
@@ -38,7 +37,7 @@ import type { BlackHoleProfile } from "./black-holes.ts";
 import { togglesClearView } from "./clear-view-shortcut.ts";
 import { opensCommandPalette, type PaletteTarget } from "./command-palette.ts";
 import { togglesDiscoverShortcut } from "./discover-shortcut.ts";
-import { findTour, readTour, tourStepSearch } from "./tours.ts";
+import type { ActiveTour } from "./tours.ts";
 import { TRAVEL_CROSS_MS, TRAVEL_REVEAL_MS, type TravelPhase } from "./travel-transition.ts";
 import { useSceneHost } from "./use-scene-host.ts";
 import type { SolarRegionProfile } from "./solar-regions.ts";
@@ -48,6 +47,10 @@ import shellStyles from "./components/shell/shell.module.css";
 import { bindStyles } from "./styles/bind-styles.ts";
 
 const cx = bindStyles(shellStyles);
+
+const TourBar = lazy(() =>
+  import("./components/TourBar.tsx").then((module) => ({ default: module.TourBar })),
+);
 
 const DiscoverScreen = lazy(() =>
   import("./components/DiscoverScreen.tsx").then((module) => ({ default: module.DiscoverScreen })),
@@ -455,19 +458,35 @@ export const App = () => {
 
   const closeDiscover = useCallback((): void => setDiscoverOpen(false), []);
 
-  const [, setTourRevision] = useState(0);
-  const activeTour = readTour(window.location.search);
+  const [tourRevision, setTourRevision] = useState(0);
+  const [activeTour, setActiveTour] = useState<ActiveTour | null>(null);
+  useEffect(() => {
+    const search = window.location.search;
+    if (!new URLSearchParams(search).has("tour")) {
+      setActiveTour(null);
+      return;
+    }
+    let active = true;
+    void import("./tours.ts").then(({ readTour }) => {
+      if (active) setActiveTour(readTour(search));
+    });
+    return () => {
+      active = false;
+    };
+  }, [activeObject, tourRevision]);
   const goToTourStep = useCallback(
     (tourId: string, index: number): void => {
-      const tour = findTour(tourId);
-      if (!tour || !tour.steps[index]) return;
-      window.history.pushState({}, "", tourStepSearch(tour, index));
-      setDiscoverOpen(false);
-      setSystemHostName(null);
-      sceneHost?.beginTravel();
-      void loadRequestedObject().then((next) => {
-        if (next.type === "missing") sceneHost?.cancelTravel();
-        setActiveObject(next);
+      void import("./tours.ts").then(({ findTour, tourStepSearch }) => {
+        const tour = findTour(tourId);
+        if (!tour || !tour.steps[index]) return;
+        window.history.pushState({}, "", tourStepSearch(tour, index));
+        setDiscoverOpen(false);
+        setSystemHostName(null);
+        sceneHost?.beginTravel();
+        void loadRequestedObject().then((next) => {
+          if (next.type === "missing") sceneHost?.cancelTravel();
+          setActiveObject(next);
+        });
       });
     },
     [sceneHost],
@@ -680,12 +699,14 @@ export const App = () => {
         </Suspense>
       ) : null}
       {activeTour && activeObject && activeObject.type !== "missing" && !discoverOpen ? (
-        <TourBar
-          active={activeTour}
-          hidden={chromeHidden || travelPhase === "departing" || travelPhase === "crossing"}
-          onExit={exitTour}
-          onStep={(index) => goToTourStep(activeTour.tour.id, index)}
-        />
+        <Suspense fallback={null}>
+          <TourBar
+            active={activeTour}
+            hidden={chromeHidden || travelPhase === "departing" || travelPhase === "crossing"}
+            onExit={exitTour}
+            onStep={(index) => goToTourStep(activeTour.tour.id, index)}
+          />
+        </Suspense>
       ) : null}
       {discoverOpen && activeObject && activeObject.type !== "missing" ? (
         <Suspense fallback={null}>
