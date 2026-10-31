@@ -9,10 +9,67 @@
     <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
     <link rel="manifest" href="/manifest.webmanifest" />
     <meta name="theme-color" content="#000000" />
+    <style>
+      .app-startup {
+        display: none;
+      }
+
+      @media (scripting: enabled) {
+        html,
+        body {
+          margin: 0;
+          background: #000;
+        }
+
+        html:not([data-startup-failed]) #app > .discovery {
+          display: none;
+        }
+
+        html:not([data-startup-failed]) .app-startup {
+          position: fixed;
+          inset: 0;
+          display: grid;
+          place-content: center;
+          background: #000;
+        }
+      }
+
+      .app-startup svg {
+        width: 44px;
+        height: 44px;
+        overflow: visible;
+        animation: startup-orbit 2.4s linear infinite;
+      }
+
+      .app-startup circle {
+        fill: none;
+        stroke: rgb(255 255 255 / 17%);
+        stroke-width: 1;
+      }
+
+      .app-startup .app-startup-body {
+        fill: #ffdeba;
+        stroke: none;
+      }
+
+      @keyframes startup-orbit {
+        to {
+          transform: rotate(360deg);
+        }
+      }
+    </style>
     <link rel="stylesheet" href="/discovery.css" />
   </head>
   <body>
-    <div id="app"><!-- discovery:body --></div>
+    <div id="app">
+      <div class="app-startup" role="status" aria-label="Loading Exora">
+        <svg viewBox="0 0 48 48" aria-hidden="true">
+          <circle cx="24" cy="24" r="20" />
+          <circle class="app-startup-body" cx="24" cy="4" r="3" />
+        </svg>
+      </div>
+      <!-- discovery:body -->
+    </div>
     <script type="module" src="/src/startup.ts"></script>
   </body>
 </html>
