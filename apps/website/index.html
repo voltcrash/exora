@@ -57,6 +57,12 @@
           transform: rotate(360deg);
         }
       }
+
+      @media (prefers-reduced-motion: reduce) {
+        .app-startup svg {
+          animation: none;
+        }
+      }
     </style>
     <link rel="stylesheet" href="/discovery.css" />
   </head>
