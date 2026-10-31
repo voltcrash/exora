@@ -27,3 +27,11 @@ test("the orbit loader covers discovery content before any application JavaScrip
   expect(view.getComputedStyle(document.querySelector(".discovery")!).display).toBe("none");
   expect(view.getComputedStyle(document.body).backgroundColor).toBe("rgb(0, 0, 0)");
 });
+
+test("discovery content remains readable when JavaScript is disabled", async () => {
+  const document = await openStartup(false);
+  const view = document.defaultView!;
+  expect(view.getComputedStyle(document.querySelector(".app-startup")!).display).toBe("none");
+  expect(view.getComputedStyle(document.querySelector(".discovery")!).display).toBe("block");
+  expect(document.querySelector("h1")?.textContent).toBe(homepage.title);
+});
