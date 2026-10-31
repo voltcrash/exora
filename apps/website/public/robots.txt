@@ -1,3 +1,4 @@
+# Search engines and AI search/retrieval crawlers share this open policy.
 User-agent: *
 Allow: /
 
