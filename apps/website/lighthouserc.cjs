@@ -41,14 +41,14 @@ module.exports = {
         ...profile.settings,
       },
       staticDistDir: "dist",
-      url: ["/"],
+      url: ["/", "/about/", "/guides/exoplanets/", "/explore/planets/trappist-1-e/"],
     },
     assert: {
       assertions: {
         "categories:accessibility": ["error", { minScore: 0.95 }],
         "categories:best-practices": ["error", { minScore: 0.9 }],
         "categories:performance": ["warn", { minScore: 0.85 }],
-        "categories:seo": ["error", { minScore: 0.9 }],
+        "categories:seo": ["error", { minScore: 1 }],
         "cumulative-layout-shift": ["error", { maxNumericValue: 0.1 }],
         "first-contentful-paint": ["error", { maxNumericValue: profile.thresholds.fcp }],
         "largest-contentful-paint": ["error", { maxNumericValue: profile.thresholds.lcp }],
