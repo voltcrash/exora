@@ -1,5 +1,51 @@
 import { expect, test } from "vite-plus/test";
-import { budgetViolations } from "./performance-budget.ts";
+import type { Manifest } from "vite-plus";
+import { budgetViolations, initialJavaScriptPaths } from "./performance-budget.ts";
+
+test("startup budgets include the dynamic app and shared static imports, excluding lazy features", () => {
+  const manifest: Manifest = {
+    "index.html": {
+      file: "assets/startup.js",
+      dynamicImports: ["src/main.tsx"],
+    },
+    "src/main.tsx": {
+      file: "assets/main.js",
+      imports: ["shared", "react"],
+      dynamicImports: ["scene"],
+    },
+    shared: { file: "assets/shared.js", imports: ["index.html", "react"] },
+    react: { file: "assets/react.js" },
+    scene: { file: "assets/scene.js" },
+  };
+  const paths = initialJavaScriptPaths(manifest, ["index.html", "src/main.tsx"]);
+  expect([...paths]).toEqual([
+    "assets/startup.js",
+    "assets/main.js",
+    "assets/shared.js",
+    "assets/react.js",
+  ]);
+  expect(
+    budgetViolations(
+      [
+        { bytes: 1_000, path: "assets/startup.js" },
+        { bytes: 449_001, path: "assets/main.js" },
+      ],
+      paths,
+      { initialBytes: 450_000, largestFileBytes: 500_000 },
+    ),
+  ).toEqual([
+    "Initial JavaScript is 450,001 bytes; the emitted initial-path budget is 450,000 bytes.",
+  ]);
+});
+
+test("missing startup entries or imports cannot silently bypass the budget", () => {
+  expect(() => initialJavaScriptPaths({}, ["src/main.tsx"])).toThrow("src/main.tsx");
+  expect(() =>
+    initialJavaScriptPaths({ "src/main.tsx": { file: "assets/main.js", imports: ["missing"] } }, [
+      "src/main.tsx",
+    ]),
+  ).toThrow("missing");
+});
 
 test("budgets the final emitted files and the initial HTML path", () => {
   const emitted = [
