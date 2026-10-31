@@ -35,3 +35,11 @@ test("discovery content remains readable when JavaScript is disabled", async () 
   expect(view.getComputedStyle(document.querySelector(".discovery")!).display).toBe("block");
   expect(document.querySelector("h1")?.textContent).toBe(homepage.title);
 });
+
+test("a startup failure reveals the readable fallback and removes the loader", async () => {
+  const document = await openStartup();
+  document.documentElement.dataset.startupFailed = "";
+  const view = document.defaultView!;
+  expect(view.getComputedStyle(document.querySelector(".app-startup")!).display).toBe("none");
+  expect(view.getComputedStyle(document.querySelector(".discovery")!).display).toBe("block");
+});
