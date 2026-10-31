@@ -1,8 +1,8 @@
 {
   "id": "/",
-  "name": "Exora — Explore Alien Worlds",
+  "name": "Exora — 3D Astronomy Explorer",
   "short_name": "Exora",
-  "description": "Explore plausible procedural alien worlds generated from real NASA exoplanet data.",
+  "description": "Explore exoplanets, Solar System worlds, stars and black holes in 3D with NASA-backed catalog data and guided astronomy tours.",
   "start_url": "/",
   "scope": "/",
   "display": "standalone",
