@@ -1,9 +1,7 @@
 import { defineConfig, loadEnv, type Plugin } from "vite-plus";
 import react from "@vitejs/plugin-react";
 import { playwright } from "vite-plus/test/browser-playwright";
-import { NOTABLE_PLANET_NAMES, NOTABLE_STAR_NAMES } from "./src/search-discovery.ts";
-import { FEATURED_REGION_NAMES } from "./src/solar-regions.ts";
-import { FEATURED_BLACK_HOLE_NAMES } from "./src/black-holes.ts";
+import { discoveryPages } from "./discovery/plugin.ts";
 import { VARIANT_LAUNCH_INITIALIZER } from "./variant-launch-embed.ts";
 
 const dropWebGpuShaders = (): Plugin => {
@@ -23,41 +21,6 @@ const dropWebGpuShaders = (): Plugin => {
     },
   };
 };
-
-const SITE_ORIGIN = "https://exora.voltcrash.com";
-
-const buildSitemap = (): string => {
-  const destinations = [
-    "/",
-    ...FEATURED_BLACK_HOLE_NAMES.map((name) => `/?blackHole=${encodeURIComponent(name)}`),
-    ...FEATURED_REGION_NAMES.map((name) => `/?region=${encodeURIComponent(name)}`),
-    ...NOTABLE_PLANET_NAMES.map((name) => `/?planet=${encodeURIComponent(name)}`),
-    ...NOTABLE_STAR_NAMES.map((name) => `/?star=${encodeURIComponent(name)}`),
-  ];
-
-  const entries = destinations
-    .map((path) => {
-      const priority = path === "/" ? "1.0" : "0.6";
-      return `  <url>\n    <loc>${SITE_ORIGIN}${path}</loc>\n    <changefreq>weekly</changefreq>\n    <priority>${priority}</priority>\n  </url>`;
-    })
-    .join("\n");
-
-  return `<?xml version="1.0" encoding="UTF-8"?>\n<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n${entries}\n</urlset>\n`;
-};
-
-const emitSitemap = (): Plugin => ({
-  name: "exora:sitemap",
-  generateBundle() {
-    this.emitFile({ type: "asset", fileName: "sitemap.xml", source: buildSitemap() });
-  },
-  configureServer(server) {
-    // Match the deployed sitemap route in development.
-    server.middlewares.use("/sitemap.xml", (_request, response) => {
-      response.setHeader("Content-Type", "application/xml");
-      response.end(buildSitemap());
-    });
-  },
-});
 
 const variantLaunchSdk = (key: string): Plugin => ({
   name: "exora:variant-launch-sdk",
@@ -136,7 +99,7 @@ export default defineConfig(({ mode }) => {
         },
       },
     },
-    plugins: [variantLaunchSdk(variantLaunchKey), react(), dropWebGpuShaders(), emitSitemap()],
+    plugins: [variantLaunchSdk(variantLaunchKey), react(), dropWebGpuShaders(), discoveryPages()],
     server: {
       proxy: {
         "/api": {
