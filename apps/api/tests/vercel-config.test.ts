@@ -68,6 +68,13 @@ test("the service worker is always revalidated so an update reaches every visito
   });
 });
 
+test("API responses are excluded from search indexes", async () => {
+  const path = new URL("../../../vercel.json", import.meta.url);
+  const config = JSON.parse(await readFile(path, "utf8")) as VercelConfig;
+  const apiRule = config.headers.find(({ source }) => source === "/api/:path*");
+  expect(apiRule?.headers).toContainEqual({ key: "X-Robots-Tag", value: "noindex" });
+});
+
 test("the API runs near its Pasadena archive upstreams", async () => {
   const config = JSON.parse(
     await readFile(new URL("../../../vercel.json", import.meta.url), "utf8"),

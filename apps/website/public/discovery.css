@@ -1,0 +1,173 @@
+.discovery {
+  color-scheme: dark;
+  min-height: 100vh;
+  padding: 0 clamp(20px, 5vw, 72px);
+  color: #e8ecf5;
+  background: #080b12;
+  font:
+    17px/1.75 system-ui,
+    sans-serif;
+  overflow-wrap: anywhere;
+}
+
+body:has(> .discovery) {
+  margin: 0;
+  background: #080b12;
+}
+
+#app > .discovery {
+  position: fixed;
+  inset: 0;
+  overflow-y: auto;
+}
+
+.discovery * {
+  box-sizing: border-box;
+}
+
+.discovery header,
+.discovery main,
+.discovery footer {
+  max-width: 900px;
+  margin: auto;
+}
+
+.discovery header {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 24px 0;
+  border-bottom: 1px solid #30384b;
+}
+
+.discovery nav {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 20px;
+}
+
+.discovery a {
+  color: #a8d8ff;
+  text-underline-offset: 4px;
+}
+
+.discovery a:hover {
+  color: #fff;
+}
+
+.discovery a:focus-visible {
+  outline: 3px solid #a8d8ff;
+  outline-offset: 5px;
+}
+
+.discovery .brand {
+  color: #fff;
+  font-size: 26px;
+  font-weight: 700;
+  text-decoration: none;
+}
+
+.discovery main {
+  padding: clamp(36px, 7vw, 80px) 0;
+}
+
+.discovery h1 {
+  max-width: 22ch;
+  margin: 12px 0 28px;
+  font-size: clamp(32px, 5.5vw, 56px);
+  font-weight: 650;
+  line-height: 1.15;
+  letter-spacing: -0.035em;
+  text-wrap: balance;
+}
+
+.discovery h2 {
+  margin: 40px 0 12px;
+  font-size: clamp(22px, 3vw, 28px);
+  font-weight: 600;
+  line-height: 1.3;
+}
+
+.discovery p,
+.discovery ul,
+.discovery ol,
+.discovery dl {
+  margin: 20px 0;
+}
+
+.discovery li + li {
+  margin-top: 16px;
+}
+
+.discovery .eyebrow {
+  color: #a8d8ff;
+  font-size: 14px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.discovery .launch a {
+  display: inline-block;
+  padding: 12px 20px;
+  border: 1px solid #a8d8ff;
+  border-radius: 8px;
+}
+
+.discovery figure {
+  margin: 32px 0;
+}
+
+.discovery img {
+  display: block;
+  width: 100%;
+  height: auto;
+  border-radius: 12px;
+}
+
+.discovery figcaption,
+.discovery footer {
+  color: #b6bfd0;
+  font-size: 14px;
+}
+
+.discovery dl {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  border-top: 1px solid #30384b;
+}
+
+.discovery dt,
+.discovery dd {
+  margin: 0;
+  padding: 12px 4px;
+  border-bottom: 1px solid #30384b;
+}
+
+.discovery dt {
+  color: #b6bfd0;
+}
+
+.discovery footer {
+  padding: 24px 0;
+  border-top: 1px solid #30384b;
+}
+
+.discovery footer > a {
+  display: inline-block;
+  margin: 8px 24px 8px 0;
+}
+
+.discovery .skip {
+  position: absolute;
+  top: -100px;
+  left: 20px;
+  z-index: 1;
+  padding: 12px;
+  background: #080b12;
+}
+
+.discovery .skip:focus {
+  top: 8px;
+}

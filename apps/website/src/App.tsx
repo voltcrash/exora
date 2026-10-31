@@ -32,7 +32,7 @@ import { RecoveryScreen } from "./components/RecoveryScreen.tsx";
 import { featuredPlanet } from "./planet-profile.ts";
 import { hasRenderer } from "./planet-utils.tsx";
 import { canonicalUrlForSearch } from "./canonical-url.ts";
-import { documentTitleFor } from "./document-title.ts";
+import { descriptionFor, documentTitleFor } from "./document-title.ts";
 import type { BlackHoleProfile } from "./black-holes.ts";
 import { togglesClearView } from "./clear-view-shortcut.ts";
 import { opensCommandPalette, type PaletteTarget } from "./command-palette.ts";
@@ -573,7 +573,19 @@ export const App = () => {
           : subject;
 
   useEffect(() => {
-    document.title = documentTitleFor(titleSubject);
+    const title = documentTitleFor(titleSubject);
+    const description = descriptionFor(titleSubject);
+    document.title = title;
+    for (const selector of ['meta[property="og:title"]', 'meta[name="twitter:title"]']) {
+      document.querySelector(selector)?.setAttribute("content", title);
+    }
+    for (const selector of [
+      'meta[name="description"]',
+      'meta[property="og:description"]',
+      'meta[name="twitter:description"]',
+    ]) {
+      document.querySelector(selector)?.setAttribute("content", description);
+    }
   }, [titleSubject]);
 
   return (

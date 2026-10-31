@@ -82,7 +82,9 @@ const createWorker = async (network: (request: Request) => Promise<Response>) =>
 test("requests are routed by what they are", async () => {
   const { route } = await createWorker(async () => new Response("net"));
 
-  expect(route("/?planet=Earth", "navigate")).toBe("shell");
+  expect(route("/", "navigate")).toBe("shell");
+  expect(route("/guides/exoplanets/", "navigate")).toBe("document");
+  expect(route("/discovery.css", "no-cors")).toBe("media");
   expect(route("/assets/index-abc123.js", "no-cors")).toBe("immutable");
   expect(route("/assets/terrain.worker-abc123.js", "same-origin")).toBe("immutable");
   expect(route("/assets/pscomppars-abc123.json", "cors")).toBe("immutable");
@@ -112,6 +114,26 @@ test("the shell is cached on install and served when the network is gone", async
   expect(await response?.text()).toBe("shell /");
 });
 
+test("reading a guide cannot replace the offline explorer shell", async () => {
+  let online = true;
+  const worker = await createWorker(async (request) => {
+    if (!online) throw new TypeError("offline");
+    return new Response(new URL(request.url).pathname === "/" ? "explorer" : "guide");
+  });
+  await worker.dispatch("install");
+  const navigate = (path: string) =>
+    worker.dispatch("fetch", {
+      method: "GET",
+      mode: "navigate",
+      url: `https://exora.test${path}`,
+    });
+  expect(await (await navigate("/guides/exoplanets/"))?.text()).toBe("guide");
+  online = false;
+  expect(await (await navigate("/guides/exoplanets/"))?.text()).toBe("guide");
+  expect(await (await navigate("/?planet=Earth"))?.text()).toBe("shell /");
+  await expect(navigate("/guides/never-visited/")).rejects.toThrow("offline");
+});
+
 test("archive answers are fetched fresh and the last good one is kept for offline", async () => {
   let online = true;
   const worker = await createWorker(async () => {
@@ -131,7 +153,7 @@ test("failed archive answers are never cached", async () => {
   await worker.dispatch("fetch", new Request("https://exora.test/api/stars/Vega"));
   status = 200;
 
-  expect([...(worker.stores.get("exora-archive-v1")?.keys() ?? [])]).toEqual([]);
+  expect([...(worker.stores.get("exora-archive-v2")?.keys() ?? [])]).toEqual([]);
 });
 
 test("activation removes caches from earlier versions only", async () => {
@@ -168,7 +190,7 @@ test("the planet catalogue snapshot is kept offline and only its newest version 
   await worker.dispatch("fetch", snapshot("old111"));
   await worker.dispatch("fetch", new Request("https://exora.test/assets/index-abc123.js"));
   await worker.dispatch("fetch", snapshot("new222"));
-  expect([...worker.stores.get("exora-assets-v1")!.keys()]).toEqual([
+  expect([...worker.stores.get("exora-assets-v2")!.keys()]).toEqual([
     "https://exora.test/assets/index-abc123.js",
     "https://exora.test/assets/pscomppars-new222.json",
   ]);

@@ -242,6 +242,11 @@ export const DiscoverScreen = ({
               onGenerateStar={onGenerateStar}
             />
           )}
+          <footer className={styles["resources"]}>
+            <a href="/about/">About Exora</a>
+            <a href="/explore/">Planet profiles and tours</a>
+            <a href="/guides/">Guides and data sources</a>
+          </footer>
         </main>
       </div>
     </dialog>

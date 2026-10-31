@@ -1,5 +1,8 @@
 # Exora
 
+Search indexing, AI crawler access and post-deployment verification are covered in
+[Search and AI discovery](docs/search-discovery.md).
+
 ## Purpose
 
 Exora turns catalogued astronomy into a place you can stand in. It reads confirmed exoplanets from the NASA Exoplanet Archive and stars from SIMBAD, derives a deterministic visual recipe from each object's measured properties, and renders that recipe as a real-time Babylon.js world you can orbit on a desktop or place on a table in phone AR.

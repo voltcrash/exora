@@ -8,7 +8,7 @@
  * good answer used — the panels already say when data is cached.
  */
 
-const VERSION = "v1";
+const VERSION = "v2";
 const SHELL_CACHE = `exora-shell-${VERSION}`;
 const ASSET_CACHE = `exora-assets-${VERSION}`;
 const MEDIA_CACHE = `exora-media-${VERSION}`;
@@ -23,9 +23,10 @@ const PLANET_CATALOG = /\/assets\/pscomppars-[^/]+\.json$/;
 /** Which strategy a same-origin GET takes, or null to leave it to the network untouched. */
 const routeFor = (pathname, mode) => {
   if (pathname.startsWith("/_vercel/") || pathname === "/sw.js") return null;
-  if (mode === "navigate") return "shell";
+  if (mode === "navigate") return pathname === "/" ? "shell" : "document";
   if (pathname.startsWith("/assets/")) return "immutable";
   if (pathname.startsWith("/api/")) return "archive";
+  if (pathname === "/discovery.css") return "media";
   if (/^\/(textures|ktx2|sky|models)\//.test(pathname)) return "media";
   if (/\.(png|svg|ico|webmanifest|jpg)$/.test(pathname)) return "media";
   return null;
@@ -117,7 +118,9 @@ self.addEventListener("fetch", (event) => {
   if (url.origin !== self.location.origin) return;
   const route = routeFor(url.pathname, request.mode);
   if (route === "shell") event.respondWith(networkFirst(event, SHELL_CACHE, "/", 0));
-  else if (route === "immutable") event.respondWith(cacheFirst(event, ASSET_CACHE, 0, false));
+  else if (route === "document") {
+    event.respondWith(networkFirst(event, SHELL_CACHE, null, 0));
+  } else if (route === "immutable") event.respondWith(cacheFirst(event, ASSET_CACHE, 0, false));
   else if (route === "media") event.respondWith(cacheFirst(event, MEDIA_CACHE, MEDIA_LIMIT, true));
   else if (route === "archive") {
     event.respondWith(networkFirst(event, ARCHIVE_CACHE, null, ARCHIVE_LIMIT));
