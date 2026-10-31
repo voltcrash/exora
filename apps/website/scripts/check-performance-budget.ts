@@ -1,19 +1,18 @@
 import { readdir, readFile, stat } from "node:fs/promises";
 import { join, relative, resolve } from "node:path";
+import type { Manifest } from "vite-plus";
 import {
   budgetViolations,
   DEFAULT_JAVASCRIPT_BUDGET,
+  initialJavaScriptPaths,
   type EmittedJavaScript,
 } from "../src/performance-budget.ts";
 
 const dist = resolve(import.meta.dirname, "../dist");
 const assets = join(dist, "assets");
-const html = new TextDecoder().decode(await readFile(join(dist, "index.html")));
-const initialPaths = new Set(
-  [...html.matchAll(/<(?:script|link)[^>]+(?:src|href)="\/([^"]+\.js)"/g)].flatMap((match) =>
-    match[1] ? [match[1]] : [],
-  ),
-);
+const manifest = JSON.parse(await readFile(join(dist, ".vite/manifest.json"), "utf8")) as Manifest;
+// The application is loaded dynamically for startup recovery, but is still needed on every visit.
+const initialPaths = initialJavaScriptPaths(manifest, ["index.html", "src/main.tsx"]);
 
 const emitted: EmittedJavaScript[] = await Promise.all(
   (await readdir(assets))

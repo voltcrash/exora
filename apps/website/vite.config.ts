@@ -84,6 +84,7 @@ export default defineConfig(({ mode }) => {
       ],
     },
     build: {
+      manifest: true,
       chunkSizeWarningLimit: MAX_JAVASCRIPT_FILE_BYTES / 1_000,
       rolldownOptions: {
         output: {
