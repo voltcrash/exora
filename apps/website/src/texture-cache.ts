@@ -6,25 +6,29 @@ import type { RockyPaletteFamily } from "@exora/worldgen";
 import { configureKtx2Transcoder } from "./ktx2-transcoder.ts";
 
 export const createKeyedCache = <T>(
-  factory: (path: string) => T,
+  factory: (path: string, failed: () => void) => T,
   fallback: (path: string) => T,
 ): { get: (path: string) => T; size: () => number } => {
   const cache = new Map<string, T>();
-  const failed = new Set<string>();
+  const failed = new Map<string, number>();
 
   return {
     get(path: string): T {
-      if (failed.has(path)) return fallback(path);
+      if ((failed.get(path) ?? 0) > Date.now()) return fallback(path);
+      failed.delete(path);
 
       const existing = cache.get(path);
       if (existing) return existing;
 
       try {
-        const created = factory(path);
+        const created = factory(path, () => {
+          cache.delete(path);
+          failed.set(path, Date.now() + 60_000);
+        });
         cache.set(path, created);
         return created;
       } catch {
-        failed.add(path);
+        failed.set(path, Date.now() + 60_000);
         return fallback(path);
       }
     },
@@ -170,6 +174,15 @@ export const surfaceDetailSelectionForPalette = (
   }
 };
 
+const NEUTRAL_TEXTURE_URLS = {
+  normal:
+    "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR4nGNoaPj/HwAGggL/s75RMwAAAABJRU5ErkJggg==",
+  roughness:
+    "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR4nGNoaGj4DwAFhAKAjM1mJgAAAABJRU5ErkJggg==",
+  color:
+    "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR4nGP4////fwAJ+wP9KobjigAAAABJRU5ErkJggg==",
+} as const;
+
 const FALLBACK_NORMAL_PIXEL = new Uint8Array([128, 128, 255, 255]);
 const FALLBACK_ROUGHNESS_PIXEL = new Uint8Array([128, 128, 128, 255]);
 const FALLBACK_COLOR_PIXEL = new Uint8Array([255, 255, 255, 255]);
@@ -214,7 +227,8 @@ export const getSurfaceDetailTextures = (
   let cache = cachesByScene.get(scene);
   if (!cache) {
     cache = createKeyedCache<Texture>(
-      (path) => {
+      (path, failed) => {
+        let fallbackApplied = false;
         const isColor = path.includes("/chemistry/");
         const texture = new Texture(
           path,
@@ -224,6 +238,14 @@ export const getSurfaceDetailTextures = (
           undefined,
           undefined,
           () => {
+            if (fallbackApplied) return;
+            fallbackApplied = true;
+            failed();
+            texture.updateURL(
+              NEUTRAL_TEXTURE_URLS[
+                isColor ? "color" : path.endsWith("normal.ktx2") ? "normal" : "roughness"
+              ],
+            );
             console.warn(`[texture-cache] failed to load ${path}, using neutral fallback`);
           },
         );

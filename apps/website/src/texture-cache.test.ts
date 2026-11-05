@@ -68,3 +68,23 @@ test("selects chemistry and physical materials from the inferred rocky palette",
     surfaceDetailSelectionForPalette("silicate-neutral").chemistryStrength,
   );
 });
+
+test("asynchronous failures enter fallback and become retryable after cooldown", () => {
+  const clock = vi.spyOn(Date, "now").mockReturnValue(1);
+  try {
+    let fail = (): void => undefined;
+    const factory = vi.fn((_path: string, onFailure: () => void) => {
+      fail = onFailure;
+      return "loading";
+    });
+    const cache = createKeyedCache(factory, () => "neutral");
+    expect(cache.get("texture")).toBe("loading");
+    fail();
+    expect(cache.get("texture")).toBe("neutral");
+    clock.mockReturnValue(60_002);
+    expect(cache.get("texture")).toBe("loading");
+    expect(factory).toHaveBeenCalledTimes(2);
+  } finally {
+    clock.mockRestore();
+  }
+});
