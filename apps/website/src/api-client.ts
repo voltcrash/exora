@@ -1,3 +1,4 @@
+import { createAsyncResource } from "./async-resource.ts";
 import {
   type ContractSchema,
   type BlackHoleProfile,
@@ -118,30 +119,37 @@ const requestStarCollection = (
   }));
 
 let planetCatalog: PlanetCatalog | null = null;
-let planetCatalogLoad: Promise<PlanetCatalog | null> | null = null;
+const planetCatalogLoad = createAsyncResource<PlanetCatalog>({ retryMs: PLANET_CATALOG_RETRY_MS });
 
 /**
  * Starts the one download of the archive snapshot. Planet search, browse and name lookups use the
  * API until it has loaded, and keep using it if it fails.
  */
 export const preloadPlanetCatalog = (fetcher?: Fetcher): Promise<PlanetCatalog | null> =>
-  (planetCatalogLoad ??= import("./planet-catalog.ts")
-    .then(({ loadPlanetCatalog }) => loadPlanetCatalog(fetcher))
-    .then((catalog) => (planetCatalog = catalog))
+  planetCatalogLoad
+    .get(() =>
+      import("./planet-catalog.ts")
+        .then(({ loadPlanetCatalog }) => loadPlanetCatalog(fetcher))
+        .then((catalog) => (planetCatalog = catalog)),
+    )
     .catch((error: unknown) => {
       console.warn("Exora could not load its planet catalog; asking the archive instead.", error);
-      setTimeout(() => {
-        planetCatalogLoad = null;
-      }, PLANET_CATALOG_RETRY_MS);
       return null;
-    }));
+    });
 
 /** Fetches the catalog once the browser is idle, unless the connection asks to save data. */
 export const prefetchPlanetCatalogWhenIdle = (): (() => void) => {
   const { connection } = navigator as Navigator & {
     connection?: { effectiveType?: string; saveData?: boolean };
   };
-  if (planetCatalogLoad || connection?.saveData || connection?.effectiveType?.endsWith("2g")) {
+  if (
+    (planetCatalogLoad.state.status !== "idle" &&
+      !(
+        planetCatalogLoad.state.status === "failed" && planetCatalogLoad.state.retryAt <= Date.now()
+      )) ||
+    connection?.saveData ||
+    connection?.effectiveType?.endsWith("2g")
+  ) {
     return () => undefined;
   }
   const prefetch = (): void => void preloadPlanetCatalog();

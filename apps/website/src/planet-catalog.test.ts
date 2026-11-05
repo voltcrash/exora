@@ -44,7 +44,7 @@ test("a loaded snapshot answers search, browse pages and exact names without the
   expect(await client.preloadPlanetCatalog(assets)).not.toBeNull();
   expect(await client.preloadPlanetCatalog(assets)).not.toBeNull();
   expect(assets).toHaveBeenCalledOnce();
-  expect(assets.mock.calls[0]?.[1]).toEqual({ priority: "low" });
+  expect(assets.mock.calls[0]?.[1]).toEqual({ priority: "low", signal: expect.any(AbortSignal) });
 
   const api = vi.fn(async () => new Response(null, { status: 503 }));
   const search = await client.searchPlanets(" kepler 18 ", { fetcher: api });
