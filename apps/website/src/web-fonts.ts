@@ -7,22 +7,21 @@ const ARRIVED = "exora:web-fonts-ready";
 // A backgrounded tab never runs an animation frame, so the request cannot hang off one alone.
 const HIDDEN_TAB_FALLBACK_MS = 200;
 
-let arrived = false;
-let requested = false;
+let state: "idle" | "loading" | "loaded" | "failed" = "idle";
 
-const announce = (): void => {
-  arrived = true;
+const announce = (next: "loaded" | "failed"): void => {
+  state = next;
   window.dispatchEvent(new Event(ARRIVED));
 };
 
 const request = (): void => {
-  if (requested) return;
-  requested = true;
+  if (state !== "idle") return;
+  state = "loading";
   // The face ships with the bundle and is declared up front, but WebKit settles
   // `document.fonts.ready` before it has begun fetching it, so it is asked for by name.
   void Promise.all(FACES.map((face) => document.fonts.load(`1em "${face}"`))).then(
-    announce,
-    announce,
+    () => announce("loaded"),
+    () => announce("failed"),
   );
 };
 
@@ -39,9 +38,10 @@ export const loadWebFonts = (): void => {
   window.setTimeout(request, HIDDEN_TAB_FALLBACK_MS);
 };
 
-export const webFontsArrived = (): boolean => arrived;
+export const webFontsSettled = (): boolean => state === "loaded" || state === "failed";
 
-export const onWebFontsReady = (listener: () => void): (() => void) => {
+export const onWebFontsSettled = (listener: () => void): (() => void) => {
   window.addEventListener(ARRIVED, listener);
+  if (webFontsSettled()) listener();
   return () => window.removeEventListener(ARRIVED, listener);
 };
