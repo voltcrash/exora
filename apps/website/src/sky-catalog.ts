@@ -1,3 +1,4 @@
+import { createAsyncResource } from "./async-resource.ts";
 import { temperatureToRgb } from "@exora/worldgen";
 
 export const SKY_CATALOG_URL = "/sky/hyg-v44-vmag65.bin";
@@ -148,28 +149,22 @@ export const parseSkyCatalog = (buffer: ArrayBuffer): SkyCatalog => {
   };
 };
 
-let pendingCatalog: Promise<SkyCatalog | null> | null = null;
+const pendingCatalog = createAsyncResource<SkyCatalog>();
 
-export const loadSkyCatalog = async (): Promise<SkyCatalog | null> => {
-  pendingCatalog ??= (async () => {
-    try {
-      const response = await fetch(SKY_CATALOG_URL);
-      if (!response.ok) {
+export const loadSkyCatalog = (): Promise<SkyCatalog | null> =>
+  pendingCatalog
+    .get(async () => {
+      const response = await fetch(SKY_CATALOG_URL, { signal: AbortSignal.timeout(10_000) });
+      if (!response.ok)
         throw new Error(`Sky catalogue request failed with status ${response.status}.`);
-      }
       return parseSkyCatalog(await response.arrayBuffer());
-    } catch (error) {
+    })
+    .catch((error: unknown) => {
       console.warn("[sky-catalog] falling back to the seeded starfield", error);
       return null;
-    }
-  })();
+    });
 
-  return pendingCatalog;
-};
-
-export const resetSkyCatalogForTesting = (): void => {
-  pendingCatalog = null;
-};
+export const resetSkyCatalogForTesting = (): void => pendingCatalog.clear();
 
 export const projectSky = (
   catalog: SkyCatalog,
