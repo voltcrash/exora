@@ -125,6 +125,8 @@ const PlanetResult = ({
 export const PlanetCatalog = ({ onSelect }: PlanetCatalogProps) => {
   const surpriseControllerRef = useRef<AbortController | null>(null);
   const pageControllerRef = useRef<AbortController | null>(null);
+  const [retry, setRetry] = useState(0);
+  const [pageError, setPageError] = useState(false);
   const [query, setQuery] = useState("");
   const [planets, setPlanets] = useState<ExoplanetProfile[]>([]);
   const [nextCursor, setNextCursor] = useState<string | null>(null);
@@ -152,6 +154,8 @@ export const PlanetCatalog = ({ onSelect }: PlanetCatalogProps) => {
     pageControllerRef.current?.abort();
     pageControllerRef.current = null;
     setLoadingMore(false);
+    setPageError(false);
+    setSuggestion(null);
     setNextCursor(null);
 
     const normalizedQuery = query.trim();
@@ -226,7 +230,7 @@ export const PlanetCatalog = ({ onSelect }: PlanetCatalogProps) => {
       window.clearTimeout(delay);
       controller.abort();
     };
-  }, [activeCategory, filtersOpen, query]);
+  }, [activeCategory, filtersOpen, query, retry]);
 
   const loadMore = useCallback((): void => {
     if (!nextCursor || pageControllerRef.current) return;
@@ -234,6 +238,7 @@ export const PlanetCatalog = ({ onSelect }: PlanetCatalogProps) => {
     const controller = new AbortController();
     pageControllerRef.current = controller;
     setLoadingMore(true);
+    setPageError(false);
     void loadPlanetFilterPool({ cursor: nextCursor, signal: controller.signal })
       .then((result) => {
         if (controller.signal.aborted) return;
@@ -243,7 +248,7 @@ export const PlanetCatalog = ({ onSelect }: PlanetCatalogProps) => {
       .catch((error: unknown) => {
         if (controller.signal.aborted) return;
         console.error(error);
-        setNextCursor(null);
+        setPageError(true);
       })
       .finally(() => {
         if (pageControllerRef.current !== controller) return;
@@ -253,7 +258,7 @@ export const PlanetCatalog = ({ onSelect }: PlanetCatalogProps) => {
   }, [nextCursor]);
 
   const sentinelRef = useInfiniteScroll<HTMLLIElement>({
-    enabled: searchState === "ready" && nextCursor !== null && !loadingMore,
+    enabled: searchState === "ready" && nextCursor !== null && !loadingMore && !pageError,
     onLoadMore: loadMore,
   });
 
@@ -287,6 +292,7 @@ export const PlanetCatalog = ({ onSelect }: PlanetCatalogProps) => {
     void discoverRandomPlanet({ signal: controller.signal })
       .then((result) => {
         if (controller.signal.aborted) return;
+        setSurpriseState("idle");
         onSelect(result.planet, result.cached);
       })
       .catch((error: unknown) => {
@@ -468,7 +474,10 @@ export const PlanetCatalog = ({ onSelect }: PlanetCatalogProps) => {
           <ResultState kind="loading">Finding confirmed worlds…</ResultState>
         ) : null}
         {searchState === "error" ? (
-          <ResultState kind="error">The search could not be completed.</ResultState>
+          <ResultState kind="error">
+            The search could not be completed.{" "}
+            <Button onClick={() => setRetry((value) => value + 1)}>Retry search</Button>
+          </ResultState>
         ) : null}
         {searchState === "ready" && visiblePlanets.length === 0 ? (
           <ResultState kind="empty">
@@ -484,7 +493,13 @@ export const PlanetCatalog = ({ onSelect }: PlanetCatalogProps) => {
           : null}
         {searchState === "ready" && nextCursor !== null ? (
           <ResultState kind="more" ref={sentinelRef} testId="catalog-load-more">
-            {loadingMore ? "Loading more worlds…" : "Scroll for more worlds"}
+            {loadingMore ? (
+              "Loading more worlds…"
+            ) : (
+              <Button onClick={loadMore}>
+                {pageError ? "Retry loading more" : "Load more worlds"}
+              </Button>
+            )}
           </ResultState>
         ) : null}
       </ResultList>

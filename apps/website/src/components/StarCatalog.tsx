@@ -1,3 +1,4 @@
+import { Button } from "./ui/Button.tsx";
 import type { StarProfile } from "@exora/contracts";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { browseStars, discoverRandomStar, discoverStars, searchStars } from "../api-client.ts";
@@ -86,6 +87,8 @@ const StarResult = ({
 export const StarCatalog = ({ onSelect }: StarCatalogProps) => {
   const surpriseControllerRef = useRef<AbortController | null>(null);
   const pageControllerRef = useRef<AbortController | null>(null);
+  const [retry, setRetry] = useState(0);
+  const [pageError, setPageError] = useState(false);
   const [query, setQuery] = useState("");
   const [stars, setStars] = useState<StarProfile[]>([]);
   const [nextCursor, setNextCursor] = useState<string | null>(null);
@@ -109,6 +112,8 @@ export const StarCatalog = ({ onSelect }: StarCatalogProps) => {
     pageControllerRef.current?.abort();
     pageControllerRef.current = null;
     setLoadingMore(false);
+    setPageError(false);
+    setSuggestion(null);
     setNextCursor(null);
 
     if (activeCategory) {
@@ -181,7 +186,7 @@ export const StarCatalog = ({ onSelect }: StarCatalogProps) => {
       window.clearTimeout(delay);
       controller.abort();
     };
-  }, [activeCategory, query]);
+  }, [activeCategory, query, retry]);
 
   const loadMore = useCallback((): void => {
     if (!nextCursor || pageControllerRef.current) return;
@@ -189,6 +194,7 @@ export const StarCatalog = ({ onSelect }: StarCatalogProps) => {
     const controller = new AbortController();
     pageControllerRef.current = controller;
     setLoadingMore(true);
+    setPageError(false);
     void browseStars({ cursor: nextCursor, signal: controller.signal })
       .then((result) => {
         if (controller.signal.aborted) return;
@@ -198,7 +204,7 @@ export const StarCatalog = ({ onSelect }: StarCatalogProps) => {
       .catch((error: unknown) => {
         if (controller.signal.aborted) return;
         console.error(error);
-        setNextCursor(null);
+        setPageError(true);
       })
       .finally(() => {
         if (pageControllerRef.current !== controller) return;
@@ -208,7 +214,7 @@ export const StarCatalog = ({ onSelect }: StarCatalogProps) => {
   }, [nextCursor]);
 
   const sentinelRef = useInfiniteScroll<HTMLLIElement>({
-    enabled: searchState === "ready" && nextCursor !== null && !loadingMore,
+    enabled: searchState === "ready" && nextCursor !== null && !loadingMore && !pageError,
     onLoadMore: loadMore,
   });
 
@@ -224,6 +230,7 @@ export const StarCatalog = ({ onSelect }: StarCatalogProps) => {
     void discoverRandomStar({ signal: controller.signal })
       .then((result) => {
         if (controller.signal.aborted) return;
+        setSurpriseState("idle");
         onSelect(result.star, result.cached);
       })
       .catch((error: unknown) => {
@@ -304,7 +311,10 @@ export const StarCatalog = ({ onSelect }: StarCatalogProps) => {
           <ResultState kind="loading">Finding stars…</ResultState>
         ) : null}
         {searchState === "error" ? (
-          <ResultState kind="error">The search could not be completed.</ResultState>
+          <ResultState kind="error">
+            The search could not be completed.{" "}
+            <Button onClick={() => setRetry((value) => value + 1)}>Retry search</Button>
+          </ResultState>
         ) : null}
         {searchState === "ready" && stars.length === 0 ? (
           <ResultState kind="empty">
@@ -318,7 +328,13 @@ export const StarCatalog = ({ onSelect }: StarCatalogProps) => {
           : null}
         {searchState === "ready" && nextCursor !== null ? (
           <ResultState kind="more" ref={sentinelRef} testId="star-catalog-load-more">
-            {loadingMore ? "Loading more stars…" : "Scroll for more stars"}
+            {loadingMore ? (
+              "Loading more stars…"
+            ) : (
+              <Button onClick={loadMore}>
+                {pageError ? "Retry loading more" : "Load more stars"}
+              </Button>
+            )}
           </ResultState>
         ) : null}
       </ResultList>
