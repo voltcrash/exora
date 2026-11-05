@@ -478,7 +478,7 @@ const createSceneHost = (canvas: HTMLCanvasElement): SceneHost => {
 
 const sceneHostRegistry = createSceneHostRegistry(createSceneHost);
 
-export const acquireSceneHost = (canvas: HTMLCanvasElement): SceneHost => {
+export const acquireSceneHost = (canvas: HTMLCanvasElement): Promise<SceneHost> => {
   return sceneHostRegistry.acquire(canvas);
 };
 
