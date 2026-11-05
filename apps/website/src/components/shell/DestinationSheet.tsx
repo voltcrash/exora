@@ -74,13 +74,18 @@ export const DestinationSheet = ({ children }: { children: ReactNode }) => {
       const current = drag.current;
       drag.current = null;
       if (!sheet) return;
-      if (current && sheet.hasPointerCapture(current.pointerId)) sheet.releasePointerCapture(current.pointerId);
+      if (current && sheet.hasPointerCapture(current.pointerId))
+        sheet.releasePointerCapture(current.pointerId);
       delete sheet.dataset.dragging;
       sheet.style.removeProperty("height");
     };
     window.addEventListener("resize", cancel);
     window.addEventListener("blur", cancel);
-    return () => { window.removeEventListener("resize", cancel); window.removeEventListener("blur", cancel); cancel(); };
+    return () => {
+      window.removeEventListener("resize", cancel);
+      window.removeEventListener("blur", cancel);
+      cancel();
+    };
   }, []);
 
   const onPointerDown = (event: PointerEvent<HTMLDivElement>): void => {
