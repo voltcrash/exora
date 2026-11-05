@@ -44,3 +44,37 @@ test("catalog results follow deferred filters and recover after reset", async ()
     .element(page.getByRole("slider", { name: "Composition", exact: true }))
     .toHaveValue("50");
 });
+
+test("a failed page keeps its cursor and can be retried", async () => {
+  let pages = 0;
+  const second = { ...featuredPlanet, id: "second-world", name: "Second world" };
+  vi.stubGlobal("fetch", async (input: string | URL | Request) => {
+    const url = new URL(
+      typeof input === "string" ? input : input instanceof URL ? input.href : input.url,
+      window.location.origin,
+    );
+    if (!url.pathname.startsWith("/api/")) return new Response(null, { status: 503 });
+    const more = url.searchParams.get("cursor") === "first";
+    if (more && ++pages === 1) return new Response(null, { status: 502 });
+    return Response.json({
+      data: [more ? second : featuredPlanet],
+      meta: {
+        cached: false,
+        count: 1,
+        query: "physical-controls",
+        source: "NASA Exoplanet Archive",
+        nextCursor: more ? null : "first",
+      },
+    });
+  });
+  container = document.createElement("div");
+  document.body.append(container);
+  root = createRoot(container);
+  root.render(<PlanetCatalog onSelect={vi.fn()} />);
+  await expect
+    .element(page.getByRole("button", { name: "Retry loading more", exact: true }))
+    .toBeVisible();
+  await userEvent.click(page.getByRole("button", { name: "Retry loading more", exact: true }));
+  await expect.element(page.getByText("Second world", { exact: true })).toBeVisible();
+  expect(pages).toBe(2);
+});
