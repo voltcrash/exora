@@ -69,17 +69,22 @@ export const BlackHoleExperience = ({ blackHole, host, travelPhase }: BlackHoleE
   useEffect(() => {
     if (!host) return;
     let abandoned = false;
+    const controller = new AbortController();
     setSceneState("loading");
     void import("../black-hole-scene.ts")
       .then(({ createBlackHoleWorld }) =>
-        host.mountWorld(() =>
-          createBlackHoleWorld(host, {
-            blackHole,
-            onFirstFrame: () => {
-              if (!abandoned) setSceneState("ready");
-            },
-          }),
-        ),
+        abandoned
+          ? null
+          : host.mountWorld(
+              () =>
+                createBlackHoleWorld(host, {
+                  blackHole,
+                  onFirstFrame: () => {
+                    if (!abandoned) setSceneState("ready");
+                  },
+                }),
+              controller.signal,
+            ),
       )
       .catch((error: unknown) => {
         console.error(error);
@@ -87,6 +92,7 @@ export const BlackHoleExperience = ({ blackHole, host, travelPhase }: BlackHoleE
       });
     return () => {
       abandoned = true;
+      controller.abort();
     };
   }, [blackHole, host]);
 

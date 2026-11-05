@@ -96,17 +96,22 @@ export const StarExperience = ({
   useEffect(() => {
     if (!host) return;
     let abandoned = false;
+    const controller = new AbortController();
     setSceneState("loading");
     void import("../star-scene.ts")
       .then(({ createStarWorld }) =>
-        host.mountWorld(() =>
-          createStarWorld(host, {
-            star,
-            onFirstFrame: () => {
-              if (!abandoned) setSceneState("ready");
-            },
-          }),
-        ),
+        abandoned
+          ? null
+          : host.mountWorld(
+              () =>
+                createStarWorld(host, {
+                  star,
+                  onFirstFrame: () => {
+                    if (!abandoned) setSceneState("ready");
+                  },
+                }),
+              controller.signal,
+            ),
       )
       .catch((error: unknown) => {
         console.error(error);
@@ -114,6 +119,7 @@ export const StarExperience = ({
       });
     return () => {
       abandoned = true;
+      controller.abort();
     };
   }, [host, star]);
 

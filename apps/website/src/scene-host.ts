@@ -63,6 +63,7 @@ export interface SceneHost {
   onTravelPhase: (listener: (phase: TravelPhase) => void) => () => void;
   mountWorld: <World extends MountedWorld>(
     build: () => Promise<World> | World,
+    signal?: AbortSignal,
   ) => Promise<World | null>;
   onXrStatus: (listener: (status: XrStatus) => void) => () => void;
   onRendererStatus: (listener: (status: RendererStatus) => void) => () => void;
@@ -289,15 +290,21 @@ const createSceneHost = (canvas: HTMLCanvasElement): SceneHost => {
 
   const mountWorld = async <World extends MountedWorld>(
     build: () => Promise<World> | World,
+    signal?: AbortSignal,
   ): Promise<World | null> => {
     const token = (mountToken += 1);
+    if (signal?.aborted || disposed) return null;
     if (worldMount.current) await departFromWorld();
-    if (token !== mountToken || disposed) return null;
+    if (token !== mountToken || disposed || signal?.aborted) return null;
 
     let world: World | null;
     try {
-      world = await worldMount.replace(build, () => token === mountToken && !disposed);
+      world = await worldMount.replace(
+        build,
+        () => token === mountToken && !disposed && !signal?.aborted,
+      );
     } catch (error) {
+      if (token !== mountToken || disposed || signal?.aborted) return null;
       endGlide(null, false);
       departure = null;
       travelOrigin = null;

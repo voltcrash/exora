@@ -228,21 +228,26 @@ export const SystemExperience = ({
   useEffect(() => {
     if (!host) return;
     let abandoned = false;
+    const controller = new AbortController();
     setSceneState("loading");
 
     void import("../system-scene.ts")
       .then(({ createSystemWorld }) =>
-        host.mountWorld(() =>
-          createSystemWorld(host, {
-            hostName: hostStar,
-            planets,
-            onSelectHostStar: () => void openHostStar(),
-            onSelectWorld: (planet) => onSelectPlanet(planet, cached),
-            onFirstFrame: () => {
-              if (!abandoned) setSceneState("ready");
-            },
-          }),
-        ),
+        abandoned
+          ? null
+          : host.mountWorld(
+              () =>
+                createSystemWorld(host, {
+                  hostName: hostStar,
+                  planets,
+                  onSelectHostStar: () => void openHostStar(),
+                  onSelectWorld: (planet) => onSelectPlanet(planet, cached),
+                  onFirstFrame: () => {
+                    if (!abandoned) setSceneState("ready");
+                  },
+                }),
+              controller.signal,
+            ),
       )
       .then((world: SystemWorld | null) => {
         if (!world || abandoned) return;
@@ -260,6 +265,7 @@ export const SystemExperience = ({
 
     return () => {
       abandoned = true;
+      controller.abort();
       worldRef.current = null;
     };
   }, [cached, host, hostStar, onSelectHostStar, onSelectPlanet, onSelectStar, planets]);

@@ -247,33 +247,41 @@ export const PlanetExperience = ({
 
     const mount = subsystemActive
       ? import("../subsystem-scene.ts").then(({ createSubsystemWorld }) =>
-          host.mountWorld(() =>
-            createSubsystemWorld(host, {
-              onFirstFrame: () => {
-                if (!abandoned) setSceneState("ready");
-              },
-              onSelectMoon: (name) => {
-                const destination = findSolarWorldRef.current?.(name);
-                if (destination) onSelectPlanet(destination, true);
-              },
-              planet,
-              subsystem,
-            }),
-          ),
+          abandoned
+            ? null
+            : host.mountWorld(
+                () =>
+                  createSubsystemWorld(host, {
+                    onFirstFrame: () => {
+                      if (!abandoned) setSceneState("ready");
+                    },
+                    onSelectMoon: (name) => {
+                      const destination = findSolarWorldRef.current?.(name);
+                      if (destination) onSelectPlanet(destination, true);
+                    },
+                    planet,
+                    subsystem,
+                  }),
+                generation.signal,
+              ),
         )
       : import("../planet-scene.ts").then(({ createPlanetWorld }) =>
-          host.mountWorld(() =>
-            createPlanetWorld(host, {
-              signal: generation.signal,
-              planet,
-              recipe,
-              onViewModeChange: setViewMode,
-              ...(custom ? {} : { onSelectHostStar: () => void openHostStar() }),
-              onFirstFrame: () => {
-                if (!abandoned) setSceneState("ready");
-              },
-            }),
-          ),
+          abandoned
+            ? null
+            : host.mountWorld(
+                () =>
+                  createPlanetWorld(host, {
+                    signal: generation.signal,
+                    planet,
+                    recipe,
+                    onViewModeChange: setViewMode,
+                    ...(custom ? {} : { onSelectHostStar: () => void openHostStar() }),
+                    onFirstFrame: () => {
+                      if (!abandoned) setSceneState("ready");
+                    },
+                  }),
+                generation.signal,
+              ),
         );
 
     void mount.catch((error: unknown) => {
