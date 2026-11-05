@@ -16,13 +16,13 @@ import { requestDeadline } from "./request-deadline.ts";
 
 type Fetcher = (input: string | URL | Request, init?: RequestInit) => Promise<Response>;
 
-const OBJECT_LOOKUP_TIMEOUT_MS = 8_000;
+const OBJECT_LOOKUP_TIMEOUT_MS = 12_000;
 const PLANET_CATALOG_RETRY_MS = 60_000;
 const MAX_PLANET_NAME_LENGTH = 100;
 
-const PLANET_COLLECTION_TIMEOUT_MS = 8_000;
-const STAR_COLLECTION_TIMEOUT_MS = 10_000;
-const BLACK_HOLE_COLLECTION_TIMEOUT_MS = 10_000;
+const PLANET_COLLECTION_TIMEOUT_MS = 30_000;
+const STAR_COLLECTION_TIMEOUT_MS = 12_000;
+const BLACK_HOLE_COLLECTION_TIMEOUT_MS = 12_000;
 const EPHEMERIS_TIMEOUT_MS = 20_000;
 const POPULATION_TIMEOUT_MS = 30_000;
 

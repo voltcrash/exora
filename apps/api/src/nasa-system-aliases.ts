@@ -70,6 +70,7 @@ export class NasaSystemAliasRepository implements SystemAliasRepository {
     if (cached !== undefined) return Promise.resolve({ cached: true, value: cached });
 
     return this.#requests.run(key, async () => {
+      const budget = AbortSignal.timeout(6_000);
       for (const candidate of candidates) {
         const url = new URL(NASA_SYSTEM_ALIASES_ENDPOINT);
         url.searchParams.set("objname", candidate);
@@ -78,7 +79,7 @@ export class NasaSystemAliasRepository implements SystemAliasRepository {
         try {
           response = await this.#fetcher(url, {
             headers: { accept: "application/json" },
-            signal: AbortSignal.timeout(this.#timeoutMs),
+            signal: AbortSignal.any([budget, AbortSignal.timeout(this.#timeoutMs)]),
           });
         } catch (error) {
           throw new NasaArchiveError("NASA system-alias lookup failed.", { cause: error });
@@ -95,13 +96,13 @@ export class NasaSystemAliasRepository implements SystemAliasRepository {
         if (payload.manifest?.lookup_status === "OK" && typeof resolvedName === "string") {
           const hostName = resolvedName.trim();
           if (hostName) {
-            this.#cache.set(key, hostName, requestTime + this.#cacheTtlMs);
+            this.#cache.set(key, hostName, this.#now() + this.#cacheTtlMs);
             return { cached: false, value: hostName };
           }
         }
       }
 
-      this.#cache.set(key, null, requestTime + this.#cacheTtlMs);
+      this.#cache.set(key, null, this.#now() + this.#cacheTtlMs);
       return { cached: false, value: null };
     });
   }

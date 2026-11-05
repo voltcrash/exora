@@ -216,8 +216,9 @@ export class JplHorizonsRepository implements HorizonsRepository {
       return target;
     });
     const epochIso = epoch.toISOString();
+    const budget = AbortSignal.timeout(17_000);
     const states = await concurrentMap(targets, this.#upstreamConcurrency, (target) =>
-      this.#position(target, epoch, epochIso),
+      this.#position(target, epoch, epochIso, budget),
     );
     return {
       cached: states.every(({ cached }) => cached),
@@ -231,6 +232,7 @@ export class JplHorizonsRepository implements HorizonsRepository {
     target: HorizonsTarget,
     epoch: Date,
     epochIso: string,
+    budget: AbortSignal,
   ): Promise<{ cached: boolean; retrievedAt: string; stale: boolean; value: EphemerisVector }> {
     const key = `${target.naifId}:${epochIso}`;
     const now = this.#now();
@@ -249,7 +251,7 @@ export class JplHorizonsRepository implements HorizonsRepository {
       try {
         const response = await this.#fetcher(requestUrl(target, epoch), {
           headers: { accept: "application/json" },
-          signal: AbortSignal.timeout(this.#timeoutMs),
+          signal: AbortSignal.any([budget, AbortSignal.timeout(this.#timeoutMs)]),
         });
         if (!response.ok)
           throw new HorizonsError(`Horizons request failed with ${response.status}.`);
@@ -257,14 +259,14 @@ export class JplHorizonsRepository implements HorizonsRepository {
         const value = parseHorizonsVector(payload, target, epochIso);
         const retrievedAt = new Date(this.#now()).toISOString();
         this.#promote(key, {
-          freshUntil: now + this.#cacheTtlMs,
+          freshUntil: this.#now() + this.#cacheTtlMs,
           retrievedAt,
-          staleUntil: now + this.#staleTtlMs,
+          staleUntil: this.#now() + this.#staleTtlMs,
           value,
         });
         return { cached: false, retrievedAt, stale: false, value };
       } catch (error) {
-        if (cached && cached.staleUntil > now) {
+        if (cached && cached.staleUntil > this.#now()) {
           this.#promote(key, cached);
           return {
             cached: true,
