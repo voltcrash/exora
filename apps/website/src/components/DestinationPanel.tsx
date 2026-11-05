@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import type { DestinationPanelModel, PanelBlock } from "../destination-panel.ts";
 import { readable, readableUnit } from "../readable.ts";
 import { bindStyles } from "../styles/bind-styles.ts";
@@ -117,6 +117,9 @@ export const DestinationPanel = ({ fps, model }: DestinationPanelProps) => {
   const [requested, setRequested] = useState("");
   const tabs = model.tabs;
   const active = tabs.find((tab) => tab.id === requested) ?? tabs[0];
+  useEffect(() => {
+    if (requested && !tabs.some((tab) => tab.id === requested)) setRequested("");
+  }, [requested, tabs]);
   const tabList = useTabList({
     label: `${model.title} sections`,
     list: "destination",

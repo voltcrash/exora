@@ -124,7 +124,8 @@ const Scatter = ({
   const [frame, setFrame] = useState<HTMLDivElement | null>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const { height, width } = useElementSize(frame);
-  const [hovered, setHovered] = useState<PlottedWorld | null>(null);
+  const [candidate, setHovered] = useState<PlottedWorld | null>(null);
+  const hovered = candidate && plotted.includes(candidate) ? candidate : null;
   const plotWidth = Math.max(width - PLOT_MARGIN.left - PLOT_MARGIN.right, 1);
   const plotHeight = Math.max(height - PLOT_MARGIN.top - PLOT_MARGIN.bottom, 1);
   const nearest = useMemo(() => createNearestIndex(plotted), [plotted]);

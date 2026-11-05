@@ -59,7 +59,11 @@ export const SignalChart = ({
   yDomain,
   yTicks,
 }: SignalChartProps) => {
-  const [active, setActive] = useState<number | null>(null);
+  const [selected, setSelected] = useState<(typeof points)[number] | null>(null);
+  const selectedIndex = selected ? points.indexOf(selected) : -1;
+  const active = selectedIndex >= 0 ? selectedIndex : null;
+  const setActive = (index: number | null): void =>
+    setSelected(index === null ? null : (points[index] ?? null));
   const titleId = useId();
   const descriptionId = useId();
   const scaleX = (x: number): number =>
@@ -87,6 +91,7 @@ export const SignalChart = ({
   };
 
   const onKeyDown = (event: KeyboardEvent<SVGSVGElement>): void => {
+    if (points.length === 0) return;
     const step = Math.max(1, Math.round(points.length / 40));
     if (event.key === "ArrowRight" || event.key === "ArrowLeft") {
       event.preventDefault();
