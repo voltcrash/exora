@@ -37,6 +37,15 @@ export const createRateLimiter = ({
   maxClients = DEFAULT_MAX_CLIENTS,
   windowMs,
 }: RateLimiterOptions): RateLimiter => {
+  if (
+    !Number.isInteger(limit) ||
+    limit <= 0 ||
+    !Number.isInteger(maxClients) ||
+    maxClients <= 0 ||
+    !Number.isFinite(windowMs) ||
+    windowMs <= 0
+  )
+    throw new RangeError("Rate-limit configuration must be positive and finite.");
   // Map insertion order tracks client recency.
   const windows = new Map<string, Window>();
 
