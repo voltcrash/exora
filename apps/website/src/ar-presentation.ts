@@ -246,6 +246,8 @@ export const createArPresentation = (scene: Scene): ArPresentation => {
   document.addEventListener("pointercancel", onPointerEnd, { capture: true, passive: false });
 
   const resetWorld = (world: WorldPresentation | null): void => {
+    activePointers.clear();
+    resetGestureBaseline();
     currentWorld?.endAr();
     currentWorld = world;
     latestHit = null;

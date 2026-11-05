@@ -2147,6 +2147,11 @@ export const createPlanetWorld = async (
   };
 
   return {
+    prepareImmersive: () => {
+      if (viewState === "entering" || viewState === "leaving")
+        finishViewTransition(viewState === "entering");
+      pressedMovementKeys.clear();
+    },
     farthestView: () => (viewState === "surface" ? SURFACE_DEPARTURE_RADIUS : undefined),
     restoreDesktopView: () => syncDesktopCamera(viewState === "surface"),
     dispose: () => {

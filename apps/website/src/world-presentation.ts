@@ -47,6 +47,8 @@ export const createWorldPresentation = async (scene: Scene): Promise<WorldPresen
   let placed = false;
   let surfaceY = 0;
   let captured = false;
+  let active = false;
+  let disposed = false;
   let frozenMeshes: readonly AbstractMesh[] = [];
 
   const applyScale = (requestedScale: number): void => {
@@ -81,11 +83,17 @@ export const createWorldPresentation = async (scene: Scene): Promise<WorldPresen
       }));
     },
     dispose: () => {
+      if (disposed) return;
+      disposed = true;
+      active = false;
+      placed = false;
       proxy.removeBehavior(drag);
       proxy.removeBehavior(scale);
       scene.onBeforeRenderObservable.remove(scaleObserver);
     },
     beginAr: () => {
+      if (disposed || active || !captured) return;
+      active = true;
       for (const mesh of frozenMeshes) mesh.unfreezeWorldMatrix();
       placed = false;
       proxy.position.setAll(0);
@@ -98,6 +106,8 @@ export const createWorldPresentation = async (scene: Scene): Promise<WorldPresen
       proxy.addBehavior(scale);
     },
     endAr: () => {
+      if (disposed || !active) return;
+      active = false;
       proxy.removeBehavior(drag);
       proxy.removeBehavior(scale);
       placed = false;
@@ -118,6 +128,7 @@ export const createWorldPresentation = async (scene: Scene): Promise<WorldPresen
       proxy.position.addInPlace(delta);
     },
     place: (position) => {
+      if (disposed || !active || placed) return;
       surfaceY = position.y;
       proxy.position.copyFrom(position);
       proxy.position.y = surfaceY - minimumY * proxy.scaling.y;
