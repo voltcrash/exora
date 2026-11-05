@@ -1,3 +1,4 @@
+import { createOperationGate } from "../operation-gate.ts";
 import type { ExoplanetProfile } from "@exora/contracts";
 import {
   useEffect,
@@ -460,6 +461,8 @@ interface PlanetAtlasProps {
  */
 export const PlanetAtlas = ({ onSelect }: PlanetAtlasProps) => {
   const [worlds, setWorlds] = useState<AtlasWorld[] | null>(null);
+  const navigation = useRef(createOperationGate()).current;
+  const [retry, setRetry] = useState(0);
   const [failed, setFailed] = useState(false);
   const [tab, setTab] = useState<AtlasTab>("radius");
   const [hidden, setHidden] = useState<ReadonlySet<MethodGroup>>(new Set());
@@ -476,6 +479,7 @@ export const PlanetAtlas = ({ onSelect }: PlanetAtlasProps) => {
 
   useEffect(() => {
     let active = true;
+    setFailed(false);
     population()
       .then((loaded) => {
         if (active) setWorlds(loaded);
@@ -485,8 +489,9 @@ export const PlanetAtlas = ({ onSelect }: PlanetAtlasProps) => {
       });
     return () => {
       active = false;
+      navigation.cancel();
     };
-  }, []);
+  }, [navigation, retry]);
 
   const view: AtlasView = tab === "mass" ? "mass" : "radius";
   const plotted = useMemo(
@@ -502,8 +507,10 @@ export const PlanetAtlas = ({ onSelect }: PlanetAtlasProps) => {
   }, [matches, worlds]);
 
   const travelTo = async (world: AtlasWorld): Promise<void> => {
+    const current = navigation.start();
     setTravel({ error: false, name: world.name });
     const result = await loadPlanetByName(world.name).catch(() => null);
+    if (!current()) return;
     if (result && hasRenderer(result.planet)) {
       onSelect(result.planet, result.cached);
       return;
@@ -593,7 +600,9 @@ export const PlanetAtlas = ({ onSelect }: PlanetAtlasProps) => {
         {failed ? (
           <p className={cx("atlas-status")} role="status">
             The NASA Exoplanet Archive could not be reached. The atlas needs the whole catalogue, so
-            try again in a moment.
+            <button type="button" onClick={() => setRetry((value) => value + 1)}>
+              Retry atlas
+            </button>
           </p>
         ) : !worlds ? (
           <p className={cx("atlas-status")} role="status">
@@ -615,7 +624,7 @@ export const PlanetAtlas = ({ onSelect }: PlanetAtlasProps) => {
       <p className={cx("atlas-caption")} role="status">
         {travel
           ? travel.error
-            ? `${travel.name} could not be opened. Its archive record may lack the size needed to render it.`
+            ? `${travel.name} could not be opened. Check your connection or try another world.`
             : `Travelling to ${travel.name}…`
           : worlds
             ? tab === "years"
