@@ -55,10 +55,13 @@ const describe = (point: HrPoint): string =>
   `${whole.format(point.temperatureKelvin)} K · M ${oneDecimal.format(point.absoluteMagnitude)}`;
 
 let populationRequest: Promise<HrPopulation | null> | null = null;
-const naturalSky = (): Promise<HrPopulation | null> => {
-  populationRequest ??= loadSkyCatalog().then((catalog) =>
-    catalog ? hrPopulation(catalog) : null,
-  );
+const naturalSky = (retry = false): Promise<HrPopulation | null> => {
+  if (retry) populationRequest = null;
+  populationRequest ??= loadSkyCatalog(retry).then((catalog) => {
+    if (catalog) return hrPopulation(catalog);
+    populationRequest = null;
+    return null;
+  });
   return populationRequest;
 };
 
@@ -69,19 +72,27 @@ const naturalSky = (): Promise<HrPopulation | null> => {
  */
 export const HrDiagram = ({ name, subject }: { name: string; subject: HrPoint }) => {
   const canvasRef = useRef<HTMLCanvasElement>(null);
+  const [retry, setRetry] = useState(0);
+  const [populationState, setPopulationState] = useState<"loading" | "ready" | "unavailable">(
+    "loading",
+  );
   const [population, setPopulation] = useState<HrPopulation | null>(null);
   const [pointer, setPointer] = useState<HrPoint | null>(null);
   const titleId = useId();
 
   useEffect(() => {
     let active = true;
-    void naturalSky().then((loaded) => {
-      if (active) setPopulation(loaded);
+    setPopulationState("loading");
+    void naturalSky(retry > 0).then((loaded) => {
+      if (active) {
+        setPopulation(loaded);
+        setPopulationState(loaded ? "ready" : "unavailable");
+      }
     });
     return () => {
       active = false;
     };
-  }, []);
+  }, [retry]);
 
   useEffect(() => {
     const canvas = canvasRef.current;
@@ -131,6 +142,14 @@ export const HrDiagram = ({ name, subject }: { name: string; subject: HrPoint })
       <figcaption className={cx("hr-title")} id={titleId}>
         Hertzsprung–Russell · {population ? whole.format(population.count) : "…"} naked-eye stars
       </figcaption>
+      {populationState === "unavailable" ? (
+        <p role="status">
+          The comparison catalog is unavailable.{" "}
+          <button type="button" onClick={() => setRetry((value) => value + 1)}>
+            Retry star catalog
+          </button>
+        </p>
+      ) : null}
       <div
         className={cx("hr-frame")}
         onPointerLeave={() => setPointer(null)}

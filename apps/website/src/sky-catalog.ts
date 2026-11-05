@@ -151,8 +151,9 @@ export const parseSkyCatalog = (buffer: ArrayBuffer): SkyCatalog => {
 
 const pendingCatalog = createAsyncResource<SkyCatalog>();
 
-export const loadSkyCatalog = (): Promise<SkyCatalog | null> =>
-  pendingCatalog
+export const loadSkyCatalog = (retry = false): Promise<SkyCatalog | null> => {
+  if (retry && pendingCatalog.state.status === "failed") pendingCatalog.clear();
+  return pendingCatalog
     .get(async () => {
       const response = await fetch(SKY_CATALOG_URL, { signal: AbortSignal.timeout(10_000) });
       if (!response.ok)
@@ -163,6 +164,7 @@ export const loadSkyCatalog = (): Promise<SkyCatalog | null> =>
       console.warn("[sky-catalog] falling back to the seeded starfield", error);
       return null;
     });
+};
 
 export const resetSkyCatalogForTesting = (): void => pendingCatalog.clear();
 
