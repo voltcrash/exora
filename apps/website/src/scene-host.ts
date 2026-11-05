@@ -423,8 +423,8 @@ const createSceneHost = (canvas: HTMLCanvasElement): SceneHost => {
       if (disposed || entering || isInXr || travelPhase !== "idle" || !worldMount.current) return;
       entering = true;
       xrIntegration.markEntering();
-      worldMount.current.prepareImmersive?.();
       try {
+        worldMount.current.prepareImmersive?.();
         const destination = xrIntegration.destination;
         if (!destination) return;
         if (destination.launchUrl) {
