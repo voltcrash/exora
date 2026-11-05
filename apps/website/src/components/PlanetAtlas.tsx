@@ -1,3 +1,4 @@
+import { createAsyncResource } from "../async-resource.ts";
 import { createOperationGate } from "../operation-gate.ts";
 import type { ExoplanetProfile } from "@exora/contracts";
 import {
@@ -68,16 +69,9 @@ const tickLabel = (value: number): string =>
 const colorOf = (group: MethodGroup): string =>
   METHOD_GROUPS.find((entry) => entry.id === group)?.color ?? "#74838a";
 
-let populationRequest: Promise<AtlasWorld[]> | null = null;
-const population = (): Promise<AtlasWorld[]> => {
-  populationRequest ??= loadPlanetPopulation()
-    .then(({ data }) => decodePopulation(data))
-    .catch((error: unknown) => {
-      populationRequest = null;
-      throw error;
-    });
-  return populationRequest;
-};
+const populationRequest = createAsyncResource<AtlasWorld[]>({ ttlMs: 600_000, retryMs: 0 });
+const population = (): Promise<AtlasWorld[]> =>
+  populationRequest.get(() => loadPlanetPopulation().then(({ data }) => decodePopulation(data)));
 
 const describeWorld = (world: AtlasWorld): string =>
   [
