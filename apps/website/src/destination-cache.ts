@@ -6,29 +6,42 @@ import {
   type SystemLoadResult,
 } from "./api-client.ts";
 
-const stars = new Map<string, Promise<StarLoadResult | null>>();
-const systems = new Map<string, Promise<SystemLoadResult | null>>();
-const starSystems = new Map<string, Promise<SystemLoadResult | null>>();
+interface Entry<T> {
+  request: Promise<T | null>;
+  expiresAt: number;
+}
+const TTL_MS = 600_000;
+const MAX_ENTRIES = 128;
+
+const stars = new Map<string, Entry<StarLoadResult>>();
+const systems = new Map<string, Entry<SystemLoadResult>>();
+const starSystems = new Map<string, Entry<SystemLoadResult>>();
 
 const remembered = <Answer>(
-  held: Map<string, Promise<Answer | null>>,
+  held: Map<string, Entry<Answer>>,
   key: string,
   ask: () => Promise<Answer | null>,
 ): Promise<Answer | null> => {
+  key = key.trim().toLocaleLowerCase();
   const asked = held.get(key);
-  if (asked) return asked;
+  if (asked && asked.expiresAt > Date.now()) return asked.request;
+  held.delete(key);
 
   const asking = ask().then(
     (answer) => {
-      if (answer === null) held.delete(key);
+      if (held.get(key)?.request === asking) {
+        if (answer === null) held.delete(key);
+        else held.set(key, { request: asking, expiresAt: Date.now() + TTL_MS });
+      }
       return answer;
     },
-    () => {
-      held.delete(key);
-      return null;
+    (error: unknown) => {
+      if (held.get(key)?.request === asking) held.delete(key);
+      throw error;
     },
   );
-  held.set(key, asking);
+  held.set(key, { request: asking, expiresAt: Infinity });
+  while (held.size > MAX_ENTRIES) held.delete(held.keys().next().value!);
   return asking;
 };
 
