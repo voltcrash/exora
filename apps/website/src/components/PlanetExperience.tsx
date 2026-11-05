@@ -213,10 +213,8 @@ export const PlanetExperience = ({
     host?.beginTravel();
     const found = await onSelectHostStar(planet.hostStar).catch(() => false);
     hostJumpRef.current = false;
-    if (!found) {
-      host?.cancelTravel();
-      setHostJumpState("error");
-    }
+    if (!found) host?.cancelTravel();
+    setHostJumpState(found ? "idle" : "error");
   };
 
   const openHostSystem = async (): Promise<void> => {

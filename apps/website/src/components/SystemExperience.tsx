@@ -105,11 +105,15 @@ export const SystemExperience = ({
   const ephemerisRef = useRef<EphemerisResponse | null>(null);
   const displayedAtRef = useRef(displayedAt);
   const requestSequence = useRef(0);
+  const ephemerisController = useRef<AbortController | null>(null);
   const { cached, hostStar, planets } = result;
   const solar = planets.length > 0 && planets.every((planet) => planet.solarSystem);
 
   const activateEphemeris = async (epoch: Date): Promise<void> => {
-    if (!solar || ephemerisRequest === "loading") return;
+    if (!solar) return;
+    ephemerisController.current?.abort();
+    const controller = new AbortController();
+    ephemerisController.current = controller;
     const request = requestSequence.current + 1;
     requestSequence.current = request;
     setPlaying(false);
@@ -118,11 +122,13 @@ export const SystemExperience = ({
       const response = await loadSolarEphemeris(
         epoch,
         planets.flatMap(({ solarSystem }) => (solarSystem ? [solarSystem.naifId] : [])),
+        { signal: controller.signal },
       );
       if (requestSequence.current !== request) return;
       ephemerisRef.current = response;
       displayedAtRef.current = epoch;
       setEphemeris(response);
+      setListening(false);
       setDisplayedAt(epoch);
       worldRef.current?.setEphemeris(response.data);
       worldRef.current?.setEphemerisTime(epoch);
@@ -135,6 +141,8 @@ export const SystemExperience = ({
 
   const useCatalogPositions = (): void => {
     requestSequence.current += 1;
+    ephemerisController.current?.abort();
+    ephemerisController.current = null;
     setPlaying(false);
     setEphemeris(null);
     ephemerisRef.current = null;
@@ -157,7 +165,7 @@ export const SystemExperience = ({
     void reachStar(hostStar).catch(() => null);
   }, [hostStar]);
 
-  const effectiveClockRate = clockRunning ? clockRate * clockDirection : 0;
+  const effectiveClockRate = !ephemeris && clockRunning ? clockRate * clockDirection : 0;
   useEffect(() => {
     worldRef.current?.setClockRate(effectiveClockRate);
   }, [effectiveClockRate, layout]);
@@ -176,6 +184,8 @@ export const SystemExperience = ({
 
   useEffect(
     () => () => {
+      requestSequence.current += 1;
+      ephemerisController.current?.abort();
       voiceRef.current?.dispose();
       voiceRef.current = null;
     },
@@ -210,17 +220,16 @@ export const SystemExperience = ({
       const now = performance.now();
       const elapsed = now - previous;
       previous = now;
-      setDisplayedAt((current) => {
-        const requestedTime = current.getTime() + elapsed * playbackRate * playbackDirection;
-        const minimum = Date.UTC(1900, 0, 1);
-        const maximum = Date.UTC(2100, 11, 31, 23, 59, 59);
-        const boundedTime = Math.min(maximum, Math.max(minimum, requestedTime));
-        if (boundedTime !== requestedTime) setPlaying(false);
-        const next = new Date(boundedTime);
-        displayedAtRef.current = next;
-        worldRef.current?.setEphemerisTime(next);
-        return next;
-      });
+      const requestedTime =
+        displayedAtRef.current.getTime() + elapsed * playbackRate * playbackDirection;
+      const minimum = Date.UTC(1900, 0, 1);
+      const maximum = Date.UTC(2100, 11, 31, 23, 59, 59);
+      const boundedTime = Math.min(maximum, Math.max(minimum, requestedTime));
+      if (boundedTime !== requestedTime) setPlaying(false);
+      const next = new Date(boundedTime);
+      displayedAtRef.current = next;
+      worldRef.current?.setEphemerisTime(next);
+      setDisplayedAt(next);
     }, 100);
     return () => window.clearInterval(timer);
   }, [ephemeris, playbackDirection, playbackRate, playing]);
@@ -307,6 +316,9 @@ export const SystemExperience = ({
           onChange={(event) => {
             const selected = new Date(event.currentTarget.value);
             if (!Number.isFinite(selected.getTime())) return;
+            requestSequence.current += 1;
+            ephemerisController.current?.abort();
+            setEphemerisRequest("idle");
             setPlaying(false);
             displayedAtRef.current = selected;
             setDisplayedAt(selected);
@@ -334,7 +346,7 @@ export const SystemExperience = ({
         <Button
           size="sm"
           icon="reverse"
-          disabled={!ephemeris}
+          disabled={!ephemeris || ephemerisRequest === "loading"}
           aria-pressed={playing && playbackDirection === -1}
           onClick={() => {
             setPlaybackDirection(-1);
@@ -346,7 +358,7 @@ export const SystemExperience = ({
         <Button
           size="sm"
           icon="pause"
-          disabled={!ephemeris || !playing}
+          disabled={!ephemeris || !playing || ephemerisRequest === "loading"}
           onClick={() => setPlaying(false)}
         >
           Pause
@@ -354,7 +366,7 @@ export const SystemExperience = ({
         <Button
           size="sm"
           icon="play"
-          disabled={!ephemeris}
+          disabled={!ephemeris || ephemerisRequest === "loading"}
           aria-pressed={playing && playbackDirection === 1}
           onClick={() => {
             setPlaybackDirection(1);
@@ -373,7 +385,12 @@ export const SystemExperience = ({
           onChange={(rate) => setPlaybackRate(Number(rate))}
         />
       </div>
-      <Button size="sm" variant="ghost" disabled={!ephemeris} onClick={useCatalogPositions}>
+      <Button
+        size="sm"
+        variant="ghost"
+        disabled={!ephemeris || ephemerisRequest === "loading"}
+        onClick={useCatalogPositions}
+      >
         Back to catalog orbits
       </Button>
       <p className={styles["note"]}>
