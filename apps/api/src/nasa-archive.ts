@@ -472,7 +472,7 @@ export class NasaPlanetRepository implements PlanetRepository {
         retrievedOn: new Date(requestTime).toISOString().slice(0, 10),
         timeoutMs: this.#timeoutMs,
       });
-      this.#cache.set(adql, planets, requestTime + this.#cacheTtlMs);
+      this.#cache.set(adql, planets, this.#now() + this.#cacheTtlMs);
       return { cached: false, value: planets };
     });
   }
