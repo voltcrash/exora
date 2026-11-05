@@ -393,11 +393,12 @@ export const App = () => {
 
   const returnHome = useCallback((): void => {
     navigation.cancel();
+    sceneHost?.cancelTravel();
     setResolving(false);
     window.history.replaceState({}, "", "/");
     setSystemHostName(null);
     setActiveObject(defaultPlanetObject());
-  }, [navigation, navigationFailed]);
+  }, [navigation, sceneHost]);
 
   const openDiscover = useCallback((): void => {
     setPaletteOpen(false);

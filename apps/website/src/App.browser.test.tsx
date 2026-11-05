@@ -1,4 +1,5 @@
 import { act } from "react";
+import { resetDestinationCacheForTesting } from "./destination-cache.ts";
 import type { BlackHoleProfile, ExoplanetProfile, StarProfile } from "@exora/contracts";
 import { page, userEvent } from "vite-plus/test/browser/context";
 import { createRoot, type Root } from "react-dom/client";
@@ -30,7 +31,7 @@ vi.mock("./scene-host.ts", () => {
   let insideXr = false;
   const host = {
     beginTravel: () => undefined,
-    cancelTravel: () => undefined,
+    cancelTravel: vi.fn(),
     camera: null,
     canvas: null,
     dispose: () => undefined,
@@ -83,10 +84,12 @@ vi.mock("./scene-host.ts", () => {
 const stubbedHost = (): {
   renderSuspensions: number;
   setInXr: (value: boolean) => void;
+  cancelTravel: () => void;
 } =>
   acquireSceneHost(document.createElement("canvas")) as unknown as {
     renderSuspensions: number;
     setInXr: (value: boolean) => void;
+    cancelTravel: () => void;
   };
 
 vi.mock("./planet-scene.ts", () => ({
@@ -1350,4 +1353,38 @@ test("a failed star-system request is unavailable rather than confirmed empty", 
     )
     .toBeVisible();
   expect(container?.textContent).not.toContain("The archive lists no confirmed worlds");
+});
+
+test("returning to the mounted featured world cancels a pending departure", async () => {
+  resetDestinationCacheForTesting();
+  stubArchive();
+  const archive = globalThis.fetch;
+  let resolveStar = (_response: Response): void => undefined;
+  const pendingStar = new Promise<Response>((resolve) => {
+    resolveStar = resolve;
+  });
+  vi.stubGlobal("fetch", (input: string | URL | Request, init?: RequestInit) => {
+    const path = typeof input === "string" ? input : input instanceof URL ? input.href : input.url;
+    return path.startsWith("/api/stars/") && !path.includes("/planets")
+      ? pendingStar
+      : archive(input, init);
+  });
+  const cancel = vi.mocked(stubbedHost().cancelTravel);
+  const cancellations = cancel.mock.calls.length;
+  mountApp();
+  await userEvent.click(
+    page.getByRole("button", { name: `Visit ${featuredPlanet.hostStar}`, exact: true }),
+  );
+  await userEvent.keyboard("{Control>}k{/Control}");
+  await userEvent.fill(page.getByRole("combobox"), "Return home");
+  await userEvent.keyboard("{Enter}");
+  await expect.poll(() => cancel.mock.calls.length).toBeGreaterThan(cancellations);
+  expect(window.location.search).toBe("");
+  await act(async () => {
+    resolveStar(Response.json({ data: sirius, meta: { cached: false, source: "SIMBAD" } }));
+    await pendingStar;
+  });
+  await expect
+    .element(page.getByRole("heading", { name: featuredPlanet.name, exact: true }))
+    .toBeVisible();
 });
