@@ -68,15 +68,15 @@ export const createSceneMountSlot = <World extends DisposableWorld>(
         hooks.prepareScene?.();
 
         const nextScope = openWorldScope(scene);
-        let next: Next;
+        let next: Next | null = null;
         try {
           next = await build();
-        } catch (error) {
           await nextScope.seal();
+        } catch (error) {
+          next?.dispose();
           nextScope.dispose();
           throw error;
         }
-        await nextScope.seal();
 
         if (disposed || !accept()) {
           next.dispose();
