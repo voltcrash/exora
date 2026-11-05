@@ -68,8 +68,28 @@ export const DestinationSheet = ({ children }: { children: ReactNode }) => {
     return { full: viewport - 72, half: viewport * 0.56, peek };
   }, []);
 
+  useEffect(() => {
+    const cancel = (): void => {
+      const sheet = sheetRef.current;
+      const current = drag.current;
+      drag.current = null;
+      if (!sheet) return;
+      if (current && sheet.hasPointerCapture(current.pointerId))
+        sheet.releasePointerCapture(current.pointerId);
+      delete sheet.dataset.dragging;
+      sheet.style.removeProperty("height");
+    };
+    window.addEventListener("resize", cancel);
+    window.addEventListener("blur", cancel);
+    return () => {
+      window.removeEventListener("resize", cancel);
+      window.removeEventListener("blur", cancel);
+      cancel();
+    };
+  }, []);
+
   const onPointerDown = (event: PointerEvent<HTMLDivElement>): void => {
-    if (!window.matchMedia(SHEET_QUERY).matches) return;
+    if (drag.current || !window.matchMedia(SHEET_QUERY).matches) return;
     if (event.pointerType === "mouse" && event.button !== 0) return;
     const target = event.target as HTMLElement;
     // Scrolling content takes the gesture once the sheet is fully open.
@@ -111,6 +131,7 @@ export const DestinationSheet = ({ children }: { children: ReactNode }) => {
   const onPointerEnd = (event: PointerEvent<HTMLDivElement>): void => {
     const current = drag.current;
     const sheet = sheetRef.current;
+    if (current?.pointerId !== event.pointerId) return;
     drag.current = null;
     if (!current || !sheet || !current.active) return;
     // A drag that moved the sheet is not also a tap on whatever it started over.
@@ -143,6 +164,7 @@ export const DestinationSheet = ({ children }: { children: ReactNode }) => {
       onPointerMove={onPointerMove}
       onPointerUp={onPointerEnd}
       onPointerCancel={onPointerEnd}
+      onLostPointerCapture={onPointerEnd}
     >
       <button
         className={styles["sheet-handle"]}

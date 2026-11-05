@@ -53,7 +53,7 @@ test("a viewpoint gets the catalogue sky, capped by the device budget", async ()
   const starfield = createStarfield({ count: 800, scene, seed: 7, viewpoint: VEGA });
 
   expect(starfield.source()).toBe("pending");
-  expect(starfield.mesh.getTotalVertices()).toBe(0);
+  expect(starfield.mesh.getTotalVertices()).toBe(800);
 
   await settle();
 

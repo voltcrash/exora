@@ -121,6 +121,12 @@ desktopTest("AR makes the page transparent and places from the XR select event",
     new PointerEvent("pointermove", { bubbles: true, clientX: 240, clientY: 100, pointerId: 2 }),
   );
   expect(scaleBy.mock.calls[0]?.[0]).toBeCloseTo(1.4936, 3);
+  const movesBeforeReplacement = moveBy.mock.calls.length;
+  presentation.setWorld(world);
+  document.dispatchEvent(
+    new PointerEvent("pointermove", { bubbles: true, clientX: 280, clientY: 100, pointerId: 2 }),
+  );
+  expect(moveBy.mock.calls.length).toBe(movesBeforeReplacement);
   document.dispatchEvent(new PointerEvent("pointerup", { bubbles: true, pointerId: 1 }));
   document.dispatchEvent(new PointerEvent("pointerup", { bubbles: true, pointerId: 2 }));
 

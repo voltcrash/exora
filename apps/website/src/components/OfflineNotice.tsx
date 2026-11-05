@@ -20,7 +20,7 @@ export const OfflineNotice = () => {
   return offline ? (
     <p className={styles["offline"]} role="status">
       <Icon name="wifi-off" size={16} />
-      Offline — showing the archive answers saved on this device
+      Offline — saved archive answers may still be available
     </p>
   ) : null;
 };

@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { shareDestination, type ShareOutcome } from "../share-destination.ts";
 import { Button } from "./ui/Button.tsx";
 
@@ -10,13 +10,23 @@ const ANNOUNCEMENTS: Partial<Record<ShareOutcome, string>> = {
 const ANNOUNCEMENT_MS = 2_400;
 
 export const ShareButton = () => {
-  const [outcome, setOutcome] = useState<ShareOutcome | null>(null);
+  const busy = useRef(false);
+  const alive = useRef(true);
+  const [pending, setPending] = useState(false);
+  const [result, setResult] = useState<{ outcome: ShareOutcome } | null>(null);
+  const outcome = result?.outcome ?? null;
+  useEffect(() => {
+    alive.current = true;
+    return () => {
+      alive.current = false;
+    };
+  }, []);
 
   useEffect(() => {
     if (!outcome) return;
-    const timer = window.setTimeout(() => setOutcome(null), ANNOUNCEMENT_MS);
+    const timer = window.setTimeout(() => setResult(null), ANNOUNCEMENT_MS);
     return () => window.clearTimeout(timer);
-  }, [outcome]);
+  }, [result]);
 
   const announcement = outcome ? (ANNOUNCEMENTS[outcome] ?? "") : "";
 
@@ -30,11 +40,21 @@ export const ShareButton = () => {
         variant="ghost"
         aria-label="Share this destination"
         title={announcement || "Share this destination"}
-        onClick={() =>
-          void shareDestination({ title: document.title, url: window.location.href }).then(
-            setOutcome,
-          )
-        }
+        disabled={pending}
+        aria-busy={pending}
+        onClick={() => {
+          if (busy.current) return;
+          busy.current = true;
+          setPending(true);
+          void shareDestination({ title: document.title, url: window.location.href })
+            .then((next) => {
+              if (alive.current) setResult({ outcome: next });
+            })
+            .finally(() => {
+              busy.current = false;
+              if (alive.current) setPending(false);
+            });
+        }}
       />
       <span className="visually-hidden" role="status">
         {announcement}

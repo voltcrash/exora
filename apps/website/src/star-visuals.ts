@@ -191,7 +191,9 @@ export const createStarfield = ({
     source = "seeded";
   };
 
+  applySeeded();
   if (viewpoint) {
+    source = "pending";
     void loadSkyCatalog().then((catalog) => {
       if (disposed || mesh.isDisposed()) return;
       if (!catalog) {
@@ -205,8 +207,6 @@ export const createStarfield = ({
       applyPoints(projected.positions, projected.colors);
       source = "catalog";
     });
-  } else {
-    applySeeded();
   }
 
   return {

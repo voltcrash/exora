@@ -2,7 +2,7 @@ import { useLayoutEffect, useRef, type ReactNode } from "react";
 import type { PanelLink } from "../destination-panel.ts";
 import { capitalize, readable } from "../readable.ts";
 import { bindStyles } from "../styles/bind-styles.ts";
-import { onWebFontsReady } from "../web-fonts.ts";
+import { onWebFontsSettled } from "../web-fonts.ts";
 import { Button } from "./ui/Button.tsx";
 import { Icon } from "./ui/Icon.tsx";
 import { Spinner } from "./ui/Spinner.tsx";
@@ -108,7 +108,7 @@ export const DestinationIdentity = ({
       refit();
     });
     observer.observe(element);
-    const stopListening = onWebFontsReady(refit);
+    const stopListening = onWebFontsSettled(refit);
 
     return () => {
       observer.disconnect();

@@ -1,4 +1,4 @@
-import { expect, test } from "vite-plus/test";
+import { expect, test, vi } from "vite-plus/test";
 import { normalizeBlackCatRow, VizierBlackHoleRepository } from "../src/black-hole-archive.ts";
 import { NORMALIZED_BLACKCAT_FALLBACK } from "../src/black-hole-fallback.ts";
 
@@ -109,4 +109,18 @@ test("serves the last successful catalog after its fresh TTL expires", async () 
   expect(live.stale).toBe(false);
   expect(stale).toMatchObject({ cached: true, stale: true });
   expect(stale.value).toEqual(live.value);
+});
+
+test("outage fallback has a cooldown instead of retrying on every read", async () => {
+  let now = 0;
+  const fetcher = vi.fn(async () => {
+    throw new Error("offline");
+  });
+  const repository = new VizierBlackHoleRepository({ fetcher, now: () => now });
+  await repository.browse(10);
+  await repository.browse(10);
+  expect(fetcher).toHaveBeenCalledOnce();
+  now = 60_001;
+  await repository.browse(10);
+  expect(fetcher).toHaveBeenCalledTimes(2);
 });

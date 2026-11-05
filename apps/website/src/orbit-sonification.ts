@@ -41,13 +41,21 @@ export const nearestSimpleRatio = (ratio: number, maximumTerm = 9): string | nul
 export interface OrbitVoice {
   dispose: () => void;
   pluck: (pitchHz: number, pan: number) => void;
+  resume: () => Promise<boolean>;
+  onStateChange: (listener: (running: boolean) => void) => () => void;
 }
 
 /** A soft plucked voice. Must be created from a user gesture so the browser allows audio. */
 export const createOrbitVoice = (): OrbitVoice | null => {
   const AudioContextClass = window.AudioContext;
   if (typeof AudioContextClass !== "function") return null;
-  const context = new AudioContextClass();
+  let context: AudioContext;
+  try {
+    context = new AudioContextClass();
+  } catch {
+    return null;
+  }
+  let disposed = false;
   const master = context.createGain();
   master.gain.value = 0.22;
   const compressor = context.createDynamicsCompressor();
@@ -55,11 +63,27 @@ export const createOrbitVoice = (): OrbitVoice | null => {
   compressor.connect(context.destination);
 
   return {
+    resume: async () => {
+      if (disposed) return false;
+      try {
+        await context.resume();
+        return context.state === "running";
+      } catch {
+        return false;
+      }
+    },
+    onStateChange: (listener) => {
+      const changed = (): void => listener(context.state === "running");
+      context.addEventListener("statechange", changed);
+      return () => context.removeEventListener("statechange", changed);
+    },
     dispose: () => {
-      void context.close();
+      if (disposed) return;
+      disposed = true;
+      void context.close().catch(() => undefined);
     },
     pluck: (pitchHz, pan) => {
-      if (context.state === "suspended") void context.resume();
+      if (disposed || context.state !== "running") return;
       const now = context.currentTime;
       const envelope = context.createGain();
       envelope.gain.setValueAtTime(0.0001, now);

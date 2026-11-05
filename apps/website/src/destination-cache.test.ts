@@ -112,7 +112,10 @@ test("a canonical SIMBAD name reaches the NASA-named host system once", async ()
 test("a host the archive links no worlds to is not remembered as a system", async () => {
   vi.stubGlobal("fetch", () =>
     Promise.resolve(
-      Response.json({ data: [], meta: { cached: false, count: 0, query: "", source: "NASA" } }),
+      Response.json({
+        data: [],
+        meta: { cached: false, count: 0, query: "", source: "NASA Exoplanet Archive" },
+      }),
     ),
   );
   expect(await reachSystem("Nowhere")).toBeNull();
@@ -124,8 +127,8 @@ test("a host the archive links no worlds to is not remembered as a system", asyn
 
 test("a lookup that failed is retried rather than remembered", async () => {
   vi.stubGlobal("fetch", () => Promise.reject(new Error("offline")));
-  expect(await reachStar("Sirius")).toBeNull();
-  expect(await reachSystem("Kepler-297")).toBeNull();
+  await expect(reachStar("Sirius")).rejects.toThrow("offline");
+  await expect(reachSystem("Kepler-297")).rejects.toThrow("offline");
 
   const archive = countingArchive();
   expect((await reachStar("Sirius"))?.star.name).toBe("Sirius");

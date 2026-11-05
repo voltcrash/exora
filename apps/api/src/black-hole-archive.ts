@@ -194,7 +194,8 @@ export class VizierBlackHoleRepository implements BlackHoleRepository {
   readonly #fetcher: Fetcher;
   readonly #now: () => number;
   readonly #requests = createRequestCoalescer<BlackHoleRepositoryResult<BlackHoleProfile[]>>();
-  #stale: readonly BlackHoleProfile[] | null = null;
+  #stale: { value: readonly BlackHoleProfile[]; expiresAt: number } | null = null;
+  #retryAfter = 0;
   readonly #timeoutMs: number;
 
   constructor(options: BlackHoleArchiveOptions = {}) {
@@ -229,6 +230,11 @@ export class VizierBlackHoleRepository implements BlackHoleRepository {
     const requestTime = this.#now();
     const cached = this.#cache.get(BLACKCAT_QUERY, requestTime);
     if (cached) return { cached: true, stale: false, value: cached };
+
+    const fallback = (): readonly BlackHoleProfile[] =>
+      this.#stale && this.#stale.expiresAt > this.#now() ? this.#stale.value : this.#fallback;
+    if (requestTime < this.#retryAfter && fallback().length > 0)
+      return { cached: true, stale: true, value: [...fallback()] };
 
     return this.#requests.run(BLACKCAT_QUERY, async () => {
       const url = new URL(VIZIER_TAP_ENDPOINT);
@@ -265,11 +271,13 @@ export class VizierBlackHoleRepository implements BlackHoleRepository {
             throw new BlackHoleArchiveError("VizieR TAP returned malformed BlackCAT measurements.");
           return normalizeTapRow(parsed.data, retrievedOn);
         });
-        this.#cache.set(BLACKCAT_QUERY, blackHoles, requestTime + this.#cacheTtlMs);
-        this.#stale = blackHoles;
+        this.#cache.set(BLACKCAT_QUERY, blackHoles, this.#now() + this.#cacheTtlMs);
+        this.#stale = { value: blackHoles, expiresAt: this.#now() + 30 * 86_400_000 };
+        this.#retryAfter = 0;
         return { cached: false, stale: false, value: blackHoles };
       } catch (error) {
-        const stale = this.#stale ?? this.#fallback;
+        this.#retryAfter = this.#now() + 60_000;
+        const stale = fallback();
         if (stale.length > 0) return { cached: true, stale: true, value: [...stale] };
         if (error instanceof BlackHoleArchiveError) throw error;
         throw new BlackHoleArchiveError("VizieR TAP request failed.", { cause: error });

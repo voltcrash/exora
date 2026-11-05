@@ -44,6 +44,7 @@ export interface MountedWorld {
   farthestView?: () => number | undefined;
   dispose: () => void;
   restoreDesktopView: () => void;
+  prepareImmersive?: () => void;
 }
 
 export interface SceneHost {
@@ -63,6 +64,7 @@ export interface SceneHost {
   onTravelPhase: (listener: (phase: TravelPhase) => void) => () => void;
   mountWorld: <World extends MountedWorld>(
     build: () => Promise<World> | World,
+    signal?: AbortSignal,
   ) => Promise<World | null>;
   onXrStatus: (listener: (status: XrStatus) => void) => () => void;
   onRendererStatus: (listener: (status: RendererStatus) => void) => () => void;
@@ -85,12 +87,16 @@ const createSceneHost = (canvas: HTMLCanvasElement): SceneHost => {
   const { camera, engine, scene } = resources;
 
   let isInXr = false;
+  let entering = false;
+  let xrEntrySettled = Promise.resolve();
+  let settleXrEntry = (): void => undefined;
 
   const arPresentation = createArPresentation(scene);
 
   let arActive = false;
   let xrCameraLayerMask = 0x0fff_ffff;
   let disposed = false;
+  let disposal: Promise<void> | null = null;
   let xr: WebXRDefaultExperience | null = null;
   let xrRuntime: typeof XrRuntime | null = null;
   let xrInitialization: Promise<WebXRDefaultExperience | null> | null = null;
@@ -119,7 +125,7 @@ const createSceneHost = (canvas: HTMLCanvasElement): SceneHost => {
 
   const renderLifecycle = createRenderLifecycle({
     engine,
-    isInXr: () => isInXr,
+    isInXr: () => isInXr || entering,
     resizeTarget: window,
     scene,
   });
@@ -204,7 +210,7 @@ const createSceneHost = (canvas: HTMLCanvasElement): SceneHost => {
   };
 
   const beginTravel = (): void => {
-    if (disposed || isInXr || !worldMount.current || departure) return;
+    if (disposed || entering || isInXr || !worldMount.current || departure) return;
     travelOrigin = {
       lower: camera.lowerRadiusLimit,
       radius: camera.radius,
@@ -215,7 +221,11 @@ const createSceneHost = (canvas: HTMLCanvasElement): SceneHost => {
     const far = flightRadius(camera.radius);
     departure = glideCamera(far, TRAVEL_DEPART_MS, easeAway).then((landed) => {
       if (landed && !departureClaimed && !disposed) {
-        void glideCamera(far * TRAVEL_COAST_SCALE, TRAVEL_COAST_MS, easeDrift);
+        void glideCamera(
+          Math.min(far * TRAVEL_COAST_SCALE, worldMount.current?.farthestView?.() ?? Infinity),
+          TRAVEL_COAST_MS,
+          easeDrift,
+        );
       }
       return landed;
     });
@@ -236,13 +246,14 @@ const createSceneHost = (canvas: HTMLCanvasElement): SceneHost => {
     });
   };
 
-  const departFromWorld = async (): Promise<void> => {
-    if (isInXr) return;
+  const departFromWorld = async (): Promise<boolean> => {
+    if (isInXr) return true;
     if (!departure) beginTravel();
     departureClaimed = true;
-    await departure;
+    if (!(await departure) || disposed) return false;
     setTravelPhase("crossing");
     await new Promise<void>((resolve) => window.setTimeout(resolve, TRAVEL_CROSS_MS));
+    return !disposed;
   };
 
   const arriveAtWorld = (mounted: number): void => {
@@ -289,15 +300,22 @@ const createSceneHost = (canvas: HTMLCanvasElement): SceneHost => {
 
   const mountWorld = async <World extends MountedWorld>(
     build: () => Promise<World> | World,
+    signal?: AbortSignal,
   ): Promise<World | null> => {
     const token = (mountToken += 1);
-    if (worldMount.current) await departFromWorld();
-    if (token !== mountToken || disposed) return null;
+    if (entering) await xrEntrySettled;
+    if (token !== mountToken || signal?.aborted || disposed) return null;
+    if (worldMount.current && !(await departFromWorld())) return null;
+    if (token !== mountToken || disposed || signal?.aborted) return null;
 
     let world: World | null;
     try {
-      world = await worldMount.replace(build, () => token === mountToken && !disposed);
+      world = await worldMount.replace(
+        build,
+        () => token === mountToken && !disposed && !signal?.aborted,
+      );
     } catch (error) {
+      if (token !== mountToken || disposed || signal?.aborted) return null;
       endGlide(null, false);
       departure = null;
       travelOrigin = null;
@@ -395,7 +413,7 @@ const createSceneHost = (canvas: HTMLCanvasElement): SceneHost => {
     prefersReducedMotion,
     getFps: () => engine.getFps(),
     isArSupported: xrIntegration.isArSupported,
-    isInXr: () => isInXr,
+    isInXr: () => isInXr || entering,
     mountWorld,
     suspendRendering: renderLifecycle.suspend,
     onXrStatus: xrIntegration.onStatus,
@@ -406,61 +424,78 @@ const createSceneHost = (canvas: HTMLCanvasElement): SceneHost => {
       return () => travelListeners.delete(listener);
     },
     enterImmersive: async () => {
-      const destination = xrIntegration.destination;
-      if (!destination) return;
-      if (destination.launchUrl) {
-        window.location.assign(destination.launchUrl);
-        return;
-      }
-      const readyXr = await ensureXr();
-      const runtime = xrRuntime;
-      if (!readyXr || !runtime) return;
-
-      arActive = true;
-      const features = readyXr.baseExperience.featuresManager;
+      if (disposed || entering || isInXr || travelPhase !== "idle" || !worldMount.current) return;
+      entering = true;
+      xrEntrySettled = new Promise<void>((resolve) => {
+        settleXrEntry = resolve;
+      });
+      xrIntegration.markEntering();
       try {
-        const hitTest = features.enableFeature(
-          runtime.WebXRFeatureName.HIT_TEST,
-          "latest",
-          { enableTransientHitTest: false },
-          true,
-          true,
-        );
-        features.enableFeature(
-          runtime.WebXRFeatureName.DOM_OVERLAY,
-          "latest",
-          { element: arPresentation.overlay, supressXRSelectEvents: false },
-          true,
-          false,
-        );
-        const arCamera = readyXr.baseExperience.camera;
-        xrCameraLayerMask = arCamera.layerMask;
-        arCamera.layerMask &= ~VIRTUAL_BACKGROUND_LAYER_MASK;
-        arPresentation.begin(
-          hitTest,
-          readyXr.baseExperience.sessionManager,
-          worldMount.scope?.presentation ?? null,
-          (spaceBackground) => {
-            arCamera.layerMask = spaceBackground
-              ? xrCameraLayerMask
-              : xrCameraLayerMask & ~VIRTUAL_BACKGROUND_LAYER_MASK;
-          },
-        );
-        await readyXr.baseExperience.enterXRAsync("immersive-ar", "local", readyXr.renderTarget);
+        worldMount.current.prepareImmersive?.();
+        const destination = xrIntegration.destination;
+        if (!destination) return;
+        if (destination.launchUrl) {
+          window.location.assign(destination.launchUrl);
+          return;
+        }
+        const readyXr = await ensureXr();
+        const runtime = xrRuntime;
+        if (disposed) return;
+        if (!readyXr || !runtime) throw new Error("AR initialization failed.");
+
+        arActive = true;
+        const features = readyXr.baseExperience.featuresManager;
+        try {
+          const hitTest = features.enableFeature(
+            runtime.WebXRFeatureName.HIT_TEST,
+            "latest",
+            { enableTransientHitTest: false },
+            true,
+            true,
+          );
+          features.enableFeature(
+            runtime.WebXRFeatureName.DOM_OVERLAY,
+            "latest",
+            { element: arPresentation.overlay, supressXRSelectEvents: false },
+            true,
+            false,
+          );
+          const arCamera = readyXr.baseExperience.camera;
+          xrCameraLayerMask = arCamera.layerMask;
+          arCamera.layerMask &= ~VIRTUAL_BACKGROUND_LAYER_MASK;
+          arPresentation.begin(
+            hitTest,
+            readyXr.baseExperience.sessionManager,
+            worldMount.scope?.presentation ?? null,
+            (spaceBackground) => {
+              arCamera.layerMask = spaceBackground
+                ? xrCameraLayerMask
+                : xrCameraLayerMask & ~VIRTUAL_BACKGROUND_LAYER_MASK;
+            },
+          );
+          await readyXr.baseExperience.enterXRAsync("immersive-ar", "local", readyXr.renderTarget);
+        } catch (error) {
+          arPresentation.end();
+          readyXr.baseExperience.camera.layerMask = xrCameraLayerMask;
+          features.disableFeature(runtime.WebXRFeatureName.HIT_TEST);
+          features.disableFeature(runtime.WebXRFeatureName.DOM_OVERLAY);
+          arActive = false;
+          xrIntegration.markReady();
+          throw error;
+        }
       } catch (error) {
-        arPresentation.end();
-        readyXr.baseExperience.camera.layerMask = xrCameraLayerMask;
-        features.disableFeature(runtime.WebXRFeatureName.HIT_TEST);
-        features.disableFeature(runtime.WebXRFeatureName.DOM_OVERLAY);
-        arActive = false;
-        xrIntegration.markReady();
+        if (!disposed) xrIntegration.markFailed();
         throw error;
+      } finally {
+        entering = false;
+        settleXrEntry();
+        if (!disposed && !isInXr && xrIntegration.destination === null) xrIntegration.markReady();
       }
     },
-    dispose: async () => {
-      if (disposed) return;
+    dispose: () => {
+      if (disposal) return disposal;
       disposed = true;
-      sceneHostRegistry.forget(sceneHost);
+      settleXrEntry();
       travelListeners.clear();
       endGlide(null, false);
       xrIntegration.dispose();
@@ -469,8 +504,9 @@ const createSceneHost = (canvas: HTMLCanvasElement): SceneHost => {
       arPresentation.dispose();
       xr?.dispose();
       xr = null;
-      await worldDisposed;
-      resources.dispose();
+      disposal = worldDisposed.finally(() => resources.dispose());
+      sceneHostRegistry.forget(sceneHost, disposal);
+      return disposal;
     },
   };
   return sceneHost;
@@ -478,10 +514,12 @@ const createSceneHost = (canvas: HTMLCanvasElement): SceneHost => {
 
 const sceneHostRegistry = createSceneHostRegistry(createSceneHost);
 
-export const acquireSceneHost = (canvas: HTMLCanvasElement): SceneHost => {
+export const acquireSceneHost = (canvas: HTMLCanvasElement): Promise<SceneHost> => {
   return sceneHostRegistry.acquire(canvas);
 };
 
 export const recreateSceneHost = (canvas: HTMLCanvasElement): Promise<SceneHost> => {
   return sceneHostRegistry.recreate(canvas);
 };
+
+export const releaseSceneHost = (host: SceneHost): Promise<void> => sceneHostRegistry.release(host);

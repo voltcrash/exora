@@ -36,9 +36,9 @@ export const getVariantLaunchUrl = (): string | null => {
     (/Macintosh/.test(navigator.userAgent) && navigator.maxTouchPoints > 1);
   if (!appleMobile) return null;
   const initialized = window.__exoraVariantLaunchDetail;
-  if (initialized) return initialized.launchRequired ? initialized.launchUrl || null : null;
+  if (initialized && !initialized.launchRequired) return null;
   const sdk = window.VLaunch;
-  if (!sdk) return null;
+  if (!sdk) return initialized?.launchUrl || null;
   try {
     const launchUrl = sdk.getLaunchUrl(window.location.href);
     return launchUrl || null;

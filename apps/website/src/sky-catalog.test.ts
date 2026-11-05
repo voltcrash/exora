@@ -152,7 +152,7 @@ test("the catalogue is downloaded once and shared by every destination", async (
   const [first, second] = await Promise.all([loadSkyCatalog(), loadSkyCatalog()]);
 
   expect(fetcher).toHaveBeenCalledTimes(1);
-  expect(fetcher).toHaveBeenCalledWith(SKY_CATALOG_URL);
+  expect(fetcher).toHaveBeenCalledWith(SKY_CATALOG_URL, { signal: expect.any(AbortSignal) });
   expect(first).toBe(second);
   expect(first?.count).toBeGreaterThan(8_000);
 });

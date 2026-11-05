@@ -69,3 +69,11 @@ test("trusts only a valid Vercel identity behind the configured proxy boundary",
   );
   expect(clientKey({})).toBe("unknown");
 });
+
+test("invalid budgets cannot create non-expiring or unbounded windows", () => {
+  expect(() => createRateLimiter({ limit: 0, windowMs: 1_000 })).toThrow(RangeError);
+  expect(() => createRateLimiter({ limit: 1, windowMs: Infinity })).toThrow(RangeError);
+  expect(() => createRateLimiter({ limit: 1, windowMs: 1_000, maxClients: -1 })).toThrow(
+    RangeError,
+  );
+});

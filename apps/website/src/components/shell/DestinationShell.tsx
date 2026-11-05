@@ -96,6 +96,8 @@ export const DestinationShell = ({
         travelling && "travelling",
         chromeHidden && "chrome-hidden",
       )}
+      data-scene-state={sceneState}
+      data-travel-phase={travelPhase}
       style={{ "--light-rgb": light, ...style } as CSSProperties}
     >
       <div className={cx("space-haze")} aria-hidden="true" />

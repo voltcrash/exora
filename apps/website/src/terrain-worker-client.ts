@@ -25,6 +25,8 @@ export const runTerrainJob = async (
     const fallback = (): void => {
       if (settled) return;
       if (signal?.aborted) return cancel();
+      worker?.terminate();
+      worker = undefined;
       try {
         finish(executeTerrainJob(request));
       } catch (error) {
@@ -35,7 +37,46 @@ export const runTerrainJob = async (
     signal?.addEventListener("abort", cancel, { once: true });
     try {
       worker = new Worker(new URL("./terrain.worker.ts", import.meta.url), { type: "module" });
-      worker.onmessage = (event: MessageEvent<TerrainResult>) => finish(event.data);
+      worker.onmessage = (event: MessageEvent<unknown>) => {
+        const result = event.data as Partial<TerrainResult> | null;
+        if (!result || result.kind !== request.kind) return fallback();
+        if (result.kind === "planet") {
+          if (
+            !(
+              result.positions instanceof Float32Array || result.positions instanceof Float64Array
+            ) ||
+            request.kind !== "planet" ||
+            result.positions.length !== request.positions.length
+          )
+            return fallback();
+        } else if (result.kind === "surface" && request.kind === "surface") {
+          const data = result.data;
+          const vertices = (request.input.resolution + 1) ** 2;
+          if (
+            !data ||
+            !Number.isFinite(data.low) ||
+            !Number.isFinite(data.high) ||
+            data.positions?.length !== vertices * 3 ||
+            data.colors?.length !== vertices * 4 ||
+            data.shade?.length !== vertices * 2 ||
+            data.heights?.length !== vertices ||
+            data.occlusion?.length !== vertices ||
+            data.visibility?.length !== vertices ||
+            data.indices?.length !== request.input.resolution ** 2 * 6 ||
+            ![
+              data.positions,
+              data.colors,
+              data.shade,
+              data.heights,
+              data.occlusion,
+              data.visibility,
+            ].every((value) => value instanceof Float32Array) ||
+            !(data.indices instanceof Uint32Array)
+          )
+            return fallback();
+        }
+        finish(result as TerrainResult);
+      };
       worker.onerror = (event) => {
         event.preventDefault();
         fallback();

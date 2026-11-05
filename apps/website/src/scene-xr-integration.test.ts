@@ -41,3 +41,21 @@ test("uses the AR launch handoff and releases its readiness listener", async () 
   integration.dispose();
   expect(stopWatching).toHaveBeenCalledOnce();
 });
+
+test("handoff URLs follow navigation and disposed integration cannot enter", async () => {
+  let launchUrl = "https://example.test/first";
+  const integration = createXrIntegration({
+    getLaunchUrl: () => launchUrl,
+    onLaunchReady: () => () => undefined,
+    xrSystem: () => undefined,
+  });
+  await settle();
+  launchUrl = "https://example.test/second";
+  expect(integration.destination).toEqual({ launchUrl });
+  integration.markFailed();
+  const listener = vi.fn();
+  integration.onStatus(listener);
+  expect(listener).toHaveBeenLastCalledWith("error");
+  integration.dispose();
+  expect(integration.destination).toBeNull();
+});

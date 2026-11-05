@@ -1,3 +1,4 @@
+import { createAsyncResource } from "../async-resource.ts";
 import { useEffect, useId, useMemo, useRef, useState, type KeyboardEvent } from "react";
 import { preloadPlanetCatalog, searchPlanets, searchStars } from "../api-client.ts";
 import {
@@ -64,67 +65,68 @@ const ACTION_ICONS: Record<string, IconName> = {
 const iconFor = (target: PaletteTarget): IconName =>
   target.type === "action" ? (ACTION_ICONS[target.action] ?? "arrow-right") : ICONS[target.type];
 
-let localEntriesRequest: Promise<PaletteEntry[]> | null = null;
+const localEntriesRequest = createAsyncResource<PaletteEntry[]>({ retryMs: 0 });
 
 const localEntries = (): Promise<PaletteEntry[]> => {
-  localEntriesRequest ??= Promise.all([
-    import("../solar-system.ts"),
-    import("../solar-regions.ts"),
-    import("../black-holes.ts"),
-  ]).then(([solar, regions, blackHoles]) => [
-    ...solar.SOLAR_SYSTEM_CATALOG.map((entry): PaletteEntry => {
-      if (entry.type === "star") {
+  return localEntriesRequest.get(() =>
+    Promise.all([
+      import("../solar-system.ts"),
+      import("../solar-regions.ts"),
+      import("../black-holes.ts"),
+    ]).then(([solar, regions, blackHoles]) => [
+      ...solar.SOLAR_SYSTEM_CATALOG.map((entry): PaletteEntry => {
+        if (entry.type === "star") {
+          return {
+            detail: "Our home star · NASA/JPL",
+            group: "Solar System",
+            id: `solar-${entry.profile.id}`,
+            keywords: entry.profile.aliases ?? [],
+            name: entry.profile.name,
+            target: { cached: true, star: entry.profile, type: "star" },
+          };
+        }
+        const identity = entry.profile.solarSystem;
         return {
-          detail: "Our home star · NASA/JPL",
+          detail:
+            identity?.bodyType === "moon"
+              ? `Moon of ${identity.parent ?? "its planet"}`
+              : identity?.bodyType === "dwarf-planet"
+                ? "Dwarf planet"
+                : "Planet",
           group: "Solar System",
           id: `solar-${entry.profile.id}`,
-          keywords: entry.profile.aliases ?? [],
+          keywords: identity?.parent ? [identity.parent] : [],
           name: entry.profile.name,
-          target: { cached: true, star: entry.profile, type: "star" },
+          target: { cached: true, planet: entry.profile, type: "planet" },
         };
-      }
-      const identity = entry.profile.solarSystem;
-      return {
-        detail:
-          identity?.bodyType === "moon"
-            ? `Moon of ${identity.parent ?? "its planet"}`
-            : identity?.bodyType === "dwarf-planet"
-              ? "Dwarf planet"
-              : "Planet",
+      }),
+      ...regions.SOLAR_SYSTEM_REGIONS.map((region): PaletteEntry => ({
+        detail: `Region · ${region.distanceAu.note}`,
         group: "Solar System",
-        id: `solar-${entry.profile.id}`,
-        keywords: identity?.parent ? [identity.parent] : [],
-        name: entry.profile.name,
-        target: { cached: true, planet: entry.profile, type: "planet" },
-      };
-    }),
-    ...regions.SOLAR_SYSTEM_REGIONS.map((region): PaletteEntry => ({
-      detail: `Region · ${region.distanceAu.note}`,
-      group: "Solar System",
-      id: `region-${region.id}`,
-      keywords: region.aliases,
-      name: region.name,
-      target: { region, type: "region" },
-    })),
-    ...blackHoles.BLACK_HOLES.map((blackHole): PaletteEntry => ({
-      detail: `${blackHoles.blackHoleKindLabel(blackHole)} · ${blackHole.host}`,
-      group: "Black holes",
-      id: `black-hole-${blackHole.id}`,
-      keywords: [...blackHole.aliases, blackHole.host],
-      name: blackHole.name,
-      target: { blackHole, type: "black-hole" },
-    })),
-    ...TOURS.map((tour): PaletteEntry => ({
-      detail: `Guided tour · ${String(tour.steps.length)} stops · ${tour.summary}`,
-      group: "Tours",
-      id: `tour-${tour.id}`,
-      keywords: ["tour", "guided", ...tour.steps.map((step) => step.name)],
-      name: tour.title,
-      target: { tourId: tour.id, type: "tour" },
-    })),
-    ...ACTIONS,
-  ]);
-  return localEntriesRequest;
+        id: `region-${region.id}`,
+        keywords: region.aliases,
+        name: region.name,
+        target: { region, type: "region" },
+      })),
+      ...blackHoles.BLACK_HOLES.map((blackHole): PaletteEntry => ({
+        detail: `${blackHoles.blackHoleKindLabel(blackHole)} · ${blackHole.host}`,
+        group: "Black holes",
+        id: `black-hole-${blackHole.id}`,
+        keywords: [...blackHole.aliases, blackHole.host],
+        name: blackHole.name,
+        target: { blackHole, type: "black-hole" },
+      })),
+      ...TOURS.map((tour): PaletteEntry => ({
+        detail: `Guided tour · ${String(tour.steps.length)} stops · ${tour.summary}`,
+        group: "Tours",
+        id: `tour-${tour.id}`,
+        keywords: ["tour", "guided", ...tour.steps.map((step) => step.name)],
+        name: tour.title,
+        target: { tourId: tour.id, type: "tour" },
+      })),
+      ...ACTIONS,
+    ]),
+  );
 };
 
 interface CommandPaletteProps {
@@ -147,7 +149,8 @@ export const CommandPalette = ({ onClose, onSelect }: CommandPaletteProps) => {
     query: "",
   });
   const [searching, setSearching] = useState(false);
-  const [active, setActive] = useState(0);
+  const [active, setActive] = useState<string | null>(null);
+  const [unavailable, setUnavailable] = useState(false);
   const listId = useId();
 
   useEffect(() => {
@@ -156,9 +159,17 @@ export const CommandPalette = ({ onClose, onSelect }: CommandPaletteProps) => {
       document.activeElement instanceof HTMLElement ? document.activeElement : null;
     dialog?.showModal();
     inputRef.current?.focus();
-    void localEntries().then(setLocal);
+    let mounted = true;
+    void localEntries()
+      .then((entries) => {
+        if (mounted) setLocal(entries);
+      })
+      .catch(() => {
+        if (mounted) setUnavailable(true);
+      });
     void preloadPlanetCatalog();
     return () => {
+      mounted = false;
       dialog?.close();
       previousFocus?.focus();
     };
@@ -178,6 +189,7 @@ export const CommandPalette = ({ onClose, onSelect }: CommandPaletteProps) => {
         searchStars(trimmed, { signal: controller.signal }),
       ]).then(([planets, stars]) => {
         if (controller.signal.aborted) return;
+        setUnavailable(planets.status === "rejected" || stars.status === "rejected");
         const planetResults = planets.status === "fulfilled" ? planets.value.planets : [];
         const hosts = [...new Set(planetResults.map((planet) => planet.hostStar))];
         setRemote({
@@ -240,10 +252,13 @@ export const CommandPalette = ({ onClose, onSelect }: CommandPaletteProps) => {
   }, [local, query, remote]);
 
   const flat = groups.flatMap(({ entries }) => entries);
-  const activeIndex = Math.min(active, Math.max(flat.length - 1, 0));
+  const activeIndex = Math.max(
+    0,
+    flat.findIndex((entry) => entry.id === active),
+  );
   const activeEntry = flat[activeIndex];
 
-  useEffect(() => setActive(0), [query]);
+  useEffect(() => setActive(null), [query]);
 
   useEffect(() => {
     if (!activeEntry) return;
@@ -260,16 +275,16 @@ export const CommandPalette = ({ onClose, onSelect }: CommandPaletteProps) => {
       event.preventDefault();
       if (flat.length === 0) return;
       const step = event.key === "ArrowDown" ? 1 : -1;
-      setActive((activeIndex + step + flat.length) % flat.length);
+      setActive(flat[(activeIndex + step + flat.length) % flat.length]!.id);
     } else if (event.key === "Enter") {
       event.preventDefault();
       choose(activeEntry);
     } else if (event.key === "Home" && flat.length > 0) {
       event.preventDefault();
-      setActive(0);
+      setActive(null);
     } else if (event.key === "End" && flat.length > 0) {
       event.preventDefault();
-      setActive(flat.length - 1);
+      setActive(flat.at(-1)!.id);
     }
   };
 
@@ -322,7 +337,7 @@ export const CommandPalette = ({ onClose, onSelect }: CommandPaletteProps) => {
                     className={cx("palette-option")}
                     role="option"
                     aria-selected={index === activeIndex}
-                    onMouseMove={() => setActive(index)}
+                    onMouseMove={() => setActive(entry.id)}
                     onClick={() => choose(entry)}
                   >
                     <span className={cx("palette-glyph")} aria-hidden="true">
@@ -346,7 +361,9 @@ export const CommandPalette = ({ onClose, onSelect }: CommandPaletteProps) => {
             <p className={cx("palette-empty")} role="status">
               {searching
                 ? "Asking the archives…"
-                : "Nothing by that name. Try a catalog ID, like Kepler-22 b or HD 209458."}
+                : unavailable
+                  ? "An archive is unavailable. Local destinations remain searchable."
+                  : "Nothing by that name. Try a catalog ID, like Kepler-22 b or HD 209458."}
             </p>
           ) : null}
         </div>
@@ -354,6 +371,8 @@ export const CommandPalette = ({ onClose, onSelect }: CommandPaletteProps) => {
         <p className={cx("palette-footer")} role="status">
           {searching ? (
             "Searching the NASA Exoplanet Archive and SIMBAD…"
+          ) : unavailable ? (
+            "Some archive results are unavailable."
           ) : (
             <>
               <span>

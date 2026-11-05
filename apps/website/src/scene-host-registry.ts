@@ -4,8 +4,9 @@ export interface RegisteredSceneHost<Canvas> {
 }
 
 export interface SceneHostRegistry<Canvas, Host extends RegisteredSceneHost<Canvas>> {
-  acquire: (canvas: Canvas) => Host;
-  forget: (host: Host) => void;
+  acquire: (canvas: Canvas) => Promise<Host>;
+  forget: (host: Host, disposal?: Promise<void>) => void;
+  release: (host: Host) => Promise<void>;
   recreate: (canvas: Canvas) => Promise<Host>;
 }
 
@@ -15,28 +16,36 @@ export const createSceneHostRegistry = <Canvas, Host extends RegisteredSceneHost
   let current: Host | null = null;
   let recreation = Promise.resolve();
 
-  const replace = (canvas: Canvas): Host => {
-    void current?.dispose();
-    current = create(canvas);
-    return current;
+  const schedule = (canvas: Canvas, force: boolean): Promise<Host> => {
+    const operation = recreation.then(async () => {
+      if (!force && current?.canvas === canvas) return current;
+      const previous = current;
+      current = null;
+      await previous?.dispose();
+      current = create(canvas);
+      return current;
+    });
+    recreation = operation.then(
+      () => undefined,
+      () => undefined,
+    );
+    return operation;
   };
 
   return {
-    acquire: (canvas) => {
-      if (current?.canvas === canvas) return current;
-      return replace(canvas);
-    },
-    forget: (host) => {
+    acquire: (canvas) => schedule(canvas, false),
+    forget: (host, disposal) => {
       if (current === host) current = null;
+      if (disposal)
+        recreation = Promise.all([recreation, disposal]).then(
+          () => undefined,
+          () => undefined,
+        );
     },
-    recreate: (canvas) => {
+    release: (host) => {
       const operation = recreation.then(async () => {
-        const previous = current;
-        current = null;
-        await previous?.dispose();
-        const replacement = create(canvas);
-        current = replacement;
-        return replacement;
+        if (current === host) current = null;
+        await host.dispose();
       });
       recreation = operation.then(
         () => undefined,
@@ -44,5 +53,6 @@ export const createSceneHostRegistry = <Canvas, Host extends RegisteredSceneHost
       );
       return operation;
     },
+    recreate: (canvas) => schedule(canvas, true),
   };
 };

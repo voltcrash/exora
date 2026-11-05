@@ -1,7 +1,6 @@
 # Opening the pull request needs the repository setting
 # "Allow GitHub Actions to create and approve pull requests" (Settings → Actions → General).
-# Pull requests opened with GITHUB_TOKEN do not start other workflows; close and reopen the pull
-# request, or push to its branch, to run the Quality checks on it.
+# Quality is dispatched explicitly because GITHUB_TOKEN pull requests do not trigger it.
 name: Refresh planet catalog
 
 on:
@@ -23,6 +22,7 @@ jobs:
     permissions:
       contents: write
       pull-requests: write
+      actions: write
     env:
       BRANCH: chore/refresh-planet-catalog
       SNAPSHOT: packages/planet-catalog/data/pscomppars.json
@@ -59,7 +59,9 @@ jobs:
           git commit --quiet --message "chore: refresh the planet catalog snapshot" \
             --message "The NASA Exoplanet Archive changed since the committed snapshot. Regenerated it with the scheduled refresh workflow." \
             -- "$SNAPSHOT"
-          git push --force origin "$BRANCH"
+          REMOTE_HEAD=$(git ls-remote --heads origin "refs/heads/$BRANCH" | cut -f1)
+          git push --force-with-lease="refs/heads/$BRANCH:$REMOTE_HEAD" origin "$BRANCH"
+          gh workflow run quality.yml --ref "$BRANCH"
           if [ -n "$(gh pr list --head "$BRANCH" --state open --json number --jq '.[].number')" ]; then
             echo "Updated the open refresh pull request."
           else

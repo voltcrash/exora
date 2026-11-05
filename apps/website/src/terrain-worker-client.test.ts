@@ -181,3 +181,10 @@ test.each(["abort", "parent disposal", "scene disposal"])(
     engine.dispose();
   },
 );
+
+test("a malformed worker result falls back instead of entering the scene", async () => {
+  const { task, worker } = pendingWorker();
+  worker.onmessage!({ data: { kind: "planet", positions: new Float32Array(1) } });
+  expect(await task).toEqual(executeTerrainJob(planetTerrainFixture(MARS)));
+  expect(worker.terminate).toHaveBeenCalledOnce();
+});

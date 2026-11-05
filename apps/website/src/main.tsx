@@ -23,11 +23,13 @@ const render = (): void => {
 
 // Development keeps the network honest; a deployed build works offline after its first visit.
 if (import.meta.env.PROD && "serviceWorker" in navigator) {
-  window.addEventListener("load", () => {
+  const register = (): void => {
     void navigator.serviceWorker.register("/sw.js").catch((error: unknown) => {
       console.warn("Exora could not install its offline cache.", error);
     });
-  });
+  };
+  if (document.readyState === "complete") register();
+  else window.addEventListener("load", register, { once: true });
 }
 
 render();

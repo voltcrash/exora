@@ -61,3 +61,10 @@ test("falls through unrecognized SIMBAD names to a NASA-recognized catalog alias
   expect((await repository.resolveHost(proxima)).value).toBe("Proxima Cen");
   expect(requests).toEqual(["Proxima Centauri", "TIC 388857263", "GJ 551"]);
 });
+
+test("an invalid alias response is not cached as a confirmed missing system", async () => {
+  const repository = new NasaSystemAliasRepository({
+    fetcher: async () => Response.json({ manifest: {} }),
+  });
+  await expect(repository.resolveHost(proxima)).rejects.toThrow("invalid status");
+});

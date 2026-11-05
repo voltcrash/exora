@@ -517,7 +517,7 @@ export class SimbadStarRepository implements StarRepository {
           rowCount: payload.data.data.length,
           value: stars,
         };
-        this.#cache.set(adql, outcome, requestTime + this.#cacheTtlMs);
+        this.#cache.set(adql, outcome, this.#now() + this.#cacheTtlMs);
         return { ...outcome, cached: false };
       } catch (error) {
         if (error instanceof SimbadArchiveError) throw error;

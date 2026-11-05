@@ -2,6 +2,7 @@ import { chooseImmersiveDestination, type ImmersiveDestination } from "./variant
 
 export type XrStatus =
   | "checking"
+  | "error"
   | "entering"
   | "in-xr"
   | "ready-ar"
@@ -23,6 +24,7 @@ export interface XrIntegration {
   dispose: () => void;
   isArSupported: () => boolean;
   markEntering: () => void;
+  markFailed: () => void;
   markInXr: () => void;
   markReady: () => void;
   onStatus: (listener: (status: XrStatus) => void) => () => void;
@@ -39,6 +41,7 @@ export const createXrIntegration = ({
   xrSystem,
 }: XrIntegrationOptions): XrIntegration => {
   let arSupported = false;
+  let refreshRevision = 0;
   let disposed = false;
   let destination: ImmersiveDestination = chooseImmersiveDestination({
     ar: false,
@@ -48,6 +51,7 @@ export const createXrIntegration = ({
   const listeners = new Set<(status: XrStatus) => void>();
 
   const setStatus = (next: XrStatus): void => {
+    if (disposed || status === next) return;
     status = next;
     for (const listener of listeners) listener(next);
   };
@@ -55,11 +59,13 @@ export const createXrIntegration = ({
   const markReady = (): void => setStatus(statusFor(destination));
 
   const refresh = async (): Promise<void> => {
+    const revision = ++refreshRevision;
     const system = xrSystem();
-    arSupported = system
+    const supported = system
       ? await system.isSessionSupported("immersive-ar").catch(() => false)
       : false;
-    if (disposed) return;
+    if (disposed || revision !== refreshRevision) return;
+    arSupported = supported;
     destination = chooseImmersiveDestination({
       ar: arSupported,
       launchUrl: getLaunchUrl(),
@@ -72,7 +78,9 @@ export const createXrIntegration = ({
 
   return {
     get destination() {
-      return destination;
+      return disposed
+        ? null
+        : chooseImmersiveDestination({ ar: arSupported, launchUrl: getLaunchUrl() });
     },
     dispose: () => {
       if (disposed) return;
@@ -81,6 +89,7 @@ export const createXrIntegration = ({
       listeners.clear();
     },
     isArSupported: () => arSupported,
+    markFailed: () => setStatus("error"),
     markEntering: () => setStatus("entering"),
     markInXr: () => setStatus("in-xr"),
     markReady,

@@ -1,5 +1,7 @@
+import { atomicWrite } from "../../../scripts/atomic-write.ts";
+import { parseCsvLine } from "./csv.ts";
 import { createHash } from "node:crypto";
-import { readFile, writeFile } from "node:fs/promises";
+import { readFile } from "node:fs/promises";
 import { argv } from "node:process";
 import { gunzipSync } from "node:zlib";
 
@@ -24,37 +26,6 @@ interface CatalogueStar {
   rightAscensionRadians: number;
   visualMagnitude: number;
 }
-
-const parseCsvLine = (line: string): string[] => {
-  const fields: string[] = [];
-  let field = "";
-  let quoted = false;
-
-  for (let index = 0; index < line.length; index += 1) {
-    const character = line[index];
-
-    if (quoted) {
-      if (character !== '"') {
-        field += character;
-      } else if (line[index + 1] === '"') {
-        field += '"';
-        index += 1;
-      } else {
-        quoted = false;
-      }
-      continue;
-    }
-
-    if (character === '"') quoted = true;
-    else if (character === ",") {
-      fields.push(field);
-      field = "";
-    } else field += character;
-  }
-
-  fields.push(field);
-  return fields;
-};
 
 const numberOrNull = (value: string | undefined): number | null => {
   if (value === undefined || value.trim() === "") return null;
@@ -202,7 +173,7 @@ const main = async (): Promise<void> => {
   const csv = Buffer.from(gzipped ? gunzipSync(source) : source).toString("utf8");
   const { counts, stars } = selectStars(csv);
   const packed = packCatalogue(stars);
-  await writeFile(OUTPUT_URL, packed);
+  await atomicWrite(OUTPUT_URL, packed);
 
   console.log(`[star-catalog] read     ${counts.rows.toLocaleString("en-US")} HYG rows`);
   console.log(

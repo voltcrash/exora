@@ -20,7 +20,10 @@ export interface PlanetCatalog {
 
 export const loadPlanetCatalog = async (fetcher: Fetcher = fetch): Promise<PlanetCatalog> => {
   // Low priority so the snapshot never competes with the scene's own downloads.
-  const response = await fetcher(snapshotUrl, { priority: "low" });
+  const response = await fetcher(snapshotUrl, {
+    priority: "low",
+    signal: AbortSignal.timeout(30_000),
+  });
   if (!response.ok) throw new Error(`Planet catalog failed with status ${response.status}.`);
   const snapshot = (await response.json()) as PlanetCatalogSnapshot;
   // Parse and decode in separate tasks, so neither is long enough to delay input.

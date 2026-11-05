@@ -99,17 +99,22 @@ export const SystemExperience = ({
   const [orbitDays, setOrbitDays] = useState(0);
   const [listening, setListening] = useState(false);
   const [audioUnavailable, setAudioUnavailable] = useState(false);
+  const audioStarting = useRef(false);
   const voiceRef = useRef<OrbitVoice | null>(null);
   const worldRef = useRef<SystemWorld | null>(null);
   const starJumpRef = useRef(false);
   const ephemerisRef = useRef<EphemerisResponse | null>(null);
   const displayedAtRef = useRef(displayedAt);
   const requestSequence = useRef(0);
+  const ephemerisController = useRef<AbortController | null>(null);
   const { cached, hostStar, planets } = result;
   const solar = planets.length > 0 && planets.every((planet) => planet.solarSystem);
 
   const activateEphemeris = async (epoch: Date): Promise<void> => {
-    if (!solar || ephemerisRequest === "loading") return;
+    if (!solar) return;
+    ephemerisController.current?.abort();
+    const controller = new AbortController();
+    ephemerisController.current = controller;
     const request = requestSequence.current + 1;
     requestSequence.current = request;
     setPlaying(false);
@@ -118,11 +123,13 @@ export const SystemExperience = ({
       const response = await loadSolarEphemeris(
         epoch,
         planets.flatMap(({ solarSystem }) => (solarSystem ? [solarSystem.naifId] : [])),
+        { signal: controller.signal },
       );
       if (requestSequence.current !== request) return;
       ephemerisRef.current = response;
       displayedAtRef.current = epoch;
       setEphemeris(response);
+      setListening(false);
       setDisplayedAt(epoch);
       worldRef.current?.setEphemeris(response.data);
       worldRef.current?.setEphemerisTime(epoch);
@@ -135,6 +142,8 @@ export const SystemExperience = ({
 
   const useCatalogPositions = (): void => {
     requestSequence.current += 1;
+    ephemerisController.current?.abort();
+    ephemerisController.current = null;
     setPlaying(false);
     setEphemeris(null);
     ephemerisRef.current = null;
@@ -157,7 +166,7 @@ export const SystemExperience = ({
     void reachStar(hostStar).catch(() => null);
   }, [hostStar]);
 
-  const effectiveClockRate = clockRunning ? clockRate * clockDirection : 0;
+  const effectiveClockRate = !ephemeris && clockRunning ? clockRate * clockDirection : 0;
   useEffect(() => {
     worldRef.current?.setClockRate(effectiveClockRate);
   }, [effectiveClockRate, layout]);
@@ -168,21 +177,31 @@ export const SystemExperience = ({
     if (!listening || !layout || !world || !voice) return;
     const pitches = orbitPitches(layout.orbits.map((orbit) => orbit.elements.periodDays));
     const spread = layout.orbits.length > 1 ? 1.2 / (layout.orbits.length - 1) : 0;
-    return world.onSightlineCrossing((index) => {
+    const stopState = voice.onStateChange((running) => {
+      if (!running) setListening(false);
+    });
+    const stopCrossings = world.onSightlineCrossing((index) => {
       const pitch = pitches[index];
       if (pitch !== null && pitch !== undefined) voice.pluck(pitch, -0.6 + index * spread);
     });
+    return () => {
+      stopState();
+      stopCrossings();
+    };
   }, [layout, listening]);
 
   useEffect(
     () => () => {
+      requestSequence.current += 1;
+      ephemerisController.current?.abort();
       voiceRef.current?.dispose();
       voiceRef.current = null;
     },
     [],
   );
 
-  const toggleListening = (): void => {
+  const toggleListening = async (): Promise<void> => {
+    if (audioStarting.current || ephemerisRef.current) return;
     if (listening) {
       setListening(false);
       return;
@@ -192,7 +211,13 @@ export const SystemExperience = ({
       setAudioUnavailable(true);
       return;
     }
-    setListening(true);
+    audioStarting.current = true;
+    const voice = voiceRef.current;
+    const ready = await voice.resume();
+    audioStarting.current = false;
+    if (voiceRef.current !== voice || ephemerisRef.current) return;
+    setAudioUnavailable(!ready);
+    setListening(ready);
   };
 
   useEffect(() => {
@@ -210,17 +235,16 @@ export const SystemExperience = ({
       const now = performance.now();
       const elapsed = now - previous;
       previous = now;
-      setDisplayedAt((current) => {
-        const requestedTime = current.getTime() + elapsed * playbackRate * playbackDirection;
-        const minimum = Date.UTC(1900, 0, 1);
-        const maximum = Date.UTC(2100, 11, 31, 23, 59, 59);
-        const boundedTime = Math.min(maximum, Math.max(minimum, requestedTime));
-        if (boundedTime !== requestedTime) setPlaying(false);
-        const next = new Date(boundedTime);
-        displayedAtRef.current = next;
-        worldRef.current?.setEphemerisTime(next);
-        return next;
-      });
+      const requestedTime =
+        displayedAtRef.current.getTime() + elapsed * playbackRate * playbackDirection;
+      const minimum = Date.UTC(1900, 0, 1);
+      const maximum = Date.UTC(2100, 11, 31, 23, 59, 59);
+      const boundedTime = Math.min(maximum, Math.max(minimum, requestedTime));
+      if (boundedTime !== requestedTime) setPlaying(false);
+      const next = new Date(boundedTime);
+      displayedAtRef.current = next;
+      worldRef.current?.setEphemerisTime(next);
+      setDisplayedAt(next);
     }, 100);
     return () => window.clearInterval(timer);
   }, [ephemeris, playbackDirection, playbackRate, playing]);
@@ -228,21 +252,26 @@ export const SystemExperience = ({
   useEffect(() => {
     if (!host) return;
     let abandoned = false;
+    const controller = new AbortController();
     setSceneState("loading");
 
     void import("../system-scene.ts")
       .then(({ createSystemWorld }) =>
-        host.mountWorld(() =>
-          createSystemWorld(host, {
-            hostName: hostStar,
-            planets,
-            onSelectHostStar: () => void openHostStar(),
-            onSelectWorld: (planet) => onSelectPlanet(planet, cached),
-            onFirstFrame: () => {
-              if (!abandoned) setSceneState("ready");
-            },
-          }),
-        ),
+        abandoned
+          ? null
+          : host.mountWorld(
+              () =>
+                createSystemWorld(host, {
+                  hostName: hostStar,
+                  planets,
+                  onSelectHostStar: () => void openHostStar(),
+                  onSelectWorld: (planet) => onSelectPlanet(planet, cached),
+                  onFirstFrame: () => {
+                    if (!abandoned) setSceneState("ready");
+                  },
+                }),
+              controller.signal,
+            ),
       )
       .then((world: SystemWorld | null) => {
         if (!world || abandoned) return;
@@ -260,6 +289,7 @@ export const SystemExperience = ({
 
     return () => {
       abandoned = true;
+      controller.abort();
       worldRef.current = null;
     };
   }, [cached, host, hostStar, onSelectHostStar, onSelectPlanet, onSelectStar, planets]);
@@ -301,6 +331,9 @@ export const SystemExperience = ({
           onChange={(event) => {
             const selected = new Date(event.currentTarget.value);
             if (!Number.isFinite(selected.getTime())) return;
+            requestSequence.current += 1;
+            ephemerisController.current?.abort();
+            setEphemerisRequest("idle");
             setPlaying(false);
             displayedAtRef.current = selected;
             setDisplayedAt(selected);
@@ -328,7 +361,7 @@ export const SystemExperience = ({
         <Button
           size="sm"
           icon="reverse"
-          disabled={!ephemeris}
+          disabled={!ephemeris || ephemerisRequest === "loading"}
           aria-pressed={playing && playbackDirection === -1}
           onClick={() => {
             setPlaybackDirection(-1);
@@ -340,7 +373,7 @@ export const SystemExperience = ({
         <Button
           size="sm"
           icon="pause"
-          disabled={!ephemeris || !playing}
+          disabled={!ephemeris || !playing || ephemerisRequest === "loading"}
           onClick={() => setPlaying(false)}
         >
           Pause
@@ -348,7 +381,7 @@ export const SystemExperience = ({
         <Button
           size="sm"
           icon="play"
-          disabled={!ephemeris}
+          disabled={!ephemeris || ephemerisRequest === "loading"}
           aria-pressed={playing && playbackDirection === 1}
           onClick={() => {
             setPlaybackDirection(1);
@@ -367,7 +400,12 @@ export const SystemExperience = ({
           onChange={(rate) => setPlaybackRate(Number(rate))}
         />
       </div>
-      <Button size="sm" variant="ghost" disabled={!ephemeris} onClick={useCatalogPositions}>
+      <Button
+        size="sm"
+        variant="ghost"
+        disabled={!ephemeris || ephemerisRequest === "loading"}
+        onClick={useCatalogPositions}
+      >
         Back to catalog orbits
       </Button>
       <p className={styles["note"]}>
@@ -466,15 +504,15 @@ export const SystemExperience = ({
       </div>
       <Button
         icon={listening ? "music-off" : "music"}
-        disabled={Boolean(ephemeris) || audioUnavailable}
+        disabled={Boolean(ephemeris)}
         aria-pressed={listening}
-        onClick={toggleListening}
+        onClick={() => void toggleListening()}
       >
         {listening ? "Stop listening" : "Listen to the orbits"}
       </Button>
       <p className={styles["note"]}>
         {audioUnavailable
-          ? "This browser offers no Web Audio, so the orbits cannot be heard."
+          ? "Audio could not start. Try listening again after checking browser audio access."
           : "Each world plucks a note as it crosses our line of sight — the moment it would transit. Pitch follows orbital frequency, folded into one octave, so resonant orbits sound in harmony."}
       </p>
       <p className={styles["note"]}>

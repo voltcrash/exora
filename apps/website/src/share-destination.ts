@@ -19,13 +19,13 @@ export const shareDestination = async (
   browser: ShareNavigator = navigator,
 ): Promise<ShareOutcome> => {
   const data = { title: target.title, url: target.url };
-  if (browser.share && (browser.canShare?.(data) ?? true)) {
-    try {
+  try {
+    if (browser.share && (browser.canShare?.(data) ?? true)) {
       await browser.share(data);
       return "shared";
-    } catch (error) {
-      if (isAbort(error)) return "cancelled";
     }
+  } catch (error) {
+    if (isAbort(error)) return "cancelled";
   }
   try {
     await browser.clipboard.writeText(target.url);

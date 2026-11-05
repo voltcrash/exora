@@ -8,11 +8,12 @@ import styles from "./shell.module.css";
 
 const XR_LABELS: Partial<Record<XrStatus, string>> = {
   entering: "Entering…",
+  error: "Retry AR",
   "ready-ar": "View in AR",
   "ready-ar-launch": "View in AR",
 };
 
-const XR_READY = new Set<XrStatus>(["ready-ar", "ready-ar-launch"]);
+const XR_READY = new Set<XrStatus>(["ready-ar", "ready-ar-launch", "error"]);
 
 interface TopBarProps {
   host: SceneHost | null;

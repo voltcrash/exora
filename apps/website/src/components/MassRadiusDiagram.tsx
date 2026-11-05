@@ -61,12 +61,16 @@ export const MassRadiusDiagram = ({
   name: string;
   reading: CompositionReading;
 }) => {
-  const [active, setActive] = useState<number | null>(null);
+  const [selected, setSelected] = useState<string | null>(null);
   const titleId = useId();
   const points: readonly Point[] = [
     ...SOLAR_SYSTEM.map((planet) => ({ ...planet, subject: false })),
     { mass: reading.massEarth, name, radius: reading.radiusEarth, subject: true },
   ];
+  const selectedIndex = points.findIndex((point) => point.name === selected);
+  const active = selectedIndex < 0 ? null : selectedIndex;
+  const setActive = (index: number | null): void =>
+    setSelected(index === null ? null : (points[index]?.name ?? null));
   const subject = points.at(-1)!;
   const subjectX = x(clampTo(subject.mass, MASS_DOMAIN));
   const subjectY = y(clampTo(subject.radius, RADIUS_DOMAIN));

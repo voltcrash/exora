@@ -97,3 +97,33 @@ test("disposal removes resize and status ownership", () => {
   expect(engine.resize).not.toHaveBeenCalled();
   expect(listener).toHaveBeenCalledOnce();
 });
+
+test("releasing an overlay cannot restart a lost or failed renderer", () => {
+  const { engine, lifecycle } = createHarness();
+  const release = lifecycle.suspend();
+  engine.onContextLostObservable.notifyObservers();
+  release();
+  expect(lifecycle.isRunning).toBe(false);
+  engine.onContextRestoredObservable.notifyObservers();
+  expect(lifecycle.isRunning).toBe(true);
+  lifecycle.fail();
+  expect(lifecycle.isRunning).toBe(false);
+  lifecycle.suspend()();
+  expect(lifecycle.isRunning).toBe(false);
+});
+
+test("an unrecovered context eventually offers renderer restart", async () => {
+  vi.useFakeTimers();
+  try {
+    const { engine, lifecycle } = createHarness();
+    const listener = vi.fn();
+    lifecycle.onStatus(listener);
+    engine.onContextLostObservable.notifyObservers();
+    await vi.advanceTimersByTimeAsync(30_000);
+    expect(listener).toHaveBeenLastCalledWith("failed");
+    expect(lifecycle.isRunning).toBe(false);
+    lifecycle.dispose();
+  } finally {
+    vi.useRealTimers();
+  }
+});

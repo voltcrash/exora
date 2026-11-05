@@ -1,36 +1,22 @@
+import { defaultPlanetObject, solarPlanetObject, type ActiveObject } from "./active-destination.ts";
+import { createOperationGate } from "./operation-gate.ts";
 import type { ExoplanetProfile, StarProfile } from "@exora/contracts";
-import {
-  deriveWorldRecipe,
-  generateCustomBlackHole,
-  generateCustomStar,
-  generateCustomWorld,
-  type CustomBlackHole,
-  type CustomStar,
-  type CustomWorld,
-  type WorldRecipe,
-} from "@exora/worldgen";
+import type { CustomBlackHole, CustomStar, CustomWorld } from "@exora/worldgen";
 import {
   lazy,
   Suspense,
   useCallback,
   useEffect,
   useMemo,
+  useRef,
   useState,
   type CSSProperties,
 } from "react";
-import {
-  loadBlackHoleByName,
-  loadPlanetByName,
-  type PlanetLoadResult,
-  type StarLoadResult,
-  type SystemLoadResult,
-} from "./api-client.ts";
+
 import { reachStar, reachSystem } from "./destination-cache.ts";
 import { PlanetExperience } from "./components/PlanetExperience.tsx";
 import { OfflineNotice } from "./components/OfflineNotice.tsx";
 import { RecoveryScreen } from "./components/RecoveryScreen.tsx";
-import { featuredPlanet } from "./planet-profile.ts";
-import { hasRenderer } from "./planet-utils.tsx";
 import { canonicalUrlForSearch } from "./canonical-url.ts";
 import { descriptionFor, documentTitleFor } from "./document-title.ts";
 import type { BlackHoleProfile } from "./black-holes.ts";
@@ -78,146 +64,22 @@ const BlackHoleExperience = lazy(() =>
     default: module.BlackHoleExperience,
   })),
 );
-type ActiveObject =
-  | { blackHole: BlackHoleProfile; type: "black-hole" }
-  | { recipe?: WorldRecipe; result: PlanetLoadResult; type: "planet" }
-  | { result: StarLoadResult; type: "star" }
-  | { result: SystemLoadResult; type: "system" }
-  | { region: SolarRegionProfile; type: "region" }
-  | {
-      kind: "black hole" | "planet" | "region" | "star" | "system";
-      name: string;
-      detail?: string;
-      type: "missing";
-    };
-
-const solarPlanetObject = async (
-  planet: ExoplanetProfile,
-  cached: boolean,
-): Promise<ActiveObject> => {
-  const { tuneSolarWorldRecipe } = await import("./solar-system.ts");
-  return {
-    recipe: tuneSolarWorldRecipe(planet, deriveWorldRecipe(planet)),
-    result: { cached, mode: "solar", planet },
-    type: "planet",
-  };
-};
-
-const defaultPlanetObject = (): ActiveObject => ({
-  result: { cached: true, mode: "fallback", planet: featuredPlanet },
-  type: "planet",
-});
-
-const loadRequestedObject = async (): Promise<ActiveObject> => {
-  const parameters = new URLSearchParams(window.location.search);
-  const customBlackHole = parameters.get("customBlackHole");
-  if (customBlackHole !== null) {
-    const { parseCustomBlackHoleUrl } = await import("./custom-destination-url.ts");
-    const customParameters = parseCustomBlackHoleUrl(customBlackHole);
-    if (!customParameters) {
-      return {
-        detail:
-          "This link carries a World Forge recipe that is invalid or from an incompatible version. Make a new one in World Forge.",
-        kind: "black hole",
-        name: "custom recipe",
-        type: "missing",
-      };
-    }
-    return { blackHole: generateCustomBlackHole(customParameters).blackHole, type: "black-hole" };
-  }
-  const blackHoleName = parameters.get("blackHole");
-  if (blackHoleName) {
-    const { findBlackHole, findProceduralBlackHole } = await import("./black-holes.ts");
-    const blackHole =
-      findBlackHole(blackHoleName) ??
-      findProceduralBlackHole(blackHoleName) ??
-      (await loadBlackHoleByName(blackHoleName));
-    return blackHole
-      ? { blackHole, type: "black-hole" }
-      : { kind: "black hole", name: blackHoleName, type: "missing" };
-  }
-  const regionName = parameters.get("region");
-  if (regionName) {
-    const { findSolarRegion } = await import("./solar-regions.ts");
-    const region = findSolarRegion(regionName);
-    return region
-      ? { region, type: "region" }
-      : { kind: "region", name: regionName, type: "missing" };
-  }
-  const starName = parameters.get("star");
-  if (starName) {
-    const { findSolarStar } = await import("./solar-system.ts");
-    const localStar = findSolarStar(starName);
-    if (localStar)
-      return { result: { cached: true, mode: "solar", star: localStar }, type: "star" };
-    const star = await reachStar(starName);
-    if (star) return { result: star, type: "star" };
-    return { kind: "star", name: starName, type: "missing" };
-  }
-
-  const systemName = parameters.get("system");
-  if (systemName) {
-    const system = await reachSystem(systemName);
-    if (system) return { result: system, type: "system" };
-    return { kind: "system", name: systemName, type: "missing" };
-  }
-
-  const name = parameters.get("planet");
-  if (name) {
-    const { findSolarWorld } = await import("./solar-system.ts");
-    const localWorld = findSolarWorld(name);
-    if (localWorld) {
-      return solarPlanetObject(localWorld, true);
-    }
-
-    const requested = await loadPlanetByName(name);
-    return requested && hasRenderer(requested.planet)
-      ? { result: requested, type: "planet" }
-      : { kind: "planet", name, type: "missing" };
-  }
-
-  const customPlanet = parameters.get("custom");
-  if (customPlanet !== null) {
-    const { parseCustomPlanetUrl } = await import("./custom-destination-url.ts");
-    const customParameters = parseCustomPlanetUrl(customPlanet);
-    if (!customParameters) {
-      return {
-        detail:
-          "This link carries a World Forge recipe that is invalid or from an incompatible version. Make a new one in World Forge.",
-        kind: "planet",
-        name: "custom recipe",
-        type: "missing",
-      };
-    }
-    const custom = generateCustomWorld(customParameters);
-    return {
-      recipe: custom.recipe,
-      result: { cached: false, mode: "custom", planet: custom.planet },
-      type: "planet",
-    };
-  }
-
-  const customStar = parameters.get("customStar");
-  if (customStar !== null) {
-    const { parseCustomStarUrl } = await import("./custom-destination-url.ts");
-    const customParameters = parseCustomStarUrl(customStar);
-    if (!customParameters) {
-      return {
-        detail:
-          "This link carries a World Forge recipe that is invalid or from an incompatible version. Make a new one in World Forge.",
-        kind: "star",
-        name: "custom recipe",
-        type: "missing",
-      };
-    }
-    const custom = generateCustomStar(customParameters);
-    return { result: { cached: false, mode: "custom", star: custom.star }, type: "star" };
-  }
-
-  return defaultPlanetObject();
-};
+const loadRequestedObject = (): Promise<ActiveObject> =>
+  import("./requested-destination.ts").then((module) => module.loadRequestedObject());
 
 export const App = () => {
+  const navigation = useRef(createOperationGate()).current;
+  const [resolving, setResolving] = useState(false);
+  const navigationFailed = useCallback(() => {
+    setResolving(false);
+    setActiveObject({
+      type: "missing",
+      kind: "planet",
+      name: "requested destination",
+      retry: true,
+      detail: "The destination could not be loaded. Check your connection and retry.",
+    });
+  }, []);
   const [canvas, setCanvas] = useState<HTMLCanvasElement | null>(null);
   const {
     host: sceneHost,
@@ -259,15 +121,28 @@ export const App = () => {
     (sceneHostStatus === "initializing" || sceneHostStatus === "ready");
 
   const loadFromLocation = useCallback(() => {
+    const current = navigation.start();
+    setResolving(true);
     setSystemHostName(null);
-    void loadRequestedObject().then(setActiveObject);
-  }, []);
+    void loadRequestedObject()
+      .then((next) => {
+        if (!current()) return;
+        setActiveObject(next);
+        setResolving(false);
+      })
+      .catch(() => {
+        if (current()) navigationFailed();
+      });
+  }, [navigation, navigationFailed]);
 
   useEffect(() => {
-    loadFromLocation();
+    if (window.location.search) loadFromLocation();
     window.addEventListener("popstate", loadFromLocation);
-    return () => window.removeEventListener("popstate", loadFromLocation);
-  }, [loadFromLocation]);
+    return () => {
+      navigation.cancel();
+      window.removeEventListener("popstate", loadFromLocation);
+    };
+  }, [loadFromLocation, navigation]);
 
   useEffect(() => {
     const toggleDiscoverWithShortcut = (event: KeyboardEvent): void => {
@@ -358,101 +233,175 @@ export const App = () => {
       ?.setAttribute("content", canonical);
   }, [activeObject]);
 
-  const selectPlanet = useCallback((planet: ExoplanetProfile, cached: boolean): void => {
-    window.history.pushState({}, "", `?planet=${encodeURIComponent(planet.name)}`);
-    setDiscoverOpen(false);
-    if (planet.solarSystem) {
-      void solarPlanetObject(planet, cached).then(setActiveObject);
-      return;
-    }
-    setActiveObject({
-      result: { cached, mode: "live", planet },
-      type: "planet",
-    });
-  }, []);
-
-  const selectStar = useCallback((star: StarProfile, cached: boolean): void => {
-    window.history.pushState({}, "", `?star=${encodeURIComponent(star.name)}`);
-    setDiscoverOpen(false);
-    setSystemHostName(null);
-    setActiveObject({
-      result: { cached, mode: star.solarSystem ? "solar" : "live", star },
-      type: "star",
-    });
-  }, []);
-
-  const selectBlackHole = useCallback((blackHole: BlackHoleProfile): void => {
-    const identity = blackHole.provenance === "procedural" ? blackHole.id : blackHole.name;
-    window.history.pushState({}, "", `?blackHole=${encodeURIComponent(identity)}`);
-    setDiscoverOpen(false);
-    setSystemHostName(null);
-    setActiveObject({ blackHole, type: "black-hole" });
-  }, []);
-
-  const selectRegion = useCallback((region: SolarRegionProfile): void => {
-    window.history.pushState({}, "", `?region=${encodeURIComponent(region.name)}`);
-    setDiscoverOpen(false);
-    setSystemHostName(null);
-    setActiveObject({ region, type: "region" });
-  }, []);
-
-  const selectSystem = useCallback(async (hostStar: string): Promise<boolean> => {
-    const system = await reachSystem(hostStar);
-    if (!system) return false;
-    window.history.pushState({}, "", `?system=${encodeURIComponent(hostStar)}`);
-    setSystemHostName(hostStar);
-    setActiveObject({ result: system, type: "system" });
-    return true;
-  }, []);
-
-  const selectHostStar = useCallback(async (hostStar: string): Promise<boolean> => {
-    const result = await reachStar(hostStar);
-    if (!result) return false;
-    window.history.pushState({}, "", `?star=${encodeURIComponent(result.star.name)}`);
-    setSystemHostName(hostStar);
-    setActiveObject({ result, type: "star" });
-    return true;
-  }, []);
-
-  const generatePlanet = useCallback(({ parameters, planet, recipe }: CustomWorld): void => {
-    void import("./custom-destination-url.ts").then(({ customPlanetUrl }) => {
-      window.history.pushState({}, "", customPlanetUrl(parameters));
+  const selectPlanet = useCallback(
+    (planet: ExoplanetProfile, cached: boolean): void => {
+      const current = navigation.start();
+      setResolving(false);
+      window.history.pushState({}, "", `?planet=${encodeURIComponent(planet.name)}`);
       setDiscoverOpen(false);
+      if (planet.solarSystem) {
+        void solarPlanetObject(planet, cached)
+          .then((next) => {
+            if (current()) setActiveObject(next);
+          })
+          .catch(() => {
+            if (current()) navigationFailed();
+          });
+        return;
+      }
       setActiveObject({
-        recipe,
-        result: { cached: false, mode: "custom", planet },
+        result: { cached, mode: "live", planet },
         type: "planet",
       });
-    });
-  }, []);
+    },
+    [navigation, navigationFailed],
+  );
 
-  const generateStar = useCallback(({ parameters, star }: CustomStar): void => {
-    void import("./custom-destination-url.ts").then(({ customStarUrl }) => {
-      window.history.pushState({}, "", customStarUrl(parameters));
+  const selectStar = useCallback(
+    (star: StarProfile, cached: boolean): void => {
+      navigation.cancel();
+      setResolving(false);
+      window.history.pushState({}, "", `?star=${encodeURIComponent(star.name)}`);
       setDiscoverOpen(false);
+      setSystemHostName(null);
       setActiveObject({
-        result: { cached: false, mode: "custom", star },
+        result: { cached, mode: star.solarSystem ? "solar" : "live", star },
         type: "star",
       });
-    });
-  }, []);
+    },
+    [navigation, navigationFailed],
+  );
 
-  const generateBlackHole = useCallback(({ blackHole, parameters }: CustomBlackHole): void => {
-    void import("./custom-destination-url.ts").then(({ customBlackHoleUrl }) => {
-      window.history.pushState({}, "", customBlackHoleUrl(parameters));
+  const selectBlackHole = useCallback(
+    (blackHole: BlackHoleProfile): void => {
+      navigation.cancel();
+      setResolving(false);
+      const identity = blackHole.provenance === "procedural" ? blackHole.id : blackHole.name;
+      window.history.pushState({}, "", `?blackHole=${encodeURIComponent(identity)}`);
       setDiscoverOpen(false);
       setSystemHostName(null);
       setActiveObject({ blackHole, type: "black-hole" });
-    });
-  }, []);
+    },
+    [navigation, navigationFailed],
+  );
+
+  const selectRegion = useCallback(
+    (region: SolarRegionProfile): void => {
+      navigation.cancel();
+      setResolving(false);
+      window.history.pushState({}, "", `?region=${encodeURIComponent(region.name)}`);
+      setDiscoverOpen(false);
+      setSystemHostName(null);
+      setActiveObject({ region, type: "region" });
+    },
+    [navigation, navigationFailed],
+  );
+
+  const selectSystem = useCallback(
+    async (hostStar: string): Promise<boolean> => {
+      const current = navigation.start();
+      setResolving(true);
+      const system = await reachSystem(hostStar).catch(() => null);
+      if (!current()) return true;
+      setResolving(false);
+      if (!system) return false;
+      window.history.pushState({}, "", `?system=${encodeURIComponent(hostStar)}`);
+      setSystemHostName(hostStar);
+      setActiveObject({ result: system, type: "system" });
+      return true;
+    },
+    [navigation, navigationFailed],
+  );
+
+  const selectHostStar = useCallback(
+    async (hostStar: string): Promise<boolean> => {
+      const current = navigation.start();
+      setResolving(true);
+      const result = await reachStar(hostStar).catch(() => null);
+      if (!current()) return true;
+      setResolving(false);
+      if (!result) return false;
+      window.history.pushState({}, "", `?star=${encodeURIComponent(result.star.name)}`);
+      setSystemHostName(hostStar);
+      setActiveObject({ result, type: "star" });
+      return true;
+    },
+    [navigation, navigationFailed],
+  );
+
+  const generatePlanet = useCallback(
+    ({ parameters, planet, recipe }: CustomWorld): void => {
+      const current = navigation.start();
+      setResolving(false);
+      void import("./custom-destination-url.ts")
+        .then(({ customPlanetUrl }) => {
+          if (!current()) return;
+          window.history.pushState({}, "", customPlanetUrl(parameters));
+          setDiscoverOpen(false);
+          setActiveObject({
+            recipe,
+            result: { cached: false, mode: "custom", planet },
+            type: "planet",
+          });
+        })
+        .catch(() => {
+          if (current()) navigationFailed();
+        });
+    },
+    [navigation, navigationFailed],
+  );
+
+  const generateStar = useCallback(
+    ({ parameters, star }: CustomStar): void => {
+      const current = navigation.start();
+      setResolving(false);
+      void import("./custom-destination-url.ts")
+        .then(({ customStarUrl }) => {
+          if (!current()) return;
+          window.history.pushState({}, "", customStarUrl(parameters));
+          setDiscoverOpen(false);
+          setActiveObject({
+            result: { cached: false, mode: "custom", star },
+            type: "star",
+          });
+        })
+        .catch(() => {
+          if (current()) navigationFailed();
+        });
+    },
+    [navigation, navigationFailed],
+  );
+
+  const generateBlackHole = useCallback(
+    ({ blackHole, parameters }: CustomBlackHole): void => {
+      const current = navigation.start();
+      setResolving(false);
+      void import("./custom-destination-url.ts")
+        .then(({ customBlackHoleUrl }) => {
+          if (!current()) return;
+          window.history.pushState({}, "", customBlackHoleUrl(parameters));
+          setDiscoverOpen(false);
+          setSystemHostName(null);
+          setActiveObject({ blackHole, type: "black-hole" });
+        })
+        .catch(() => {
+          if (current()) navigationFailed();
+        });
+    },
+    [navigation, navigationFailed],
+  );
 
   const returnHome = useCallback((): void => {
+    navigation.cancel();
+    sceneHost?.cancelTravel();
+    setResolving(false);
     window.history.replaceState({}, "", "/");
     setSystemHostName(null);
     setActiveObject(defaultPlanetObject());
-  }, []);
+  }, [navigation, sceneHost]);
 
   const openDiscover = useCallback((): void => {
+    setPaletteOpen(false);
     setDiscoverOpen(true);
   }, []);
 
@@ -476,20 +425,41 @@ export const App = () => {
   }, [activeObject, tourRevision]);
   const goToTourStep = useCallback(
     (tourId: string, index: number): void => {
-      void import("./tours.ts").then(({ findTour, tourStepSearch }) => {
-        const tour = findTour(tourId);
-        if (!tour || !tour.steps[index]) return;
-        window.history.pushState({}, "", tourStepSearch(tour, index));
-        setDiscoverOpen(false);
-        setSystemHostName(null);
-        sceneHost?.beginTravel();
-        void loadRequestedObject().then((next) => {
-          if (next.type === "missing") sceneHost?.cancelTravel();
-          setActiveObject(next);
+      const current = navigation.start();
+      setResolving(true);
+      void import("./tours.ts")
+        .then(({ findTour, tourStepSearch }) => {
+          if (!current()) return;
+          const tour = findTour(tourId);
+          if (!tour || !tour.steps[index]) {
+            setResolving(false);
+            return;
+          }
+          const sameDestination =
+            canonicalUrlForSearch(window.location.search) ===
+            canonicalUrlForSearch(tourStepSearch(tour, index));
+          window.history.pushState({}, "", tourStepSearch(tour, index));
+          setDiscoverOpen(false);
+          setSystemHostName(null);
+          if (!sameDestination) sceneHost?.beginTravel();
+          void loadRequestedObject()
+            .then((next) => {
+              if (!current()) return;
+              setResolving(false);
+              if (next.type === "missing") sceneHost?.cancelTravel();
+              setActiveObject(next);
+            })
+            .catch(() => {
+              if (!current()) return;
+              sceneHost?.cancelTravel();
+              navigationFailed();
+            });
+        })
+        .catch(() => {
+          if (current()) navigationFailed();
         });
-      });
     },
-    [sceneHost],
+    [sceneHost, navigation, navigationFailed],
   );
   const exitTour = useCallback((): void => {
     const parameters = new URLSearchParams(window.location.search);
@@ -641,13 +611,13 @@ export const App = () => {
         />
       ) : activeObject.type === "missing" ? (
         <RecoveryScreen
-          action="Go to the featured world"
+          action={activeObject.retry ? "Retry destination" : "Go to the featured world"}
           detail={
             activeObject.detail ??
             `Exora could not find the ${activeObject.kind} “${activeObject.name}” in its archive, or cannot draw it yet.`
           }
           heading="Destination unavailable"
-          onRetry={returnHome}
+          onRetry={activeObject.retry ? loadFromLocation : returnHome}
         />
       ) : activeObject.type === "black-hole" ? (
         <Suspense fallback={null}>
@@ -710,7 +680,11 @@ export const App = () => {
           <CommandPalette onClose={closePalette} onSelect={travelFromPalette} />
         </Suspense>
       ) : null}
-      {activeTour && activeObject && activeObject.type !== "missing" && !discoverOpen ? (
+      {activeTour &&
+      !resolving &&
+      activeObject &&
+      activeObject.type !== "missing" &&
+      !discoverOpen ? (
         <Suspense fallback={null}>
           <TourBar
             active={activeTour}

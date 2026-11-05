@@ -8,7 +8,7 @@
  * good answer used — the panels already say when data is cached.
  */
 
-const VERSION = "v2";
+const VERSION = "v3";
 const SHELL_CACHE = `exora-shell-${VERSION}`;
 const ASSET_CACHE = `exora-assets-${VERSION}`;
 const MEDIA_CACHE = `exora-media-${VERSION}`;
@@ -17,8 +17,8 @@ const CACHES = [SHELL_CACHE, ASSET_CACHE, MEDIA_CACHE, ARCHIVE_CACHE];
 const MEDIA_LIMIT = 160;
 const ARCHIVE_LIMIT = 240;
 const SHELL = ["/", "/manifest.webmanifest", "/exora-orbit.svg", "/icon-192.png"];
-// Each refresh of the planet catalogue gets a new hash; only the newest is worth its megabytes.
-const PLANET_CATALOG = /\/assets\/pscomppars-[^/]+\.json$/;
+// Keep hashed snapshots available to clients running an earlier deployment.
+const ARCHIVE_MAX_AGE_MS = 7 * 86_400_000;
 
 /** Which strategy a same-origin GET takes, or null to leave it to the network untouched. */
 const routeFor = (pathname, mode) => {
@@ -43,22 +43,24 @@ const trim = async (cacheName, limit) => {
 const store = async (cacheName, request, response, limit) => {
   if (!response || !response.ok || response.type === "opaque") return;
   const cache = await caches.open(cacheName);
+  response = new Response(response.body, {
+    status: response.status,
+    statusText: response.statusText,
+    headers: response.headers,
+  });
+  response.headers.set("X-Exora-Stored-At", String(Date.now()));
   await cache.put(request, response);
   if (limit) await trim(cacheName, limit);
-  const url = typeof request === "string" ? request : request.url;
-  if (PLANET_CATALOG.test(url)) {
-    const keys = await cache.keys();
-    await Promise.all(
-      keys
-        .filter((key) => key.url !== url && PLANET_CATALOG.test(key.url))
-        .map((key) => cache.delete(key)),
-    );
-  }
 };
 
 const networkFirst = async (event, cacheName, fallbackUrl, limit) => {
+  let failedResponse;
   try {
-    const response = await fetch(event.request);
+    const response = await fetch(event.request, { signal: AbortSignal.timeout(30_000) });
+    if (response.status >= 500) {
+      failedResponse = response;
+      throw new Error("Upstream unavailable");
+    }
     // Every destination URL is the same single-page shell, so navigations share one entry.
     const key = fallbackUrl ?? event.request;
     event.waitUntil(store(cacheName, key, response.clone(), limit));
@@ -66,7 +68,24 @@ const networkFirst = async (event, cacheName, fallbackUrl, limit) => {
   } catch (error) {
     const cached =
       (await caches.match(event.request)) ?? (fallbackUrl ? await caches.match(fallbackUrl) : null);
-    if (cached) return cached;
+    if (cached) {
+      if (cacheName !== ARCHIVE_CACHE) return cached;
+      const storedAt = Number(cached.headers.get("X-Exora-Stored-At"));
+      if (storedAt > 0 && Date.now() - storedAt <= ARCHIVE_MAX_AGE_MS) {
+        try {
+          const payload = await cached.clone().json();
+          if (payload.meta) {
+            payload.meta.cached = true;
+            if ("stale" in payload.meta) payload.meta.stale = true;
+            return Response.json(payload, { headers: { "X-Exora-Cache": "offline" } });
+          }
+        } catch {
+          /* A non-JSON archive response retains its original bytes. */
+        }
+        return cached;
+      }
+    }
+    if (failedResponse) return failedResponse;
     throw error;
   }
 };
@@ -88,12 +107,7 @@ const cacheFirst = async (event, cacheName, limit, revalidate) => {
 self.exoraRouteFor = routeFor;
 
 self.addEventListener("install", (event) => {
-  event.waitUntil(
-    caches
-      .open(SHELL_CACHE)
-      .then((cache) => cache.addAll(SHELL))
-      .then(() => self.skipWaiting()),
-  );
+  event.waitUntil(caches.open(SHELL_CACHE).then((cache) => cache.addAll(SHELL)));
 });
 
 self.addEventListener("activate", (event) => {
@@ -106,8 +120,7 @@ self.addEventListener("activate", (event) => {
             .filter((name) => name.startsWith("exora-") && !CACHES.includes(name))
             .map((name) => caches.delete(name)),
         ),
-      )
-      .then(() => self.clients.claim()),
+      ),
   );
 });
 

@@ -57,7 +57,7 @@ const createWorker = async (network: (request: Request) => Promise<Response>) =>
     location: { origin: "https://exora.test" },
     skipWaiting: async () => undefined,
   };
-  runInNewContext(source, { URL, caches, fetch: network, Response, self });
+  runInNewContext(source, { URL, caches, fetch: network, Response, self, AbortSignal });
 
   const dispatch = async (
     type: string,
@@ -153,7 +153,7 @@ test("failed archive answers are never cached", async () => {
   await worker.dispatch("fetch", new Request("https://exora.test/api/stars/Vega"));
   status = 200;
 
-  expect([...(worker.stores.get("exora-archive-v2")?.keys() ?? [])]).toEqual([]);
+  expect([...(worker.stores.get("exora-archive-v3")?.keys() ?? [])]).toEqual([]);
 });
 
 test("activation removes caches from earlier versions only", async () => {
@@ -179,7 +179,7 @@ test("a hashed terrain worker chunk is reused offline without another network re
   expect(calls).toBe(1);
 });
 
-test("the planet catalogue snapshot is kept offline and only its newest version is retained", async () => {
+test("the planet catalogue snapshot is kept offline and earlier client versions remain available", async () => {
   let online = true;
   const worker = await createWorker(async (request) => {
     if (!online) throw new TypeError("offline");
@@ -190,7 +190,8 @@ test("the planet catalogue snapshot is kept offline and only its newest version 
   await worker.dispatch("fetch", snapshot("old111"));
   await worker.dispatch("fetch", new Request("https://exora.test/assets/index-abc123.js"));
   await worker.dispatch("fetch", snapshot("new222"));
-  expect([...worker.stores.get("exora-assets-v2")!.keys()]).toEqual([
+  expect([...worker.stores.get("exora-assets-v3")!.keys()]).toEqual([
+    "https://exora.test/assets/pscomppars-old111.json",
     "https://exora.test/assets/index-abc123.js",
     "https://exora.test/assets/pscomppars-new222.json",
   ]);
@@ -218,4 +219,19 @@ test.each([
   online = false;
   const cached = await worker.dispatch("fetch", request());
   expect(new Uint8Array(await cached!.arrayBuffer())).toEqual(bytes);
+});
+
+test("offline and upstream-error delivery explicitly marks scientific responses stale", async () => {
+  let online = true;
+  const worker = await createWorker(async () =>
+    online
+      ? Response.json({ data: [], meta: { cached: false, stale: false } })
+      : new Response(null, { status: 502 }),
+  );
+  const request = () => new Request("https://exora.test/api/ephemerides?at=example");
+  await worker.dispatch("fetch", request());
+  online = false;
+  const response = await worker.dispatch("fetch", request());
+  expect((await response!.json()).meta).toEqual({ cached: true, stale: true });
+  expect(response!.headers.get("X-Exora-Cache")).toBe("offline");
 });

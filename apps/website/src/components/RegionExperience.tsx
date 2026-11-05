@@ -30,17 +30,22 @@ export const RegionExperience = ({
   useEffect(() => {
     if (!host) return;
     let abandoned = false;
+    const controller = new AbortController();
     setSceneState("loading");
     void import("../solar-region-scene.ts")
       .then(({ createSolarRegionWorld }) =>
-        host.mountWorld(() =>
-          createSolarRegionWorld(host, {
-            onFirstFrame: () => {
-              if (!abandoned) setSceneState("ready");
-            },
-            region,
-          }),
-        ),
+        abandoned
+          ? null
+          : host.mountWorld(
+              () =>
+                createSolarRegionWorld(host, {
+                  onFirstFrame: () => {
+                    if (!abandoned) setSceneState("ready");
+                  },
+                  region,
+                }),
+              controller.signal,
+            ),
       )
       .catch((error: unknown) => {
         console.error(error);
@@ -48,6 +53,7 @@ export const RegionExperience = ({
       });
     return () => {
       abandoned = true;
+      controller.abort();
     };
   }, [host, region]);
 

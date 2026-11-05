@@ -1,3 +1,5 @@
+import { createAsyncResource } from "../async-resource.ts";
+import { createOperationGate } from "../operation-gate.ts";
 import type { ExoplanetProfile } from "@exora/contracts";
 import {
   useEffect,
@@ -67,16 +69,9 @@ const tickLabel = (value: number): string =>
 const colorOf = (group: MethodGroup): string =>
   METHOD_GROUPS.find((entry) => entry.id === group)?.color ?? "#74838a";
 
-let populationRequest: Promise<AtlasWorld[]> | null = null;
-const population = (): Promise<AtlasWorld[]> => {
-  populationRequest ??= loadPlanetPopulation()
-    .then(({ data }) => decodePopulation(data))
-    .catch((error: unknown) => {
-      populationRequest = null;
-      throw error;
-    });
-  return populationRequest;
-};
+const populationRequest = createAsyncResource<AtlasWorld[]>({ ttlMs: 600_000, retryMs: 0 });
+const population = (): Promise<AtlasWorld[]> =>
+  populationRequest.get(() => loadPlanetPopulation().then(({ data }) => decodePopulation(data)));
 
 const describeWorld = (world: AtlasWorld): string =>
   [
@@ -129,7 +124,8 @@ const Scatter = ({
   const [frame, setFrame] = useState<HTMLDivElement | null>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const { height, width } = useElementSize(frame);
-  const [hovered, setHovered] = useState<PlottedWorld | null>(null);
+  const [candidate, setHovered] = useState<PlottedWorld | null>(null);
+  const hovered = candidate && plotted.includes(candidate) ? candidate : null;
   const plotWidth = Math.max(width - PLOT_MARGIN.left - PLOT_MARGIN.right, 1);
   const plotHeight = Math.max(height - PLOT_MARGIN.top - PLOT_MARGIN.bottom, 1);
   const nearest = useMemo(() => createNearestIndex(plotted), [plotted]);
@@ -460,6 +456,8 @@ interface PlanetAtlasProps {
  */
 export const PlanetAtlas = ({ onSelect }: PlanetAtlasProps) => {
   const [worlds, setWorlds] = useState<AtlasWorld[] | null>(null);
+  const navigation = useRef(createOperationGate()).current;
+  const [retry, setRetry] = useState(0);
   const [failed, setFailed] = useState(false);
   const [tab, setTab] = useState<AtlasTab>("radius");
   const [hidden, setHidden] = useState<ReadonlySet<MethodGroup>>(new Set());
@@ -476,6 +474,7 @@ export const PlanetAtlas = ({ onSelect }: PlanetAtlasProps) => {
 
   useEffect(() => {
     let active = true;
+    setFailed(false);
     population()
       .then((loaded) => {
         if (active) setWorlds(loaded);
@@ -485,8 +484,9 @@ export const PlanetAtlas = ({ onSelect }: PlanetAtlasProps) => {
       });
     return () => {
       active = false;
+      navigation.cancel();
     };
-  }, []);
+  }, [navigation, retry]);
 
   const view: AtlasView = tab === "mass" ? "mass" : "radius";
   const plotted = useMemo(
@@ -502,8 +502,10 @@ export const PlanetAtlas = ({ onSelect }: PlanetAtlasProps) => {
   }, [matches, worlds]);
 
   const travelTo = async (world: AtlasWorld): Promise<void> => {
+    const current = navigation.start();
     setTravel({ error: false, name: world.name });
     const result = await loadPlanetByName(world.name).catch(() => null);
+    if (!current()) return;
     if (result && hasRenderer(result.planet)) {
       onSelect(result.planet, result.cached);
       return;
@@ -593,7 +595,9 @@ export const PlanetAtlas = ({ onSelect }: PlanetAtlasProps) => {
         {failed ? (
           <p className={cx("atlas-status")} role="status">
             The NASA Exoplanet Archive could not be reached. The atlas needs the whole catalogue, so
-            try again in a moment.
+            <button type="button" onClick={() => setRetry((value) => value + 1)}>
+              Retry atlas
+            </button>
           </p>
         ) : !worlds ? (
           <p className={cx("atlas-status")} role="status">
@@ -615,7 +619,7 @@ export const PlanetAtlas = ({ onSelect }: PlanetAtlasProps) => {
       <p className={cx("atlas-caption")} role="status">
         {travel
           ? travel.error
-            ? `${travel.name} could not be opened. Its archive record may lack the size needed to render it.`
+            ? `${travel.name} could not be opened. Check your connection or try another world.`
             : `Travelling to ${travel.name}…`
           : worlds
             ? tab === "years"

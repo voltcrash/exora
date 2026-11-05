@@ -143,7 +143,7 @@ export class NasaPopulationRepository implements PopulationRepository {
         this.#cache.set(
           POPULATION_QUERY,
           { population, retrievedOn },
-          requestTime + this.#cacheTtlMs,
+          this.#now() + this.#cacheTtlMs,
         );
         return { cached: false, retrievedOn, value: population };
       } catch (error) {

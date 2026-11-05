@@ -66,15 +66,16 @@ with the API's own TAP columns, row validation, and normalization (`loadNasaPlan
 `nasa-archive.ts`). It sorts planets by name and writes a header of field paths plus one array of
 values per planet, with the generation time and source query. Fields NASA did not report stay
 `null`. If only the timestamp would change, the generator keeps the old file, so an unchanged
-archive produces no diff. It refuses to write a catalog of fewer than 1,000 planets. The
+archive produces no diff. It refuses to write a catalog of fewer than 1,000 planets or a decline over 5% from the previous
+snapshot. After checking a legitimate decline, `--allow-shrink` bypasses only the relative guard.
+Catalog generators write a temporary file and atomically replace the output after validation. The
 October 2026 snapshot holds 6,451 planets: 1,766,258 bytes raw, 510,445 gzip, and 408,147 brotli.
 
 The `Refresh planet catalog` workflow regenerates the snapshot every Monday and on demand. It
 validates the snapshot with the `@exora/planet-catalog` tests, then opens or force-updates the
 `chore/refresh-planet-catalog` pull request when the data changed. It needs the repository setting
-"Allow GitHub Actions to create and approve pull requests". Pull requests opened with
-`GITHUB_TOKEN` do not start the Quality workflow, so close and reopen the pull request, or push to
-its branch, before merging. The snapshot ships when the pull request merges and `main` deploys.
+"Allow GitHub Actions to create and approve pull requests". The refresh workflow explicitly dispatches Quality on its pushed branch because PR events created
+with `GITHUB_TOKEN` do not start other workflows. The snapshot ships when the pull request merges and `main` deploys.
 
 The name matching, ranking, browse filters (distance, temperature, and a radius), lexical name
 order, limit bounds, and last-name keyset cursor live in `@exora/planet-catalog`. The API and the
@@ -100,7 +101,9 @@ Until the snapshot has loaded, and if it fails, `api-client.ts` answers through 
 first keystroke never waits. A failed load is retried after a minute. Once loaded, search, browse
 pages, and exact-name lookups are answered in the browser. An exact-name miss or a search with no
 match still asks the API. The service worker keeps the snapshot with the other hashed assets for
-offline use and deletes older snapshots when a new one is stored.
+offline use and retains earlier hashed snapshots for open clients. Service-worker updates wait for existing clients
+to close before activating. Offline API replay sets cached delivery metadata, marks responses with
+a stale field as stale, and is limited to seven days.
 
 Local measurements, taken on an aarch64 development machine with the production builds and
 headless Chromium. These are samples, not service-level guarantees:

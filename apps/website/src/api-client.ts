@@ -1,3 +1,4 @@
+import { createAsyncResource } from "./async-resource.ts";
 import {
   type ContractSchema,
   type BlackHoleProfile,
@@ -16,13 +17,13 @@ import { requestDeadline } from "./request-deadline.ts";
 
 type Fetcher = (input: string | URL | Request, init?: RequestInit) => Promise<Response>;
 
-const OBJECT_LOOKUP_TIMEOUT_MS = 8_000;
+const OBJECT_LOOKUP_TIMEOUT_MS = 12_000;
 const PLANET_CATALOG_RETRY_MS = 60_000;
 const MAX_PLANET_NAME_LENGTH = 100;
 
-const PLANET_COLLECTION_TIMEOUT_MS = 8_000;
-const STAR_COLLECTION_TIMEOUT_MS = 10_000;
-const BLACK_HOLE_COLLECTION_TIMEOUT_MS = 10_000;
+const PLANET_COLLECTION_TIMEOUT_MS = 30_000;
+const STAR_COLLECTION_TIMEOUT_MS = 12_000;
+const BLACK_HOLE_COLLECTION_TIMEOUT_MS = 12_000;
 const EPHEMERIS_TIMEOUT_MS = 20_000;
 const POPULATION_TIMEOUT_MS = 30_000;
 
@@ -118,30 +119,37 @@ const requestStarCollection = (
   }));
 
 let planetCatalog: PlanetCatalog | null = null;
-let planetCatalogLoad: Promise<PlanetCatalog | null> | null = null;
+const planetCatalogLoad = createAsyncResource<PlanetCatalog>({ retryMs: PLANET_CATALOG_RETRY_MS });
 
 /**
  * Starts the one download of the archive snapshot. Planet search, browse and name lookups use the
  * API until it has loaded, and keep using it if it fails.
  */
 export const preloadPlanetCatalog = (fetcher?: Fetcher): Promise<PlanetCatalog | null> =>
-  (planetCatalogLoad ??= import("./planet-catalog.ts")
-    .then(({ loadPlanetCatalog }) => loadPlanetCatalog(fetcher))
-    .then((catalog) => (planetCatalog = catalog))
+  planetCatalogLoad
+    .get(() =>
+      import("./planet-catalog.ts")
+        .then(({ loadPlanetCatalog }) => loadPlanetCatalog(fetcher))
+        .then((catalog) => (planetCatalog = catalog)),
+    )
     .catch((error: unknown) => {
       console.warn("Exora could not load its planet catalog; asking the archive instead.", error);
-      setTimeout(() => {
-        planetCatalogLoad = null;
-      }, PLANET_CATALOG_RETRY_MS);
       return null;
-    }));
+    });
 
 /** Fetches the catalog once the browser is idle, unless the connection asks to save data. */
 export const prefetchPlanetCatalogWhenIdle = (): (() => void) => {
   const { connection } = navigator as Navigator & {
     connection?: { effectiveType?: string; saveData?: boolean };
   };
-  if (planetCatalogLoad || connection?.saveData || connection?.effectiveType?.endsWith("2g")) {
+  if (
+    (planetCatalogLoad.state.status !== "idle" &&
+      !(
+        planetCatalogLoad.state.status === "failed" && planetCatalogLoad.state.retryAt <= Date.now()
+      )) ||
+    connection?.saveData ||
+    connection?.effectiveType?.endsWith("2g")
+  ) {
     return () => undefined;
   }
   const prefetch = (): void => void preloadPlanetCatalog();
@@ -206,16 +214,13 @@ const requestBlackHole = async (
   fetcher: Fetcher,
   signal?: AbortSignal,
 ): Promise<BlackHoleResponse | null> => {
-  try {
-    const response = await fetcher(`/api/black-holes/${encodeURIComponent(name)}`, {
-      headers: { accept: "application/json" },
-      signal: requestDeadline(OBJECT_LOOKUP_TIMEOUT_MS, signal),
-    });
-    if (!response.ok) return null;
-    return await parseApiPayload(responseSchema.BlackHole, await response.json());
-  } catch {
-    return null;
-  }
+  const response = await fetcher(`/api/black-holes/${encodeURIComponent(name)}`, {
+    headers: { accept: "application/json" },
+    signal: requestDeadline(OBJECT_LOOKUP_TIMEOUT_MS, signal),
+  });
+  if (response.status === 404) return null;
+  if (!response.ok) throw new Error(`Destination lookup failed with status ${response.status}.`);
+  return parseApiPayload(responseSchema.BlackHole, await response.json());
 };
 
 /** Every confirmed planet as compact rows, for plotting the whole archive at once. */
@@ -287,25 +292,20 @@ const requestPlanet = async (
   fetcher: Fetcher,
   signal?: AbortSignal,
 ): Promise<PlanetResponse | null> => {
-  try {
-    const response = await fetcher(path, {
-      headers: { accept: "application/json" },
-      signal: requestDeadline(OBJECT_LOOKUP_TIMEOUT_MS, signal),
-    });
-
-    if (!response.ok) return null;
-
-    return await parseApiPayload(responseSchema.Planet, await response.json());
-  } catch {
-    return null;
-  }
+  const response = await fetcher(path, {
+    headers: { accept: "application/json" },
+    signal: requestDeadline(OBJECT_LOOKUP_TIMEOUT_MS, signal),
+  });
+  if (response.status === 404) return null;
+  if (!response.ok) throw new Error(`Destination lookup failed with status ${response.status}.`);
+  return parseApiPayload(responseSchema.Planet, await response.json());
 };
 
 export const loadFeaturedPlanet = async (
   fallback: ExoplanetProfile,
   fetcher: Fetcher = fetch,
 ): Promise<PlanetLoadResult> => {
-  const payload = await requestPlanet("/api/planets/featured", fetcher);
+  const payload = await requestPlanet("/api/planets/featured", fetcher).catch(() => null);
 
   return payload
     ? { cached: payload.meta.cached, mode: "live", planet: payload.data }
@@ -455,16 +455,13 @@ const requestStar = async (
   fetcher: Fetcher,
   signal?: AbortSignal,
 ): Promise<StarResponse | null> => {
-  try {
-    const response = await fetcher(path, {
-      headers: { accept: "application/json" },
-      signal: requestDeadline(OBJECT_LOOKUP_TIMEOUT_MS, signal),
-    });
-    if (!response.ok) return null;
-    return await parseApiPayload(responseSchema.Star, await response.json());
-  } catch {
-    return null;
-  }
+  const response = await fetcher(path, {
+    headers: { accept: "application/json" },
+    signal: requestDeadline(OBJECT_LOOKUP_TIMEOUT_MS, signal),
+  });
+  if (response.status === 404) return null;
+  if (!response.ok) throw new Error(`Destination lookup failed with status ${response.status}.`);
+  return parseApiPayload(responseSchema.Star, await response.json());
 };
 
 export const loadStarByName = async (

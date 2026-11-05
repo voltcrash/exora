@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 
-import { onWebFontsReady, webFontsArrived } from "./web-fonts.ts";
+import { onWebFontsSettled, webFontsSettled } from "./web-fonts.ts";
 
 /*
  * The faces are only asked for a second after the first paint, so a scene that finishes sooner
@@ -10,11 +10,11 @@ import { onWebFontsReady, webFontsArrived } from "./web-fonts.ts";
 const TYPEFACE_WAIT_CAP_MS = 3_000;
 
 export const useTypographySettled = (): boolean => {
-  const [settled, setSettled] = useState(webFontsArrived);
+  const [settled, setSettled] = useState(webFontsSettled);
 
   useEffect(() => {
     if (settled) return;
-    const stopListening = onWebFontsReady(() => setSettled(true));
+    const stopListening = onWebFontsSettled(() => setSettled(true));
     const cap = window.setTimeout(() => setSettled(true), TYPEFACE_WAIT_CAP_MS);
     return () => {
       stopListening();
