@@ -98,3 +98,54 @@ test("acquisition waits for an ongoing restart and reuses its replacement", asyn
   expect(await acquiring).toBe(await restart);
   expect(id).toBe(2);
 });
+
+test("cleanup disposal is awaited before a restart can create another host", async () => {
+  let finish = (): void => undefined;
+  let started = (): void => undefined;
+  const disposing = new Promise<void>((resolve) => {
+    finish = resolve;
+  });
+  const disposalStarted = new Promise<void>((resolve) => {
+    started = resolve;
+  });
+  let created = 0;
+  const registry = createSceneHostRegistry<object, TestHost>((canvas) => ({
+    canvas,
+    id: ++created,
+    dispose: () => {
+      started();
+      return disposing;
+    },
+  }));
+  const canvas = {};
+  const host = await registry.acquire(canvas);
+  const cleanup = registry.release(host);
+  await disposalStarted;
+  const restarting = registry.recreate(canvas);
+  await Promise.resolve();
+  expect(created).toBe(1);
+  finish();
+  await cleanup;
+  expect((await restarting).id).toBe(2);
+});
+
+test("direct host disposal remains a barrier after the host is forgotten", async () => {
+  let finish = (): void => undefined;
+  const disposal = new Promise<void>((resolve) => {
+    finish = resolve;
+  });
+  let created = 0;
+  const registry = createSceneHostRegistry<object, TestHost>((canvas) => ({
+    canvas,
+    id: ++created,
+    dispose: () => disposal,
+  }));
+  const canvas = {};
+  const host = await registry.acquire(canvas);
+  registry.forget(host, disposal);
+  const next = registry.acquire(canvas);
+  await Promise.resolve();
+  expect(created).toBe(1);
+  finish();
+  expect((await next).id).toBe(2);
+});

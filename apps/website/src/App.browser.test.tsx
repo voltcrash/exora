@@ -73,7 +73,11 @@ vi.mock("./scene-host.ts", () => {
     scene: null,
   };
 
-  return { acquireSceneHost: () => host, recreateSceneHost: () => host };
+  return {
+    acquireSceneHost: () => host,
+    recreateSceneHost: () => host,
+    releaseSceneHost: async () => host.dispose(),
+  };
 });
 
 const stubbedHost = (): {

@@ -5,7 +5,8 @@ export interface RegisteredSceneHost<Canvas> {
 
 export interface SceneHostRegistry<Canvas, Host extends RegisteredSceneHost<Canvas>> {
   acquire: (canvas: Canvas) => Promise<Host>;
-  forget: (host: Host) => void;
+  forget: (host: Host, disposal?: Promise<void>) => void;
+  release: (host: Host) => Promise<void>;
   recreate: (canvas: Canvas) => Promise<Host>;
 }
 
@@ -33,8 +34,24 @@ export const createSceneHostRegistry = <Canvas, Host extends RegisteredSceneHost
 
   return {
     acquire: (canvas) => schedule(canvas, false),
-    forget: (host) => {
+    forget: (host, disposal) => {
       if (current === host) current = null;
+      if (disposal)
+        recreation = Promise.all([recreation, disposal]).then(
+          () => undefined,
+          () => undefined,
+        );
+    },
+    release: (host) => {
+      const operation = recreation.then(async () => {
+        if (current === host) current = null;
+        await host.dispose();
+      });
+      recreation = operation.then(
+        () => undefined,
+        () => undefined,
+      );
+      return operation;
     },
     recreate: (canvas) => schedule(canvas, true),
   };

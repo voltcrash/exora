@@ -94,6 +94,7 @@ const createSceneHost = (canvas: HTMLCanvasElement): SceneHost => {
   let arActive = false;
   let xrCameraLayerMask = 0x0fff_ffff;
   let disposed = false;
+  let disposal: Promise<void> | null = null;
   let xr: WebXRDefaultExperience | null = null;
   let xrRuntime: typeof XrRuntime | null = null;
   let xrInitialization: Promise<WebXRDefaultExperience | null> | null = null;
@@ -484,10 +485,9 @@ const createSceneHost = (canvas: HTMLCanvasElement): SceneHost => {
         if (!disposed && !isInXr && xrIntegration.destination === null) xrIntegration.markReady();
       }
     },
-    dispose: async () => {
-      if (disposed) return;
+    dispose: () => {
+      if (disposal) return disposal;
       disposed = true;
-      sceneHostRegistry.forget(sceneHost);
       travelListeners.clear();
       endGlide(null, false);
       xrIntegration.dispose();
@@ -496,8 +496,9 @@ const createSceneHost = (canvas: HTMLCanvasElement): SceneHost => {
       arPresentation.dispose();
       xr?.dispose();
       xr = null;
-      await worldDisposed;
-      resources.dispose();
+      disposal = worldDisposed.finally(() => resources.dispose());
+      sceneHostRegistry.forget(sceneHost, disposal);
+      return disposal;
     },
   };
   return sceneHost;
@@ -512,3 +513,5 @@ export const acquireSceneHost = (canvas: HTMLCanvasElement): Promise<SceneHost> 
 export const recreateSceneHost = (canvas: HTMLCanvasElement): Promise<SceneHost> => {
   return sceneHostRegistry.recreate(canvas);
 };
+
+export const releaseSceneHost = (host: SceneHost): Promise<void> => sceneHostRegistry.release(host);

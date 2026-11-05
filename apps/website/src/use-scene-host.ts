@@ -53,6 +53,7 @@ export const useSceneHost = (canvas: HTMLCanvasElement | null): SceneHostControl
     if (!canvas) return;
     let cancelled = false;
     let ownedHost: SceneHost | null = null;
+    let release = (_host: SceneHost): Promise<void> => Promise.resolve();
     let unsubscribe = (): void => undefined;
     setStatus("initializing");
     const cancelStartup = afterFirstPaint(() => {
@@ -62,13 +63,14 @@ export const useSceneHost = (canvas: HTMLCanvasElement | null): SceneHostControl
       );
       void import("./sky-catalog.ts").then(({ loadSkyCatalog }) => loadSkyCatalog());
       void import("./scene-host.ts")
-        .then(async ({ acquireSceneHost, recreateSceneHost }) => {
+        .then(async ({ acquireSceneHost, recreateSceneHost, releaseSceneHost }) => {
+          release = releaseSceneHost;
           if (cancelled) return;
           const nextHost = await (attempt === 0
             ? acquireSceneHost(canvas)
             : recreateSceneHost(canvas));
           if (cancelled) {
-            await nextHost.dispose();
+            await release(nextHost);
             return;
           }
           ownedHost = nextHost;
@@ -86,7 +88,10 @@ export const useSceneHost = (canvas: HTMLCanvasElement | null): SceneHostControl
       cancelled = true;
       cancelStartup();
       unsubscribe();
-      void ownedHost?.dispose();
+      if (ownedHost)
+        void release(ownedHost).catch((error: unknown) =>
+          console.error("[renderer] disposal failed", error),
+        );
     };
   }, [attempt, canvas]);
 
