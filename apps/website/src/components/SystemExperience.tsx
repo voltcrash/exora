@@ -99,6 +99,7 @@ export const SystemExperience = ({
   const [orbitDays, setOrbitDays] = useState(0);
   const [listening, setListening] = useState(false);
   const [audioUnavailable, setAudioUnavailable] = useState(false);
+  const audioStarting = useRef(false);
   const voiceRef = useRef<OrbitVoice | null>(null);
   const worldRef = useRef<SystemWorld | null>(null);
   const starJumpRef = useRef(false);
@@ -176,10 +177,17 @@ export const SystemExperience = ({
     if (!listening || !layout || !world || !voice) return;
     const pitches = orbitPitches(layout.orbits.map((orbit) => orbit.elements.periodDays));
     const spread = layout.orbits.length > 1 ? 1.2 / (layout.orbits.length - 1) : 0;
-    return world.onSightlineCrossing((index) => {
+    const stopState = voice.onStateChange((running) => {
+      if (!running) setListening(false);
+    });
+    const stopCrossings = world.onSightlineCrossing((index) => {
       const pitch = pitches[index];
       if (pitch !== null && pitch !== undefined) voice.pluck(pitch, -0.6 + index * spread);
     });
+    return () => {
+      stopState();
+      stopCrossings();
+    };
   }, [layout, listening]);
 
   useEffect(
@@ -192,7 +200,8 @@ export const SystemExperience = ({
     [],
   );
 
-  const toggleListening = (): void => {
+  const toggleListening = async (): Promise<void> => {
+    if (audioStarting.current || ephemerisRef.current) return;
     if (listening) {
       setListening(false);
       return;
@@ -202,7 +211,13 @@ export const SystemExperience = ({
       setAudioUnavailable(true);
       return;
     }
-    setListening(true);
+    audioStarting.current = true;
+    const voice = voiceRef.current;
+    const ready = await voice.resume();
+    audioStarting.current = false;
+    if (voiceRef.current !== voice || ephemerisRef.current) return;
+    setAudioUnavailable(!ready);
+    setListening(ready);
   };
 
   useEffect(() => {
@@ -489,15 +504,15 @@ export const SystemExperience = ({
       </div>
       <Button
         icon={listening ? "music-off" : "music"}
-        disabled={Boolean(ephemeris) || audioUnavailable}
+        disabled={Boolean(ephemeris)}
         aria-pressed={listening}
-        onClick={toggleListening}
+        onClick={() => void toggleListening()}
       >
         {listening ? "Stop listening" : "Listen to the orbits"}
       </Button>
       <p className={styles["note"]}>
         {audioUnavailable
-          ? "This browser offers no Web Audio, so the orbits cannot be heard."
+          ? "Audio could not start. Try listening again after checking browser audio access."
           : "Each world plucks a note as it crosses our line of sight — the moment it would transit. Pitch follows orbital frequency, folded into one octave, so resonant orbits sound in harmony."}
       </p>
       <p className={styles["note"]}>
