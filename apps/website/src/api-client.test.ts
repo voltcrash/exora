@@ -63,7 +63,7 @@ test("loads an observed black hole by name and rejects malformed profiles", asyn
       meta: { cached: false, source: "BlackCAT / CDS VizieR", stale: false },
     });
   });
-  const malformed = await loadBlackHoleByName("Candidate", async () =>
+  const malformed = loadBlackHoleByName("Candidate", async () =>
     Response.json({
       data: { id: "candidate", massSolar: "unknown", name: "Candidate" },
       meta: { cached: false, source: "BlackCAT / CDS VizieR", stale: false },
@@ -71,7 +71,7 @@ test("loads an observed black hole by name and rejects malformed profiles", asyn
   );
 
   expect(live?.name).toBe("Cygnus X-1");
-  expect(malformed).toBeNull();
+  await expect(malformed).rejects.toThrow();
 });
 
 test("falls back when the API is unavailable", async () => {
@@ -332,14 +332,14 @@ test("loads a star by its familiar name", async () => {
 });
 
 test("rejects an id-and-name-only star payload", async () => {
-  const result = await loadStarByName("Sirius", async () =>
+  const result = loadStarByName("Sirius", async () =>
     Response.json({
       data: { id: "alf-cma", name: "Sirius" },
       meta: { cached: false, source: "SIMBAD" },
     }),
   );
 
-  expect(result).toBeNull();
+  await expect(result).rejects.toThrow();
 });
 
 test("loads featured stars for an empty catalog query", async () => {
@@ -430,4 +430,13 @@ test("browses the stellar catalog page by page", async () => {
     nextCursor: "NAME Antares",
     stars: [{ id: starPayload.data.id }],
   });
+});
+
+test("an absent destination differs from an unavailable archive", async () => {
+  expect(
+    await loadPlanetByName("Absent", async () => new Response(null, { status: 404 })),
+  ).toBeNull();
+  await expect(
+    loadPlanetByName("Offline", async () => new Response(null, { status: 502 })),
+  ).rejects.toThrow("502");
 });

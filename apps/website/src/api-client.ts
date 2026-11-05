@@ -206,16 +206,13 @@ const requestBlackHole = async (
   fetcher: Fetcher,
   signal?: AbortSignal,
 ): Promise<BlackHoleResponse | null> => {
-  try {
-    const response = await fetcher(`/api/black-holes/${encodeURIComponent(name)}`, {
-      headers: { accept: "application/json" },
-      signal: requestDeadline(OBJECT_LOOKUP_TIMEOUT_MS, signal),
-    });
-    if (!response.ok) return null;
-    return await parseApiPayload(responseSchema.BlackHole, await response.json());
-  } catch {
-    return null;
-  }
+  const response = await fetcher(`/api/black-holes/${encodeURIComponent(name)}`, {
+    headers: { accept: "application/json" },
+    signal: requestDeadline(OBJECT_LOOKUP_TIMEOUT_MS, signal),
+  });
+  if (response.status === 404) return null;
+  if (!response.ok) throw new Error(`Destination lookup failed with status ${response.status}.`);
+  return parseApiPayload(responseSchema.BlackHole, await response.json());
 };
 
 /** Every confirmed planet as compact rows, for plotting the whole archive at once. */
@@ -287,25 +284,20 @@ const requestPlanet = async (
   fetcher: Fetcher,
   signal?: AbortSignal,
 ): Promise<PlanetResponse | null> => {
-  try {
-    const response = await fetcher(path, {
-      headers: { accept: "application/json" },
-      signal: requestDeadline(OBJECT_LOOKUP_TIMEOUT_MS, signal),
-    });
-
-    if (!response.ok) return null;
-
-    return await parseApiPayload(responseSchema.Planet, await response.json());
-  } catch {
-    return null;
-  }
+  const response = await fetcher(path, {
+    headers: { accept: "application/json" },
+    signal: requestDeadline(OBJECT_LOOKUP_TIMEOUT_MS, signal),
+  });
+  if (response.status === 404) return null;
+  if (!response.ok) throw new Error(`Destination lookup failed with status ${response.status}.`);
+  return parseApiPayload(responseSchema.Planet, await response.json());
 };
 
 export const loadFeaturedPlanet = async (
   fallback: ExoplanetProfile,
   fetcher: Fetcher = fetch,
 ): Promise<PlanetLoadResult> => {
-  const payload = await requestPlanet("/api/planets/featured", fetcher);
+  const payload = await requestPlanet("/api/planets/featured", fetcher).catch(() => null);
 
   return payload
     ? { cached: payload.meta.cached, mode: "live", planet: payload.data }
@@ -455,16 +447,13 @@ const requestStar = async (
   fetcher: Fetcher,
   signal?: AbortSignal,
 ): Promise<StarResponse | null> => {
-  try {
-    const response = await fetcher(path, {
-      headers: { accept: "application/json" },
-      signal: requestDeadline(OBJECT_LOOKUP_TIMEOUT_MS, signal),
-    });
-    if (!response.ok) return null;
-    return await parseApiPayload(responseSchema.Star, await response.json());
-  } catch {
-    return null;
-  }
+  const response = await fetcher(path, {
+    headers: { accept: "application/json" },
+    signal: requestDeadline(OBJECT_LOOKUP_TIMEOUT_MS, signal),
+  });
+  if (response.status === 404) return null;
+  if (!response.ok) throw new Error(`Destination lookup failed with status ${response.status}.`);
+  return parseApiPayload(responseSchema.Star, await response.json());
 };
 
 export const loadStarByName = async (
