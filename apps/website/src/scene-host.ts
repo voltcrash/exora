@@ -88,6 +88,8 @@ const createSceneHost = (canvas: HTMLCanvasElement): SceneHost => {
 
   let isInXr = false;
   let entering = false;
+  let xrEntrySettled = Promise.resolve();
+  let settleXrEntry = (): void => undefined;
 
   const arPresentation = createArPresentation(scene);
 
@@ -301,7 +303,8 @@ const createSceneHost = (canvas: HTMLCanvasElement): SceneHost => {
     signal?: AbortSignal,
   ): Promise<World | null> => {
     const token = (mountToken += 1);
-    if (signal?.aborted || disposed) return null;
+    if (entering) await xrEntrySettled;
+    if (token !== mountToken || signal?.aborted || disposed) return null;
     if (worldMount.current && !(await departFromWorld())) return null;
     if (token !== mountToken || disposed || signal?.aborted) return null;
 
@@ -423,6 +426,9 @@ const createSceneHost = (canvas: HTMLCanvasElement): SceneHost => {
     enterImmersive: async () => {
       if (disposed || entering || isInXr || travelPhase !== "idle" || !worldMount.current) return;
       entering = true;
+      xrEntrySettled = new Promise<void>((resolve) => {
+        settleXrEntry = resolve;
+      });
       xrIntegration.markEntering();
       try {
         worldMount.current.prepareImmersive?.();
@@ -482,12 +488,14 @@ const createSceneHost = (canvas: HTMLCanvasElement): SceneHost => {
         throw error;
       } finally {
         entering = false;
+        settleXrEntry();
         if (!disposed && !isInXr && xrIntegration.destination === null) xrIntegration.markReady();
       }
     },
     dispose: () => {
       if (disposal) return disposal;
       disposed = true;
+      settleXrEntry();
       travelListeners.clear();
       endGlide(null, false);
       xrIntegration.dispose();
