@@ -97,3 +97,17 @@ test("disposal removes resize and status ownership", () => {
   expect(engine.resize).not.toHaveBeenCalled();
   expect(listener).toHaveBeenCalledOnce();
 });
+
+test("releasing an overlay cannot restart a lost or failed renderer", () => {
+  const { engine, lifecycle } = createHarness();
+  const release = lifecycle.suspend();
+  engine.onContextLostObservable.notifyObservers();
+  release();
+  expect(lifecycle.isRunning).toBe(false);
+  engine.onContextRestoredObservable.notifyObservers();
+  expect(lifecycle.isRunning).toBe(true);
+  lifecycle.fail();
+  expect(lifecycle.isRunning).toBe(false);
+  lifecycle.suspend()();
+  expect(lifecycle.isRunning).toBe(false);
+});

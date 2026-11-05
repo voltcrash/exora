@@ -46,7 +46,7 @@ export const createRenderLifecycle = ({
 
   const renderFrame = (): void => {
     if (disposed) return;
-    if (status === "context-lost") return;
+    if (status === "context-lost" || status === "failed") return;
     try {
       scene.render();
       dispatch("frame-rendered");
@@ -59,7 +59,14 @@ export const createRenderLifecycle = ({
   };
 
   const start = (): void => {
-    if (looping || disposed) return;
+    if (
+      looping ||
+      disposed ||
+      status === "context-lost" ||
+      status === "failed" ||
+      (suspensions > 0 && !isInXr())
+    )
+      return;
     looping = true;
     engine.performanceMonitor.reset();
     engine.runRenderLoop(renderFrame);
@@ -89,16 +96,16 @@ export const createRenderLifecycle = ({
     if (!looping && !disposed) renderFrame();
   };
 
-  engine.onContextLostObservable.add(() => {
+  const lostObserver = engine.onContextLostObservable.add(() => {
     if (disposed) return;
     dispatch("context-lost");
     stop();
   });
-  engine.onContextRestoredObservable.add(() => {
+  const restoredObserver = engine.onContextRestoredObservable.add(() => {
     if (disposed) return;
     dispatch("context-restored");
     engine.resize();
-    if (suspensions === 0) start();
+    if (suspensions === 0 || isInXr()) start();
   });
   resizeTarget.addEventListener("resize", resize);
   start();
@@ -114,11 +121,17 @@ export const createRenderLifecycle = ({
       if (disposed) return;
       disposed = true;
       listeners.clear();
+      engine.onContextLostObservable.remove(lostObserver);
+      engine.onContextRestoredObservable.remove(restoredObserver);
       resizeTarget.removeEventListener("resize", resize);
       looping = false;
       engine.stopRenderLoop();
     },
-    fail: () => dispatch("render-failed"),
+    fail: () => {
+      if (disposed) return;
+      dispatch("render-failed");
+      stop();
+    },
     onStatus: (listener) => {
       listeners.add(listener);
       listener(status);
