@@ -33,6 +33,7 @@ export const createRenderLifecycle = ({
 }: RenderLifecycleOptions): RenderLifecycle => {
   let disposed = false;
   let looping = false;
+  let recoveryDeadline: ReturnType<typeof setTimeout> | undefined;
   let status: RendererStatus = "ready";
   let suspensions = 0;
   const listeners = new Set<(status: RendererStatus) => void>();
@@ -100,9 +101,14 @@ export const createRenderLifecycle = ({
     if (disposed) return;
     dispatch("context-lost");
     stop();
+    clearTimeout(recoveryDeadline);
+    recoveryDeadline = setTimeout(() => {
+      if (!disposed && status === "context-lost") dispatch("render-failed");
+    }, 30_000);
   });
   const restoredObserver = engine.onContextRestoredObservable.add(() => {
     if (disposed) return;
+    clearTimeout(recoveryDeadline);
     dispatch("context-restored");
     engine.resize();
     if (suspensions === 0 || isInXr()) start();
@@ -120,6 +126,7 @@ export const createRenderLifecycle = ({
     dispose: () => {
       if (disposed) return;
       disposed = true;
+      clearTimeout(recoveryDeadline);
       listeners.clear();
       engine.onContextLostObservable.remove(lostObserver);
       engine.onContextRestoredObservable.remove(restoredObserver);

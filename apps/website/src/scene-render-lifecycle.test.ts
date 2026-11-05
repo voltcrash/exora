@@ -111,3 +111,19 @@ test("releasing an overlay cannot restart a lost or failed renderer", () => {
   lifecycle.suspend()();
   expect(lifecycle.isRunning).toBe(false);
 });
+
+test("an unrecovered context eventually offers renderer restart", async () => {
+  vi.useFakeTimers();
+  try {
+    const { engine, lifecycle } = createHarness();
+    const listener = vi.fn();
+    lifecycle.onStatus(listener);
+    engine.onContextLostObservable.notifyObservers();
+    await vi.advanceTimersByTimeAsync(30_000);
+    expect(listener).toHaveBeenLastCalledWith("failed");
+    expect(lifecycle.isRunning).toBe(false);
+    lifecycle.dispose();
+  } finally {
+    vi.useRealTimers();
+  }
+});
