@@ -148,3 +148,25 @@ test("waits for an in-flight build before completing disposal", async () => {
   expect(worldDispose).toHaveBeenCalledOnce();
   expect(scene.meshes).toHaveLength(0);
 });
+
+test("world replacement releases private textures and preserves scene assets", async () => {
+  const { RawTexture } = await import("@babylonjs/core/Materials/Textures/rawTexture.js");
+  const { retainSceneTexture } = await import("./texture-ownership.ts");
+  const scene = createScene();
+  const slot = createSceneMountSlot<DisposableWorld>(scene);
+  let shared: unknown;
+  await slot.replace(
+    () => {
+      RawTexture.CreateRGBATexture(new Uint8Array(4), 1, 1, scene);
+      shared = retainSceneTexture(RawTexture.CreateRGBATexture(new Uint8Array(4), 1, 1, scene));
+      return { dispose: () => undefined };
+    },
+    () => true,
+  );
+  await slot.replace(
+    () => ({ dispose: () => undefined }),
+    () => true,
+  );
+  expect(scene.textures).toEqual([shared]);
+  await slot.dispose();
+});

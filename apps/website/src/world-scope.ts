@@ -1,3 +1,5 @@
+import type { BaseTexture } from "@babylonjs/core/Materials/Textures/baseTexture.js";
+import { isSceneTexture } from "./texture-ownership.ts";
 import type { AbstractMesh } from "@babylonjs/core/Meshes/abstractMesh.js";
 import type { AbstractActionManager } from "@babylonjs/core/Actions/abstractActionManager.js";
 import type { Light } from "@babylonjs/core/Lights/light.js";
@@ -18,6 +20,7 @@ interface SceneContents {
   materials: readonly Material[];
   meshes: readonly AbstractMesh[];
   transformNodes: readonly TransformNode[];
+  textures: readonly BaseTexture[];
 }
 
 const read = (scene: Scene): SceneContents => ({
@@ -26,6 +29,7 @@ const read = (scene: Scene): SceneContents => ({
   materials: [...scene.materials],
   meshes: [...scene.meshes],
   transformNodes: [...scene.transformNodes],
+  textures: [...scene.textures],
 });
 
 const addedSince = <Item>(before: readonly Item[], after: readonly Item[]): Item[] => {
@@ -49,6 +53,21 @@ export const openWorldScope = (scene: Scene): WorldScope => {
   const before = read(scene);
   let presentation: WorldPresentation | null = null;
   let owned: SceneContents | null = null;
+  let disposed = false;
+
+  const collect = (): void => {
+    const after = read(scene);
+    owned = {
+      actionManagers: addedSince(before.actionManagers, after.actionManagers),
+      lights: addedSince(before.lights, after.lights),
+      materials: addedSince(before.materials, after.materials),
+      meshes: addedSince(before.meshes, after.meshes),
+      transformNodes: addedSince(before.transformNodes, after.transformNodes),
+      textures: addedSince(before.textures, after.textures).filter(
+        (texture) => !isSceneTexture(texture),
+      ),
+    };
+  };
 
   return {
     get presentation() {
@@ -56,21 +75,16 @@ export const openWorldScope = (scene: Scene): WorldScope => {
       return presentation;
     },
     seal: async () => {
-      const after = read(scene);
-      owned = {
-        actionManagers: addedSince(before.actionManagers, after.actionManagers),
-        lights: addedSince(before.lights, after.lights),
-        materials: addedSince(before.materials, after.materials),
-        meshes: addedSince(before.meshes, after.meshes),
-        transformNodes: addedSince(before.transformNodes, after.transformNodes),
-      };
+      collect();
       const { createWorldPresentation } = await import("./world-presentation.ts");
       presentation = await createWorldPresentation(scene);
-      presentation.capture(owned);
+      presentation.capture(owned!);
     },
     dispose: () => {
-      if (!owned) return;
-      const contents = owned;
+      if (disposed) return;
+      disposed = true;
+      if (!owned) collect();
+      const contents = owned!;
       owned = null;
       presentation?.dispose();
       presentation?.proxy.dispose(false, false);
@@ -81,6 +95,7 @@ export const openWorldScope = (scene: Scene): WorldScope => {
       disposeOwned(contents.materials, scene.materials, (material) =>
         material.dispose(false, false),
       );
+      disposeOwned(contents.textures, scene.textures, (texture) => texture.dispose());
       disposeOwned(contents.lights, scene.lights, (light) => light.dispose());
     },
   };

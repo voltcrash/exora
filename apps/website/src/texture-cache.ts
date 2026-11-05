@@ -1,3 +1,4 @@
+import { retainSceneTexture } from "./texture-ownership.ts";
 import { Texture } from "@babylonjs/core/Materials/Textures/texture.js";
 import { RawTexture } from "@babylonjs/core/Materials/Textures/rawTexture.js";
 import type { Scene } from "@babylonjs/core/scene.js";
@@ -195,6 +196,7 @@ const getFallbackTexture = (scene: Scene, kind: "color" | "normal" | "roughness"
         : FALLBACK_COLOR_PIXEL;
   const texture = RawTexture.CreateRGBATexture(pixel, 1, 1, scene, false, false);
   texture.gammaSpace = kind === "color";
+  retainSceneTexture(texture);
   textures[kind] = texture;
   return texture;
 };
@@ -229,7 +231,7 @@ export const getSurfaceDetailTextures = (
         texture.wrapV = Texture.WRAP_ADDRESSMODE;
         texture.anisotropicFilteringLevel = anisotropicFiltering;
         texture.gammaSpace = isColor;
-        return texture;
+        return retainSceneTexture(texture);
       },
       (path) =>
         getFallbackTexture(
