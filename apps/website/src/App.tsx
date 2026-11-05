@@ -1,15 +1,7 @@
+import { defaultPlanetObject, solarPlanetObject, type ActiveObject } from "./active-destination.ts";
 import { createOperationGate } from "./operation-gate.ts";
 import type { ExoplanetProfile, StarProfile } from "@exora/contracts";
-import {
-  deriveWorldRecipe,
-  generateCustomBlackHole,
-  generateCustomStar,
-  generateCustomWorld,
-  type CustomBlackHole,
-  type CustomStar,
-  type CustomWorld,
-  type WorldRecipe,
-} from "@exora/worldgen";
+import type { CustomBlackHole, CustomStar, CustomWorld } from "@exora/worldgen";
 import {
   lazy,
   Suspense,
@@ -20,19 +12,11 @@ import {
   useState,
   type CSSProperties,
 } from "react";
-import {
-  loadBlackHoleByName,
-  loadPlanetByName,
-  type PlanetLoadResult,
-  type StarLoadResult,
-  type SystemLoadResult,
-} from "./api-client.ts";
+
 import { reachStar, reachSystem } from "./destination-cache.ts";
 import { PlanetExperience } from "./components/PlanetExperience.tsx";
 import { OfflineNotice } from "./components/OfflineNotice.tsx";
 import { RecoveryScreen } from "./components/RecoveryScreen.tsx";
-import { featuredPlanet } from "./planet-profile.ts";
-import { hasRenderer } from "./planet-utils.tsx";
 import { canonicalUrlForSearch } from "./canonical-url.ts";
 import { descriptionFor, documentTitleFor } from "./document-title.ts";
 import type { BlackHoleProfile } from "./black-holes.ts";
@@ -80,145 +64,8 @@ const BlackHoleExperience = lazy(() =>
     default: module.BlackHoleExperience,
   })),
 );
-type ActiveObject =
-  | { blackHole: BlackHoleProfile; type: "black-hole" }
-  | { recipe?: WorldRecipe; result: PlanetLoadResult; type: "planet" }
-  | { result: StarLoadResult; type: "star" }
-  | { result: SystemLoadResult; type: "system" }
-  | { region: SolarRegionProfile; type: "region" }
-  | {
-      kind: "black hole" | "planet" | "region" | "star" | "system";
-      name: string;
-      detail?: string;
-      retry?: boolean;
-      type: "missing";
-    };
-
-const solarPlanetObject = async (
-  planet: ExoplanetProfile,
-  cached: boolean,
-): Promise<ActiveObject> => {
-  const { tuneSolarWorldRecipe } = await import("./solar-system.ts");
-  return {
-    recipe: tuneSolarWorldRecipe(planet, deriveWorldRecipe(planet)),
-    result: { cached, mode: "solar", planet },
-    type: "planet",
-  };
-};
-
-const defaultPlanetObject = (): ActiveObject => ({
-  result: { cached: true, mode: "fallback", planet: featuredPlanet },
-  type: "planet",
-});
-
-const loadRequestedObject = async (): Promise<ActiveObject> => {
-  const parameters = new URLSearchParams(window.location.search);
-  const customBlackHole = parameters.get("customBlackHole");
-  if (customBlackHole !== null) {
-    const { parseCustomBlackHoleUrl } = await import("./custom-destination-url.ts");
-    const customParameters = parseCustomBlackHoleUrl(customBlackHole);
-    if (!customParameters) {
-      return {
-        detail:
-          "This link carries a World Forge recipe that is invalid or from an incompatible version. Make a new one in World Forge.",
-        kind: "black hole",
-        name: "custom recipe",
-        type: "missing",
-      };
-    }
-    return { blackHole: generateCustomBlackHole(customParameters).blackHole, type: "black-hole" };
-  }
-  const blackHoleName = parameters.get("blackHole");
-  if (blackHoleName) {
-    const { findBlackHole, findProceduralBlackHole } = await import("./black-holes.ts");
-    const blackHole =
-      findBlackHole(blackHoleName) ??
-      findProceduralBlackHole(blackHoleName) ??
-      (await loadBlackHoleByName(blackHoleName));
-    return blackHole
-      ? { blackHole, type: "black-hole" }
-      : { kind: "black hole", name: blackHoleName, type: "missing" };
-  }
-  const regionName = parameters.get("region");
-  if (regionName) {
-    const { findSolarRegion } = await import("./solar-regions.ts");
-    const region = findSolarRegion(regionName);
-    return region
-      ? { region, type: "region" }
-      : { kind: "region", name: regionName, type: "missing" };
-  }
-  const starName = parameters.get("star");
-  if (starName) {
-    const { findSolarStar } = await import("./solar-system.ts");
-    const localStar = findSolarStar(starName);
-    if (localStar)
-      return { result: { cached: true, mode: "solar", star: localStar }, type: "star" };
-    const star = await reachStar(starName);
-    if (star) return { result: star, type: "star" };
-    return { kind: "star", name: starName, type: "missing" };
-  }
-
-  const systemName = parameters.get("system");
-  if (systemName) {
-    const system = await reachSystem(systemName);
-    if (system) return { result: system, type: "system" };
-    return { kind: "system", name: systemName, type: "missing" };
-  }
-
-  const name = parameters.get("planet");
-  if (name) {
-    const { findSolarWorld } = await import("./solar-system.ts");
-    const localWorld = findSolarWorld(name);
-    if (localWorld) {
-      return solarPlanetObject(localWorld, true);
-    }
-
-    const requested = await loadPlanetByName(name);
-    return requested && hasRenderer(requested.planet)
-      ? { result: requested, type: "planet" }
-      : { kind: "planet", name, type: "missing" };
-  }
-
-  const customPlanet = parameters.get("custom");
-  if (customPlanet !== null) {
-    const { parseCustomPlanetUrl } = await import("./custom-destination-url.ts");
-    const customParameters = parseCustomPlanetUrl(customPlanet);
-    if (!customParameters) {
-      return {
-        detail:
-          "This link carries a World Forge recipe that is invalid or from an incompatible version. Make a new one in World Forge.",
-        kind: "planet",
-        name: "custom recipe",
-        type: "missing",
-      };
-    }
-    const custom = generateCustomWorld(customParameters);
-    return {
-      recipe: custom.recipe,
-      result: { cached: false, mode: "custom", planet: custom.planet },
-      type: "planet",
-    };
-  }
-
-  const customStar = parameters.get("customStar");
-  if (customStar !== null) {
-    const { parseCustomStarUrl } = await import("./custom-destination-url.ts");
-    const customParameters = parseCustomStarUrl(customStar);
-    if (!customParameters) {
-      return {
-        detail:
-          "This link carries a World Forge recipe that is invalid or from an incompatible version. Make a new one in World Forge.",
-        kind: "star",
-        name: "custom recipe",
-        type: "missing",
-      };
-    }
-    const custom = generateCustomStar(customParameters);
-    return { result: { cached: false, mode: "custom", star: custom.star }, type: "star" };
-  }
-
-  return defaultPlanetObject();
-};
+const loadRequestedObject = (): Promise<ActiveObject> =>
+  import("./requested-destination.ts").then((module) => module.loadRequestedObject());
 
 export const App = () => {
   const navigation = useRef(createOperationGate()).current;
@@ -289,7 +136,7 @@ export const App = () => {
   }, [navigation, navigationFailed]);
 
   useEffect(() => {
-    loadFromLocation();
+    if (window.location.search) loadFromLocation();
     window.addEventListener("popstate", loadFromLocation);
     return () => {
       navigation.cancel();
