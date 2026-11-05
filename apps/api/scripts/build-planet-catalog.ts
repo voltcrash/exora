@@ -1,4 +1,6 @@
-import { readFile, writeFile } from "node:fs/promises";
+import { atomicWrite } from "../../../scripts/atomic-write.ts";
+import { assertCatalogSize } from "./catalog-refresh.ts";
+import { readFile } from "node:fs/promises";
 import { brotliCompressSync, constants, gzipSync } from "node:zlib";
 import {
   compareCatalogNames,
@@ -32,12 +34,10 @@ const readPrevious = async (): Promise<PlanetCatalogSnapshot | null> => {
 const planets = (await loadNasaPlanets(PLANET_CATALOG_QUERY, { timeoutMs: 180_000 })).sort(
   compareCatalogNames,
 );
-if (planets.length < 1_000) {
-  throw new Error(`NASA returned only ${planets.length} planets; refusing to shrink the snapshot.`);
-}
 
 const metadata = { endpoint: NASA_TAP_ENDPOINT, query: PLANET_CATALOG_QUERY };
 const previous = await readPrevious();
+assertCatalogSize(planets.length, previous?.rows.length, process.argv.includes("--allow-shrink"));
 const fresh = serialize(
   encodePlanetCatalog(planets, { ...metadata, generatedAt: new Date().toISOString() }),
 );
@@ -54,7 +54,7 @@ const brotli = brotliCompressSync(bytes, {
   params: { [constants.BROTLI_PARAM_QUALITY]: constants.BROTLI_MAX_QUALITY },
 }).byteLength;
 
-await writeFile(OUTPUT_URL, output);
+await atomicWrite(OUTPUT_URL, output);
 console.log(
   `[planet-catalog] ${planets.length} planets, ${bytes.byteLength} bytes raw, ${gzip} gzip, ${brotli} brotli` +
     (output === fresh ? "" : " (unchanged)"),
