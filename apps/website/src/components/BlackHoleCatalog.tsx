@@ -1,3 +1,4 @@
+import { Button } from "./ui/Button.tsx";
 import { useEffect, useMemo, useState } from "react";
 import { loadObservedBlackHoles } from "../api-client.ts";
 import {
@@ -29,7 +30,7 @@ interface BlackHoleCatalogProps {
   onSelect: (blackHole: BlackHoleProfile) => void;
 }
 
-type ArchiveState = "loading" | "ready" | "featured-only";
+type ArchiveState = "loading" | "ready" | "stale" | "featured-only";
 
 const formatDistance = (blackHole: BlackHoleProfile): string => {
   if (blackHole.distanceLightYears === null) {
@@ -67,6 +68,7 @@ export const BlackHoleResult = ({
 );
 
 export const BlackHoleCatalog = ({ onSelect }: BlackHoleCatalogProps) => {
+  const [retry, setRetry] = useState(0);
   const [query, setQuery] = useState("");
   const [observed, setObserved] = useState<readonly BlackHoleProfile[]>([]);
   const [archiveState, setArchiveState] = useState<ArchiveState>("loading");
@@ -74,12 +76,13 @@ export const BlackHoleCatalog = ({ onSelect }: BlackHoleCatalogProps) => {
   const [resultView, setResultView] = useState<ResultView>("gallery");
 
   useEffect(() => {
+    setArchiveState("loading");
     const controller = new AbortController();
     void loadObservedBlackHoles(50, { signal: controller.signal })
       .then((result) => {
         if (controller.signal.aborted) return;
         setObserved(result.blackHoles);
-        setArchiveState("ready");
+        setArchiveState(result.stale ? "stale" : "ready");
       })
       .catch((error: unknown) => {
         if (controller.signal.aborted) return;
@@ -87,7 +90,7 @@ export const BlackHoleCatalog = ({ onSelect }: BlackHoleCatalogProps) => {
         setArchiveState("featured-only");
       });
     return () => controller.abort();
-  }, []);
+  }, [retry]);
 
   const catalog = useMemo(() => mergeBlackHoles(BLACK_HOLES, observed), [observed]);
   const records = useMemo(
@@ -109,10 +112,15 @@ export const BlackHoleCatalog = ({ onSelect }: BlackHoleCatalogProps) => {
       ? "Loading observed horizons from the compact-object archive…"
       : archiveState === "featured-only"
         ? "The archive is unreachable, so only the curated horizons are shown."
-        : `${String(records.length)} black holes`;
+        : archiveState === "stale"
+          ? "Cached archive records · the live archive is unavailable"
+          : `${String(records.length)} black holes`;
 
   return (
     <section className={catalogStyles["catalog"]} aria-label="Black hole catalog">
+      {archiveState === "stale" || archiveState === "featured-only" ? (
+        <Button onClick={() => setRetry((value) => value + 1)}>Retry archive</Button>
+      ) : null}
       <CatalogSearch
         describedBy="black-hole-catalog-status"
         label="Search black holes"
