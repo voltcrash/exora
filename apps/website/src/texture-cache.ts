@@ -230,14 +230,10 @@ export const getSurfaceDetailTextures = (
       (path, failed) => {
         let fallbackApplied = false;
         const isColor = path.includes("/chemistry/");
-        const texture = new Texture(
-          path,
-          scene,
-          { noMipmap: false, invertY: false },
-          undefined,
-          undefined,
-          undefined,
-          () => {
+        const texture = new Texture(path, scene, {
+          noMipmap: false,
+          invertY: false,
+          onError: () => {
             if (fallbackApplied) return;
             fallbackApplied = true;
             failed();
@@ -245,10 +241,13 @@ export const getSurfaceDetailTextures = (
               NEUTRAL_TEXTURE_URLS[
                 isColor ? "color" : path.endsWith("normal.ktx2") ? "normal" : "roughness"
               ],
+              undefined,
+              undefined,
+              ".png",
             );
             console.warn(`[texture-cache] failed to load ${path}, using neutral fallback`);
           },
-        );
+        });
         texture.wrapU = Texture.WRAP_ADDRESSMODE;
         texture.wrapV = Texture.WRAP_ADDRESSMODE;
         texture.anisotropicFilteringLevel = anisotropicFiltering;
