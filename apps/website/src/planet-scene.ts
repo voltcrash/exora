@@ -1914,6 +1914,7 @@ export const createPlanetWorld = async (
     ? Math.sign(rotationPeriodHours) *
       Math.min(0.22, Math.max(0.008, 0.085 * (24 / Math.abs(rotationPeriodHours)) ** 0.32))
     : recipe.rotationSpeed;
+  let travelling = false;
   let viewState: "entering" | "leaving" | "orbit" | "surface" = "orbit";
   let viewTransitionSeconds = 0;
   let viewTransitionFrom = 0;
@@ -1996,7 +1997,7 @@ export const createPlanetWorld = async (
     camera.upperRadiusLimit = entering ? SURFACE_FAR_LIMIT : 25;
     camera.lowerBetaLimit = entering ? 1.02 : 0.58;
     camera.upperBetaLimit = entering ? 1.48 : Math.PI - 0.58;
-    camera.attachControl(canvas, true);
+    if (!host.isInXr() && !travelling) camera.attachControl(canvas, true);
     onViewModeChange(entering ? "surface" : "orbit");
   };
 
@@ -2059,8 +2060,9 @@ export const createPlanetWorld = async (
       surfaceTarget.y = camera.target.y;
     }
 
-    if (!isInXr && viewState === "orbit" && camera.radius <= 10.62) beginViewTransition("entering");
-    if (!isInXr && viewState === "surface" && camera.radius >= SURFACE_RETURN_RADIUS)
+    if (!isInXr && !travelling && viewState === "orbit" && camera.radius <= 10.62)
+      beginViewTransition("entering");
+    if (!isInXr && !travelling && viewState === "surface" && camera.radius >= SURFACE_RETURN_RADIUS)
       beginViewTransition("leaving");
 
     if (viewState === "entering" || viewState === "leaving") {
@@ -2124,6 +2126,7 @@ export const createPlanetWorld = async (
   const firstFrameObserver = scene.onAfterRenderObservable.addOnce(onFirstFrame);
 
   const releaseCameraToTravel = host.onTravelPhase((phase) => {
+    travelling = phase !== "idle";
     if (phase !== "departing") return;
     if (viewState === "entering" || viewState === "leaving") {
       finishViewTransition(viewState === "entering");

@@ -216,7 +216,11 @@ const createSceneHost = (canvas: HTMLCanvasElement): SceneHost => {
     const far = flightRadius(camera.radius);
     departure = glideCamera(far, TRAVEL_DEPART_MS, easeAway).then((landed) => {
       if (landed && !departureClaimed && !disposed) {
-        void glideCamera(far * TRAVEL_COAST_SCALE, TRAVEL_COAST_MS, easeDrift);
+        void glideCamera(
+          Math.min(far * TRAVEL_COAST_SCALE, worldMount.current?.farthestView?.() ?? Infinity),
+          TRAVEL_COAST_MS,
+          easeDrift,
+        );
       }
       return landed;
     });
@@ -237,13 +241,14 @@ const createSceneHost = (canvas: HTMLCanvasElement): SceneHost => {
     });
   };
 
-  const departFromWorld = async (): Promise<void> => {
-    if (isInXr) return;
+  const departFromWorld = async (): Promise<boolean> => {
+    if (isInXr) return true;
     if (!departure) beginTravel();
     departureClaimed = true;
-    await departure;
+    if (!(await departure) || disposed) return false;
     setTravelPhase("crossing");
     await new Promise<void>((resolve) => window.setTimeout(resolve, TRAVEL_CROSS_MS));
+    return !disposed;
   };
 
   const arriveAtWorld = (mounted: number): void => {
@@ -294,7 +299,7 @@ const createSceneHost = (canvas: HTMLCanvasElement): SceneHost => {
   ): Promise<World | null> => {
     const token = (mountToken += 1);
     if (signal?.aborted || disposed) return null;
-    if (worldMount.current) await departFromWorld();
+    if (worldMount.current && !(await departFromWorld())) return null;
     if (token !== mountToken || disposed || signal?.aborted) return null;
 
     let world: World | null;
