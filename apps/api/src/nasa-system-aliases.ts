@@ -92,6 +92,9 @@ export class NasaSystemAliasRepository implements SystemAliasRepository {
         }
 
         const payload = (await response.json()) as AliasLookupPayload;
+        const status = payload?.manifest?.lookup_status;
+        if (status !== "OK" && status !== "System Not Found")
+          throw new NasaArchiveError("NASA system-alias lookup returned an invalid status.");
         const resolvedName = payload.manifest?.resolved_name;
         if (payload.manifest?.lookup_status === "OK" && typeof resolvedName === "string") {
           const hostName = resolvedName.trim();
@@ -100,6 +103,8 @@ export class NasaSystemAliasRepository implements SystemAliasRepository {
             return { cached: false, value: hostName };
           }
         }
+        if (status === "OK")
+          throw new NasaArchiveError("NASA system-alias lookup omitted its host name.");
       }
 
       this.#cache.set(key, null, this.#now() + this.#cacheTtlMs);
