@@ -235,19 +235,19 @@ export const WorldForge = ({
     return <BlackHoleCatalogVisual blackHole={generateCustomBlackHole(draftBlackHole).blackHole} />;
   }, [draftBlackHole, draftStar, draftWorld, mode]);
 
-  const radiusLabel =
-    parameters.kind === "rocky"
-      ? `${(0.45 + parameters.radius * 1.65).toFixed(2)} R⊕`
-      : parameters.kind === "ice-giant"
-        ? `${(2.1 + parameters.radius * 4.2).toFixed(1)} R⊕`
-        : `${(0.72 + parameters.radius * 1.18).toFixed(2)} RJ`;
-
+  const radiusLabelFor = (world: CustomPlanetParameters): string =>
+    world.kind === "rocky"
+      ? `${(0.45 + world.radius * 1.65).toFixed(2)} R⊕`
+      : world.kind === "ice-giant"
+        ? `${(2.1 + world.radius * 4.2).toFixed(1)} R⊕`
+        : `${(0.72 + world.radius * 1.18).toFixed(2)} RJ`;
+  const radiusLabel = radiusLabelFor(parameters);
   const previewCaption =
     mode === "planet"
-      ? `${parameters.name || "Untitled world"} · ${radiusLabel} · ${String(parameters.temperatureKelvin)} K`
+      ? `${draftWorld.name || "Untitled world"} · ${radiusLabelFor(draftWorld)} · ${String(draftWorld.temperatureKelvin)} K`
       : mode === "star"
-        ? `${starParameters.name || "Untitled star"} · ${spectralClass(starParameters.temperatureKelvin)}`
-        : `${blackHoleParameters.name || "Untitled horizon"} · ${blackHoleMassLabel(blackHoleParameters)}`;
+        ? `${draftStar.name || "Untitled star"} · ${spectralClass(draftStar.temperatureKelvin)}`
+        : `${draftBlackHole.name || "Untitled horizon"} · ${blackHoleMassLabel(draftBlackHole)}`;
 
   return (
     <section className={styles["forge"]} data-testid="planet-builder" aria-label="World Forge">
