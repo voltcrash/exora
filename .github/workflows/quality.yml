@@ -37,7 +37,9 @@ jobs:
         run: vp run quality:assets
 
       - name: Run unit tests
-        run: vp run -r test
+        run: |
+          vp test
+          vp run -r test
 
       - name: Build every workspace
         run: vp run -r build
