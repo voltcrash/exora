@@ -1,5 +1,3 @@
-import { isIP } from "node:net";
-
 export interface RateLimitDecision {
   limit: number;
   remaining: number;
@@ -10,12 +8,6 @@ export interface RateLimitDecision {
 export interface RateLimiter {
   check(client: string, now: number): RateLimitDecision & { allowed: boolean };
   size(): number;
-}
-
-export interface ClientIdentityHeaders {
-  forwardedFor?: string | undefined;
-  realIp?: string | undefined;
-  vercelForwardedFor?: string | undefined;
 }
 
 export interface RateLimiterOptions {
@@ -81,12 +73,24 @@ export const createRateLimiter = ({
   };
 };
 
-export const clientKey = (
-  headers: ClientIdentityHeaders,
-  { trustVercelProxy = false }: { trustVercelProxy?: boolean } = {},
-): string => {
-  if (!trustVercelProxy) return "unknown";
+const IPV4 = /^(?:(?:25[0-5]|2[0-4]\d|1\d\d|[1-9]?\d)\.){3}(?:25[0-5]|2[0-4]\d|1\d\d|[1-9]?\d)$/;
 
-  const forwarded = headers.vercelForwardedFor?.trim() ?? "";
-  return isIP(forwarded) ? forwarded : "unknown";
+/** IPv4 or IPv6 literal, without depending on `node:net` so every runtime can load it. */
+export const isIpAddress = (value: string): boolean => {
+  if (IPV4.test(value)) return true;
+  if (!value.includes(":") || !/^[\da-f:.]+$/i.test(value)) return false;
+  try {
+    return new URL(`http://[${value}]/`).hostname.length > 2;
+  } catch {
+    return false;
+  }
+};
+
+/**
+ * The caller's address from the one header the hosting edge overwrites on every request, such as
+ * Cloudflare's `cf-connecting-ip`. Anything else is caller-controlled and shares one budget.
+ */
+export const clientKey = (trustedClientIp: string | undefined): string => {
+  const address = trustedClientIp?.trim() ?? "";
+  return isIpAddress(address) ? address : "unknown";
 };

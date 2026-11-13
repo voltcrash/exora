@@ -91,7 +91,6 @@ test("requests are routed by what they are", async () => {
   expect(route("/api/planets/TRAPPIST-1%20e", "cors")).toBe("archive");
   expect(route("/sky/hyg-v44-vmag65.bin", "cors")).toBe("media");
   expect(route("/textures/solar-system/earth.ktx2", "cors")).toBe("media");
-  expect(route("/_vercel/insights/view", "cors")).toBeNull();
   expect(route("/sw.js", "cors")).toBeNull();
 });
 

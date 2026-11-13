@@ -1,0 +1,30 @@
+# Response headers for static files on hosts that read _headers (Cloudflare Workers static assets,
+# Cloudflare Pages, Netlify). API responses set their own headers in apps/api.
+
+/*
+  Content-Security-Policy: default-src 'self'; base-uri 'self'; connect-src 'self' https://launchar.app; font-src 'self'; form-action 'self'; frame-ancestors 'none'; frame-src 'none'; img-src 'self' data: blob:; manifest-src 'self'; media-src 'self' blob:; object-src 'none'; script-src 'self' 'sha256-vV0ddcMIpbgwrPAv9wjcD4L8TiMCMddgAaD32HbbQo4=' 'wasm-unsafe-eval' 'unsafe-eval' https://launchar.app; style-src 'self' 'unsafe-inline'; worker-src 'self' blob:; upgrade-insecure-requests
+  Cross-Origin-Opener-Policy: same-origin
+  Cross-Origin-Resource-Policy: same-origin
+  Permissions-Policy: camera=(self), geolocation=(), microphone=(), payment=(), usb=(), xr-spatial-tracking=(self)
+  Referrer-Policy: strict-origin-when-cross-origin
+  Strict-Transport-Security: max-age=63072000; includeSubDomains
+  X-Content-Type-Options: nosniff
+  X-Frame-Options: DENY
+
+/assets/*
+  Cache-Control: public, max-age=31536000, immutable
+
+/sky/*
+  Cache-Control: public, max-age=31536000, immutable
+
+/textures/*
+  Cache-Control: public, max-age=604800, stale-while-revalidate=2592000
+
+/models/*
+  Cache-Control: public, max-age=604800, stale-while-revalidate=2592000
+
+/ktx2/*
+  Cache-Control: public, max-age=604800, stale-while-revalidate=2592000
+
+/sw.js
+  Cache-Control: public, max-age=0, must-revalidate

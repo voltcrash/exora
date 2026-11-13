@@ -11,6 +11,9 @@ export const planetNameTokens = (query: string): string[] =>
     .flatMap((token) => token.split(/(?<=\p{L})(?=\p{N})|(?<=\p{N})(?=\p{L})/u))
     .filter((token) => token.length > 0);
 
+// One collator for every comparison; localeCompare builds a fresh one on each call.
+const englishOrder = new Intl.Collator("en").compare;
+
 const compactName = (value: string): string =>
   value.toLowerCase().replaceAll(/[^\p{L}\p{N}]/gu, "");
 
@@ -39,7 +42,7 @@ export const rankPlanetMatches = (
       (left, right) =>
         left.rank - right.rank ||
         left.planet.name.length - right.planet.name.length ||
-        left.planet.name.localeCompare(right.planet.name, "en"),
+        englishOrder(left.planet.name, right.planet.name),
     )
     .map(({ planet }) => planet);
 };

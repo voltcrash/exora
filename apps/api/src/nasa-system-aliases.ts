@@ -1,11 +1,10 @@
 import type { StarProfile } from "@exora/contracts";
 import { createArchiveCache, createRequestCoalescer } from "./archive-cache.ts";
 import { NasaArchiveError, type RepositoryResult } from "./nasa-archive.ts";
+import { type Fetcher, globalFetch } from "./fetcher.ts";
 
 const NASA_SYSTEM_ALIASES_ENDPOINT =
   "https://exoplanetarchive.ipac.caltech.edu/cgi-bin/Lookup/nph-aliaslookup.py";
-
-type Fetcher = (input: string | URL | Request, init?: RequestInit) => Promise<Response>;
 
 interface AliasLookupPayload {
   manifest?: {
@@ -57,7 +56,7 @@ export class NasaSystemAliasRepository implements SystemAliasRepository {
 
   constructor(options: NasaSystemAliasRepositoryOptions = {}) {
     this.#cacheTtlMs = options.cacheTtlMs ?? 1000 * 60 * 60 * 12;
-    this.#fetcher = options.fetcher ?? fetch;
+    this.#fetcher = options.fetcher ?? globalFetch;
     this.#now = options.now ?? Date.now;
     this.#timeoutMs = options.timeoutMs ?? 10_000;
   }

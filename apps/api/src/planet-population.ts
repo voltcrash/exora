@@ -2,6 +2,7 @@ import { planetPopulationSchema, type PlanetPopulation } from "@exora/contracts"
 import { z } from "zod";
 import { createArchiveCache, createRequestCoalescer } from "./archive-cache.ts";
 import { NasaArchiveError } from "./nasa-archive.ts";
+import { type Fetcher, globalFetch } from "./fetcher.ts";
 
 /*
  * EVERY CONFIRMED WORLD, ONE ROW EACH
@@ -21,8 +22,6 @@ export const POPULATION_FLAGS = {
   massMinimum: 2,
   radiusEstimated: 1,
 } as const;
-
-type Fetcher = (input: string | URL | Request, init?: RequestInit) => Promise<Response>;
 
 const nullableNumber = z.number().finite().nullable();
 const nullableText = z.string().nullable();
@@ -107,7 +106,7 @@ export class NasaPopulationRepository implements PopulationRepository {
 
   constructor({
     cacheTtlMs = 1000 * 60 * 60 * 12,
-    fetcher = fetch,
+    fetcher = globalFetch,
     now = Date.now,
     timeoutMs = 25_000,
   }: { cacheTtlMs?: number; fetcher?: Fetcher; now?: () => number; timeoutMs?: number } = {}) {

@@ -52,22 +52,18 @@ test("bounds tracked clients and evicts the least recently seen", () => {
   expect(smallLimiter.check("b", 4).allowed).toBe(true);
 });
 
-test("trusts only a valid Vercel identity behind the configured proxy boundary", () => {
-  const headers = { vercelForwardedFor: "203.0.113.7" };
-
-  expect(clientKey(headers)).toBe("unknown");
-  expect(clientKey(headers, { trustVercelProxy: true })).toBe("203.0.113.7");
-  expect(clientKey({ forwardedFor: "203.0.113.7" })).toBe("unknown");
-  expect(
-    clientKey({ forwardedFor: "203.0.113.7", realIp: "198.51.100.4" }, { trustVercelProxy: true }),
-  ).toBe("unknown");
-  expect(
-    clientKey({ vercelForwardedFor: "203.0.113.7, 198.51.100.4" }, { trustVercelProxy: true }),
-  ).toBe("unknown");
-  expect(clientKey({ vercelForwardedFor: "not-an-ip" }, { trustVercelProxy: true })).toBe(
-    "unknown",
-  );
-  expect(clientKey({})).toBe("unknown");
+test("only a single valid address from the trusted edge header identifies a caller", () => {
+  expect(clientKey("203.0.113.7")).toBe("203.0.113.7");
+  expect(clientKey(" 2001:db8::7 ")).toBe("2001:db8::7");
+  expect(clientKey("::ffff:203.0.113.7")).toBe("::ffff:203.0.113.7");
+  expect(clientKey("203.0.113.7, 198.51.100.4")).toBe("unknown");
+  expect(clientKey("256.0.0.1")).toBe("unknown");
+  expect(clientKey("2001:db8::7/64")).toBe("unknown");
+  expect(clientKey("[2001:db8::7]")).toBe("unknown");
+  expect(clientKey("example.com")).toBe("unknown");
+  expect(clientKey("not-an-ip")).toBe("unknown");
+  expect(clientKey("")).toBe("unknown");
+  expect(clientKey(undefined)).toBe("unknown");
 });
 
 test("invalid budgets cannot create non-expiring or unbounded windows", () => {

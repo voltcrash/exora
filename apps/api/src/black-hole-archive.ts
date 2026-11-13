@@ -6,6 +6,7 @@ import {
   type NormalizedBlackCatFixture,
 } from "./black-hole-fallback.ts";
 import { UpstreamError } from "./errors.ts";
+import { type Fetcher, globalFetch } from "./fetcher.ts";
 
 const VIZIER_TAP_ENDPOINT = "https://tapvizier.cds.unistra.fr/TAPVizieR/tap/sync";
 const BLACKCAT_TABLE = "J/A+A/587/A61/tablea1";
@@ -28,8 +29,6 @@ const EXPECTED_COLUMNS = [
   "M1u",
   "l_M1",
 ] as const;
-
-type Fetcher = (input: string | URL | Request, init?: RequestInit) => Promise<Response>;
 
 const nullableFiniteNumber = z.number().finite().nullable();
 const blackCatRowSchema = z.strictObject({
@@ -200,7 +199,7 @@ export class VizierBlackHoleRepository implements BlackHoleRepository {
 
   constructor(options: BlackHoleArchiveOptions = {}) {
     this.#cacheTtlMs = options.cacheTtlMs ?? 1000 * 60 * 60 * 6;
-    this.#fetcher = options.fetcher ?? fetch;
+    this.#fetcher = options.fetcher ?? globalFetch;
     this.#now = options.now ?? Date.now;
     this.#timeoutMs = options.timeoutMs ?? 10_000;
     this.#fallback = options.fallback ?? normalizedFixtureProfiles(normalizeBlackCatRow);

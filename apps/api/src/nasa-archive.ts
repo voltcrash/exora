@@ -7,6 +7,7 @@ import {
   searchLimit,
   searchPlanetCatalog,
 } from "@exora/planet-catalog";
+import { type Fetcher, globalFetch } from "./fetcher.ts";
 import { escapeAdqlLiteral, planetNamePattern, planetNamePrefixes } from "./planet-search.ts";
 import {
   exoplanetProfileSchema,
@@ -69,8 +70,6 @@ export {
   PLANET_DISCOVERY_CATEGORIES,
   type PlanetDiscoveryCategory,
 } from "./discovery-categories.ts";
-
-type Fetcher = (input: string | URL | Request, init?: RequestInit) => Promise<Response>;
 
 interface NasaPlanetRow {
   dec: number | null;
@@ -327,7 +326,7 @@ export const normalizeNasaPlanet = (
 export const loadNasaPlanets = async (
   adql: string,
   {
-    fetcher = fetch,
+    fetcher = globalFetch,
     retrievedOn = new Date().toISOString().slice(0, 10),
     timeoutMs,
   }: { fetcher?: Fetcher; retrievedOn?: string; timeoutMs: number },
@@ -377,7 +376,7 @@ export class NasaPlanetRepository implements PlanetRepository {
   constructor(options: NasaPlanetRepositoryOptions = {}) {
     this.#cacheTtlMs = options.cacheTtlMs ?? 1000 * 60 * 60 * 6;
     this.#catalog = options.catalog;
-    this.#fetcher = options.fetcher ?? fetch;
+    this.#fetcher = options.fetcher ?? globalFetch;
     this.#now = options.now ?? Date.now;
     this.#timeoutMs = options.timeoutMs ?? 10_000;
   }

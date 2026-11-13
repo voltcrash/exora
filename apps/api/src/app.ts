@@ -59,7 +59,8 @@ interface CreateAppOptions {
   repository?: PlanetRepository;
   starRepository?: StarRepository;
   systemAliasRepository?: SystemAliasRepository;
-  trustVercelProxy?: boolean;
+  /** A request header the hosting edge sets to the caller's address and callers cannot forge. */
+  trustedClientIpHeader?: string;
 }
 
 const apiError = (code: ApiErrorResponse["error"]["code"], message: string): ApiErrorResponse =>
@@ -203,9 +204,11 @@ export const createApp = ({
   repository = new NasaPlanetRepository(),
   starRepository = new SimbadStarRepository(),
   systemAliasRepository = new NasaSystemAliasRepository(),
-  trustVercelProxy = false,
+  trustedClientIpHeader,
 }: CreateAppOptions = {}) => {
   const app = new Hono();
+  const callerOf = (context: Context): string =>
+    clientKey(trustedClientIpHeader ? context.req.header(trustedClientIpHeader) : undefined);
   const handleError = (error: unknown, context: Context): Response => {
     console.error("API request failed", {
       error,
@@ -226,18 +229,15 @@ export const createApp = ({
     }),
   );
 
+  // Set here rather than in host configuration so every platform serves the same API headers.
   app.use("/api/*", async (context, next) => {
-    const decision = rateLimiter.check(
-      clientKey(
-        {
-          forwardedFor: context.req.header("x-forwarded-for"),
-          realIp: context.req.header("x-real-ip"),
-          vercelForwardedFor: context.req.header("x-vercel-forwarded-for"),
-        },
-        { trustVercelProxy },
-      ),
-      Date.now(),
-    );
+    await next();
+    context.header("X-Content-Type-Options", "nosniff");
+    context.header("X-Robots-Tag", "noindex");
+  });
+
+  app.use("/api/*", async (context, next) => {
+    const decision = rateLimiter.check(callerOf(context), Date.now());
 
     context.header("RateLimit-Limit", String(decision.limit));
     context.header("RateLimit-Remaining", String(decision.remaining));
@@ -321,17 +321,7 @@ export const createApp = ({
   });
 
   app.get("/api/ephemerides", async (context) => {
-    const decision = horizonsRateLimiter.check(
-      clientKey(
-        {
-          forwardedFor: context.req.header("x-forwarded-for"),
-          realIp: context.req.header("x-real-ip"),
-          vercelForwardedFor: context.req.header("x-vercel-forwarded-for"),
-        },
-        { trustVercelProxy },
-      ),
-      Date.now(),
-    );
+    const decision = horizonsRateLimiter.check(callerOf(context), Date.now());
     context.header("Ephemeris-RateLimit-Limit", String(decision.limit));
     context.header("Ephemeris-RateLimit-Remaining", String(decision.remaining));
     if (!decision.allowed) {

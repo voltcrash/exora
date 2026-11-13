@@ -30,7 +30,8 @@ Every indexable document has a title, description, self-canonical URL, social
 preview and JSON-LD describing Exora and the page. Breadcrumb markup uses real
 parent pages. Do not invent ratings, endorsements, prices or observed imagery.
 The production API has an `X-Robots-Tag: noindex` header; a static `404.html`
-provides Vercel's missing-page response without promoting it as a search result.
+is the host's missing-page response, served with status 404, so it is never promoted as a search
+result.
 
 ## Crawlers and AI services
 
@@ -65,18 +66,18 @@ they are not performed by a repository build:
 2. Check production responses: pages return 200 with their own HTML, canonical
    URLs agree with the final slash form, unknown paths return 404, API responses
    carry `noindex`, and robots/sitemap/llms URLs have the correct content types.
-   Confirm `/api/...` rewrites still work. Do not add a catch-all SPA rewrite
+   Confirm `/api/...` paths still reach the Worker. Do not add a catch-all SPA rewrite
    that turns missing pages into successful copies of the homepage.
 3. Validate the emitted JSON-LD with Schema.org's validator. A lack of Google
    rich-result eligibility is not itself a schema error. Exora does not claim
    review stars or unsupported rich-result features.
-4. Check Vercel firewall, bot protection and any CDN for challenges or denied
+4. Check Cloudflare WAF, bot protection and any other CDN for challenges or denied
    requests from search/retrieval crawlers. Use each provider's published
    verification guidance and IP ranges rather than trusting a user-agent alone.
 5. Track Search Console impressions, clicks, indexing and Core Web Vitals;
    review Bing coverage and actual referred visits from AI services. Compare
    changes over time after recrawling, rather than treating a single chatbot
-   response as an SEO test. Existing Vercel telemetry loads after the app settles.
+   response as an SEO test. Exora ships no analytics script; use the host's request analytics.
 6. Keep sources, features and guide copy current. Share useful demonstrations
    and source-linked educational material through channels the project owns;
    seek authentic mentions and links instead of buying links or mass-producing

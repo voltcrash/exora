@@ -44,6 +44,11 @@ jobs:
       - name: Build every workspace
         run: vp run -r build
 
+      - name: Bundle the Cloudflare Worker and static assets without deploying
+        run: vp run deploy:check
+        env:
+          WRANGLER_SEND_METRICS: "false"
+
       - name: Audit production dependencies
         run: vp pm audit -- --prod --audit-level=high
 

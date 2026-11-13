@@ -1,7 +1,12 @@
 import { serve } from "@hono/node-server";
 import { createRuntimeApp } from "./runtime.ts";
+import { serveStaticSite } from "./static-site.ts";
 
-const app = createRuntimeApp();
+// Behind a reverse proxy, name the header it overwrites with the caller's address.
+const app = createRuntimeApp({ trustedClientIpHeader: process.env.TRUSTED_CLIENT_IP_HEADER });
+// Point STATIC_ROOT at apps/website/dist to serve the whole site from this one process.
+const staticRoot = process.env.STATIC_ROOT?.trim();
+if (staticRoot) serveStaticSite(app, staticRoot);
 const configuredPort = Number.parseInt(process.env.PORT ?? "8787", 10);
 const port = Number.isFinite(configuredPort) ? configuredPort : 8787;
 const server = serve({ fetch: app.fetch, port }, (info) => {
