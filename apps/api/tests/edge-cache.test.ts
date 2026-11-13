@@ -120,3 +120,72 @@ test("an unavailable cache falls through to the application", async () => {
   expect(response.status).toBe(200);
   expect(handle).toHaveBeenCalledOnce();
 });
+
+const policyResponse = (body: string, status = 200) =>
+  new Response(body, {
+    status,
+    headers: {
+      "Cache-Control": "public, max-age=60",
+      "CDN-Cache-Control": "public, max-age=100, stale-while-revalidate=200, stale-if-error=1000",
+    },
+  });
+
+const expiringCache = async () => {
+  const { cache, entries } = memoryCache();
+  const { tasks, waitUntil } = settle();
+  let clock = 0;
+  const now = () => clock;
+  const url = "https://exora.test/api/planets/population";
+  await edgeCached(new Request(url), () => policyResponse("first"), cache, waitUntil, now);
+  await Promise.all(tasks.splice(0));
+  return {
+    entries,
+    read: async (handle: () => Response) => {
+      const response = await edgeCached(new Request(url), handle, cache, waitUntil, now);
+      await Promise.all(tasks.splice(0));
+      return response;
+    },
+    advance: (secondsLater: number) => {
+      clock = secondsLater * 1_000;
+    },
+  };
+};
+
+test("entries outlive max-age by their longest stale window", async () => {
+  const { entries } = await expiringCache();
+  expect(
+    entries.get("https://exora.test/api/planets/population")?.headers.get("Cache-Control"),
+  ).toBe("public, max-age=1100");
+});
+
+test("a stale entry inside stale-while-revalidate is served while it refreshes", async () => {
+  const { advance, read } = await expiringCache();
+  const handle = vi.fn(() => policyResponse("second"));
+
+  advance(99);
+  expect(await (await read(handle)).text()).toBe("first");
+  expect(handle).not.toHaveBeenCalled();
+
+  advance(150);
+  const stale = await read(handle);
+  expect(await stale.text()).toBe("first");
+  expect(stale.headers.get("Cache-Control")).toBe("public, max-age=60");
+  expect(handle).toHaveBeenCalledOnce();
+
+  expect(await (await read(handle)).text()).toBe("second");
+});
+
+test("past stale-while-revalidate, an upstream failure is covered by stale-if-error", async () => {
+  const { advance, read } = await expiringCache();
+
+  advance(500);
+  expect(await (await read(() => policyResponse("{}", 502))).text()).toBe("first");
+  expect(await (await read(() => policyResponse("refreshed"))).text()).toBe("refreshed");
+});
+
+test("past every stale window, failures reach the caller", async () => {
+  const { advance, read } = await expiringCache();
+
+  advance(1_200);
+  expect((await read(() => policyResponse("{}", 502))).status).toBe(502);
+});
