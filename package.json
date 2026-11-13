@@ -7,6 +7,8 @@
     "ready": "vp check && vp run -r test && vp run -r build",
     "quality:assets": "node scripts/check-asset-provenance.mjs",
     "quality:lighthouse": "vp run website#quality:lighthouse",
+    "deploy": "vp run -r build && pnpm dlx wrangler@latest deploy",
+    "deploy:check": "pnpm dlx wrangler@latest deploy --dry-run --outdir .wrangler/dry-run",
     "dev": "vp run --parallel --filter website --filter @exora/api dev",
     "dev:api": "vp run @exora/api#dev",
     "dev:web": "vp run website#dev",

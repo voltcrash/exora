@@ -1,10 +1,8 @@
+// Build first with `vp run -r build`; `vp run deploy` does both.
 {
   "name": "exora",
   "main": "apps/api/dist/worker.mjs",
   "compatibility_date": "2026-11-01",
-  "build": {
-    "command": "vp run website#build && vp run @exora/api#build",
-  },
   "assets": {
     "directory": "apps/website/dist",
     "html_handling": "auto-trailing-slash",
