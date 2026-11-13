@@ -1,0 +1,18 @@
+{
+  "name": "exora",
+  "main": "apps/api/dist/worker.mjs",
+  "compatibility_date": "2026-11-01",
+  "build": {
+    "command": "vp run website#build && vp run @exora/api#build",
+  },
+  "assets": {
+    "directory": "apps/website/dist",
+    "html_handling": "auto-trailing-slash",
+    "not_found_handling": "404-page",
+    // Only API calls start the Worker; every other path is a free static-asset request.
+    "run_worker_first": ["/api/*"],
+  },
+  "observability": {
+    "enabled": true,
+  },
+}
