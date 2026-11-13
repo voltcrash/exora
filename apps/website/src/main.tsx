@@ -1,7 +1,6 @@
 import { createRoot } from "react-dom/client";
 import { App } from "./App.tsx";
 import { ApplicationErrorBoundary } from "./components/ApplicationErrorBoundary.tsx";
-import { DeferredTelemetry } from "./components/DeferredTelemetry.tsx";
 import { loadWebFonts } from "./web-fonts.ts";
 import "./styles/tokens.css";
 import "./styles/globals.css";
@@ -12,10 +11,7 @@ if (!root) throw new Error("Exora could not find its application root.");
 const render = (): void => {
   createRoot(root).render(
     <ApplicationErrorBoundary>
-      <>
-        <App />
-        <DeferredTelemetry />
-      </>
+      <App />
     </ApplicationErrorBoundary>,
   );
   loadWebFonts();

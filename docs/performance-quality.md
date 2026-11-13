@@ -5,16 +5,15 @@
 The website uses React 19 and React DOM through the standard React Vite plugin in development,
 production builds, and the unit and browser test projects.
 
-Code that does not contribute to the initial destination is loaded on demand. Vercel Analytics
-and Speed Insights mount after a paint during browser idle time, with a two-second timeout for
-busy browsers and a timed fallback when the idle callback API is unavailable. An optional telemetry
-chunk failing to load does not prevent the application from rendering.
+Code that does not contribute to the initial destination is loaded on demand. The site ships no
+third-party analytics or real-user monitoring script; traffic is read from the host's own request
+analytics instead, so no visitor downloads or runs telemetry code.
 
 The planet mass-radius diagram and signal curves load when their Physics or Signal tab opens;
 their Suspense boundaries cover only the charts. Guided-tour data and controls load when a tour
 starts or its URL opens. The scene host, initial scene preload, world mounting, and first-frame
-callbacks do not wait for any of these features. Browser regressions cover telemetry scheduling,
-opening both chart tabs after the world is ready, and restoring, advancing, and leaving a tour.
+callbacks do not wait for any of these features. Browser regressions cover opening both chart tabs
+after the world is ready, and restoring, advancing, and leaving a tour.
 
 With React DOM and these deferrals, the October 2026 production build emits 447,506 bytes of initial
 JavaScript across ten files, or 143,242 bytes after gzipping each file and summing the results.

@@ -22,7 +22,7 @@ const ARCHIVE_MAX_AGE_MS = 7 * 86_400_000;
 
 /** Which strategy a same-origin GET takes, or null to leave it to the network untouched. */
 const routeFor = (pathname, mode) => {
-  if (pathname.startsWith("/_vercel/") || pathname === "/sw.js") return null;
+  if (pathname === "/sw.js") return null;
   if (mode === "navigate") return pathname === "/" ? "shell" : "document";
   if (pathname.startsWith("/assets/")) return "immutable";
   if (pathname.startsWith("/api/")) return "archive";
