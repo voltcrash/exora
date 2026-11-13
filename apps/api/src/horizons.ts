@@ -1,12 +1,11 @@
 import { ephemerisVectorSchema, type EphemerisVector } from "@exora/contracts";
 import { createRequestCoalescer } from "./archive-cache.ts";
 import { UpstreamError } from "./errors.ts";
+import { type Fetcher, globalFetch } from "./fetcher.ts";
 
 const HORIZONS_ENDPOINT = "https://ssd.jpl.nasa.gov/api/horizons.api";
 export const HORIZONS_API_VERSION = "1.2";
 export const HORIZONS_SOURCE = "NASA/JPL Horizons API" as const;
-
-type Fetcher = (input: string | URL | Request, init?: RequestInit) => Promise<Response>;
 
 export interface HorizonsTarget {
   command: string;
@@ -201,7 +200,7 @@ export class JplHorizonsRepository implements HorizonsRepository {
 
   constructor(options: JplHorizonsRepositoryOptions = {}) {
     this.#cacheTtlMs = options.cacheTtlMs ?? 86_400_000;
-    this.#fetcher = options.fetcher ?? fetch;
+    this.#fetcher = options.fetcher ?? globalFetch;
     this.#maxCacheEntries = options.maxCacheEntries ?? 1_024;
     this.#now = options.now ?? Date.now;
     this.#staleTtlMs = options.staleTtlMs ?? 30 * 86_400_000;

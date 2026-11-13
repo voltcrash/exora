@@ -3,6 +3,7 @@ import { z } from "zod";
 import { createArchiveCache, createRequestCoalescer } from "./archive-cache.ts";
 import { UpstreamError } from "./errors.ts";
 import type { RepositoryPage, RepositoryResult } from "./nasa-archive.ts";
+import { type Fetcher, globalFetch } from "./fetcher.ts";
 
 const SIMBAD_TAP_ENDPOINT = "https://simbad.cds.unistra.fr/simbad/sim-tap/sync";
 const FEATURED_NAMES = [
@@ -40,8 +41,6 @@ const STAR_FROM =
   "left outer join ids as a on b.oid=a.oidref " +
   "left outer join mesDiameter as d on b.oid=d.oidref and d.mespos=1 " +
   "left outer join mesFe_h as h on b.oid=h.oidref and h.mespos=1";
-
-type Fetcher = (input: string | URL | Request, init?: RequestInit) => Promise<Response>;
 
 interface SimbadStarRow {
   G: number | null;
@@ -393,7 +392,7 @@ export class SimbadStarRepository implements StarRepository {
 
   constructor(options: SimbadStarRepositoryOptions = {}) {
     this.#cacheTtlMs = options.cacheTtlMs ?? 1000 * 60 * 60 * 12;
-    this.#fetcher = options.fetcher ?? fetch;
+    this.#fetcher = options.fetcher ?? globalFetch;
     this.#now = options.now ?? Date.now;
     this.#timeoutMs = options.timeoutMs ?? 10_000;
   }
