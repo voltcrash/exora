@@ -229,6 +229,13 @@ export const createApp = ({
     }),
   );
 
+  // Set here rather than in host configuration so every platform serves the same API headers.
+  app.use("/api/*", async (context, next) => {
+    await next();
+    context.header("X-Content-Type-Options", "nosniff");
+    context.header("X-Robots-Tag", "noindex");
+  });
+
   app.use("/api/*", async (context, next) => {
     const decision = rateLimiter.check(callerOf(context), Date.now());
 

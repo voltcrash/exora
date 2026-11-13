@@ -411,6 +411,16 @@ test("joins a canonical SIMBAD star to NASA's authoritative host name and planet
   });
 });
 
+test("every API response, including errors, is kept out of search indexes", async () => {
+  const app = createApp({ repository });
+
+  for (const path of ["/api/health", "/api/planets", "/api/missing"]) {
+    const response = await app.request(path);
+    expect(response.headers.get("X-Robots-Tag")).toBe("noindex");
+    expect(response.headers.get("X-Content-Type-Options")).toBe("nosniff");
+  }
+});
+
 test("every response carries the caller's remaining request budget", async () => {
   const response = await createApp({ repository }).request("/api/health");
 
