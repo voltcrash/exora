@@ -423,9 +423,9 @@ test("a caller past its budget is refused with a wait", async () => {
   const app = createApp({
     repository,
     rateLimiter: createRateLimiter({ limit: 2, windowMs: 60_000 }),
-    trustVercelProxy: true,
+    trustedClientIpHeader: "cf-connecting-ip",
   });
-  const headers = { "x-vercel-forwarded-for": "203.0.113.7" };
+  const headers = { "cf-connecting-ip": "203.0.113.7" };
 
   const allowed = await Promise.all([
     app.request("/api/health", { headers }),
@@ -445,15 +445,15 @@ test("one caller exhausting its budget does not refuse another", async () => {
   const app = createApp({
     repository,
     rateLimiter: createRateLimiter({ limit: 1, windowMs: 60_000 }),
-    trustVercelProxy: true,
+    trustedClientIpHeader: "cf-connecting-ip",
   });
 
-  await app.request("/api/health", { headers: { "x-vercel-forwarded-for": "203.0.113.7" } });
+  await app.request("/api/health", { headers: { "cf-connecting-ip": "203.0.113.7" } });
   const sameCaller = await app.request("/api/health", {
-    headers: { "x-vercel-forwarded-for": "203.0.113.7" },
+    headers: { "cf-connecting-ip": "203.0.113.7" },
   });
   const otherCaller = await app.request("/api/health", {
-    headers: { "x-vercel-forwarded-for": "198.51.100.4" },
+    headers: { "cf-connecting-ip": "198.51.100.4" },
   });
 
   expect(sameCaller.status).toBe(429);
@@ -481,7 +481,7 @@ test("generic proxy headers cannot manufacture fresh deployed budgets", async ()
   const app = createApp({
     repository,
     rateLimiter: createRateLimiter({ limit: 1, windowMs: 60_000 }),
-    trustVercelProxy: true,
+    trustedClientIpHeader: "cf-connecting-ip",
   });
 
   const first = await app.request("/api/health", {
