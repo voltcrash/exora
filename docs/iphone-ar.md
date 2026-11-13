@@ -9,7 +9,8 @@ devices with native WebXR use the same AR session directly and do not need the i
 1. Create a Variant Launch project and authorize every hostname that will serve AR, including the
    production hostname and any HTTPS preview hostname used for device testing.
 2. Add the project's SDK key to the website build environment as
-   `VITE_VARIANT_LAUNCH_KEY`. On Vercel this must be a build-time environment variable, because
+   `VITE_VARIANT_LAUNCH_KEY`. The Deploy workflow reads it from the repository variable of that name.
+   It must be present at build time, because
    Vite injects the SDK script into the generated HTML.
 3. Deploy over trusted HTTPS. An iPhone certificate warning or a self-signed LAN certificate is
    not sufficient for the App Clip flow.

@@ -52,9 +52,9 @@ The system diorama is where that discipline is most visible, because a picture o
 
 - **Toolchain and monorepo:** Vite+ (`vp`), pnpm workspaces with a version catalog, TypeScript
 - **Web:** React 19 with React DOM, Vite, Babylon.js 9 (WebGL2 + WebXR)
-- **API:** Hono on Node 26
+- **API:** Hono, run as a Cloudflare Worker or on Node 26
 - **Data sources:** NASA Exoplanet Archive TAP, SIMBAD TAP (CDS, Strasbourg), and NASA/JPL APIs
-- **Hosting:** Vercel static output plus a Vercel Function, with Analytics and Speed Insights
+- **Hosting:** One Cloudflare Worker with static assets; the same build also runs from a single Node process
 
 ## Development
 
@@ -108,11 +108,13 @@ GET /api/stars/:name
 
 `vp dev` and `vp build` always invoke Vite's built-in commands. Use `vp run dev` in this repository so both applications start.
 
-Local development uses the website's Vite server and its `/api` proxy rather than Vercel CLI
-emulation. The API deployment bundle is produced and validated by its workspace build:
+Local development uses the website's Vite server and its `/api` proxy and needs no Cloudflare
+tooling. The API build emits the Node server and the Worker, and checks that the Worker loads no
+Node.js built-in and fits the Workers Free size limit:
 
 ```sh
 vp run @exora/api#build
+vp run deploy:check  # bundle the Worker and static assets with wrangler, without publishing
 ```
 
 ### Immersive mode
@@ -149,23 +151,44 @@ and never lays out chrome of its own; Explore's catalogs are assembled from `com
 
 ## Current deployment architecture
 
-Vercel's Git integration deploys only `main`. Preview deployments are disabled for every other
-branch, including branches with slashes in their names. Merge to `main` to deploy to Production.
-Vercel reads the committed `vercel.json`, which keeps the website and API build, function bundle,
-region, rewrites, and response headers under version control.
-
-The repository does not install Vercel CLI. If a deployment must be started manually, use the
-latest CLI as a one-off command instead of adding it to the workspace:
+Production is one Cloudflare Worker with static assets, described by the committed
+`wrangler.jsonc`. The Deploy workflow builds and publishes `main` once the `CLOUDFLARE_API_TOKEN`
+and `CLOUDFLARE_ACCOUNT_ID` repository secrets exist, and reads `VITE_VARIANT_LAUNCH_KEY` from the
+repository variable of that name. The repository does not install wrangler; a manual deployment
+uses the latest release as a one-off command:
 
 ```sh
-pnpm dlx vercel@latest --prod  # Production
+vp run deploy  # build every workspace, then pnpm dlx wrangler@latest deploy
 ```
 
-The website builds to static output served from Vercel's edge, and the Hono application is bundled into a single Vercel Function pinned to `sfo1`. A rewrite sends every `/api/*` path to that one function, which keeps routing inside Hono rather than splitting it across per-route handlers.
+The website builds to static files that Cloudflare serves directly. Only `/api/*` starts the
+Worker, so pages, bundles, textures and the sky catalogue are static-asset requests, which
+Cloudflare does not bill as Worker invocations and which never use Worker CPU. Response headers
+and cache rules for those files live in `apps/website/public/_headers`, the `/favicon.svg` alias in
+`_redirects`, and an unknown path answers 404 with `404.html`.
 
-The function answers planet search, browse, and exact-name reads from a committed snapshot of the NASA Exoplanet Archive and queries the live archive for everything else. Stars resolve through SIMBAD, which needs no registration or key; Solar System ephemerides resolve through NASA/JPL services.
+Inside the Worker, Hono routes every `/api/*` path. Successful reads are kept in the data centre's
+Workers Cache API for as long as their `CDN-Cache-Control` allows, so a repeated read is one cache
+lookup rather than an application run or an archive query. The Worker needs no Node.js
+compatibility layer, decodes the bundled planet catalog while the isolate starts, and is about
+660 KB gzipped, well inside the Workers Free limit.
 
-Planet search, browse pages, and exact-name lookups read `packages/planet-catalog/data/pscomppars.json`, a snapshot of the confirmed NASA catalog that a weekly workflow regenerates and proposes as a pull request. The API bundles it, so no instance downloads the catalog. The website loads it as a hashed asset after the first scene, or when search opens, and then answers those reads itself with the same matching, ranking, pagination, and nullable measurements. Until it loads, or if it fails, the website uses the API. Names and searches the snapshot lacks fall back to cached live TAP queries. Discovery collections and host-system queries keep their live-query caches. Stars use a twelve-hour cache, and all upstream requests have timeouts. Responses also carry `Cache-Control` with `stale-while-revalidate` so Vercel's CDN absorbs repeated reads.
+Nothing in the build is specific to Cloudflare. `_headers` and `_redirects` are also read by
+Cloudflare Pages and Netlify, and the Node server hosts the whole site from one process on any VPS,
+container or PaaS:
+
+```sh
+vp run -r build
+STATIC_ROOT=apps/website/dist node apps/api/dist/index.mjs
+```
+
+It serves the API first, then the built site with the same headers, rewrites, trailing-slash
+redirects and 404 page. Behind a reverse proxy, set `TRUSTED_CLIENT_IP_HEADER` to the header the
+proxy overwrites with the caller's address so rate limits apply per caller.
+
+The API answers planet search, browse, and exact-name reads from a committed snapshot of the NASA Exoplanet Archive and queries the live archive for everything else. Stars resolve through SIMBAD, which needs no registration or key; Solar System ephemerides resolve through NASA/JPL services.
+
+Planet search, browse pages, and exact-name lookups read `packages/planet-catalog/data/pscomppars.json`, a snapshot of the confirmed NASA catalog that a weekly workflow regenerates and proposes as a pull request. The API bundles it, so no instance downloads the catalog. The website loads it as a hashed asset after the first scene, or when search opens, and then answers those reads itself with the same matching, ranking, pagination, and nullable measurements. Until it loads, or if it fails, the website uses the API. Names and searches the snapshot lacks fall back to cached live TAP queries. Discovery collections and host-system queries keep their live-query caches. Stars use a twelve-hour cache, and all upstream requests have timeouts. Responses also carry `CDN-Cache-Control`, which the Worker's edge cache honours, so repeated reads never reach the archives.
 
 The in-process caches and request budgets are intentionally per-instance safeguards, not global
 quotas. See [API rate limiting and caching](docs/api-rate-limiting-and-caching.md) for the trust
@@ -187,9 +210,10 @@ flowchart TB
         Worldgen["@exora/worldgen<br/>deterministic recipes"]
     end
 
-    subgraph Vercel["Vercel"]
-        Static["Static site<br/>apps/website/dist"]
-        Fn["API Function<br/>Hono, sfo1, /api/*"]
+    subgraph Cloudflare["Cloudflare"]
+        Static["Static assets<br/>apps/website/dist"]
+        Fn["API Worker<br/>Hono, /api/*"]
+        Edge["Workers Cache API<br/>per data centre"]
     end
 
     subgraph Archives["Archives"]
@@ -206,6 +230,7 @@ flowchart TB
 
     UI -->|/api/planets, /api/stars| Fn
     Host -->|/api/ephemerides| Fn
+    Fn <-->|repeated reads| Edge
 
     Fn --> NASA
     Fn --> SIMBAD

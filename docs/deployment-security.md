@@ -1,20 +1,24 @@
 # Deployment security
 
-Exora's Vercel deployment applies one global response policy in `vercel.json`. It is deliberately
+Exora's deployment applies one global response policy from `apps/website/public/_headers`. It is deliberately
 compatible with the browser features the renderer actually uses rather than aiming for an empty
 allowlist that would disable the experience.
 
 ## Deployment workflow
 
-Normal Preview and Production deployments are created by Vercel's Git integration from pull
-requests and `main`, respectively. The committed `vercel.json` remains the source of truth for the
-build command, static output, function bundle, region, rewrites, and headers. The API function runs
-in `sfo1`, near the NASA Exoplanet Archive and JPL upstreams in Pasadena.
+Production is one Cloudflare Worker with static assets, described by the committed
+`wrangler.jsonc`. The Deploy workflow publishes `main` once the `CLOUDFLARE_API_TOKEN` and
+`CLOUDFLARE_ACCOUNT_ID` repository secrets exist. Static files carry the headers and cache rules
+in `apps/website/public/_headers`; the API sets its own `X-Robots-Tag` and
+`X-Content-Type-Options`, because header files never apply to responses a Worker produces.
 
-Local development uses `vp run dev`; it does not require Vercel CLI. To validate the deployable API
-bundle without deploying, run `vp run @exora/api#build`. For an exceptional manual deployment, run
-`pnpm dlx vercel@latest` for Preview or `pnpm dlx vercel@latest --prod` for Production. Do not add
-Vercel CLI back to the workspace dependencies.
+Local development uses `vp run dev` and needs no Cloudflare tooling. `vp run deploy:check` bundles
+the Worker and reads the asset directory without publishing, as the Quality workflow does on every
+pull request. For a manual deployment, run `vp run deploy`, which builds and then runs the latest
+wrangler through `pnpm dlx`. Do not add wrangler to the workspace dependencies.
+
+The same `_headers` and `_redirects` files are read by Cloudflare Pages and Netlify, and by the Node
+server when `STATIC_ROOT` points at `apps/website/dist`, so the policy below holds on any of them.
 
 ## Browser policy decisions
 
@@ -26,8 +30,8 @@ Vercel CLI back to the workspace dependencies.
   so `unsafe-eval` is a required compatibility exception in `script-src`. No external origin can
   supply that code, and inline scripts still require the Variant hash. `blob:` is limited to
   workers and media/images so decoder workers and browser-generated resources keep working.
-- Google Fonts is allowed only for stylesheets and fonts. Vercel Analytics and Speed Insights use
-  same-origin `/_vercel` scripts and collection endpoints in production.
+- Fonts are bundled and served from the deployment origin. No analytics or monitoring script is
+  loaded, so no third-party collection endpoint is allowed.
 - Inline styles remain allowed because Babylon and React components set runtime
   element styles. This exception does not authorize inline scripts.
 - `frame-ancestors 'none'` and `X-Frame-Options: DENY` both prevent framing. Variant's supported
@@ -55,7 +59,7 @@ still require the physical-iPhone smoke test in `docs/iphone-ar.md`.
 `worker-src` is the modern worker directive. Older browsers fall back through `child-src` and then
 `script-src`; they are outside Exora's supported WebXR browser set if they cannot run the decoder
 worker under this policy. Local Vite development is unchanged because these deployment headers are
-applied by Vercel, not by the Vite development server.
+applied by the host, not by the Vite development server.
 
 ## API boundaries
 
@@ -63,7 +67,8 @@ The public API exposes unauthenticated, read-only astronomy data, so CORS remain
 `GET` and `OPTIONS` without credentials or caller-selected request headers. Restricting browser
 origins would not stop direct clients; rate limits and upstream caches are the relevant controls.
 
-Only Vercel's ingress-owned `x-vercel-forwarded-for` value is accepted as a rate-limit identity,
-and only when the runtime is deployed on Vercel. Generic `x-forwarded-for` and `x-real-ip` values
-are ignored because an upstream proxy or direct caller can replace them. Local/direct requests
-share the conservative `unknown` bucket.
+Only the one header the hosting edge overwrites is accepted as a rate-limit identity:
+`cf-connecting-ip` on Cloudflare, or the header named by `TRUSTED_CLIENT_IP_HEADER` for the Node
+server behind a reverse proxy. Generic `x-forwarded-for` and `x-real-ip` values are otherwise
+ignored because an upstream proxy or direct caller can replace them. Local/direct requests share
+the conservative `unknown` bucket.

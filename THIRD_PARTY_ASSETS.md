@@ -371,7 +371,7 @@ about 104 KB over the wire; the browser maps each column onto a typed array with
 parsing. Stars are ordered brightest-first as seen from Earth, which costs nothing and compresses
 better than catalogue order.
 
-The filename carries the catalogue version, so `vercel.json` can serve it `immutable`. Regenerating
+The filename carries the catalogue version, so `_headers` can serve it `immutable`. Regenerating
 from a different HYG release means a new filename, and the URL in `sky-catalog.ts` moves with it.
 
 ### What it does not claim

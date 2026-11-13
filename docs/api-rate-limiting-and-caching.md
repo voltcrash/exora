@@ -5,46 +5,41 @@
 Exora does not currently need a durable application-level rate-limit store. The API is public,
 read-only, and unauthenticated, so there is no paid-user quota or authorization boundary that must
 be exact. Planet search, browse, and exact-name reads use a committed NASA Exoplanet Archive
-snapshot bundled into the function, and cacheable successful GET responses carry shared-CDN
+snapshot bundled into the Worker, and cacheable successful GET responses carry shared-CDN
 freshness and stale-serving policies. The NASA, SIMBAD, and JPL adapters use
 bounded per-instance caches, coalesce identical misses within an instance, and have tighter
 per-route request budgets where an upstream miss is relatively expensive.
 
 This is a traffic-model decision, not a claim that the in-memory limits are global. There is no
 current evidence of distributed abuse, upstream quota exhaustion, or a cost/SLO problem that would
-justify adding a network write to every cache miss or API request. Review the decision if Vercel
-traffic logs show sustained function invocations that bypass the CDN, upstream `429` responses,
-materially elevated egress/function cost, or one source spreading requests across concurrent
-instances.
+justify adding a network write to every cache miss or API request. Review the decision if Workers
+analytics show sustained invocations that miss the edge cache, upstream `429` responses, materially
+elevated request or CPU cost, or one source spreading requests across concurrent isolates.
 
 ## Enforcement boundaries
 
-| Mechanism                 | Scope                        | What it guarantees                                                                 |
-| ------------------------- | ---------------------------- | ---------------------------------------------------------------------------------- |
-| Browser `Cache-Control`   | One browser cache            | Short reuse for public GET responses; no cross-client protection                   |
-| `CDN-Cache-Control`       | Shared Vercel/downstream CDN | Cross-client reuse of identical cacheable GET responses at the edge                |
-| Archive adapter cache     | One warm function instance   | Bounded LRU/TTL reuse; a cold or different instance misses independently           |
-| Request coalescer         | One warm function instance   | One in-flight upstream load per key in that instance only                          |
-| General and route budgets | One warm function instance   | Bounds a client bucket on that instance; reset or scale-out creates another budget |
-| Vercel platform firewall  | Vercel ingress               | Platform DDoS protection before the function                                       |
+| Mechanism                  | Scope                      | What it guarantees                                                                   |
+| -------------------------- | -------------------------- | ------------------------------------------------------------------------------------ |
+| Browser `Cache-Control`    | One browser cache          | Short reuse for public GET responses; no cross-client protection                     |
+| `CDN-Cache-Control`        | One Cloudflare data centre | The Worker keeps identical cacheable GETs in the Cache API for this lifetime         |
+| Archive adapter cache      | One warm Worker isolate    | Bounded LRU/TTL reuse; a cold or different isolate misses independently              |
+| Request coalescer          | One warm Worker isolate    | One in-flight upstream load per key in that isolate only                             |
+| General and route budgets  | One warm Worker isolate    | Bounds a client bucket on that isolate; eviction or scale-out creates another budget |
+| Cloudflare DDoS protection | Cloudflare edge            | Platform DDoS protection before the Worker                                           |
 
 The response headers describe the decision made by the instance that handled the request. They are
 useful back-pressure signals, but must not be interpreted as a durable global quota.
 
 ## Client identity
 
-Production trusts Vercel's protected `x-vercel-forwarded-for` header only when the runtime has
-Vercel's system environment marker. Vercel sets this header at its ingress; generic
-`x-forwarded-for` and `x-real-ip` values are ignored, and direct or local runtimes do not trust any
-forwarding header. The protected value must be one valid IP address. Missing, malformed,
-comma-separated, and untrusted values all share the `unknown` bucket, so a caller cannot obtain new
-local budgets merely by changing a forwarding header.
+The Worker trusts only `cf-connecting-ip`, which Cloudflare overwrites with the connecting
+address on every request. The Node server trusts no header unless `TRUSTED_CLIENT_IP_HEADER` names
+the one its reverse proxy overwrites. Generic `x-forwarded-for` and `x-real-ip` values are ignored.
+The trusted value must be one valid IP address. Missing, malformed, comma-separated, and untrusted
+values all share the `unknown` bucket, so a caller cannot obtain new local budgets merely by
+changing a forwarding header. Do not restore parsing of an arbitrary left-most forwarded address.
 
-If another reverse proxy is placed in front of Vercel, revisit this boundary before deployment.
-The proxy can collapse identity to its own egress address unless Vercel's supported trusted-proxy
-configuration is used. Do not restore parsing of an arbitrary left-most forwarded address.
-
-Reference: [Vercel request headers](https://vercel.com/docs/headers/request-headers).
+Reference: [Cloudflare HTTP request headers](https://developers.cloudflare.com/fundamentals/reference/http-headers/).
 
 ## Cache and failure behavior
 
@@ -53,8 +48,10 @@ Only successful public data responses receive reusable cache policies. Rate-limi
 a shared cache cannot replay one client's refusal to others. Errors also remain uncacheable.
 
 An adapter cache miss is expected on a cold instance and does not indicate data loss. Identical
-concurrent misses are coalesced only within that instance. Across instances, the CDN is the shared
-cache for HTTP responses. Adding a distributed archive-result cache would duplicate the CDN for
+concurrent misses are coalesced only within that instance. Across isolates, the Workers Cache API
+is the shared cache for HTTP responses: a hit is answered before the application runs, carries the
+browser's own `Cache-Control`, and drops the per-caller budget headers of the request that filled
+it. The Cache API is available on a custom domain, not on `workers.dev`. Adding a distributed archive-result cache would duplicate the CDN for
 repeatable GETs and would introduce invalidation, serialization, availability, and operating-cost
 concerns.
 
@@ -121,13 +118,12 @@ headless Chromium. These are samples, not service-level guarantees:
 
 ## Escalation path
 
-If measurements demonstrate a need for globally enforceable request limits, prefer a Vercel WAF
-rate-limit rule on `/api/*` or only the expensive JPL/SIMBAD paths. It executes at ingress before
-function and upstream cost, uses Vercel's source identity, and is compatible with the current
-deployment. Start the rule in log mode, review its counts and Vercel function logs, then choose a
-fixed-window threshold and `429` action.
+If measurements demonstrate a need for globally enforceable request limits, prefer a Cloudflare
+WAF rate-limiting rule on `/api/*` or only the expensive JPL/SIMBAD paths. It executes at the edge
+before the Worker and upstream cost, uses Cloudflare's source identity, and needs no code. Start the
+rule in log mode, review its counts and Workers logs, then choose a threshold and `429` action.
 
-Reference: [Vercel WAF rate limiting](https://vercel.com/docs/vercel-firewall/vercel-waf/rate-limiting).
+Reference: [Cloudflare rate limiting rules](https://developers.cloudflare.com/waf/rate-limiting-rules/).
 
-A new distributed counter service is not justified while Vercel ingress controls satisfy the
-demonstrated requirement.
+A new distributed counter service is not justified while edge controls satisfy the demonstrated
+requirement.
