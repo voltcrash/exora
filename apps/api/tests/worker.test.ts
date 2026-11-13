@@ -26,7 +26,31 @@ test("the Worker answers planet reads from the bundled snapshot without reaching
 
   expect(search.status).toBe(200);
   expect(data[0]?.name).toBe("Kepler-18 b");
+
+  const browse = await worker.fetch(
+    new Request("https://exora.test/api/planets?browse=physical-controls&limit=12"),
+    {},
+    ctx,
+  );
+  const page = (await browse.json()) as { data: unknown[]; meta: { nextCursor: string } };
+  expect(page.data).toHaveLength(12);
+  expect(page.meta.nextCursor).toEqual(expect.any(String));
+
+  const planet = await worker.fetch(
+    new Request("https://exora.test/api/planets/TRAPPIST-1%20e"),
+    {},
+    ctx,
+  );
+  expect(planet.status).toBe(200);
   expect(upstream).not.toHaveBeenCalled();
+
+  const newer = await worker.fetch(
+    new Request("https://exora.test/api/planets/Not%20Yet%20Catalogued%20b"),
+    {},
+    ctx,
+  );
+  expect(newer.status).toBe(502);
+  expect(upstream).toHaveBeenCalledOnce();
 });
 
 test("the Worker rate-limits by Cloudflare's connecting address, not forwarding headers", async () => {
