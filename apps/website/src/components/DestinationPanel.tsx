@@ -1,9 +1,10 @@
+import type { SceneHost } from "../scene-host.ts";
 import { useEffect, useState } from "react";
 import type { DestinationPanelModel, PanelBlock } from "../destination-panel.ts";
 import { readable, readableUnit } from "../readable.ts";
 import { bindStyles } from "../styles/bind-styles.ts";
 import { useTabList } from "../use-tab-list.ts";
-import { FrameRateSignal } from "./FrameRateSignal.tsx";
+import { LiveFrameRateSignal } from "./FrameRateSignal.tsx";
 import { ShareButton } from "./ShareButton.tsx";
 import { Icon } from "./ui/Icon.tsx";
 import { TabBar } from "./ui/TabBar.tsx";
@@ -102,7 +103,7 @@ const PanelBlockView = ({ block }: { block: PanelBlock }) => {
 };
 
 interface DestinationPanelProps {
-  fps: string;
+  host: SceneHost | null;
   model: DestinationPanelModel;
 }
 
@@ -113,7 +114,7 @@ interface DestinationPanelProps {
  * sections costs exactly as much screen as a black hole with one. On a wide screen it is an
  * inspector down the right edge; on a phone it is the lower part of the destination sheet.
  */
-export const DestinationPanel = ({ fps, model }: DestinationPanelProps) => {
+export const DestinationPanel = ({ host, model }: DestinationPanelProps) => {
   const [requested, setRequested] = useState("");
   const tabs = model.tabs;
   const active = tabs.find((tab) => tab.id === requested) ?? tabs[0];
@@ -178,7 +179,7 @@ export const DestinationPanel = ({ fps, model }: DestinationPanelProps) => {
 
         <footer className={cx("panel-foot")}>
           <p>{typeof model.footer === "string" ? readable(model.footer) : model.footer}</p>
-          <FrameRateSignal fps={fps} />
+          <LiveFrameRateSignal host={host} />
         </footer>
       </div>
     </aside>

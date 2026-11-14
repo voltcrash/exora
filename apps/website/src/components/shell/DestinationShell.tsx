@@ -5,7 +5,7 @@ import type { DestinationPanelModel } from "../../destination-panel.ts";
 import type { SceneHost } from "../../scene-host.ts";
 import { bindStyles } from "../../styles/bind-styles.ts";
 import type { TravelPhase } from "../../travel-transition.ts";
-import { useFrameRate, useXrStatus } from "../../use-scene-readouts.ts";
+import { useXrStatus } from "../../use-scene-readouts.ts";
 import { useTypographySettled } from "../../use-typography-settled.ts";
 import { DestinationIdentity, type DestinationIdentityProps } from "../DestinationIdentity.tsx";
 import { DestinationPanel } from "../DestinationPanel.tsx";
@@ -62,7 +62,6 @@ export const DestinationShell = ({
   travelPhase,
 }: DestinationShellProps) => {
   const { chromeHidden, toggleChrome } = useChrome();
-  const fps = useFrameRate(host);
   const xrStatus = useXrStatus(host);
   const typographySettled = useTypographySettled();
   const travelling = travelPhase === "departing" || travelPhase === "crossing";
@@ -108,7 +107,7 @@ export const DestinationShell = ({
       <main className={cx("hud")} data-testid="hud">
         <DestinationSheet>
           <DestinationIdentity {...identity} links={panel.links} />
-          <DestinationPanel fps={fps} model={panel} />
+          <DestinationPanel host={host} model={panel} />
         </DestinationSheet>
       </main>
 

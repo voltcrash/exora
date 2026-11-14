@@ -1,3 +1,5 @@
+import type { SceneHost } from "../scene-host.ts";
+import { useFrameRate } from "../use-scene-readouts.ts";
 import { frameRateStrength } from "../frame-rate.ts";
 import styles from "./Destination.module.css";
 
@@ -27,4 +29,9 @@ export const FrameRateSignal = ({ fps }: FrameRateSignalProps) => {
       <small>FPS</small>
     </span>
   );
+};
+
+export const LiveFrameRateSignal = ({ host }: { host: SceneHost | null }) => {
+  const fps = useFrameRate(host);
+  return <FrameRateSignal fps={fps} />;
 };
