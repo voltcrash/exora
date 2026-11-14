@@ -317,7 +317,10 @@ export const loadPlanetByName = async (
   fetcher: Fetcher = fetch,
 ): Promise<PlanetLoadResult | null> => {
   // A name missing from the snapshot may be a planet confirmed since, so the API still decides.
-  const known = name.trim().length <= MAX_PLANET_NAME_LENGTH ? planetCatalog?.find(name) : null;
+  const known =
+    name.trim().length <= MAX_PLANET_NAME_LENGTH
+      ? await planetCatalog?.find(name).catch(() => null)
+      : null;
   if (known) return { cached: true, mode: "live", planet: known };
   const payload = await requestPlanet(`/api/planets/${encodeURIComponent(name)}`, fetcher);
 
@@ -333,7 +336,7 @@ export const searchPlanets = async (
     return { cached: false, nextCursor: null, planets: [], query: normalizedQuery };
   }
 
-  const known = planetCatalog?.search(normalizedQuery, 12) ?? [];
+  const known = (await planetCatalog?.search(normalizedQuery, 12).catch(() => [])) ?? [];
   if (known.length > 0) {
     return {
       cached: true,
@@ -391,8 +394,8 @@ export const loadPlanetFilterPool = async ({
   limit = PLANET_PAGE_SIZE,
   ...options
 }: PageOptions = {}): Promise<PlanetSearchResult> => {
-  if (planetCatalog) {
-    const page = planetCatalog.browse(limit, cursor);
+  const page = await planetCatalog?.browse(limit, cursor).catch(() => null);
+  if (page) {
     return {
       cached: true,
       nextCursor: page.nextCursor,
