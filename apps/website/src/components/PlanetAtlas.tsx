@@ -28,6 +28,7 @@ import {
 } from "../atlas-model.ts";
 import { hasRenderer } from "../planet-utils.tsx";
 import { useTabList } from "../use-tab-list.ts";
+import { Spinner } from "./ui/Spinner.tsx";
 import styles from "./PlanetAtlas.module.css";
 import { bindStyles } from "../styles/bind-styles.ts";
 
@@ -586,7 +587,7 @@ export const PlanetAtlas = ({ onSelect }: PlanetAtlasProps) => {
               checked={includeEstimates}
               onChange={(event) => setIncludeEstimates(event.target.checked)}
             />
-            <span>Include archive estimates · drawn hollow</span>
+            <span>Include estimates</span>
           </label>
         ) : null}
       </div>
@@ -594,14 +595,14 @@ export const PlanetAtlas = ({ onSelect }: PlanetAtlasProps) => {
       <div className={cx("atlas-stage")} {...tabList.panelProps(tab)}>
         {failed ? (
           <p className={cx("atlas-status")} role="status">
-            The NASA Exoplanet Archive could not be reached. The atlas needs the whole catalogue, so
+            Archive unavailable.
             <button type="button" onClick={() => setRetry((value) => value + 1)}>
-              Retry atlas
+              Retry
             </button>
           </p>
         ) : !worlds ? (
-          <p className={cx("atlas-status")} role="status">
-            Reading every confirmed world from the NASA Exoplanet Archive…
+          <p className={cx("atlas-status")} role="status" aria-label="Loading the atlas…">
+            <Spinner size={20} />
           </p>
         ) : tab === "years" ? (
           <YearChart hidden={hidden} worlds={worlds} />
@@ -619,12 +620,12 @@ export const PlanetAtlas = ({ onSelect }: PlanetAtlasProps) => {
       <p className={cx("atlas-caption")} role="status">
         {travel
           ? travel.error
-            ? `${travel.name} could not be opened. Check your connection or try another world.`
+            ? `${travel.name} could not be opened.`
             : `Travelling to ${travel.name}…`
           : worlds
             ? tab === "years"
-              ? `${whole.format(worlds.length)} confirmed worlds by the year they were announced.`
-              : `${whole.format(plotted.length)} of ${whole.format(worlds.length)} worlds have a measured period and ${view === "radius" ? "radius" : "mass"}${includeEstimates ? " or an archive estimate" : ""}. ${view === "mass" ? "Radial-velocity masses are minimums (M sin i). " : ""}Lettered rings are the Solar System's planets.`
+              ? `${whole.format(worlds.length)} worlds`
+              : `${whole.format(plotted.length)} of ${whole.format(worlds.length)} plotted${view === "mass" ? " · masses are minimums" : ""}`
             : ""}
       </p>
     </section>
