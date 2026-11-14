@@ -52,9 +52,9 @@ The system diorama is where that discipline is most visible, because a picture o
 
 - **Toolchain and monorepo:** Vite+ (`vp`), pnpm workspaces with a version catalog, TypeScript
 - **Web:** React 19 with React DOM, Vite, Babylon.js 9 (WebGL2 + WebXR)
-- **API:** Hono, run as a Cloudflare Worker or on Node 26
+- **API:** Hono on Cloudflare Workers; Node 26 for local development
 - **Data sources:** NASA Exoplanet Archive TAP, SIMBAD TAP (CDS, Strasbourg), and NASA/JPL APIs
-- **Hosting:** One Cloudflare Worker with static assets; the same build also runs from a single Node process
+- **Hosting:** One Cloudflare Worker with static assets at `exora.voltcrash.com`
 
 ## Development
 
@@ -151,14 +151,23 @@ and never lays out chrome of its own; Explore's catalogs are assembled from `com
 
 ## Current deployment architecture
 
-Production is one Cloudflare Worker with static assets, described by the committed
-`wrangler.jsonc`. The Deploy workflow builds and publishes `main` once the `CLOUDFLARE_API_TOKEN`
-and `CLOUDFLARE_ACCOUNT_ID` repository secrets exist, and reads `VITE_VARIANT_LAUNCH_KEY` from the
-repository variable of that name. The repository does not install wrangler; a manual deployment
-uses the latest release as a one-off command:
+Production is one Cloudflare Worker with static assets at <https://exora.voltcrash.com>,
+described by `wrangler.jsonc`. The Production deployment workflow follows Onyx's release
+process: successful main-push Quality checks authorize the exact commit, then the workflow
+builds, dry-runs and deploys only if that snapshot is still current. Missing credentials
+fail the release rather than silently skipping it.
+
+Configure `CLOUDFLARE_API_TOKEN` as a `Production` environment secret,
+`CLOUDFLARE_ACCOUNT_ID` as an Actions variable, and the optional public
+`VITE_VARIANT_LAUNCH_KEY` as a build-time variable. See [Cloudflare Workers deployment](docs/deployment.md)
+for account permissions, hostname cutover, local Worker preview and manual release retries.
+Wrangler is installed through Vite+ and locked with the workspace:
 
 ```sh
-vp run deploy  # build every workspace, then pnpm dlx wrangler@latest deploy
+vp run -r build
+vp run preview       # run the production Worker and assets locally
+vp run deploy:check  # validate without publishing
+vp run deploy        # manual build and deployment with Cloudflare credentials
 ```
 
 The website builds to static files that Cloudflare serves directly. Only `/api/*` starts the
@@ -173,18 +182,7 @@ lookup rather than an application run or an archive query. The Worker needs no N
 compatibility layer, decodes the bundled planet catalog while the isolate starts, and is about
 660 KB gzipped, well inside the Workers Free limit.
 
-Nothing in the build is specific to Cloudflare. `_headers` and `_redirects` are also read by
-Cloudflare Pages and Netlify, and the Node server hosts the whole site from one process on any VPS,
-container or PaaS:
-
-```sh
-vp run -r build
-STATIC_ROOT=apps/website/dist node apps/api/dist/index.mjs
-```
-
-It serves the API first, then the built site with the same headers, rewrites, trailing-slash
-redirects and 404 page. Behind a reverse proxy, set `TRUSTED_CLIENT_IP_HEADER` to the header the
-proxy overwrites with the caller's address so rate limits apply per caller.
+The Node API server supports local development; production traffic is served by Workers.
 
 The API answers planet search, browse, and exact-name reads from a committed snapshot of the NASA Exoplanet Archive and queries the live archive for everything else. Stars resolve through SIMBAD, which needs no registration or key; Solar System ephemerides resolve through NASA/JPL services.
 

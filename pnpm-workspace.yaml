@@ -29,6 +29,7 @@ catalog:
   "@babel/core": ^8.1.2
   "@rolldown/plugin-babel": ^0.3.1
   babel-plugin-react-compiler: ^1.0.0
+  wrangler: ^4.162.0
 overrides:
   # Advisory patches for transitive development tooling still used by Vite+ and Lighthouse.
   # Drop an entry once its dependents ship the fixed version on their own.
@@ -45,3 +46,7 @@ peerDependencyRules:
     vitest: "*"
 allowBuilds:
   esbuild: true
+  workerd: true
+minimumReleaseAgeExclude:
+  - miniflare@5.20261113.0-beta
+  - wrangler@4.162.0

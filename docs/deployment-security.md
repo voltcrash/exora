@@ -6,19 +6,21 @@ allowlist that would disable the experience.
 
 ## Deployment workflow
 
-Production is one Cloudflare Worker with static assets, described by the committed
-`wrangler.jsonc`. The Deploy workflow publishes `main` once the `CLOUDFLARE_API_TOKEN` and
-`CLOUDFLARE_ACCOUNT_ID` repository secrets exist. Static files carry the headers and cache rules
-in `apps/website/public/_headers`; the API sets its own `X-Robots-Tag` and
-`X-Content-Type-Options`, because header files never apply to responses a Worker produces.
+Production is one Cloudflare Worker with static assets at `exora.voltcrash.com`, described by
+`wrangler.jsonc`. The Production deployment workflow requires successful main-push Quality for
+the exact deployment commit, then builds, validates and publishes it only while it is current.
+It uses the `Production` environment, reads `CLOUDFLARE_API_TOKEN` from secrets and
+`CLOUDFLARE_ACCOUNT_ID` from Actions variables, and fails if either is missing. See
+[Cloudflare Workers deployment](deployment.md) for configuration and retry instructions.
 
-Local development uses `vp run dev` and needs no Cloudflare tooling. `vp run deploy:check` bundles
-the Worker and reads the asset directory without publishing, as the Quality workflow does on every
-pull request. For a manual deployment, run `vp run deploy`, which builds and then runs the latest
-wrangler through `pnpm dlx`. Do not add wrangler to the workspace dependencies.
+Static files carry the headers and cache rules in `apps/website/public/_headers`; the API sets
+its own `X-Robots-Tag` and `X-Content-Type-Options`, because header files never apply to responses
+a Worker produces. Production's `workers.dev` and version preview URLs are disabled.
 
-The same `_headers` and `_redirects` files are read by Cloudflare Pages and Netlify, and by the Node
-server when `STATIC_ROOT` points at `apps/website/dist`, so the policy below holds on any of them.
+Local development uses `vp run dev`. After building, `vp run preview` serves the production
+output in the local Workers runtime, and `vp run deploy:check` bundles it without publishing,
+as Quality does on every pull request. Wrangler is a locked workspace development dependency.
+The local Node server also reads `_headers` and `_redirects` when serving a built website.
 
 ## Browser policy decisions
 
