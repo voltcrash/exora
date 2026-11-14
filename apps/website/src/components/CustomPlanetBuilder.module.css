@@ -34,13 +34,6 @@
   --visual-size: clamp(240px, 26vw, 360px);
 }
 
-.preview figcaption {
-  color: var(--ink-2);
-  font-size: var(--text-sm);
-  font-variant-numeric: tabular-nums;
-  text-align: center;
-}
-
 .controls {
   display: grid;
   gap: var(--space-5);
@@ -191,11 +184,6 @@
   background: rgb(16 17 20 / 92%);
 }
 
-.footer p {
-  color: var(--ink-3);
-  font-size: var(--text-xs);
-}
-
 @media (max-width: 900px) {
   .body {
     grid-template-columns: 1fr;
@@ -218,10 +206,6 @@
 
   .footer {
     justify-content: stretch;
-  }
-
-  .footer p {
-    display: none;
   }
 
   .footer button {
