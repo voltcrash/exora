@@ -559,3 +559,18 @@
     transition: none;
   }
 }
+
+/* Off-screen cards skip layout and paint; `auto` remembers each card's measured height. */
+.results > li {
+  content-visibility: auto;
+  contain-intrinsic-size: auto 300px;
+}
+
+.results[data-view="list"] > li {
+  contain-intrinsic-size: auto 72px;
+}
+
+.bodies > li {
+  content-visibility: auto;
+  contain-intrinsic-size: auto 120px;
+}
