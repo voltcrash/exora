@@ -21,8 +21,8 @@
   --ink-4: #50545c;
   --void: #000;
 
-  /* Surfaces float over a live scene, so they are smoked glass rather than paint. */
-  --surface: rgb(16 17 20 / 74%);
+  /* Near-opaque surfaces keep moving scenes readable without per-frame background blur. */
+  --surface: rgb(16 17 20 / 94%);
   --surface-solid: #101114;
   --surface-sunken: rgb(0 0 0 / 28%);
   --fill: rgb(255 255 255 / 5%);
@@ -79,7 +79,7 @@
   --radius-lg: 20px;
   --radius-pill: 999px;
 
-  --blur: blur(22px) saturate(140%);
+  --blur: none;
   --shadow-float: 0 18px 50px rgb(0 0 0 / 45%), 0 2px 8px rgb(0 0 0 / 30%);
 
   --ease: cubic-bezier(0.2, 0.8, 0.2, 1);
