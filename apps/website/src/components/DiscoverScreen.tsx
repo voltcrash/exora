@@ -1,6 +1,6 @@
 import type { ExoplanetProfile, StarProfile } from "@exora/contracts";
 import type { CustomBlackHole, CustomStar, CustomWorld } from "@exora/worldgen";
-import { lazy, Suspense, useEffect, useRef, useState } from "react";
+import { lazy, Suspense, useEffect, useRef, useState, useTransition } from "react";
 import type { BlackHoleProfile } from "../black-holes.ts";
 import type { SolarRegionProfile } from "../solar-regions.ts";
 import type { ForgeMode } from "./CustomPlanetBuilder.tsx";
@@ -116,6 +116,8 @@ export const DiscoverScreen = ({
   onStartTour,
 }: DiscoverScreenProps) => {
   const [section, setSection] = useState<DiscoverSection>(initialSection);
+  // A section switch keeps the current catalog on screen until the next one is ready to paint.
+  const [switching, startSwitch] = useTransition();
   const closeRef = useRef<HTMLButtonElement>(null);
   const dialogRef = useRef<HTMLDialogElement>(null);
   const stageRef = useRef<HTMLDivElement>(null);
@@ -171,7 +173,7 @@ export const DiscoverScreen = ({
                   type="button"
                   aria-label={`${item.label} · ${item.source}`}
                   aria-current={section === item.id ? "page" : undefined}
-                  onClick={() => setSection(item.id)}
+                  onClick={() => startSwitch(() => setSection(item.id))}
                 >
                   <span data-icon={item.id} className={styles["nav-icon"]}>
                     <Icon name={item.icon} size={18} />
@@ -191,7 +193,12 @@ export const DiscoverScreen = ({
         </footer>
       </aside>
 
-      <div ref={stageRef} className={styles["stage"]} data-testid="discover-stage">
+      <div
+        ref={stageRef}
+        className={styles["stage"]}
+        data-testid="discover-stage"
+        aria-busy={switching || undefined}
+      >
         <header className={styles["header"]}>
           <div className={styles["header-copy"]}>
             <h1 id="discover-title">{sectionTitles[section]}</h1>

@@ -1,4 +1,4 @@
-import { memo, type ReactNode, type Ref } from "react";
+import { memo, startTransition, type ReactNode, type Ref } from "react";
 import { Button } from "../ui/Button.tsx";
 import { Icon } from "../ui/Icon.tsx";
 import { Segmented } from "../ui/Segmented.tsx";
@@ -151,7 +151,7 @@ export const ResultToolbar = ({
           { icon: "list", id: "list", label: "List" },
         ]}
         value={view}
-        onChange={onViewChange}
+        onChange={(next) => startTransition(() => onViewChange(next))}
       />
     </div>
   </div>
