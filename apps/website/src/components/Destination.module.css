@@ -59,7 +59,7 @@
   color: var(--ink);
   font-size: calc(var(--text-display) * var(--identity-name-fit));
   font-stretch: var(--wide);
-  font-weight: 340;
+  font-weight: 300;
   line-height: 0.98;
   letter-spacing: -0.025em;
   text-shadow: 0 2px 30px rgb(0 0 0 / 50%);
@@ -68,7 +68,7 @@
 
 .identity-name em {
   font-style: normal;
-  font-weight: 560;
+  font-weight: 600;
 }
 
 .identity-tags {
@@ -151,7 +151,7 @@
   margin-top: 2px;
   color: var(--ink);
   font-size: var(--text-md);
-  font-weight: 560;
+  font-weight: 600;
   letter-spacing: -0.005em;
 }
 
@@ -355,7 +355,7 @@
   font-family: var(--font-mono);
   font-size: var(--text-sm);
   font-variant-numeric: tabular-nums;
-  font-weight: 520;
+  font-weight: 500;
 }
 
 .fact-unit {
@@ -449,7 +449,7 @@ button.body:hover .body-go {
 .body-copy strong {
   overflow: hidden;
   font-size: var(--text-sm);
-  font-weight: 520;
+  font-weight: 500;
   text-overflow: ellipsis;
   white-space: nowrap;
 }

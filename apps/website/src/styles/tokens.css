@@ -20,9 +20,9 @@
 
   /* Ink on the void, brightest to faintest. */
   --ink: #ecebe6;
-  --ink-2: #aeb1b7;
-  --ink-3: #a0a4ad;
-  --ink-4: #959aa5;
+  --ink-2: #b3b6bc;
+  --ink-3: #9196a0;
+  --ink-4: #80858f;
   --void: #000;
 
   /* Near-opaque surfaces keep moving scenes readable without per-frame background blur. */

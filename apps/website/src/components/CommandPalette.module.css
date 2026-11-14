@@ -109,7 +109,7 @@
 .palette-copy strong {
   overflow: hidden;
   font-size: var(--text-sm);
-  font-weight: 520;
+  font-weight: 500;
   text-overflow: ellipsis;
   white-space: nowrap;
 }

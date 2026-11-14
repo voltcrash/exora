@@ -97,7 +97,7 @@
 
 .atlas-matches strong {
   font-size: var(--text-sm);
-  font-weight: 520;
+  font-weight: 500;
 }
 
 .atlas-matches small {
@@ -273,7 +273,7 @@
 .atlas-tooltip strong {
   color: var(--ink);
   font-size: var(--text-sm);
-  font-weight: 560;
+  font-weight: 600;
 }
 
 .atlas-tooltip span {

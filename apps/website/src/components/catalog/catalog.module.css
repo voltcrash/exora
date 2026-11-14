@@ -123,7 +123,7 @@
   border-color: transparent;
   color: var(--on-light);
   background: var(--light);
-  font-weight: 560;
+  font-weight: 600;
 }
 
 .rail-note {
@@ -166,7 +166,7 @@
 
 .did-you-mean strong {
   color: var(--light);
-  font-weight: 560;
+  font-weight: 600;
 }
 
 /* Results */
@@ -224,7 +224,7 @@
 .card-copy strong {
   overflow: hidden;
   font-size: var(--text-md);
-  font-weight: 540;
+  font-weight: 500;
   letter-spacing: -0.005em;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -348,7 +348,7 @@
 .section-title {
   color: var(--ink-2);
   font-size: var(--text-sm);
-  font-weight: 560;
+  font-weight: 600;
 }
 
 .bodies {

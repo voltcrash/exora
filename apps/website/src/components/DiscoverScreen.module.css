@@ -138,7 +138,7 @@
 
 .nav-copy strong {
   font-size: var(--text-sm);
-  font-weight: 520;
+  font-weight: 500;
 }
 
 .nav-copy small {
@@ -190,7 +190,7 @@
 .header h1 {
   font-size: var(--text-xl);
   font-stretch: var(--wide);
-  font-weight: 360;
+  font-weight: 300;
   letter-spacing: -0.025em;
   line-height: 1.05;
   text-wrap: balance;
