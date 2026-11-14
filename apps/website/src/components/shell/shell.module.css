@@ -234,6 +234,14 @@
   }
 }
 
+.hints[data-visible="false"] {
+  visibility: hidden;
+  opacity: 0;
+  transition:
+    opacity var(--duration-slow) var(--ease),
+    visibility var(--duration-slow) var(--ease);
+}
+
 .scene-alert {
   position: fixed;
   z-index: var(--layer-hud);
