@@ -5,8 +5,8 @@
   bottom: calc(var(--safe-bottom) + var(--edge) + var(--space-2));
   left: calc(var(--safe-left) + var(--edge) + var(--space-2));
   display: grid;
-  gap: var(--space-4);
-  width: min(460px, 40vw);
+  gap: var(--space-3);
+  width: min(360px, 36vw);
   pointer-events: auto;
 }
 
@@ -94,14 +94,6 @@
   white-space: nowrap;
 }
 
-.identity-summary {
-  max-width: 54ch;
-  color: var(--ink-2);
-  font-size: var(--text-base);
-  line-height: 1.55;
-  text-shadow: 0 1px 14px rgb(0 0 0 / 70%);
-}
-
 .identity-next {
   display: flex;
   flex-wrap: wrap;
@@ -121,20 +113,6 @@
   font-size: var(--text-sm);
 }
 
-.identity-note {
-  display: flex;
-  align-items: flex-start;
-  gap: var(--space-2);
-  max-width: 54ch;
-  color: var(--ink-3);
-  font-size: var(--text-xs);
-  line-height: 1.45;
-}
-
-.identity-note svg {
-  margin-top: 1px;
-}
-
 /* Panel: what is known, down the right edge on a wide screen */
 
 .panel {
@@ -143,7 +121,7 @@
   right: calc(var(--safe-right) + var(--edge));
   display: flex;
   flex-direction: column;
-  width: 360px;
+  width: 312px;
   max-height: calc(
     100dvh - var(--safe-top) - var(--safe-bottom) - 2 * var(--edge) - var(--control-height) -
       var(--space-4)
@@ -183,20 +161,15 @@
   display: grid;
   flex: none;
   grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 1px;
-  margin: var(--space-4) var(--space-5) 0;
-  overflow: hidden;
-  border: 1px solid var(--hairline);
-  border-radius: var(--radius-md);
-  background: var(--hairline);
+  gap: var(--space-4);
+  margin: var(--space-4) var(--space-5);
 }
 
 .metric {
   display: grid;
   gap: 4px;
   min-width: 0;
-  padding: 12px 14px;
-  background: var(--surface-solid);
+  padding: 0;
 }
 
 .metric dt {
@@ -243,6 +216,42 @@
 
 .metric small sub {
   font-size: 0.75em;
+}
+
+.panel-toggle {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-2);
+  min-height: var(--control-height);
+  padding: 0 var(--space-5);
+  border: 0;
+  border-top: 1px solid var(--hairline);
+  color: var(--ink-2);
+  background: none;
+  font-size: var(--text-sm);
+}
+
+.panel-toggle:hover {
+  color: var(--ink);
+  background: var(--fill);
+}
+
+.panel[data-expanded="false"] .panel-drawer {
+  display: none;
+}
+
+.panel-about {
+  display: grid;
+  gap: var(--space-2);
+  color: var(--ink-2);
+  font-size: var(--text-sm);
+  line-height: var(--leading);
+}
+
+.panel-note {
+  color: var(--tone-caveat);
+  font-size: var(--text-xs);
 }
 
 .panel-drawer {
@@ -573,11 +582,6 @@ button.body:hover .body-go {
     text-shadow: none;
   }
 
-  .identity-summary,
-  .identity-note {
-    text-shadow: none;
-  }
-
   .identity-next {
     display: grid;
     grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
@@ -605,8 +609,12 @@ button.body:hover .body-go {
     margin: var(--space-4) 0 0;
   }
 
-  .metric {
-    background: rgb(12 13 16);
+  .panel-toggle {
+    display: none;
+  }
+
+  .panel[data-expanded="false"] .panel-drawer {
+    display: flex;
   }
 
   .panel-drawer > [role="tablist"] {

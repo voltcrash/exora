@@ -105,9 +105,17 @@ export const DestinationShell = ({
       <TopBar host={host} xrStatus={xrStatus} />
 
       <main className={cx("hud")} data-testid="hud">
-        <DestinationSheet>
+        <DestinationSheet
+          host={chromeHidden || travelling ? null : host}
+          inXr={xrStatus === "in-xr"}
+        >
           <DestinationIdentity {...identity} links={panel.links} />
-          <DestinationPanel host={host} model={panel} />
+          <DestinationPanel
+            host={host}
+            model={panel}
+            summary={identity.summary}
+            note={identity.note}
+          />
         </DestinationSheet>
       </main>
 
