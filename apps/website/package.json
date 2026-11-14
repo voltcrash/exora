@@ -26,12 +26,15 @@
     "react-dom": "catalog:"
   },
   "devDependencies": {
+    "@babel/core": "catalog:",
     "@lhci/cli": "catalog:",
+    "@rolldown/plugin-babel": "catalog:",
     "@types/node": "catalog:",
     "@types/react": "catalog:",
     "@types/react-dom": "catalog:",
     "@vitejs/plugin-react": "catalog:",
     "@vitest/browser-playwright": "catalog:",
+    "babel-plugin-react-compiler": "catalog:",
     "playwright": "catalog:",
     "typescript": "catalog:",
     "vite": "catalog:",
