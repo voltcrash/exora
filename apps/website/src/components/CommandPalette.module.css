@@ -72,11 +72,11 @@
 
 .palette-option {
   display: grid;
-  grid-template-columns: 32px minmax(0, 1fr) auto;
+  grid-template-columns: 20px minmax(0, 1fr) auto;
   align-items: center;
   gap: var(--space-3);
-  min-height: 52px;
-  padding: 6px var(--space-3);
+  min-height: 42px;
+  padding: 4px var(--space-3);
   border-radius: var(--radius-sm);
   cursor: pointer;
 }
@@ -88,33 +88,32 @@
 .palette-glyph {
   display: grid;
   place-items: center;
-  width: 32px;
-  height: 32px;
-  border: 1px solid var(--hairline);
-  border-radius: var(--radius-xs);
-  color: var(--ink-3);
+  color: var(--ink-4);
 }
 
 .palette-option[aria-selected="true"] .palette-glyph {
-  border-color: var(--light-line);
   color: var(--light);
-  background: var(--light-wash);
 }
 
 .palette-copy {
-  display: grid;
+  display: flex;
+  align-items: baseline;
+  gap: var(--space-3);
   min-width: 0;
 }
 
 .palette-copy strong {
   overflow: hidden;
-  font-size: var(--text-sm);
+  font-size: var(--text-base);
   font-weight: 500;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 
 .palette-copy small {
+  flex: none;
+  max-width: 45%;
+  margin-left: auto;
   overflow: hidden;
   color: var(--ink-3);
   font-size: var(--text-xs);
@@ -143,16 +142,8 @@
   font-size: var(--text-xs);
 }
 
-.palette-footer span {
-  display: inline-flex;
-  align-items: center;
-  gap: 4px;
-}
-
-@media (pointer: coarse) {
-  .palette-footer {
-    display: none;
-  }
+.palette-footer:empty {
+  display: none;
 }
 
 @media (prefers-reduced-motion: reduce) {
