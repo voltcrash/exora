@@ -180,11 +180,7 @@ export const BlackHoleExperience = ({ blackHole, host, travelPhase }: BlackHoleE
         nameId: "black-hole-name",
         note: "An interpretive model of gravitational lensing, not telescope imagery.",
         summary: blackHole.observation.summary,
-        tags: [
-          blackHole.milestone,
-          blackHole.host,
-          ...(blackHole.constellation ? [blackHole.constellation] : []),
-        ],
+        tags: [blackHole.host],
         tagsLabel: "Black hole classification",
         tone: "black-hole",
       }}

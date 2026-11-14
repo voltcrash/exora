@@ -12,17 +12,7 @@
 
 .identity-head {
   display: grid;
-  gap: var(--space-3);
-}
-
-.identity-kind {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
   gap: var(--space-2);
-  color: var(--ink-2);
-  font-size: var(--text-sm);
-  font-weight: 500;
 }
 
 .identity-category {
@@ -30,23 +20,16 @@
   align-items: center;
   gap: 7px;
   color: var(--light);
+  font-size: var(--text-xs);
+  font-weight: 500;
 }
 
 .identity-category::before {
   content: "";
-  width: 7px;
-  height: 7px;
+  width: 6px;
+  height: 6px;
   border-radius: 50%;
   background: var(--light);
-  box-shadow: 0 0 10px rgb(var(--light-rgb) / 70%);
-}
-
-.identity-category::after {
-  content: "";
-  width: 1px;
-  height: 12px;
-  margin-left: 3px;
-  background: var(--hairline-strong);
 }
 
 /* The one loud thing on the screen: the name, set wide and light, the way it is printed on a chart. */
@@ -74,24 +57,24 @@
 .identity-tags {
   display: flex;
   flex-wrap: wrap;
-  gap: 6px;
+  gap: 2px 0;
   margin: 0;
   padding: 0;
+  color: var(--ink-2);
+  font-size: var(--text-sm);
   list-style: none;
+  text-shadow: 0 1px 12px rgb(0 0 0 / 70%);
 }
 
 .identity-tags li {
-  display: inline-flex;
-  align-items: center;
-  height: 26px;
-  padding: 0 10px;
-  border: 1px solid var(--hairline-strong);
-  border-radius: var(--radius-pill);
-  color: var(--ink-2);
-  background: rgb(0 0 0 / 22%);
-  font-size: var(--text-xs);
   font-variant-numeric: tabular-nums;
   white-space: nowrap;
+}
+
+.identity-tags li + li::before {
+  content: "/";
+  margin: 0 8px;
+  color: var(--ink-4);
 }
 
 .identity-next {

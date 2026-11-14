@@ -146,7 +146,7 @@ export const RegionExperience = ({
         nameId: "world-name",
         note: region.disclosure,
         summary: region.summary,
-        tags: [evidenceLabel, "Statistical visualization", "Non-linear scale where labelled"],
+        tags: [],
         tagsLabel: "Region evidence classification",
         tone: "region",
       }}

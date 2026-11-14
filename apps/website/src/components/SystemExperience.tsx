@@ -684,11 +684,7 @@ export const SystemExperience = ({
         summary: solar
           ? "Every planet in our Solar System, placed on its measured orbit and turning on its own clock. Select a world to cross the system, or the Sun at the centre to stand at our star."
           : `Every confirmed world of ${hostStar}, on the orbit the archive measured for it and turning at its own measured period. Select a world to travel to it, or the star at the centre to stand at the star itself.`,
-        tags: [
-          "Orbital diorama",
-          `${drawn.length} orbit${drawn.length === 1 ? "" : "s"} drawn`,
-          solar ? "NASA/JPL" : "NASA Exoplanet Archive",
-        ],
+        tags: [],
         tagsLabel: "System classification",
         tone: "region",
       }}

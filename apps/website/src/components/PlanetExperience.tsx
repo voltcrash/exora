@@ -436,6 +436,11 @@ export const PlanetExperience = ({
       ...(habitableZone.within ? { tone: "cyan" as const } : {}),
       value: habitableZone.value,
     },
+    !custom &&
+      !solar && {
+        label: "Discovered by",
+        value: observation.discoveryMethod,
+      },
     !custom && {
       detail: hostSpectrum,
       label: "Host spectrum",
@@ -733,7 +738,6 @@ export const PlanetExperience = ({
           recipe.derived.equilibriumTemperatureKelvin === null
             ? "Temperature unknown"
             : `${recipe.derived.equilibriumTemperatureSource === "derived" ? "~" : ""}${formatNumber(recipe.derived.equilibriumTemperatureKelvin, 0)} K`,
-          observation.discoveryMethod,
         ],
         tagsLabel: "World classification",
         tone: subsystemActive ? "subsystem" : "world",
