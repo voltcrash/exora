@@ -188,29 +188,18 @@ interface ResultCardProps {
   /** A short note when the result cannot be opened, in place of its facts. */
   notice?: string;
   onSelect: () => void;
-  subtitle: string;
   title: string;
   trait?: string;
   visual: ReactNode;
 }
 
 export const ResultCard = memo(
-  ({
-    disabled = false,
-    facts,
-    notice,
-    onSelect,
-    subtitle,
-    title,
-    trait,
-    visual,
-  }: ResultCardProps) => (
+  ({ disabled = false, facts, notice, onSelect, title, trait, visual }: ResultCardProps) => (
     <li>
       <button className={styles["card"]} type="button" disabled={disabled} onClick={onSelect}>
         <span className={styles["card-visual"]}>{visual}</span>
         <span className={styles["card-copy"]}>
           <strong>{title}</strong>
-          <small>{subtitle}</small>
           {trait ? <span className={styles["card-trait"]}>{trait}</span> : null}
         </span>
         <span className={styles["card-facts"]}>

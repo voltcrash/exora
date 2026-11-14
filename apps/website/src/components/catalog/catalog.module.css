@@ -178,7 +178,7 @@
 
 .results {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+  grid-template-columns: repeat(auto-fill, minmax(196px, 1fr));
   gap: var(--space-3);
   margin: 0;
   padding: 0;
@@ -199,14 +199,12 @@
   text-align: left;
   transition:
     border-color var(--duration-fast) var(--ease),
-    background-color var(--duration-fast) var(--ease),
-    transform var(--duration) var(--ease);
+    background-color var(--duration-fast) var(--ease);
 }
 
 .card:hover:not(:disabled) {
   border-color: var(--light-line);
   background: var(--fill-hover);
-  transform: translateY(-2px);
 }
 
 .card:disabled {
@@ -217,6 +215,10 @@
 .card-visual {
   display: block;
   border-bottom: 1px solid var(--hairline);
+}
+
+.results[data-view="gallery"] .card-visual > * {
+  --visual-size: 128px;
 }
 
 .card-copy {
@@ -231,14 +233,6 @@
   font-size: var(--text-md);
   font-weight: 500;
   letter-spacing: -0.005em;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.card-copy small {
-  overflow: hidden;
-  color: var(--ink-3);
-  font-size: var(--text-xs);
   text-overflow: ellipsis;
   white-space: nowrap;
 }
@@ -508,8 +502,8 @@
     gap: var(--space-2);
   }
 
-  .results .card-visual > * {
-    --visual-size: 124px;
+  .results[data-view="gallery"] .card-visual > * {
+    --visual-size: 112px;
   }
 
   .card-copy {
@@ -555,7 +549,7 @@
 /* Off-screen cards skip layout and paint; `auto` remembers each card's measured height. */
 .results > li {
   content-visibility: auto;
-  contain-intrinsic-size: auto 300px;
+  contain-intrinsic-size: auto 220px;
 }
 
 .results[data-view="list"] > li {

@@ -58,9 +58,9 @@ export const BlackHoleResult = ({
       capitalize(blackHoleKindLabel(blackHole)),
       formatBlackHoleMass(blackHole.massSolar),
       formatDistance(blackHole),
+      ...(blackHole.status === "confirmed" ? [] : [capitalize(blackHole.status)]),
     ]}
     onSelect={() => onSelect(blackHole)}
-    subtitle={`${blackHole.catalogDesignation} · ${capitalize(blackHole.status)} · ${blackHole.host}`}
     title={blackHole.name}
     trait={blackHoleNotableTrait(blackHole)}
     visual={<BlackHoleCatalogVisual blackHole={blackHole} />}

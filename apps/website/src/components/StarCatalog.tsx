@@ -61,7 +61,6 @@ const StarResult = ({
       `${formatNumber(star.observation.distanceParsecs, 1)} pc`,
     ]}
     onSelect={() => onSelect(star, cached)}
-    subtitle={`${star.catalogName} · ${star.objectType}`}
     title={star.name}
     trait={starNotableTrait(star)}
     visual={<StarCatalogVisual star={star} />}

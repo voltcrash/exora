@@ -93,7 +93,6 @@ const PlanetResult = ({
       ]}
       {...(hasRenderer(planet) ? {} : { notice: "Exora cannot draw this world yet" })}
       onSelect={() => onSelect(planet, cached)}
-      subtitle={planet.observation.discoveryMethod}
       title={planet.name}
       visual={<PlanetCatalogVisual planet={planet} />}
     />
