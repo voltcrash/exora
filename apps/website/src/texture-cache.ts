@@ -234,7 +234,7 @@ export const getSurfaceDetailTextures = (
           noMipmap: false,
           invertY: false,
           onError: () => {
-            if (fallbackApplied) return;
+            if (fallbackApplied || scene.isDisposed) return;
             fallbackApplied = true;
             failed();
             texture.updateURL(
