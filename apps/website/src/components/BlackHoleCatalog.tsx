@@ -129,7 +129,7 @@ export const BlackHoleCatalog = ({ onSelect }: BlackHoleCatalogProps) => {
           setQuery(value);
         }}
         onRandom={takeMeSomewhere}
-        placeholder="Search by name, catalog ID or host galaxy"
+        placeholder="Search black holes"
         randomLabel="Random horizon"
         resultsId="black-hole-search-results"
         value={query}

@@ -7,7 +7,6 @@ import type { ForgeMode } from "./CustomPlanetBuilder.tsx";
 import { BrandMark } from "./shell/BrandMark.tsx";
 import { Button } from "./ui/Button.tsx";
 import { Icon, type IconName } from "./ui/Icon.tsx";
-import { Kbd } from "./ui/Kbd.tsx";
 import styles from "./DiscoverScreen.module.css";
 
 const BlackHoleCatalog = lazy(() =>
@@ -85,37 +84,14 @@ const NAVIGATION: readonly { label: string; sections: readonly SectionEntry[] }[
   },
 ];
 
-const sectionCopy: Record<DiscoverSection, { title: string; summary: string }> = {
-  solar: {
-    title: "Close to home",
-    summary: "Every planet, the principal moons and the regions between them, from NASA/JPL.",
-  },
-  worlds: {
-    title: "Find another world",
-    summary: "Search the NASA Exoplanet Archive, browse a collection, or filter by physics.",
-  },
-  atlas: {
-    title: "See them all at once",
-    summary:
-      "Every confirmed planet on the planes astronomers read the population from. Hover to identify, click to travel.",
-  },
-  tours: {
-    title: "Take the long way round",
-    summary:
-      "Narrated journeys through real destinations. Every stop is a shareable link, and you can leave at any time.",
-  },
-  stars: {
-    title: "Follow the light",
-    summary: "Search the SIMBAD stellar archive or browse families of stars.",
-  },
-  "black-holes": {
-    title: "Follow the light to its edge",
-    summary: "Observed horizons, from the one at the heart of our galaxy to the heaviest known.",
-  },
-  forge: {
-    title: "Make the next discovery",
-    summary: "Build a world, a star or a black hole from first principles, then step into it.",
-  },
+const sectionTitles: Record<DiscoverSection, string> = {
+  solar: "Solar System",
+  worlds: "Exoplanets",
+  atlas: "Planet atlas",
+  tours: "Guided tours",
+  stars: "Stars",
+  "black-holes": "Black holes",
+  forge: "World Forge",
 };
 
 /*
@@ -166,8 +142,6 @@ export const DiscoverScreen = ({
     stageRef.current?.scrollTo({ top: 0 });
   }, [section]);
 
-  const copy = sectionCopy[section];
-
   return (
     <dialog
       ref={dialogRef}
@@ -203,24 +177,18 @@ export const DiscoverScreen = ({
                   </span>
                   <span className={styles["nav-copy"]} data-testid="discover-nav-copy">
                     <strong>{item.label}</strong>
-                    <small>{item.source}</small>
                   </span>
                 </button>
               ))}
             </div>
           ))}
         </nav>
-
-        <p className={styles["rail-tip"]}>
-          <Kbd>/</Kbd> jumps straight to anywhere by name
-        </p>
       </aside>
 
       <div ref={stageRef} className={styles["stage"]} data-testid="discover-stage">
         <header className={styles["header"]}>
           <div className={styles["header-copy"]}>
-            <h1 id="discover-title">{copy.title}</h1>
-            <p>{copy.summary}</p>
+            <h1 id="discover-title">{sectionTitles[section]}</h1>
           </div>
           <Button
             ref={closeRef}

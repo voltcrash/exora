@@ -28,7 +28,7 @@ test("Explore starts directly in the Exoplanet catalog", async () => {
 
   expect(markup).toContain('aria-label="Explore destinations"');
   expect(markup).toContain('aria-label="Exoplanet catalog"');
-  expect(markup).toContain("Find another world");
+  expect(markup).toContain("Exoplanets");
   for (const icon of ["worlds", "stars", "solar", "black-holes", "atlas", "tours", "forge"]) {
     expect(navigation).toContain(`data-icon="${icon}"`);
   }

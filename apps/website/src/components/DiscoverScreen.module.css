@@ -1,5 +1,5 @@
 .explore {
-  --rail-width: 248px;
+  --rail-width: 208px;
   --stage-gutter: clamp(20px, 4vw, 56px);
 
   position: fixed;
@@ -124,15 +124,11 @@
   place-items: center;
   width: 32px;
   height: 32px;
-  border: 1px solid var(--hairline);
-  border-radius: var(--radius-sm);
   color: var(--ink-3);
 }
 
 .nav-item[aria-current="page"] .nav-icon {
-  border-color: var(--light-line);
   color: var(--light);
-  background: var(--light-wash);
 }
 
 .nav-copy {
@@ -192,7 +188,7 @@
 }
 
 .header h1 {
-  font-size: clamp(var(--text-xl), 2.4vw + 0.8rem, 2.75rem);
+  font-size: var(--text-xl);
   font-stretch: var(--wide);
   font-weight: 360;
   letter-spacing: -0.025em;
@@ -213,49 +209,9 @@
   padding: 0 var(--stage-gutter) calc(var(--safe-bottom) + var(--space-12));
 }
 
-@media (max-width: 960px) {
-  .explore {
-    --rail-width: 76px;
-  }
-
-  .home span,
-  .nav-label,
-  .nav-copy,
-  .rail-tip {
-    display: none;
-  }
-
-  .rail {
-    align-items: center;
-    padding-right: var(--space-2);
-    padding-left: calc(var(--safe-left) + var(--space-2));
-  }
-
-  .home {
-    align-self: center;
-    padding: 4px;
-  }
-
-  .nav-group + .nav-group {
-    padding-top: var(--space-4);
-    border-top: 1px solid var(--hairline);
-  }
-
-  .nav-item {
-    justify-content: center;
-    width: 52px;
-    padding: 6px;
-  }
-
-  .nav-icon {
-    width: 36px;
-    height: 36px;
-  }
-}
-
 /* Phones: the rail becomes a row of tabs under the title. */
 
-@media (max-width: 640px) {
+@media (max-width: 760px) {
   .explore {
     --stage-gutter: 16px;
 
@@ -273,12 +229,14 @@
     border-bottom: 1px solid var(--hairline);
   }
 
-  .home {
+  .home,
+  .nav-label {
     display: none;
   }
 
   .nav {
     display: flex;
+    flex-wrap: wrap;
     gap: 0;
     width: 100%;
     padding: 0 var(--stage-gutter);
@@ -291,9 +249,7 @@
   }
 
   .nav-group {
-    display: flex;
-    flex: none;
-    gap: 0;
+    display: contents;
   }
 
   .nav-group + .nav-group {
@@ -330,7 +286,6 @@
   }
 
   .header {
-    position: static;
     padding-top: var(--space-5);
     padding-bottom: var(--space-4);
   }
