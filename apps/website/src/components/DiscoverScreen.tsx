@@ -1,20 +1,36 @@
 import type { ExoplanetProfile, StarProfile } from "@exora/contracts";
 import type { CustomBlackHole, CustomStar, CustomWorld } from "@exora/worldgen";
-import { useEffect, useRef, useState } from "react";
+import { lazy, Suspense, useEffect, useRef, useState } from "react";
 import type { BlackHoleProfile } from "../black-holes.ts";
 import type { SolarRegionProfile } from "../solar-regions.ts";
-import { WorldForge, type ForgeMode } from "./CustomPlanetBuilder.tsx";
-import { BlackHoleCatalog } from "./BlackHoleCatalog.tsx";
-import { PlanetAtlas } from "./PlanetAtlas.tsx";
-import { PlanetCatalog } from "./PlanetCatalog.tsx";
-import { SolarSystemCatalog } from "./SolarSystemCatalog.tsx";
-import { StarCatalog } from "./StarCatalog.tsx";
-import { TourCatalog } from "./TourCatalog.tsx";
+import type { ForgeMode } from "./CustomPlanetBuilder.tsx";
 import { BrandMark } from "./shell/BrandMark.tsx";
 import { Button } from "./ui/Button.tsx";
 import { Icon, type IconName } from "./ui/Icon.tsx";
 import { Kbd } from "./ui/Kbd.tsx";
 import styles from "./DiscoverScreen.module.css";
+
+const BlackHoleCatalog = lazy(() =>
+  import("./BlackHoleCatalog.tsx").then((module) => ({ default: module.BlackHoleCatalog })),
+);
+const PlanetAtlas = lazy(() =>
+  import("./PlanetAtlas.tsx").then((module) => ({ default: module.PlanetAtlas })),
+);
+const PlanetCatalog = lazy(() =>
+  import("./PlanetCatalog.tsx").then((module) => ({ default: module.PlanetCatalog })),
+);
+const SolarSystemCatalog = lazy(() =>
+  import("./SolarSystemCatalog.tsx").then((module) => ({ default: module.SolarSystemCatalog })),
+);
+const StarCatalog = lazy(() =>
+  import("./StarCatalog.tsx").then((module) => ({ default: module.StarCatalog })),
+);
+const TourCatalog = lazy(() =>
+  import("./TourCatalog.tsx").then((module) => ({ default: module.TourCatalog })),
+);
+const WorldForge = lazy(() =>
+  import("./CustomPlanetBuilder.tsx").then((module) => ({ default: module.WorldForge })),
+);
 
 export type DiscoverSection =
   | "solar"
@@ -218,30 +234,32 @@ export const DiscoverScreen = ({
         </header>
 
         <main className={styles["main"]}>
-          {section === "solar" ? (
-            <SolarSystemCatalog
-              onSelectPlanet={onSelectPlanet}
-              onSelectRegion={onSelectRegion}
-              onSelectStar={onSelectStar}
-            />
-          ) : section === "worlds" ? (
-            <PlanetCatalog onSelect={onSelectPlanet} />
-          ) : section === "atlas" ? (
-            <PlanetAtlas onSelect={onSelectPlanet} />
-          ) : section === "tours" ? (
-            <TourCatalog onStart={onStartTour} />
-          ) : section === "stars" ? (
-            <StarCatalog onSelect={onSelectStar} />
-          ) : section === "black-holes" ? (
-            <BlackHoleCatalog onSelect={onSelectBlackHole} />
-          ) : (
-            <WorldForge
-              initialMode={initialForgeMode}
-              onGenerateBlackHole={onGenerateBlackHole}
-              onGeneratePlanet={onGeneratePlanet}
-              onGenerateStar={onGenerateStar}
-            />
-          )}
+          <Suspense key={section} fallback={<p role="status">Loading destinations…</p>}>
+            {section === "solar" ? (
+              <SolarSystemCatalog
+                onSelectPlanet={onSelectPlanet}
+                onSelectRegion={onSelectRegion}
+                onSelectStar={onSelectStar}
+              />
+            ) : section === "worlds" ? (
+              <PlanetCatalog onSelect={onSelectPlanet} />
+            ) : section === "atlas" ? (
+              <PlanetAtlas onSelect={onSelectPlanet} />
+            ) : section === "tours" ? (
+              <TourCatalog onStart={onStartTour} />
+            ) : section === "stars" ? (
+              <StarCatalog onSelect={onSelectStar} />
+            ) : section === "black-holes" ? (
+              <BlackHoleCatalog onSelect={onSelectBlackHole} />
+            ) : (
+              <WorldForge
+                initialMode={initialForgeMode}
+                onGenerateBlackHole={onGenerateBlackHole}
+                onGeneratePlanet={onGeneratePlanet}
+                onGenerateStar={onGenerateStar}
+              />
+            )}
+          </Suspense>
           <footer className={styles["resources"]}>
             <a href="/about/">About Exora</a>
             <a href="/explore/">Planet profiles and tours</a>
