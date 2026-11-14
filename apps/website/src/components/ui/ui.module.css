@@ -120,6 +120,7 @@
   border-bottom-width: 2px;
   border-radius: 5px;
   color: var(--ink-2);
+  font-family: var(--font-mono);
   font-size: var(--text-2xs);
   font-weight: 500;
   line-height: 1;

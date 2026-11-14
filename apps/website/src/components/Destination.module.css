@@ -185,11 +185,11 @@
   min-width: 0;
   margin: 0;
   color: var(--ink);
+  font-family: var(--font-mono);
   font-size: var(--text-xl);
-  font-stretch: var(--narrow);
   font-variant-numeric: tabular-nums;
-  font-weight: 420;
-  letter-spacing: -0.02em;
+  font-weight: 400;
+  letter-spacing: -0.03em;
   line-height: 1.1;
   white-space: nowrap;
 }
@@ -352,6 +352,7 @@
 
 .fact strong {
   color: var(--ink);
+  font-family: var(--font-mono);
   font-size: var(--text-sm);
   font-variant-numeric: tabular-nums;
   font-weight: 520;
@@ -503,6 +504,7 @@ button.body:hover .body-go {
 
 .frame-rate strong {
   color: var(--ink-3);
+  font-family: var(--font-mono);
   font-variant-numeric: tabular-nums;
   font-weight: 500;
 }

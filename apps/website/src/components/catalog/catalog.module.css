@@ -251,7 +251,8 @@
   gap: 4px 10px;
   padding: var(--space-3) var(--space-4) var(--space-4);
   color: var(--ink-2);
-  font-size: var(--text-xs);
+  font-family: var(--font-mono);
+  font-size: var(--text-2xs);
   font-variant-numeric: tabular-nums;
 }
 
