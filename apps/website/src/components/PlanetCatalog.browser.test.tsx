@@ -76,10 +76,8 @@ test("a failed page keeps its cursor and can be retried", async () => {
   document.body.append(container);
   root = createRoot(container);
   root.render(<PlanetCatalog onSelect={vi.fn()} />);
-  await expect
-    .element(page.getByRole("button", { name: "Retry loading more", exact: true }))
-    .toBeVisible();
-  await userEvent.click(page.getByRole("button", { name: "Retry loading more", exact: true }));
+  await expect.element(page.getByRole("button", { name: "Retry", exact: true })).toBeVisible();
+  await userEvent.click(page.getByRole("button", { name: "Retry", exact: true }));
   await expect.element(page.getByText("Second world", { exact: true })).toBeVisible();
   expect(pages).toBe(2);
 });
