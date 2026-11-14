@@ -28,37 +28,21 @@ type SearchState = "idle" | "loading" | "ready" | "error";
 type SurpriseState = "idle" | "loading" | "error";
 
 const collections = [
-  {
-    id: "closest-neighbors",
-    label: "Closest to home",
-    note: "Our nearest stellar neighbours, ordered by measured parallax.",
-  },
-  {
-    id: "solar-analogs",
-    label: "The Sun's cousins",
-    note: "Nearby main-sequence stars with Sun-like spectra.",
-  },
-  {
-    id: "brightest-stars",
-    label: "Brightest in our sky",
-    note: "The most brilliant stars as seen from Earth.",
-  },
-  {
-    id: "stellar-extremes",
-    label: "Stellar extremes",
-    note: "Rare, massive and extraordinarily hot blue stars.",
-  },
+  { id: "closest-neighbors", label: "Closest to home" },
+  { id: "solar-analogs", label: "The Sun's cousins" },
+  { id: "brightest-stars", label: "Brightest in our sky" },
+  { id: "stellar-extremes", label: "Stellar extremes" },
 ] as const;
 
 const categories = [
-  { id: "nearby-stars", label: "Nearby", note: "Within our stellar neighbourhood." },
-  { id: "sun-like", label: "Sun-like", note: "F and G main-sequence stars." },
-  { id: "red-dwarfs", label: "Red dwarfs", note: "Small, cool and long-lived." },
-  { id: "blue-stars", label: "Blue stars", note: "Hot, luminous stellar giants." },
-  { id: "giants", label: "Giants", note: "Stars in their evolved stages." },
-  { id: "binary-systems", label: "Binaries", note: "Two stars in orbit around each other." },
-  { id: "variable-stars", label: "Variables", note: "Stars whose brightness changes." },
-  { id: "stellar-remnants", label: "Remnants", note: "White dwarfs and pulsars." },
+  { id: "nearby-stars", label: "Nearby" },
+  { id: "sun-like", label: "Sun-like" },
+  { id: "red-dwarfs", label: "Red dwarfs" },
+  { id: "blue-stars", label: "Blue stars" },
+  { id: "giants", label: "Giants" },
+  { id: "binary-systems", label: "Binaries" },
+  { id: "variable-stars", label: "Variables" },
+  { id: "stellar-remnants", label: "Remnants" },
 ] as const;
 
 const StarResult = ({

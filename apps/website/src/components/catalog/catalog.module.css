@@ -126,11 +126,6 @@
   font-weight: 600;
 }
 
-.rail-note {
-  color: var(--ink-3);
-  font-size: var(--text-sm);
-}
-
 /* Toolbar */
 
 .toolbar {

@@ -71,7 +71,6 @@ export const CatalogSearch = ({
 export interface Chip {
   id: string;
   label: string;
-  note?: string;
 }
 
 interface ChipRailProps {
@@ -82,9 +81,8 @@ interface ChipRailProps {
   onSelect: (id: string | null) => void;
 }
 
-/** Collections and kinds as one scrolling row; the active chip's note explains what it holds. */
+/** Collections and kinds as one scrolling row. */
 export const ChipRail = ({ active, allLabel, groups, label, onSelect }: ChipRailProps) => {
-  const note = groups.flatMap((group) => group.chips).find((chip) => chip.id === active)?.note;
   return (
     <div className={styles["rail"]}>
       <div className={styles["chips"]} role="group" aria-label={label}>
@@ -119,7 +117,6 @@ export const ChipRail = ({ active, allLabel, groups, label, onSelect }: ChipRail
           </span>
         ))}
       </div>
-      {note ? <p className={styles["rail-note"]}>{note}</p> : null}
     </div>
   );
 };

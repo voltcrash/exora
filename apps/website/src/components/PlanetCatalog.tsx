@@ -56,41 +56,21 @@ const axisPositionLabel = (value: number, low: string, high: string): string =>
   value < 34 ? low : value > 66 ? high : "Anything";
 
 const collections = [
-  {
-    id: "most-earth-like",
-    label: "Most Earth-like",
-    note: "Rocky worlds closest to Earth's size and estimated temperature.",
-  },
-  {
-    id: "nearest-rocky-worlds",
-    label: "Nearest rocky worlds",
-    note: "The closest small planets in our galactic neighbourhood, nearest first.",
-  },
-  {
-    id: "recently-confirmed",
-    label: "Recently confirmed",
-    note: "The newest confirmed additions to the exoplanet archive.",
-  },
-  {
-    id: "record-breakers",
-    label: "Record breakers",
-    note: "The hottest and most massive worlds in the catalog.",
-  },
+  { id: "most-earth-like", label: "Most Earth-like" },
+  { id: "nearest-rocky-worlds", label: "Nearest rocky worlds" },
+  { id: "recently-confirmed", label: "Recently confirmed" },
+  { id: "record-breakers", label: "Record breakers" },
 ] as const;
 
 const categories = [
-  { id: "earth-like", label: "Earth-like", note: "Familiar size and climate." },
-  {
-    id: "potentially-habitable",
-    label: "Potentially habitable",
-    note: "Temperate rocky candidates.",
-  },
-  { id: "ocean-candidates", label: "Ocean worlds", note: "Worlds that may hold global seas." },
-  { id: "lava-worlds", label: "Lava worlds", note: "Molten, ultra-hot surfaces." },
-  { id: "frozen-worlds", label: "Frozen worlds", note: "Cold, distant frontiers." },
-  { id: "gas-giants", label: "Gas giants", note: "Colossal layers of cloud." },
-  { id: "extreme-weather", label: "Extreme weather", note: "Violent atmospheric systems." },
-  { id: "recently-discovered", label: "Recently discovered", note: "The archive's newest worlds." },
+  { id: "earth-like", label: "Earth-like" },
+  { id: "potentially-habitable", label: "Potentially habitable" },
+  { id: "ocean-candidates", label: "Ocean worlds" },
+  { id: "lava-worlds", label: "Lava worlds" },
+  { id: "frozen-worlds", label: "Frozen worlds" },
+  { id: "gas-giants", label: "Gas giants" },
+  { id: "extreme-weather", label: "Extreme weather" },
+  { id: "recently-discovered", label: "Recently discovered" },
 ] as const;
 
 const PlanetResult = ({
