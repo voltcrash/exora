@@ -11,7 +11,6 @@ import { formatNumber, hasRenderer, planetKindLabel } from "../planet-utils.tsx"
 import {
   DEFAULT_PHYSICAL_PLANET_FILTERS,
   filterPlanetsByPhysicalControls,
-  planetNotableTrait,
   suggestPlanetName,
   type PhysicalPlanetFilters,
 } from "../search-discovery.ts";
@@ -114,9 +113,8 @@ const PlanetResult = ({
       ]}
       {...(hasRenderer(planet) ? {} : { notice: "Exora cannot draw this world yet" })}
       onSelect={() => onSelect(planet, cached)}
-      subtitle={`${planet.hostStar} · ${planet.observation.discoveryMethod}`}
+      subtitle={planet.observation.discoveryMethod}
       title={planet.name}
-      trait={planetNotableTrait(planet)}
       visual={<PlanetCatalogVisual planet={planet} />}
     />
   );
@@ -338,7 +336,7 @@ export const PlanetCatalog = ({ onSelect }: PlanetCatalogProps) => {
           setQuery(value);
         }}
         onRandom={takeMeSomewhere}
-        placeholder="Search by name or catalog ID — misspellings are fine"
+        placeholder="Search planets"
         randomBusy={surpriseState === "loading"}
         randomError={surpriseState === "error"}
         randomLabel="Random world"

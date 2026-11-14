@@ -1,3 +1,4 @@
+import type { SceneHost } from "../../scene-host.ts";
 import { useCallback, useEffect, useRef, useState, type PointerEvent, type ReactNode } from "react";
 import styles from "./shell.module.css";
 
@@ -30,11 +31,35 @@ interface Drag {
  * and is dragged, flicked or tapped between them. Nothing is measured to decide which composition
  * applies, so it renders the same on a server and in a test.
  */
-export const DestinationSheet = ({ children }: { children: ReactNode }) => {
+export const DestinationSheet = ({
+  children,
+  host,
+  inXr,
+}: {
+  children: ReactNode;
+  host: SceneHost | null;
+  inXr: boolean;
+}) => {
   const [snap, setSnap] = useState<SheetSnap>("peek");
   const sheetRef = useRef<HTMLDivElement>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
   const drag = useRef<Drag | null>(null);
+
+  useEffect(() => {
+    if (!host || inXr || snap !== "full") return;
+    const media = window.matchMedia(SHEET_QUERY);
+    let release: (() => void) | undefined;
+    const update = (): void => {
+      release?.();
+      release = media.matches ? host.suspendRendering() : undefined;
+    };
+    update();
+    media.addEventListener("change", update);
+    return () => {
+      media.removeEventListener("change", update);
+      release?.();
+    };
+  }, [host, inXr, snap]);
 
   // The peek is however tall the destination's name runs, so it is measured from the content.
   useEffect(() => {
@@ -56,7 +81,7 @@ export const DestinationSheet = ({ children }: { children: ReactNode }) => {
   }, []);
 
   useEffect(() => {
-    if (snap !== "full") scrollRef.current?.scrollTo({ top: 0 });
+    if (snap === "peek") scrollRef.current?.scrollTo({ top: 0 });
   }, [snap]);
 
   const heights = useCallback((): Record<SheetSnap, number> => {
@@ -65,7 +90,8 @@ export const DestinationSheet = ({ children }: { children: ReactNode }) => {
       ? Number.parseFloat(sheet.style.getPropertyValue("--sheet-peek")) || 170
       : 170;
     const viewport = window.innerHeight;
-    return { full: viewport - 72, half: viewport * 0.56, peek };
+    const full = sheet ? Number.parseFloat(getComputedStyle(sheet).maxHeight) : viewport - 72;
+    return { full, half: Math.min(full, viewport * 0.56), peek: Math.min(full, peek) };
   }, []);
 
   useEffect(() => {
@@ -93,7 +119,7 @@ export const DestinationSheet = ({ children }: { children: ReactNode }) => {
     if (event.pointerType === "mouse" && event.button !== 0) return;
     const target = event.target as HTMLElement;
     // Scrolling content takes the gesture once the sheet is fully open.
-    if (snap === "full" && !target.closest("[data-sheet-grip]")) return;
+    if (snap !== "peek" && !target.closest("[data-sheet-grip]")) return;
     if (target.closest("input, select, textarea, [role='tablist'], [data-sheet-no-drag]")) return;
     const sheet = sheetRef.current;
     if (!sheet) return;
@@ -172,12 +198,23 @@ export const DestinationSheet = ({ children }: { children: ReactNode }) => {
         data-sheet-grip
         type="button"
         aria-expanded={snap !== "peek"}
-        aria-label={snap === "full" ? "Hide destination readings" : "Show destination readings"}
+        aria-label={
+          snap === "full" ? "Collapse destination readings" : "Details: expand destination readings"
+        }
+        aria-controls="destination-sheet-content"
         onClick={() => setSnap(nextSnap)}
       >
         <span aria-hidden="true" />
+        <small>{snap === "full" ? "Collapse" : "Details"}</small>
       </button>
-      <div ref={scrollRef} className={styles["sheet-scroll"]}>
+      <div
+        id="destination-sheet-content"
+        ref={scrollRef}
+        className={styles["sheet-scroll"]}
+        onFocusCapture={() => {
+          if (snap === "peek" && window.matchMedia(SHEET_QUERY).matches) setSnap("full");
+        }}
+      >
         {children}
       </div>
     </div>

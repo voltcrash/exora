@@ -6,6 +6,11 @@ import { PlanetCatalog } from "./PlanetCatalog.tsx";
 import "../styles/tokens.css";
 import "../styles/globals.css";
 
+vi.mock("../planet-catalog.ts", async (importOriginal) => {
+  const original = await importOriginal<typeof import("../planet-catalog.ts")>();
+  return { ...original, loadPlanetCatalog: () => original.loadPlanetCatalog(fetch) };
+});
+
 let root: Root | undefined;
 let container: HTMLDivElement | undefined;
 

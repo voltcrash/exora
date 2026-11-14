@@ -4,7 +4,6 @@ import { capitalize, readable } from "../readable.ts";
 import { bindStyles } from "../styles/bind-styles.ts";
 import { onWebFontsSettled } from "../web-fonts.ts";
 import { Button } from "./ui/Button.tsx";
-import { Icon } from "./ui/Icon.tsx";
 import { Spinner } from "./ui/Spinner.tsx";
 import styles from "./Destination.module.css";
 
@@ -78,8 +77,6 @@ export const DestinationIdentity = ({
   links = [],
   name,
   nameId,
-  note,
-  summary,
   tags,
   tagsLabel,
   tone,
@@ -134,13 +131,13 @@ export const DestinationIdentity = ({
           {name}
         </h1>
         <ul className={cx("identity-tags")} aria-label={tagsLabel} data-sheet-peek-end>
-          {tags.map((tag) => (
-            <li key={tag}>{readable(tag)}</li>
-          ))}
+          {tags
+            .filter((tag) => readable(tag).toLowerCase() !== readable(classification).toLowerCase())
+            .map((tag) => (
+              <li key={tag}>{readable(tag)}</li>
+            ))}
         </ul>
       </div>
-
-      <p className={cx("identity-summary")}>{summary}</p>
 
       {links.length > 0 ? (
         <nav className={cx("identity-next")} aria-label="Go from here">
@@ -154,13 +151,6 @@ export const DestinationIdentity = ({
           {link.error}
         </p>
       ))}
-
-      {note ? (
-        <p className={cx("identity-note")}>
-          <Icon name="info" size={14} />
-          <span>{readable(note)}</span>
-        </p>
-      ) : null}
     </section>
   );
 };

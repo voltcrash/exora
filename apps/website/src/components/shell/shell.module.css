@@ -8,9 +8,7 @@
 }
 
 .space-haze {
-  background:
-    radial-gradient(ellipse 70% 60% at 50% 45%, transparent 40%, rgb(0 0 0 / 55%) 100%),
-    linear-gradient(to top, rgb(0 0 0 / 55%), transparent 38%);
+  background: linear-gradient(to top, rgb(0 0 0 / 45%), transparent 28%);
 }
 
 .surface-veil {
@@ -96,27 +94,6 @@
 .chrome-hidden:not(.travelling) .restore {
   visibility: visible;
   opacity: 1;
-}
-
-/*
- * On a surface the horizon is the point, so the chrome steps back until it is reached for. The
- * sheet has no box of its own on a wide screen, so its children are what fade.
- */
-:global(.view-surface) .topbar,
-:global(.view-surface) .sheet-scroll > *,
-:global(.view-surface) .hints {
-  opacity: 0.38;
-}
-
-:global(.view-surface) .topbar:hover,
-:global(.view-surface) .topbar:focus-within,
-:global(.view-surface) .sheet-scroll > *:hover,
-:global(.view-surface) .sheet-scroll > *:focus-within {
-  opacity: 1;
-}
-
-.sheet-scroll > * {
-  transition: opacity var(--duration) var(--ease);
 }
 
 /* Top bar */
@@ -352,7 +329,7 @@
   font-size: var(--text-sm);
 }
 
-/* The copy is withheld rather than drawn in the platform sans and redrawn once Archivo lands. */
+/* The copy is withheld rather than drawn in the platform sans and redrawn once the web font lands. */
 .loading p,
 .loading small {
   opacity: 0;
@@ -387,13 +364,10 @@
   }
 
   .search {
-    justify-self: end;
-    width: var(--control-height);
-    padding: 0;
-    justify-content: center;
+    width: 100%;
+    padding: 0 var(--space-3);
   }
 
-  .search-label,
   .search-keys {
     display: none;
   }
@@ -403,7 +377,6 @@
   }
 
   /* Icon-only on a phone, but the label stays as the button's accessible name. */
-  .explore > span,
   .xr > span {
     position: absolute;
     width: 1px;
@@ -413,7 +386,6 @@
     white-space: nowrap;
   }
 
-  .explore,
   .xr {
     width: var(--control-height);
     padding: 0;
@@ -458,8 +430,11 @@
     flex: none;
     place-items: center;
     width: 100%;
-    height: 22px;
-    padding: 0;
+    height: 36px;
+    gap: 3px;
+    padding: 6px 0;
+    color: var(--ink-2);
+    font-size: var(--text-xs);
     border: 0;
     background: none;
   }
@@ -486,7 +461,7 @@
     touch-action: none;
   }
 
-  .sheet[data-snap="full"] .sheet-scroll {
+  .sheet:not([data-snap="peek"]) .sheet-scroll {
     overflow-y: auto;
     touch-action: pan-y;
   }

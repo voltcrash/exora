@@ -1,9 +1,10 @@
-import { useEffect, useState } from "react";
+import type { SceneHost } from "../scene-host.ts";
+import { useEffect, useId, useState } from "react";
 import type { DestinationPanelModel, PanelBlock } from "../destination-panel.ts";
 import { readable, readableUnit } from "../readable.ts";
 import { bindStyles } from "../styles/bind-styles.ts";
 import { useTabList } from "../use-tab-list.ts";
-import { FrameRateSignal } from "./FrameRateSignal.tsx";
+import { LiveFrameRateSignal } from "./FrameRateSignal.tsx";
 import { ShareButton } from "./ShareButton.tsx";
 import { Icon } from "./ui/Icon.tsx";
 import { TabBar } from "./ui/TabBar.tsx";
@@ -102,8 +103,10 @@ const PanelBlockView = ({ block }: { block: PanelBlock }) => {
 };
 
 interface DestinationPanelProps {
-  fps: string;
+  host: SceneHost | null;
   model: DestinationPanelModel;
+  summary: string;
+  note: string;
 }
 
 /*
@@ -113,7 +116,9 @@ interface DestinationPanelProps {
  * sections costs exactly as much screen as a black hole with one. On a wide screen it is an
  * inspector down the right edge; on a phone it is the lower part of the destination sheet.
  */
-export const DestinationPanel = ({ fps, model }: DestinationPanelProps) => {
+export const DestinationPanel = ({ host, model, summary, note }: DestinationPanelProps) => {
+  const [expanded, setExpanded] = useState(false);
+  const drawerId = useId();
   const [requested, setRequested] = useState("");
   const tabs = model.tabs;
   const active = tabs.find((tab) => tab.id === requested) ?? tabs[0];
@@ -130,7 +135,12 @@ export const DestinationPanel = ({ fps, model }: DestinationPanelProps) => {
   const tabbed = tabs.length > 1;
 
   return (
-    <aside className={cx("panel")} data-testid="telemetry" aria-label={model.label}>
+    <aside
+      className={cx("panel")}
+      data-testid="telemetry"
+      aria-label={model.label}
+      data-expanded={expanded}
+    >
       <header className={cx("panel-head")}>
         <div>
           <p className={cx("panel-source")}>{readable(model.source)}</p>
@@ -155,7 +165,19 @@ export const DestinationPanel = ({ fps, model }: DestinationPanelProps) => {
         ))}
       </dl>
 
-      <div className={cx("panel-drawer")} data-testid="panel-drawer">
+      {note ? <p className={cx("panel-note")}>{readable(note)}</p> : null}
+
+      <button
+        className={cx("panel-toggle")}
+        type="button"
+        aria-expanded={expanded}
+        aria-controls={drawerId}
+        onClick={() => setExpanded((open) => !open)}
+      >
+        {expanded ? "Hide details" : "Show details"}
+        <Icon name={expanded ? "chevron-up" : "chevron-down"} size={16} />
+      </button>
+      <div className={cx("panel-drawer")} id={drawerId} data-testid="panel-drawer">
         {tabbed ? (
           <TabBar
             api={tabList}
@@ -170,6 +192,11 @@ export const DestinationPanel = ({ fps, model }: DestinationPanelProps) => {
             data-testid="panel-body"
             {...(tabbed ? tabList.panelProps(active.id) : {})}
           >
+            {active.id === tabs[0]?.id ? (
+              <div className={cx("panel-about")}>
+                <p>{summary}</p>
+              </div>
+            ) : null}
             {active.blocks.map((block, index) => (
               <PanelBlockView key={`${block.type}-${String(index)}`} block={block} />
             ))}
@@ -178,7 +205,7 @@ export const DestinationPanel = ({ fps, model }: DestinationPanelProps) => {
 
         <footer className={cx("panel-foot")}>
           <p>{typeof model.footer === "string" ? readable(model.footer) : model.footer}</p>
-          <FrameRateSignal fps={fps} />
+          <LiveFrameRateSignal host={host} />
         </footer>
       </div>
     </aside>

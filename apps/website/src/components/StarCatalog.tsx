@@ -266,7 +266,7 @@ export const StarCatalog = ({ onSelect }: StarCatalogProps) => {
           setQuery(value);
         }}
         onRandom={takeMeSomewhere}
-        placeholder="Search by common name or catalog ID — misspellings are fine"
+        placeholder="Search stars"
         randomBusy={surpriseState === "loading"}
         randomError={surpriseState === "error"}
         randomLabel="Random star"

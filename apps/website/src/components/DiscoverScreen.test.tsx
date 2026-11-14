@@ -1,9 +1,9 @@
-import { renderToStaticMarkup } from "react-dom/server";
+import { renderToReadableStream } from "react-dom/server";
 import { expect, test, vi } from "vite-plus/test";
 import { DiscoverScreen, type DiscoverSection } from "./DiscoverScreen.tsx";
 
-const discoverMarkup = (initialSection?: DiscoverSection): string =>
-  renderToStaticMarkup(
+const discoverMarkup = async (initialSection?: DiscoverSection): Promise<string> => {
+  const stream = await renderToReadableStream(
     <DiscoverScreen
       initialForgeMode="planet"
       {...(initialSection ? { initialSection } : {})}
@@ -18,14 +18,17 @@ const discoverMarkup = (initialSection?: DiscoverSection): string =>
       onStartTour={vi.fn()}
     />,
   );
+  await stream.allReady;
+  return (await new Response(stream).text()).replaceAll(/<!--.*?-->/g, "");
+};
 
-test("Explore starts directly in the Exoplanet catalog", () => {
-  const markup = discoverMarkup();
+test("Explore starts directly in the Exoplanet catalog", async () => {
+  const markup = await discoverMarkup();
   const navigation = markup.slice(markup.indexOf("<nav"), markup.indexOf("</nav>"));
 
   expect(markup).toContain('aria-label="Explore destinations"');
   expect(markup).toContain('aria-label="Exoplanet catalog"');
-  expect(markup).toContain("Find another world");
+  expect(markup).toContain("Exoplanets");
   for (const icon of ["worlds", "stars", "solar", "black-holes", "atlas", "tours", "forge"]) {
     expect(navigation).toContain(`data-icon="${icon}"`);
   }
@@ -35,16 +38,16 @@ test("Explore starts directly in the Exoplanet catalog", () => {
   expect(navigation).toContain('aria-current="page"');
 });
 
-test("the Solar System catalog keeps its regions", () => {
-  const markup = discoverMarkup("solar");
+test("the Solar System catalog keeps its regions", async () => {
+  const markup = await discoverMarkup("solar");
 
   expect(markup).toContain("Regions · statistical populations and measured boundaries");
   expect(markup).not.toContain("Missions · optional trajectories and exploration sites");
   expect(markup).not.toContain("Comets · measured nuclei and simulated activity");
 });
 
-test("the black-hole catalog lists the five sourced landmarks", () => {
-  const markup = discoverMarkup("black-holes");
+test("the black-hole catalog lists the five sourced landmarks", async () => {
+  const markup = await discoverMarkup("black-holes");
 
   expect(markup).toContain('aria-label="Black hole catalog"');
   for (const name of ["Sagittarius A*", "M87*", "TON 618", "Cygnus X-1", "Gaia BH1"]) {
@@ -52,13 +55,13 @@ test("the black-hole catalog lists the five sourced landmarks", () => {
   }
 });
 
-test("search leads every searchable catalog, with a way to be surprised beside it", () => {
+test("search leads every searchable catalog, with a way to be surprised beside it", async () => {
   for (const [section, random] of [
     ["worlds", "Random world"],
     ["stars", "Random star"],
     ["black-holes", "Random horizon"],
   ] as const) {
-    const markup = discoverMarkup(section);
+    const markup = await discoverMarkup(section);
     const searchPosition = markup.indexOf('type="search"');
     const collectionsPosition = markup.indexOf("All ");
 
@@ -69,8 +72,8 @@ test("search leads every searchable catalog, with a way to be surprised beside i
   }
 });
 
-test("collections and kinds share one rail, with everything selected first", () => {
-  const markup = discoverMarkup("worlds");
+test("collections and kinds share one rail, with everything selected first", async () => {
+  const markup = await discoverMarkup("worlds");
 
   expect(markup).toContain('aria-label="Planet collections"');
   expect(markup).toMatch(/aria-pressed="true"[^>]*>All worlds</);
@@ -78,16 +81,16 @@ test("collections and kinds share one rail, with everything selected first", () 
   expect(markup).toContain("Lava worlds");
 });
 
-test("a catalog is a named region inside the full-screen dialog", () => {
-  const markup = discoverMarkup("worlds");
+test("a catalog is a named region inside the full-screen dialog", async () => {
+  const markup = await discoverMarkup("worlds");
 
   expect(markup).toContain('aria-label="Exoplanet catalog"');
   expect(markup).not.toContain("<dialog id=");
   expect(markup).toContain('aria-label="Close Explore"');
 });
 
-test("Explore lists the guided tours with their first and last stops", () => {
-  const markup = discoverMarkup("tours");
+test("Explore lists the guided tours with their first and last stops", async () => {
+  const markup = await discoverMarkup("tours");
 
   expect(markup).toContain("Guided Tours");
   expect(markup).toContain("Home to the edge");
