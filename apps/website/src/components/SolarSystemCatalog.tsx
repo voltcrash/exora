@@ -1,6 +1,5 @@
 import type { ExoplanetProfile, StarProfile } from "@exora/contracts";
 import { useMemo, useState } from "react";
-import { capitalize } from "../readable.ts";
 import type { SolarRegionProfile } from "../solar-regions.ts";
 import { SOLAR_SYSTEM_REGIONS } from "../solar-regions.ts";
 import { SOLAR_SYSTEM_CATALOG_GROUPS } from "../solar-system.ts";
@@ -113,7 +112,6 @@ export const SolarSystemCatalog = ({
                     />
                     <span className={styles["body-copy"]}>
                       <strong>{entry.profile.name}</strong>
-                      <small>{capitalize(identity?.bodyType.replace("-", " ") ?? "body")}</small>
                     </span>
                   </button>
                 </li>
@@ -139,7 +137,6 @@ export const SolarSystemCatalog = ({
                   </span>
                   <span className={styles["body-copy"]}>
                     <strong>{region.name}</strong>
-                    <small>Region</small>
                   </span>
                 </button>
               </li>
