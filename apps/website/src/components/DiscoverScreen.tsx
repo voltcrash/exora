@@ -216,7 +216,6 @@ export const DiscoverScreen = ({
 
         <main className={styles["main"]}>
           <Suspense
-            key={section}
             fallback={
               <p className={styles["loading"]} role="status" aria-label="Loading destinations…">
                 <Spinner size={20} />
