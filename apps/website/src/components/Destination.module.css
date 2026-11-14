@@ -110,32 +110,9 @@
       var(--space-4)
   );
   border: 1px solid var(--hairline);
-  border-radius: var(--radius-lg);
+  border-radius: var(--radius-md);
   background: var(--surface);
-  box-shadow: var(--shadow-float);
   pointer-events: auto;
-}
-
-.panel-head {
-  display: flex;
-  flex: none;
-  align-items: flex-start;
-  justify-content: space-between;
-  gap: var(--space-3);
-  padding: var(--space-4) var(--space-3) 0 var(--space-5);
-}
-
-.panel-source {
-  color: var(--ink-3);
-  font-size: var(--text-xs);
-}
-
-.panel-title {
-  margin-top: 2px;
-  color: var(--ink);
-  font-size: var(--text-md);
-  font-weight: 600;
-  letter-spacing: -0.005em;
 }
 
 .metrics {
@@ -143,7 +120,7 @@
   flex: none;
   grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: var(--space-4);
-  margin: var(--space-4) var(--space-5);
+  margin: var(--space-5);
 }
 
 .metric {
@@ -199,15 +176,23 @@
   font-size: 0.75em;
 }
 
+.panel-bar {
+  display: flex;
+  flex: none;
+  align-items: center;
+  padding-right: var(--space-2);
+  border-top: 1px solid var(--hairline);
+}
+
 .panel-toggle {
   display: flex;
+  flex: 1;
   align-items: center;
   justify-content: space-between;
   gap: var(--space-2);
   min-height: var(--control-height);
-  padding: 0 var(--space-5);
+  padding: 0 var(--space-3) 0 var(--space-5);
   border: 0;
-  border-top: 1px solid var(--hairline);
   color: var(--ink-2);
   background: none;
   font-size: var(--text-sm);
@@ -576,21 +561,24 @@ button.body:hover .body-go {
     border: 0;
     border-radius: 0;
     background: none;
-    box-shadow: none;
-  }
-
-  .panel-head {
-    padding: var(--space-5) 0 0;
-    border-top: 1px solid var(--hairline);
   }
 
   .metrics {
-    margin: var(--space-4) 0 0;
+    margin: 0;
+    padding-top: var(--space-5);
+    border-top: 1px solid var(--hairline);
   }
 
   .panel-note {
     margin-right: 0;
     margin-left: 0;
+  }
+
+  .panel-bar {
+    justify-content: flex-end;
+    margin-top: var(--space-3);
+    padding: 0;
+    border: 0;
   }
 
   .panel-toggle {

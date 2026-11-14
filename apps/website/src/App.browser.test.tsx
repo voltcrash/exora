@@ -538,9 +538,11 @@ test("readings stay out of the scene until opened and release the renderer when 
   } else {
     const drawer = page.getByTestId("panel-drawer");
     await expect.element(drawer).not.toBeVisible();
-    await userEvent.click(page.getByRole("button", { name: "Show details", exact: true }));
+    const details = page.getByRole("button", { name: "Details", exact: true });
+    await userEvent.click(details);
     await expect.element(drawer).toBeVisible();
-    await userEvent.click(page.getByRole("button", { name: "Hide details", exact: true }));
+    await expect.element(details).toHaveAttribute("aria-expanded", "true");
+    await userEvent.click(details);
     await expect.element(drawer).not.toBeVisible();
   }
 });
