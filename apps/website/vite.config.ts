@@ -1,5 +1,6 @@
 import { defineConfig, loadEnv, type Plugin } from "vite-plus";
-import react from "@vitejs/plugin-react";
+import babel from "@rolldown/plugin-babel";
+import react, { reactCompilerPreset } from "@vitejs/plugin-react";
 import { playwright } from "vite-plus/test/browser-playwright";
 import { discoveryPages } from "./discovery/plugin.ts";
 import { VARIANT_LAUNCH_INITIALIZER } from "./variant-launch-embed.ts";
@@ -100,7 +101,15 @@ export default defineConfig(({ mode }) => {
         },
       },
     },
-    plugins: [variantLaunchSdk(variantLaunchKey), react(), dropWebGpuShaders(), discoveryPages()],
+    plugins: [
+      variantLaunchSdk(variantLaunchKey),
+      react(),
+      // The compiler memoises components and hooks, so a scene readout or search keystroke
+      // re-renders only what it changed instead of whole destination trees.
+      babel({ presets: [reactCompilerPreset()] }),
+      dropWebGpuShaders(),
+      discoveryPages(),
+    ],
     server: {
       proxy: {
         "/api": {

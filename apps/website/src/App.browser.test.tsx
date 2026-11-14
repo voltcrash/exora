@@ -418,13 +418,29 @@ const openPanelSection = async (name: string): Promise<void> => {
   await userEvent.click(section);
 };
 
+// Section switches are transitions, so the previous section stays mounted until the next is ready.
+const settleDiscoverSection = async (name: string): Promise<void> => {
+  await expect
+    .poll(() => document.querySelector("#discover-title")?.textContent?.toLowerCase())
+    .toBe(
+      { atlas: "planet atlas", "guided tours": "guided tours" }[name.toLowerCase()] ??
+        name.toLowerCase(),
+    );
+  await expect
+    .poll(() => document.querySelector('[data-testid="discover-stage"]')?.hasAttribute("aria-busy"))
+    .toBe(false);
+  await expect
+    .element(page.getByRole("status", { name: "Loading destinations…" }))
+    .not.toBeInTheDocument();
+};
+
 const openDiscoverSection = async (
   name: "Black Holes" | "Exoplanets" | "Solar System" | "Stars" | "World Forge",
 ): Promise<void> => {
   await userEvent.click(page.getByRole("button", { exact: true, name: "Explore" }));
   await expect.element(page.getByRole("dialog", { name: /Exoplanets/ })).toBeVisible();
   await userEvent.click(page.getByRole("button", { name: new RegExp(name) }).first());
-  await expect.element(page.getByText("Loading destinations…")).not.toBeInTheDocument();
+  await settleDiscoverSection(name);
 };
 
 beforeEach(() => {
@@ -538,9 +554,11 @@ test("readings stay out of the scene until opened and release the renderer when 
   } else {
     const drawer = page.getByTestId("panel-drawer");
     await expect.element(drawer).not.toBeVisible();
-    await userEvent.click(page.getByRole("button", { name: "Show details", exact: true }));
+    const details = page.getByRole("button", { name: "Details", exact: true });
+    await userEvent.click(details);
     await expect.element(drawer).toBeVisible();
-    await userEvent.click(page.getByRole("button", { name: "Hide details", exact: true }));
+    await expect.element(details).toHaveAttribute("aria-expanded", "true");
+    await userEvent.click(details);
     await expect.element(drawer).not.toBeVisible();
   }
 });
@@ -774,7 +792,7 @@ desktopTest("the atlas folds archive candidates in beside the curated horizons",
 
   const candidate = page.getByRole("button", { name: /GS 2023\+338/ });
   await expect.element(candidate).toBeVisible();
-  await expect.element(page.getByText(/· Candidate ·/).first()).toBeVisible();
+  await expect.element(page.getByText("Candidate", { exact: true }).first()).toBeVisible();
   await expect.element(page.getByText("Mass unavailable").first()).toBeVisible();
   await expect.element(page.getByRole("button", { name: /Sagittarius A\*/ })).toBeVisible();
 });
@@ -837,7 +855,7 @@ desktopTest(
 
     await openDiscoverSection("Solar System");
     await userEvent.click(page.getByRole("button", { exact: true, name: "Regions" }));
-    await userEvent.fill(page.getByPlaceholder("Search by name or SPK ID"), "Oort");
+    await userEvent.fill(page.getByPlaceholder("Search"), "Oort");
     const oortCloud = page.getByRole("button", { name: /Oort Cloud/ });
     await expect.element(oortCloud).toBeVisible();
     await userEvent.click(oortCloud);
@@ -1277,6 +1295,7 @@ desktopTest("Explore resets its scroll position when changing sections", async (
   expect(discoverStage.scrollTop).toBeGreaterThan(0);
 
   await userEvent.click(page.getByRole("button", { name: /Stars/ }).first());
+  await settleDiscoverSection("Stars");
   await expect.poll(() => discoverStage.scrollTop).toBe(0);
 });
 
@@ -1297,8 +1316,9 @@ test("Explore content fits the mobile viewport in every section", async () => {
     "World Forge",
   ] as const) {
     await userEvent.click(page.getByRole("button", { name: new RegExp(section) }).first());
+    await settleDiscoverSection(section);
     const stage = document.querySelector<HTMLElement>('[data-testid="discover-stage"]')!;
-    expect(stage.scrollWidth).toBeLessThanOrEqual(stage.clientWidth);
+    expect(stage.scrollWidth, section).toBeLessThanOrEqual(stage.clientWidth);
   }
 });
 

@@ -1,5 +1,5 @@
 .explore {
-  --rail-width: 208px;
+  --rail-width: 196px;
   --stage-gutter: clamp(20px, 4vw, 56px);
 
   position: fixed;
@@ -18,7 +18,7 @@
   background:
     radial-gradient(ellipse 60% 40% at 70% 0%, rgb(var(--light-rgb) / 5%), transparent 70%),
     var(--surface-solid);
-  animation: explore-in var(--duration-slow) var(--ease);
+  animation: explore-in var(--duration-fast) var(--ease);
 }
 
 .explore::backdrop {
@@ -34,19 +34,30 @@
 /* Rail */
 
 .resources {
-  display: flex;
-  flex-wrap: wrap;
-  gap: var(--space-4);
-  margin-top: var(--space-6);
-  padding-top: var(--space-4);
-  border-top: 1px solid var(--hairline);
-  color: var(--ink);
-  font-size: var(--text-sm);
+  display: grid;
+  gap: var(--space-1);
+  margin-top: auto;
+  padding: 0 var(--space-3);
+  font-size: var(--text-xs);
 }
 
 .resources a {
-  padding: var(--space-2) 0;
-  text-underline-offset: 4px;
+  padding: var(--space-1) 0;
+  color: var(--ink-3);
+  text-decoration: none;
+}
+
+.resources a:hover {
+  color: var(--ink);
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+
+.loading {
+  display: grid;
+  place-items: center;
+  padding: var(--space-12) 0;
+  color: var(--ink-3);
 }
 
 .rail {
@@ -76,7 +87,7 @@
 
 .nav {
   display: grid;
-  gap: var(--space-5);
+  gap: var(--space-3);
 }
 
 .nav-group {
@@ -84,11 +95,9 @@
   gap: 2px;
 }
 
-.nav-label {
-  padding: 0 var(--space-3) var(--space-2);
-  color: var(--ink-4);
-  font-size: var(--text-xs);
-  font-weight: 500;
+.nav-group + .nav-group {
+  padding-top: var(--space-3);
+  border-top: 1px solid var(--hairline);
 }
 
 .nav-item {
@@ -96,8 +105,8 @@
   align-items: center;
   gap: var(--space-3);
   width: 100%;
-  min-height: 48px;
-  padding: 6px var(--space-3);
+  min-height: 40px;
+  padding: 4px var(--space-2);
   border: 0;
   border-radius: var(--radius-sm);
   color: var(--ink-2);
@@ -122,8 +131,8 @@
   display: grid;
   flex: none;
   place-items: center;
-  width: 32px;
-  height: 32px;
+  width: 24px;
+  height: 24px;
   color: var(--ink-3);
 }
 
@@ -138,25 +147,7 @@
 
 .nav-copy strong {
   font-size: var(--text-sm);
-  font-weight: 520;
-}
-
-.nav-copy small {
-  overflow: hidden;
-  color: var(--ink-3);
-  font-size: var(--text-xs);
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.rail-tip {
-  display: flex;
-  align-items: center;
-  gap: var(--space-2);
-  margin-top: auto;
-  padding: 0 var(--space-3);
-  color: var(--ink-3);
-  font-size: var(--text-xs);
+  font-weight: 500;
 }
 
 /* Stage */
@@ -164,9 +155,14 @@
 .stage {
   min-width: 0;
   min-height: 0;
+  transition: opacity var(--duration-fast) var(--ease);
   overflow-y: auto;
   overscroll-behavior: contain;
   scrollbar-color: var(--hairline-strong) transparent;
+}
+
+.stage[aria-busy="true"] {
+  opacity: 0.6;
 }
 
 .header {
@@ -177,7 +173,7 @@
   align-items: flex-start;
   justify-content: space-between;
   gap: var(--space-6);
-  padding: calc(var(--safe-top) + var(--space-8)) var(--stage-gutter) var(--space-6);
+  padding: calc(var(--safe-top) + var(--space-6)) var(--stage-gutter) var(--space-5);
   background: linear-gradient(var(--surface-solid) 78%, transparent);
 }
 
@@ -190,7 +186,7 @@
 .header h1 {
   font-size: var(--text-xl);
   font-stretch: var(--wide);
-  font-weight: 360;
+  font-weight: 300;
   letter-spacing: -0.025em;
   line-height: 1.05;
   text-wrap: balance;
@@ -230,18 +226,19 @@
   }
 
   .home,
-  .nav-label {
+  .resources {
     display: none;
   }
 
   .nav {
     display: flex;
-    flex-wrap: wrap;
+    flex-wrap: nowrap;
     gap: 0;
     width: 100%;
-    padding: 0 var(--stage-gutter);
+    padding: 0 60px 0 var(--space-1);
     overflow-x: auto;
     scrollbar-width: none;
+    mask-image: linear-gradient(to right, #000 calc(100% - 84px), transparent calc(100% - 52px));
   }
 
   .nav::-webkit-scrollbar {
@@ -253,8 +250,11 @@
   }
 
   .nav-group + .nav-group {
+    margin-left: var(--space-1);
     padding-top: 0;
+    padding-left: var(--space-1);
     border-top: 0;
+    border-left: 0;
   }
 
   .nav-item {
@@ -280,14 +280,30 @@
     display: grid;
   }
 
-  .nav-copy small,
   .nav-icon {
     display: none;
   }
 
+  /* The active tab already names the section, so the title is left to screen readers. */
   .header {
-    padding-top: var(--space-5);
-    padding-bottom: var(--space-4);
+    position: absolute;
+    top: calc(var(--safe-top) + var(--space-1));
+    right: var(--space-2);
+    padding: 0;
+    background: none;
+  }
+
+  .header-copy {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip-path: inset(50%);
+    white-space: nowrap;
+  }
+
+  .main {
+    padding-top: var(--space-4);
   }
 
   .header p {

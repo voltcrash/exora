@@ -161,13 +161,13 @@ const SeedField = ({ onChange, value }: { onChange: (seed: number) => void; valu
 );
 
 const spectralClass = (temperatureKelvin: number): string => {
-  if (temperatureKelvin >= 30_000) return "Class O · blue";
-  if (temperatureKelvin >= 10_000) return "Class B · blue-white";
-  if (temperatureKelvin >= 7_500) return "Class A · white";
-  if (temperatureKelvin >= 6_000) return "Class F · yellow-white";
-  if (temperatureKelvin >= 5_200) return "Class G · yellow";
-  if (temperatureKelvin >= 3_700) return "Class K · orange";
-  return "Class M · red";
+  if (temperatureKelvin >= 30_000) return "O";
+  if (temperatureKelvin >= 10_000) return "B";
+  if (temperatureKelvin >= 7_500) return "A";
+  if (temperatureKelvin >= 6_000) return "F";
+  if (temperatureKelvin >= 5_200) return "G";
+  if (temperatureKelvin >= 3_700) return "K";
+  return "M";
 };
 
 const blackHoleMass = ({ kind, mass }: CustomBlackHoleParameters): number => {
@@ -242,12 +242,6 @@ export const WorldForge = ({
         ? `${(2.1 + world.radius * 4.2).toFixed(1)} R⊕`
         : `${(0.72 + world.radius * 1.18).toFixed(2)} RJ`;
   const radiusLabel = radiusLabelFor(parameters);
-  const previewCaption =
-    mode === "planet"
-      ? `${draftWorld.name || "Untitled world"} · ${radiusLabelFor(draftWorld)} · ${String(draftWorld.temperatureKelvin)} K`
-      : mode === "star"
-        ? `${draftStar.name || "Untitled star"} · ${spectralClass(draftStar.temperatureKelvin)}`
-        : `${draftBlackHole.name || "Untitled horizon"} · ${blackHoleMassLabel(draftBlackHole)}`;
 
   return (
     <section className={styles["forge"]} data-testid="planet-builder" aria-label="World Forge">
@@ -277,7 +271,6 @@ export const WorldForge = ({
         <div className={styles["body"]} data-style-role="builder-body" {...tabs.panelProps(mode)}>
           <figure className={styles["preview"]}>
             <div className={styles["preview-visual"]}>{preview}</div>
-            <figcaption>{previewCaption}</figcaption>
           </figure>
 
           {mode === "planet" ? (
@@ -424,7 +417,7 @@ export const WorldForge = ({
                   max={40_000}
                   step={100}
                   value={starParameters.temperatureKelvin}
-                  valueLabel={`${starParameters.temperatureKelvin.toLocaleString()} K`}
+                  valueLabel={`${starParameters.temperatureKelvin.toLocaleString()} K · ${spectralClass(starParameters.temperatureKelvin)}`}
                   onChange={(value) => updateStar("temperatureKelvin", value)}
                 />
                 <RangeControl
@@ -526,7 +519,6 @@ export const WorldForge = ({
         </div>
 
         <footer className={styles["footer"]} data-style-role="builder-footer">
-          <p>Opens in the viewer with a link that rebuilds exactly this object.</p>
           <Button type="submit" variant="primary" icon="sparkle">
             Generate {mode === "planet" ? "planet" : mode === "star" ? "star" : "black hole"}
           </Button>

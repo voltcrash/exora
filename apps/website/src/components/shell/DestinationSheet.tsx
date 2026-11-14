@@ -198,14 +198,11 @@ export const DestinationSheet = ({
         data-sheet-grip
         type="button"
         aria-expanded={snap !== "peek"}
-        aria-label={
-          snap === "full" ? "Collapse destination readings" : "Details: expand destination readings"
-        }
+        aria-label={snap === "full" ? "Collapse readings" : "Expand readings"}
         aria-controls="destination-sheet-content"
         onClick={() => setSnap(nextSnap)}
       >
         <span aria-hidden="true" />
-        <small>{snap === "full" ? "Collapse" : "Details"}</small>
       </button>
       <div
         id="destination-sheet-content"

@@ -10,7 +10,7 @@ import {
 import { planetKindLabel } from "../planet-utils.tsx";
 import { TOURS } from "../tours.ts";
 import { Icon, type IconName } from "./ui/Icon.tsx";
-import { Kbd, MODIFIER_KEY } from "./ui/Kbd.tsx";
+import { Kbd } from "./ui/Kbd.tsx";
 import { Spinner } from "./ui/Spinner.tsx";
 import styles from "./CommandPalette.module.css";
 import { bindStyles } from "../styles/bind-styles.ts";
@@ -21,7 +21,7 @@ const REMOTE_DELAY_MS = 220;
 
 const ACTIONS: readonly PaletteEntry[] = [
   {
-    detail: "Browse every catalogue, the Solar System and World Forge",
+    detail: "",
     group: "Actions",
     id: "action-discover",
     keywords: ["browse", "catalog", "catalogue", "search", "forge", "create", "discover"],
@@ -29,7 +29,7 @@ const ACTIONS: readonly PaletteEntry[] = [
     target: { action: "discover", type: "action" },
   },
   {
-    detail: "Hide or restore the interface over the view",
+    detail: "",
     group: "Actions",
     id: "action-clear-view",
     keywords: ["hide", "interface", "screenshot", "chrome", "clear", "view"],
@@ -37,7 +37,7 @@ const ACTIONS: readonly PaletteEntry[] = [
     target: { action: "clear-view", type: "action" },
   },
   {
-    detail: "Back to the featured world",
+    detail: "",
     group: "Actions",
     id: "action-home",
     keywords: ["featured", "start", "reset"],
@@ -77,7 +77,7 @@ const localEntries = (): Promise<PaletteEntry[]> => {
       ...solar.SOLAR_SYSTEM_CATALOG.map((entry): PaletteEntry => {
         if (entry.type === "star") {
           return {
-            detail: "Our home star · NASA/JPL",
+            detail: "Star",
             group: "Solar System",
             id: `solar-${entry.profile.id}`,
             keywords: entry.profile.aliases ?? [],
@@ -101,7 +101,7 @@ const localEntries = (): Promise<PaletteEntry[]> => {
         };
       }),
       ...regions.SOLAR_SYSTEM_REGIONS.map((region): PaletteEntry => ({
-        detail: `Region · ${region.distanceAu.note}`,
+        detail: "Region",
         group: "Solar System",
         id: `region-${region.id}`,
         keywords: region.aliases,
@@ -109,7 +109,7 @@ const localEntries = (): Promise<PaletteEntry[]> => {
         target: { region, type: "region" },
       })),
       ...blackHoles.BLACK_HOLES.map((blackHole): PaletteEntry => ({
-        detail: `${blackHoles.blackHoleKindLabel(blackHole)} · ${blackHole.host}`,
+        detail: blackHoles.blackHoleKindLabel(blackHole),
         group: "Black holes",
         id: `black-hole-${blackHole.id}`,
         keywords: [...blackHole.aliases, blackHole.host],
@@ -117,7 +117,7 @@ const localEntries = (): Promise<PaletteEntry[]> => {
         target: { blackHole, type: "black-hole" },
       })),
       ...TOURS.map((tour): PaletteEntry => ({
-        detail: `Guided tour · ${String(tour.steps.length)} stops · ${tour.summary}`,
+        detail: `${String(tour.steps.length)} stops`,
         group: "Tours",
         id: `tour-${tour.id}`,
         keywords: ["tour", "guided", ...tour.steps.map((step) => step.name)],
@@ -195,7 +195,7 @@ export const CommandPalette = ({ onClose, onSelect }: CommandPaletteProps) => {
         setRemote({
           entries: [
             ...planetResults.map((planet): PaletteEntry => ({
-              detail: `${planetKindLabel(planet)} · ${planet.hostStar} · ${planet.observation.discoveryMethod}`,
+              detail: planetKindLabel(planet),
               group: "Exoplanets",
               id: `planet-${planet.id}`,
               keywords: [planet.hostStar],
@@ -207,7 +207,7 @@ export const CommandPalette = ({ onClose, onSelect }: CommandPaletteProps) => {
               },
             })),
             ...hosts.map((hostStar): PaletteEntry => ({
-              detail: "Every confirmed world on its measured orbit",
+              detail: "Planetary system",
               group: "Systems",
               id: `system-${hostStar}`,
               keywords: [hostStar],
@@ -311,8 +311,8 @@ export const CommandPalette = ({ onClose, onSelect }: CommandPaletteProps) => {
             aria-controls={listId}
             aria-expanded={flat.length > 0}
             aria-activedescendant={activeEntry ? `${listId}-${activeEntry.id}` : undefined}
-            aria-label="Go anywhere: a planet, moon, star, system, region or black hole"
-            placeholder="Go anywhere — a planet, moon, star, system or black hole"
+            aria-label="Go anywhere"
+            placeholder="Search planets, stars, black holes"
             spellCheck={false}
             autoComplete="off"
             value={query}
@@ -345,7 +345,7 @@ export const CommandPalette = ({ onClose, onSelect }: CommandPaletteProps) => {
                     </span>
                     <span className={cx("palette-copy")}>
                       <strong>{entry.name}</strong>
-                      <small>{entry.detail}</small>
+                      {entry.detail ? <small>{entry.detail}</small> : null}
                     </span>
                     {index === activeIndex ? (
                       <span className={cx("palette-enter")} aria-hidden="true">
@@ -359,34 +359,13 @@ export const CommandPalette = ({ onClose, onSelect }: CommandPaletteProps) => {
           ))}
           {flat.length === 0 ? (
             <p className={cx("palette-empty")} role="status">
-              {searching
-                ? "Asking the archives…"
-                : unavailable
-                  ? "An archive is unavailable. Local destinations remain searchable."
-                  : "Nothing by that name. Try a catalog ID, like Kepler-22 b or HD 209458."}
+              {searching ? "Searching…" : unavailable ? "Archive unavailable." : "No matches."}
             </p>
           ) : null}
         </div>
 
         <p className={cx("palette-footer")} role="status">
-          {searching ? (
-            "Searching the NASA Exoplanet Archive and SIMBAD…"
-          ) : unavailable ? (
-            "Some archive results are unavailable."
-          ) : (
-            <>
-              <span>
-                <Kbd>↑</Kbd>
-                <Kbd>↓</Kbd> move
-              </span>
-              <span>
-                <Kbd>↵</Kbd> travel
-              </span>
-              <span>
-                <Kbd>{`${MODIFIER_KEY} K`}</Kbd> or <Kbd>/</Kbd> opens this anywhere
-              </span>
-            </>
-          )}
+          {!searching && unavailable && flat.length > 0 ? "Some results unavailable." : null}
         </p>
       </div>
     </dialog>

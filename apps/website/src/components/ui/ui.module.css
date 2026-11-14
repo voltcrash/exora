@@ -82,10 +82,6 @@
 .button[data-variant="surface"] {
   --button-bg: var(--surface);
   --button-bg-hover: rgb(36 38 44 / 82%);
-
-  box-shadow: 0 6px 24px rgb(0 0 0 / 28%);
-  backdrop-filter: var(--blur);
-  -webkit-backdrop-filter: var(--blur);
 }
 
 .button[data-variant="ghost"] {
@@ -122,6 +118,7 @@
   border-bottom-width: 2px;
   border-radius: 5px;
   color: var(--ink-2);
+  font-family: var(--font-mono);
   font-size: var(--text-2xs);
   font-weight: 500;
   line-height: 1;

@@ -12,17 +12,7 @@
 
 .identity-head {
   display: grid;
-  gap: var(--space-3);
-}
-
-.identity-kind {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
   gap: var(--space-2);
-  color: var(--ink-2);
-  font-size: var(--text-sm);
-  font-weight: 500;
 }
 
 .identity-category {
@@ -30,23 +20,16 @@
   align-items: center;
   gap: 7px;
   color: var(--light);
+  font-size: var(--text-xs);
+  font-weight: 500;
 }
 
 .identity-category::before {
   content: "";
-  width: 7px;
-  height: 7px;
+  width: 6px;
+  height: 6px;
   border-radius: 50%;
   background: var(--light);
-  box-shadow: 0 0 10px rgb(var(--light-rgb) / 70%);
-}
-
-.identity-category::after {
-  content: "";
-  width: 1px;
-  height: 12px;
-  margin-left: 3px;
-  background: var(--hairline-strong);
 }
 
 /* The one loud thing on the screen: the name, set wide and light, the way it is printed on a chart. */
@@ -59,7 +42,7 @@
   color: var(--ink);
   font-size: calc(var(--text-display) * var(--identity-name-fit));
   font-stretch: var(--wide);
-  font-weight: 340;
+  font-weight: 300;
   line-height: 0.98;
   letter-spacing: -0.025em;
   text-shadow: 0 2px 30px rgb(0 0 0 / 50%);
@@ -68,30 +51,30 @@
 
 .identity-name em {
   font-style: normal;
-  font-weight: 560;
+  font-weight: 600;
 }
 
 .identity-tags {
   display: flex;
   flex-wrap: wrap;
-  gap: 6px;
+  gap: 2px 0;
   margin: 0;
   padding: 0;
+  color: var(--ink-2);
+  font-size: var(--text-sm);
   list-style: none;
+  text-shadow: 0 1px 12px rgb(0 0 0 / 70%);
 }
 
 .identity-tags li {
-  display: inline-flex;
-  align-items: center;
-  height: 26px;
-  padding: 0 10px;
-  border: 1px solid var(--hairline-strong);
-  border-radius: var(--radius-pill);
-  color: var(--ink-2);
-  background: rgb(0 0 0 / 22%);
-  font-size: var(--text-xs);
   font-variant-numeric: tabular-nums;
   white-space: nowrap;
+}
+
+.identity-tags li + li::before {
+  content: "/";
+  margin: 0 8px;
+  color: var(--ink-4);
 }
 
 .identity-next {
@@ -127,34 +110,11 @@
       var(--space-4)
   );
   border: 1px solid var(--hairline);
-  border-radius: var(--radius-lg);
+  border-radius: var(--radius-md);
   background: var(--surface);
-  box-shadow: var(--shadow-float);
   pointer-events: auto;
-  backdrop-filter: var(--blur);
-  -webkit-backdrop-filter: var(--blur);
-}
-
-.panel-head {
-  display: flex;
-  flex: none;
-  align-items: flex-start;
-  justify-content: space-between;
-  gap: var(--space-3);
-  padding: var(--space-4) var(--space-3) 0 var(--space-5);
-}
-
-.panel-source {
-  color: var(--ink-3);
-  font-size: var(--text-xs);
-}
-
-.panel-title {
-  margin-top: 2px;
-  color: var(--ink);
-  font-size: var(--text-md);
-  font-weight: 560;
-  letter-spacing: -0.005em;
+  /* Opening details or a tab re-lays out only the panel, never the rest of the HUD. */
+  contain: layout style;
 }
 
 .metrics {
@@ -162,7 +122,7 @@
   flex: none;
   grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: var(--space-4);
-  margin: var(--space-4) var(--space-5);
+  margin: var(--space-5);
 }
 
 .metric {
@@ -188,10 +148,9 @@
   margin: 0;
   color: var(--ink);
   font-size: var(--text-xl);
-  font-stretch: var(--narrow);
   font-variant-numeric: tabular-nums;
-  font-weight: 420;
-  letter-spacing: -0.02em;
+  font-weight: 400;
+  letter-spacing: -0.01em;
   line-height: 1.1;
   white-space: nowrap;
 }
@@ -218,15 +177,23 @@
   font-size: 0.75em;
 }
 
+.panel-bar {
+  display: flex;
+  flex: none;
+  align-items: center;
+  padding-right: var(--space-2);
+  border-top: 1px solid var(--hairline);
+}
+
 .panel-toggle {
   display: flex;
+  flex: 1;
   align-items: center;
   justify-content: space-between;
   gap: var(--space-2);
   min-height: var(--control-height);
-  padding: 0 var(--space-5);
+  padding: 0 var(--space-3) 0 var(--space-5);
   border: 0;
-  border-top: 1px solid var(--hairline);
   color: var(--ink-2);
   background: none;
   font-size: var(--text-sm);
@@ -356,7 +323,7 @@
   color: var(--ink);
   font-size: var(--text-sm);
   font-variant-numeric: tabular-nums;
-  font-weight: 520;
+  font-weight: 500;
 }
 
 .fact-unit {
@@ -450,7 +417,7 @@ button.body:hover .body-go {
 .body-copy strong {
   overflow: hidden;
   font-size: var(--text-sm);
-  font-weight: 520;
+  font-weight: 500;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
@@ -505,6 +472,7 @@ button.body:hover .body-go {
 
 .frame-rate strong {
   color: var(--ink-3);
+  font-family: var(--font-mono);
   font-variant-numeric: tabular-nums;
   font-weight: 500;
 }
@@ -593,23 +561,24 @@ button.body:hover .body-go {
     border: 0;
     border-radius: 0;
     background: none;
-    box-shadow: none;
-    backdrop-filter: none;
-    -webkit-backdrop-filter: none;
-  }
-
-  .panel-head {
-    padding: var(--space-5) 0 0;
-    border-top: 1px solid var(--hairline);
   }
 
   .metrics {
-    margin: var(--space-4) 0 0;
+    margin: 0;
+    padding-top: var(--space-5);
+    border-top: 1px solid var(--hairline);
   }
 
   .panel-note {
     margin-right: 0;
     margin-left: 0;
+  }
+
+  .panel-bar {
+    justify-content: flex-end;
+    margin-top: var(--space-3);
+    padding: 0;
+    border: 0;
   }
 
   .panel-toggle {

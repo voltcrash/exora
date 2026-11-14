@@ -141,13 +141,7 @@ export const DestinationPanel = ({ host, model, summary, note }: DestinationPane
       aria-label={model.label}
       data-expanded={expanded}
     >
-      <header className={cx("panel-head")}>
-        <div>
-          <p className={cx("panel-source")}>{readable(model.source)}</p>
-          <h2 className={cx("panel-title")}>{model.title}</h2>
-        </div>
-        <ShareButton />
-      </header>
+      <h2 className="visually-hidden">{model.title}</h2>
 
       <dl className={cx("metrics")}>
         {model.metrics.map((metric) => (
@@ -167,16 +161,19 @@ export const DestinationPanel = ({ host, model, summary, note }: DestinationPane
 
       {note ? <p className={cx("panel-note")}>{readable(note)}</p> : null}
 
-      <button
-        className={cx("panel-toggle")}
-        type="button"
-        aria-expanded={expanded}
-        aria-controls={drawerId}
-        onClick={() => setExpanded((open) => !open)}
-      >
-        {expanded ? "Hide details" : "Show details"}
-        <Icon name={expanded ? "chevron-up" : "chevron-down"} size={16} />
-      </button>
+      <div className={cx("panel-bar")}>
+        <button
+          className={cx("panel-toggle")}
+          type="button"
+          aria-expanded={expanded}
+          aria-controls={drawerId}
+          onClick={() => setExpanded((open) => !open)}
+        >
+          Details
+          <Icon name={expanded ? "chevron-up" : "chevron-down"} size={16} />
+        </button>
+        <ShareButton />
+      </div>
       <div className={cx("panel-drawer")} id={drawerId} data-testid="panel-drawer">
         {tabbed ? (
           <TabBar

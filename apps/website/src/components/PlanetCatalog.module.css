@@ -15,7 +15,7 @@
 
 .filters-head h3 {
   font-size: var(--text-base);
-  font-weight: 560;
+  font-weight: 600;
 }
 
 .axes {
@@ -37,7 +37,7 @@
 }
 
 .axis-head strong {
-  font-weight: 520;
+  font-weight: 500;
 }
 
 .axis-head output {
@@ -92,7 +92,7 @@
 
 .toggles strong {
   font-size: var(--text-sm);
-  font-weight: 520;
+  font-weight: 500;
 }
 
 .toggles small {

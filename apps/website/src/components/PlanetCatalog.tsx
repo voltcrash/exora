@@ -1,5 +1,13 @@
 import type { ExoplanetProfile } from "@exora/contracts";
-import { useCallback, useDeferredValue, useEffect, useMemo, useRef, useState } from "react";
+import {
+  startTransition,
+  useCallback,
+  useDeferredValue,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
 import {
   discoverPlanets,
   discoverRandomPlanet,
@@ -56,41 +64,21 @@ const axisPositionLabel = (value: number, low: string, high: string): string =>
   value < 34 ? low : value > 66 ? high : "Anything";
 
 const collections = [
-  {
-    id: "most-earth-like",
-    label: "Most Earth-like",
-    note: "Rocky worlds closest to Earth's size and estimated temperature.",
-  },
-  {
-    id: "nearest-rocky-worlds",
-    label: "Nearest rocky worlds",
-    note: "The closest small planets in our galactic neighbourhood, nearest first.",
-  },
-  {
-    id: "recently-confirmed",
-    label: "Recently confirmed",
-    note: "The newest confirmed additions to the exoplanet archive.",
-  },
-  {
-    id: "record-breakers",
-    label: "Record breakers",
-    note: "The hottest and most massive worlds in the catalog.",
-  },
+  { id: "most-earth-like", label: "Most Earth-like" },
+  { id: "nearest-rocky-worlds", label: "Nearest rocky worlds" },
+  { id: "recently-confirmed", label: "Recently confirmed" },
+  { id: "record-breakers", label: "Record breakers" },
 ] as const;
 
 const categories = [
-  { id: "earth-like", label: "Earth-like", note: "Familiar size and climate." },
-  {
-    id: "potentially-habitable",
-    label: "Potentially habitable",
-    note: "Temperate rocky candidates.",
-  },
-  { id: "ocean-candidates", label: "Ocean worlds", note: "Worlds that may hold global seas." },
-  { id: "lava-worlds", label: "Lava worlds", note: "Molten, ultra-hot surfaces." },
-  { id: "frozen-worlds", label: "Frozen worlds", note: "Cold, distant frontiers." },
-  { id: "gas-giants", label: "Gas giants", note: "Colossal layers of cloud." },
-  { id: "extreme-weather", label: "Extreme weather", note: "Violent atmospheric systems." },
-  { id: "recently-discovered", label: "Recently discovered", note: "The archive's newest worlds." },
+  { id: "earth-like", label: "Earth-like" },
+  { id: "potentially-habitable", label: "Potentially habitable" },
+  { id: "ocean-candidates", label: "Ocean worlds" },
+  { id: "lava-worlds", label: "Lava worlds" },
+  { id: "frozen-worlds", label: "Frozen worlds" },
+  { id: "gas-giants", label: "Gas giants" },
+  { id: "extreme-weather", label: "Extreme weather" },
+  { id: "recently-discovered", label: "Recently discovered" },
 ] as const;
 
 const PlanetResult = ({
@@ -113,7 +101,6 @@ const PlanetResult = ({
       ]}
       {...(hasRenderer(planet) ? {} : { notice: "Exora cannot draw this world yet" })}
       onSelect={() => onSelect(planet, cached)}
-      subtitle={planet.observation.discoveryMethod}
       title={planet.name}
       visual={<PlanetCatalogVisual planet={planet} />}
     />
@@ -237,11 +224,18 @@ export const PlanetCatalog = ({ onSelect }: PlanetCatalogProps) => {
     pageControllerRef.current = controller;
     setLoadingMore(true);
     setPageError(false);
+    let appended = false;
     void loadPlanetFilterPool({ cursor: nextCursor, signal: controller.signal })
       .then((result) => {
         if (controller.signal.aborted) return;
-        setPlanets((current) => appendUniqueById(current, result.planets));
-        setNextCursor(result.nextCursor);
+        // Appending a page renders dozens of cards; as a transition it yields to scrolling.
+        // Loading ends in the same transition, so the observer re-arms only with the new cursor.
+        appended = true;
+        startTransition(() => {
+          setPlanets((current) => appendUniqueById(current, result.planets));
+          setNextCursor(result.nextCursor);
+          setLoadingMore(false);
+        });
       })
       .catch((error: unknown) => {
         if (controller.signal.aborted) return;
@@ -251,7 +245,7 @@ export const PlanetCatalog = ({ onSelect }: PlanetCatalogProps) => {
       .finally(() => {
         if (pageControllerRef.current !== controller) return;
         pageControllerRef.current = null;
-        setLoadingMore(false);
+        if (!appended) setLoadingMore(false);
       });
   }, [nextCursor]);
 
@@ -301,24 +295,17 @@ export const PlanetCatalog = ({ onSelect }: PlanetCatalogProps) => {
   };
 
   const trimmed = query.trim();
+  // Only results worth counting are announced; loading and errors speak from the list itself.
   const status =
-    searchState === "loading"
-      ? trimmed
-        ? `Searching the NASA Exoplanet Archive for “${trimmed}”…`
+    searchState === "error"
+      ? "Archive unavailable."
+      : searchState !== "ready"
+        ? ""
         : filtersOpen
-          ? "Gathering worlds to filter…"
-          : activeLabel
-            ? `Opening ${activeLabel.toLowerCase()}…`
-            : "Loading the catalog…"
-      : searchState === "error"
-        ? "The NASA Exoplanet Archive did not answer. Try again in a moment."
-        : trimmed
-          ? `${String(visiblePlanets.length)} worlds match “${trimmed}”`
-          : filtersOpen
-            ? `${String(visiblePlanets.length)} worlds fit these filters`
-            : activeLabel
-              ? `${String(visiblePlanets.length)} worlds · ${activeLabel}`
-              : "Every confirmed world, A to Z";
+          ? `${String(visiblePlanets.length)} worlds fit these filters`
+          : trimmed || activeLabel
+            ? `${String(visiblePlanets.length)} worlds`
+            : "";
 
   return (
     <section
@@ -468,20 +455,15 @@ export const PlanetCatalog = ({ onSelect }: PlanetCatalogProps) => {
       ) : null}
 
       <ResultList id="planet-search-results" testId="catalog-results" view={resultView}>
-        {searchState === "loading" ? (
-          <ResultState kind="loading">Finding confirmed worlds…</ResultState>
-        ) : null}
+        {searchState === "loading" ? <ResultState kind="loading">Loading…</ResultState> : null}
         {searchState === "error" ? (
           <ResultState kind="error">
-            The search could not be completed.{" "}
-            <Button onClick={() => setRetry((value) => value + 1)}>Retry search</Button>
+            <Button onClick={() => setRetry((value) => value + 1)}>Retry</Button>
           </ResultState>
         ) : null}
         {searchState === "ready" && visiblePlanets.length === 0 ? (
           <ResultState kind="empty">
-            {filtersOpen
-              ? "No worlds fit every filter. Widen one or two of them."
-              : "No confirmed planet matches that name, or anything close to it."}
+            {filtersOpen ? "No worlds fit every filter." : "No matches."}
           </ResultState>
         ) : null}
         {searchState === "ready"
@@ -492,11 +474,9 @@ export const PlanetCatalog = ({ onSelect }: PlanetCatalogProps) => {
         {searchState === "ready" && nextCursor !== null ? (
           <ResultState kind="more" ref={sentinelRef} testId="catalog-load-more">
             {loadingMore ? (
-              "Loading more worlds…"
+              "Loading…"
             ) : (
-              <Button onClick={loadMore}>
-                {pageError ? "Retry loading more" : "Load more worlds"}
-              </Button>
+              <Button onClick={loadMore}>{pageError ? "Retry" : "Load more"}</Button>
             )}
           </ResultState>
         ) : null}

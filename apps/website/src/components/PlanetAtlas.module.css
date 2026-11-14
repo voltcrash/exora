@@ -1,5 +1,7 @@
 .atlas {
   display: grid;
+  /* An auto track grows to its widest child's min-content and pushed phones sideways. */
+  grid-template-columns: minmax(0, 1fr);
   gap: var(--space-4);
   min-width: 0;
 }
@@ -97,7 +99,7 @@
 
 .atlas-matches strong {
   font-size: var(--text-sm);
-  font-weight: 520;
+  font-weight: 500;
 }
 
 .atlas-matches small {
@@ -273,7 +275,7 @@
 .atlas-tooltip strong {
   color: var(--ink);
   font-size: var(--text-sm);
-  font-weight: 560;
+  font-weight: 600;
 }
 
 .atlas-tooltip span {

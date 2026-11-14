@@ -1,4 +1,4 @@
-import { memo, type ReactNode, type Ref } from "react";
+import { memo, startTransition, type ReactNode, type Ref } from "react";
 import { Button } from "../ui/Button.tsx";
 import { Icon } from "../ui/Icon.tsx";
 import { Segmented } from "../ui/Segmented.tsx";
@@ -59,11 +59,11 @@ export const CatalogSearch = ({
         icon="dice"
         disabled={randomBusy}
         aria-busy={randomBusy || undefined}
-        title={randomError ? "The archive did not answer. Try again." : undefined}
+        aria-label={randomLabel}
+        title={randomError ? "Archive unavailable. Try again." : randomLabel}
+        data-error={randomError || undefined}
         onClick={onRandom}
-      >
-        {randomLabel}
-      </Button>
+      />
     ) : null}
   </div>
 );
@@ -71,7 +71,6 @@ export const CatalogSearch = ({
 export interface Chip {
   id: string;
   label: string;
-  note?: string;
 }
 
 interface ChipRailProps {
@@ -82,9 +81,8 @@ interface ChipRailProps {
   onSelect: (id: string | null) => void;
 }
 
-/** Collections and kinds as one scrolling row; the active chip's note explains what it holds. */
+/** Collections and kinds as one scrolling row. */
 export const ChipRail = ({ active, allLabel, groups, label, onSelect }: ChipRailProps) => {
-  const note = groups.flatMap((group) => group.chips).find((chip) => chip.id === active)?.note;
   return (
     <div className={styles["rail"]}>
       <div className={styles["chips"]} role="group" aria-label={label}>
@@ -119,7 +117,6 @@ export const ChipRail = ({ active, allLabel, groups, label, onSelect }: ChipRail
           </span>
         ))}
       </div>
-      {note ? <p className={styles["rail-note"]}>{note}</p> : null}
     </div>
   );
 };
@@ -154,7 +151,7 @@ export const ResultToolbar = ({
           { icon: "list", id: "list", label: "List" },
         ]}
         value={view}
-        onChange={onViewChange}
+        onChange={(next) => startTransition(() => onViewChange(next))}
       />
     </div>
   </div>
@@ -191,29 +188,18 @@ interface ResultCardProps {
   /** A short note when the result cannot be opened, in place of its facts. */
   notice?: string;
   onSelect: () => void;
-  subtitle: string;
   title: string;
   trait?: string;
   visual: ReactNode;
 }
 
 export const ResultCard = memo(
-  ({
-    disabled = false,
-    facts,
-    notice,
-    onSelect,
-    subtitle,
-    title,
-    trait,
-    visual,
-  }: ResultCardProps) => (
+  ({ disabled = false, facts, notice, onSelect, title, trait, visual }: ResultCardProps) => (
     <li>
       <button className={styles["card"]} type="button" disabled={disabled} onClick={onSelect}>
         <span className={styles["card-visual"]}>{visual}</span>
         <span className={styles["card-copy"]}>
           <strong>{title}</strong>
-          <small>{subtitle}</small>
           {trait ? <span className={styles["card-trait"]}>{trait}</span> : null}
         </span>
         <span className={styles["card-facts"]}>

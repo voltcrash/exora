@@ -49,8 +49,7 @@
   box-shadow:
     inset calc(var(--visual-size) * -0.12) calc(var(--visual-size) * -0.08)
       calc(var(--visual-size) * 0.17) rgb(0 0 0 / 70%),
-    inset 12px 8px 20px rgb(255 255 255 / 8%),
-    0 0 32px rgb(var(--visual-light) / 15%);
+    inset 12px 8px 20px rgb(255 255 255 / 8%);
   transform: rotate(var(--visual-tilt));
 }
 
@@ -148,7 +147,6 @@
     rgb(0 0 0 / 62%) 30%,
     transparent 96%
   );
-  filter: blur(1.2px);
 }
 
 /* The core clips to white and the colour lives in the limb: the thing doing the lighting, not a lit sphere. */
@@ -164,10 +162,8 @@
     rgb(var(--star-color) / 68%) 78%,
     rgb(var(--star-color) / 48%) 100%
   );
-  box-shadow:
-    0 0 12px rgb(var(--star-color) / 80%),
-    0 0 30px rgb(var(--star-color) / 38%),
-    0 0 70px rgb(var(--star-color) / 18%);
+  /* One glow is enough at thumbnail size; wider shadows repaint a large area per card. */
+  box-shadow: 0 0 18px rgb(var(--star-color) / 65%);
 }
 
 .black-hole-catalog-visual {
@@ -192,9 +188,7 @@
   border-right-color: hsl(calc(var(--black-hole-hue) + 26deg) 96% 82% / 96%);
   border-left-color: hsl(var(--black-hole-hue) 82% 44% / 45%);
   border-radius: 50%;
-  box-shadow:
-    0 0 7px hsl(var(--black-hole-hue) 95% 72% / 62%),
-    0 0 24px hsl(var(--black-hole-hue) 90% 58% / 30%);
+  box-shadow: 0 0 10px hsl(var(--black-hole-hue) 95% 68% / 55%);
   transform: rotate(var(--black-hole-tilt));
 }
 
@@ -205,8 +199,9 @@
 
 .black-hole-catalog-disk.front {
   z-index: 5;
+  border-color: hsl(var(--black-hole-hue) 98% 72% / 82%);
+  border-right-color: hsl(calc(var(--black-hole-hue) + 26deg) 100% 88%);
   clip-path: inset(50% -16px -16px -16px);
-  filter: saturate(1.18) brightness(1.12);
 }
 
 .black-hole-catalog-shadow {

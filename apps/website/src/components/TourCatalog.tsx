@@ -1,5 +1,4 @@
 import { TOURS } from "../tours.ts";
-import { Icon } from "./ui/Icon.tsx";
 import styles from "./TourBar.module.css";
 
 /** The tours on offer, each started by opening its first destination. */
@@ -16,11 +15,8 @@ export const TourCatalog = ({ onStart }: { onStart: (tourId: string) => void }) 
           <strong>{tour.title}</strong>
           <span>{tour.summary}</span>
           <small>
-            {tour.steps[0]?.name} → {tour.steps.at(-1)?.name} · {tour.steps.length} stops
+            {tour.steps[0]?.name} → {tour.steps.at(-1)?.name}
           </small>
-          <span className={styles["catalog-start"]}>
-            Start tour <Icon name="arrow-right" size={16} />
-          </span>
         </button>
       </li>
     ))}

@@ -1,6 +1,6 @@
 import { Button } from "./ui/Button.tsx";
 import type { StarProfile } from "@exora/contracts";
-import { useCallback, useEffect, useRef, useState } from "react";
+import { startTransition, useCallback, useEffect, useRef, useState } from "react";
 import { browseStars, discoverRandomStar, discoverStars, searchStars } from "../api-client.ts";
 import { formatNumber } from "../planet-utils.tsx";
 import { starKindLabel } from "../star-utils.ts";
@@ -28,37 +28,21 @@ type SearchState = "idle" | "loading" | "ready" | "error";
 type SurpriseState = "idle" | "loading" | "error";
 
 const collections = [
-  {
-    id: "closest-neighbors",
-    label: "Closest to home",
-    note: "Our nearest stellar neighbours, ordered by measured parallax.",
-  },
-  {
-    id: "solar-analogs",
-    label: "The Sun's cousins",
-    note: "Nearby main-sequence stars with Sun-like spectra.",
-  },
-  {
-    id: "brightest-stars",
-    label: "Brightest in our sky",
-    note: "The most brilliant stars as seen from Earth.",
-  },
-  {
-    id: "stellar-extremes",
-    label: "Stellar extremes",
-    note: "Rare, massive and extraordinarily hot blue stars.",
-  },
+  { id: "closest-neighbors", label: "Closest to home" },
+  { id: "solar-analogs", label: "The Sun's cousins" },
+  { id: "brightest-stars", label: "Brightest in our sky" },
+  { id: "stellar-extremes", label: "Stellar extremes" },
 ] as const;
 
 const categories = [
-  { id: "nearby-stars", label: "Nearby", note: "Within our stellar neighbourhood." },
-  { id: "sun-like", label: "Sun-like", note: "F and G main-sequence stars." },
-  { id: "red-dwarfs", label: "Red dwarfs", note: "Small, cool and long-lived." },
-  { id: "blue-stars", label: "Blue stars", note: "Hot, luminous stellar giants." },
-  { id: "giants", label: "Giants", note: "Stars in their evolved stages." },
-  { id: "binary-systems", label: "Binaries", note: "Two stars in orbit around each other." },
-  { id: "variable-stars", label: "Variables", note: "Stars whose brightness changes." },
-  { id: "stellar-remnants", label: "Remnants", note: "White dwarfs and pulsars." },
+  { id: "nearby-stars", label: "Nearby" },
+  { id: "sun-like", label: "Sun-like" },
+  { id: "red-dwarfs", label: "Red dwarfs" },
+  { id: "blue-stars", label: "Blue stars" },
+  { id: "giants", label: "Giants" },
+  { id: "binary-systems", label: "Binaries" },
+  { id: "variable-stars", label: "Variables" },
+  { id: "stellar-remnants", label: "Remnants" },
 ] as const;
 
 const StarResult = ({
@@ -77,7 +61,6 @@ const StarResult = ({
       `${formatNumber(star.observation.distanceParsecs, 1)} pc`,
     ]}
     onSelect={() => onSelect(star, cached)}
-    subtitle={`${star.catalogName} · ${star.objectType}`}
     title={star.name}
     trait={starNotableTrait(star)}
     visual={<StarCatalogVisual star={star} />}
@@ -195,11 +178,18 @@ export const StarCatalog = ({ onSelect }: StarCatalogProps) => {
     pageControllerRef.current = controller;
     setLoadingMore(true);
     setPageError(false);
+    let appended = false;
     void browseStars({ cursor: nextCursor, signal: controller.signal })
       .then((result) => {
         if (controller.signal.aborted) return;
-        setStars((current) => appendUniqueById(current, result.stars));
-        setNextCursor(result.nextCursor);
+        // Appending a page renders dozens of cards; as a transition it yields to scrolling.
+        // Loading ends in the same transition, so the observer re-arms only with the new cursor.
+        appended = true;
+        startTransition(() => {
+          setStars((current) => appendUniqueById(current, result.stars));
+          setNextCursor(result.nextCursor);
+          setLoadingMore(false);
+        });
       })
       .catch((error: unknown) => {
         if (controller.signal.aborted) return;
@@ -209,7 +199,7 @@ export const StarCatalog = ({ onSelect }: StarCatalogProps) => {
       .finally(() => {
         if (pageControllerRef.current !== controller) return;
         pageControllerRef.current = null;
-        setLoadingMore(false);
+        if (!appended) setLoadingMore(false);
       });
   }, [nextCursor]);
 
@@ -242,19 +232,11 @@ export const StarCatalog = ({ onSelect }: StarCatalogProps) => {
 
   const trimmed = query.trim();
   const status =
-    searchState === "loading"
-      ? trimmed
-        ? `Looking up “${trimmed}” in SIMBAD…`
-        : activeLabel
-          ? `Opening ${activeLabel.toLowerCase()}…`
-          : "Loading the catalog…"
-      : searchState === "error"
-        ? "SIMBAD did not answer. Try again in a moment."
-        : trimmed
-          ? `${String(stars.length)} stars match “${trimmed}”`
-          : activeLabel
-            ? `${String(stars.length)} stars · ${activeLabel}`
-            : "Stars from SIMBAD, A to Z";
+    searchState === "error"
+      ? "SIMBAD unavailable."
+      : searchState === "ready" && (trimmed || activeLabel)
+        ? `${String(stars.length)} stars`
+        : "";
 
   return (
     <section className={catalogStyles["catalog"]} aria-label="Star catalog">
@@ -307,19 +289,14 @@ export const StarCatalog = ({ onSelect }: StarCatalogProps) => {
       ) : null}
 
       <ResultList id="star-search-results" view={resultView}>
-        {searchState === "loading" ? (
-          <ResultState kind="loading">Finding stars…</ResultState>
-        ) : null}
+        {searchState === "loading" ? <ResultState kind="loading">Loading…</ResultState> : null}
         {searchState === "error" ? (
           <ResultState kind="error">
-            The search could not be completed.{" "}
-            <Button onClick={() => setRetry((value) => value + 1)}>Retry search</Button>
+            <Button onClick={() => setRetry((value) => value + 1)}>Retry</Button>
           </ResultState>
         ) : null}
         {searchState === "ready" && stars.length === 0 ? (
-          <ResultState kind="empty">
-            No star matches that name, or anything close to it.
-          </ResultState>
+          <ResultState kind="empty">No matches.</ResultState>
         ) : null}
         {searchState === "ready"
           ? stars.map((star) => (
@@ -329,11 +306,9 @@ export const StarCatalog = ({ onSelect }: StarCatalogProps) => {
         {searchState === "ready" && nextCursor !== null ? (
           <ResultState kind="more" ref={sentinelRef} testId="star-catalog-load-more">
             {loadingMore ? (
-              "Loading more stars…"
+              "Loading…"
             ) : (
-              <Button onClick={loadMore}>
-                {pageError ? "Retry loading more" : "Load more stars"}
-              </Button>
+              <Button onClick={loadMore}>{pageError ? "Retry" : "Load more"}</Button>
             )}
           </ResultState>
         ) : null}

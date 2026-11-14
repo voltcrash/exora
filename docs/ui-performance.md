@@ -1,47 +1,68 @@
 # Interface and responsiveness
 
 Exora's world is the primary view. The interface keeps the destination, travel actions and four
-headline readings visible. Rendering caveats stay visible beside the headline readings. Show details opens explanations,
-sources and scientific tabs. On phones, those readings share a sheet with the destination. The half-open sheet scrolls;
-the fully opened sheet pauses rendering. Hiding the interface or travelling resumes the scene.
+headline readings visible. Rendering caveats stay visible beside the headline readings. Details
+opens explanations, sources and scientific tabs. On phones, those readings share a sheet with the
+destination. The half-open sheet scrolls; the fully opened sheet pauses rendering. Hiding the
+interface or travelling resumes the scene.
 
-The interface uses self-hosted Atkinson Hyperlegible Next, larger small labels and stronger text
-contrast. Search and Explore retain visible labels on phones. Explore uses short section names,
-without repeated source subtitles or instructions; sources remain with the scientific readings.
+## Words
+
+Text appears only where it helps someone act or understand a reading:
+
+- A destination shows its category, its name and one line of traits such as `Ice giant / 531 K`.
+  The discovery method lives in the Record tab.
+- The readings panel starts with its four measurements. The archive is credited once, in the
+  footer of Details.
+- Pointer and keyboard hints fade after the first drag or scroll, or after eight seconds.
+- Catalogue cards show a name and one line of facts. Status lines report counts and failures, not
+  what is loading. Loading is a spinner.
+- Search results pair a name with a one-word kind.
+- Loading screens name the destination.
+
+## Typography
+
+The interface uses self-hosted IBM Plex Sans for text and readings. Its tabular figures keep values
+aligned without the slashed zeros that made catalogue IDs and decimals noisy. Geist Mono is used
+for keyboard keys, seeds and slider values. Text uses weights 300, 400, 500 and 600, and three
+distinct ink levels that stay above 4.5:1 on the panel surface.
 
 ## Implementation choices
 
 - Keep React 19 and Babylon.js. A framework replacement would leave the expensive work unchanged.
+- Compile components with React Compiler 1.0 through the `@vitejs/plugin-react` Babel preset, so
+  readouts, travel state and search re-render only what changed. The native Rust compiler is
+  experimental and requires an `oxc-transform-react` release older than the current one.
 - Use a persistent module Web Worker for catalog download, JSON decoding, searches and pagination.
   Only requested results cross back to React. Until ready, or after a worker error, reads use the API.
-- Load each Explore tool through React lazy and Suspense. Navigation and Close stay available
-  while a tool loads.
+- Load each Explore tool through React lazy and Suspense. Section switches, gallery and list
+  toggles and infinite-scroll appends run as transitions, so input is never blocked behind a
+  catalogue render.
+- Skip layout and paint for off-screen catalogue cards with `content-visibility: auto`.
+- Draw thumbnails without CSS filters or stacked glows, and float controls over the scene without
+  drop shadows or backdrop blur.
 - Sample frame rate in a leaf component instead of rerendering the destination shell every second.
-- Replace backdrop blur with near-opaque surfaces so UI compositing does not repeatedly filter
-  the animated WebGL canvas.
 
-Design guidance came from Claude Fable 5.2 and the Game UI Frontend skill: protect the scene,
-keep one compact secondary surface, and reveal explanations when requested.
+Design guidance came from Claude Fable 5.2 and the frontend design skill: protect the scene, keep
+one compact secondary surface, and cut words that restate what the screen already shows.
 
 ## Observed evidence
 
-Local Chromium measurements on 14 November 2026:
+Local Chromium measurements on 14 November 2026, comparing `main` with this change. Both builds
+were served by the Node server from their production output, with WebGL on SwiftShader.
 
-| Check                                               |   Before |   After |
-| --------------------------------------------------- | -------: | ------: |
-| Explore entry JavaScript, uncompressed              | 62.84 KB | 6.87 KB |
-| Explore entry CSS, uncompressed                     | 31.71 KB | 4.63 KB |
-| Maximum input timer gap during 100 catalog searches |   147 ms |    5 ms |
-| Wall time for those 100 searches                    |   146 ms |  152 ms |
+| Check                                                          |   Before |    After |
+| -------------------------------------------------------------- | -------: | -------: |
+| Main-thread script time while loading 300 more catalogue cards |    40 ms |    20 ms |
+| GPU raster time while scrolling 10,000 px of 361 cards         | 5,499 ms | 3,623 ms |
+| Initial JavaScript, uncompressed                               | 348.2 KB | 356.1 KB |
 
-The search comparison loaded the same snapshot into the previous main-thread implementation and
-the worker, searched for `kepler` 100 times sequentially, and sampled a 4 ms input timer on an
-otherwise idle page. It measures responsiveness during repeated work, not an overall frame-rate
-claim. Device, GPU and browser affect results. Chunk sizes are build output for the entry chunk;
-individual catalog tools still load when needed.
+Script time is the median of three runs of Chrome's `ScriptDuration` metric. Raster time is the
+median of three traces of `RasterDecoderImpl::DoEndRasterCHROMIUM`. Other work on the machine made
+wall-clock frame times too noisy to report. The extra initial JavaScript is the compiler's
+memoisation code. Device, GPU and browser affect results.
 
 Validation includes `vp check`, `vp test`, workspace tests and builds, asset provenance, the
 production JavaScript budget, discovery checks, the Cloudflare dry run and desktop/mobile browser
-journeys. Browser tests exercise the real catalog worker separately from deterministic API
-fixtures, disclosures, sheet scrolling and render suspension, clear view, travel, search and AR
-controls. Visual inspection covered desktop, tablet and phone layouts and the expanded readings.
+journeys. Visual inspection covered desktop and phone layouts of every destination type, Explore
+section, the search palette and the readings panel.

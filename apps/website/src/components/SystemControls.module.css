@@ -9,7 +9,7 @@
   gap: var(--space-2);
   color: var(--ink);
   font-size: var(--text-sm);
-  font-weight: 520;
+  font-weight: 500;
 }
 
 .state::before {
@@ -38,7 +38,7 @@
 .readout strong {
   color: var(--ink);
   font-variant-numeric: tabular-nums;
-  font-weight: 520;
+  font-weight: 500;
 }
 
 .row,

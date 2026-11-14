@@ -167,11 +167,8 @@
   border-radius: var(--radius-pill);
   color: var(--ink-3);
   background: var(--surface);
-  box-shadow: 0 6px 24px rgb(0 0 0 / 28%);
   font-size: var(--text-sm);
   text-align: left;
-  backdrop-filter: var(--blur);
-  -webkit-backdrop-filter: var(--blur);
   transition:
     border-color var(--duration-fast) var(--ease),
     color var(--duration-fast) var(--ease);
@@ -225,6 +222,7 @@
   border: 1px solid var(--hairline);
   border-radius: 5px;
   color: var(--ink-2);
+  font-family: var(--font-mono);
   font-size: var(--text-2xs);
   font-weight: 500;
 }
@@ -233,6 +231,14 @@
   .hints {
     display: flex;
   }
+}
+
+.hints[data-visible="false"] {
+  visibility: hidden;
+  opacity: 0;
+  transition:
+    opacity var(--duration-slow) var(--ease),
+    visibility var(--duration-slow) var(--ease);
 }
 
 .scene-alert {
@@ -247,8 +253,6 @@
   background: var(--surface);
   font-size: var(--text-sm);
   transform: translateX(-50%);
-  backdrop-filter: var(--blur);
-  -webkit-backdrop-filter: var(--blur);
 }
 
 /* The way back from a cleared view */
@@ -323,21 +327,13 @@
   font-weight: 500;
 }
 
-.loading small {
-  max-width: 32ch;
-  color: var(--ink-3);
-  font-size: var(--text-sm);
-}
-
 /* The copy is withheld rather than drawn in the platform sans and redrawn once the web font lands. */
-.loading p,
-.loading small {
+.loading p {
   opacity: 0;
   transition: opacity var(--duration) var(--ease);
 }
 
-.loading[data-type-settled] p,
-.loading[data-type-settled] small {
+.loading[data-type-settled] p {
   opacity: 1;
 }
 
@@ -407,8 +403,6 @@
     box-shadow: 0 -12px 40px rgb(0 0 0 / 40%);
     pointer-events: auto;
     touch-action: none;
-    backdrop-filter: var(--blur);
-    -webkit-backdrop-filter: var(--blur);
     transition: height var(--duration-slow) var(--ease);
   }
 
@@ -430,11 +424,8 @@
     flex: none;
     place-items: center;
     width: 100%;
-    height: 36px;
-    gap: 3px;
-    padding: 6px 0;
-    color: var(--ink-2);
-    font-size: var(--text-xs);
+    height: 28px;
+    padding: 0;
     border: 0;
     background: none;
   }

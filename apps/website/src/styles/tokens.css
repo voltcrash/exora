@@ -11,14 +11,18 @@
 
   /* Astronomical symbols fall through to a face that supplies them. */
   --font-sans:
-    "Atkinson Hyperlegible Next Variable", "Apple Symbols", "Segoe UI Symbol", "Noto Sans Symbols",
+    "IBM Plex Sans Variable", "Apple Symbols", "Segoe UI Symbol", "Noto Sans Symbols",
     ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
+  /* Readings, coordinates and keys: fixed-width digits that hold still as values change. */
+  --font-mono:
+    "Geist Mono Variable", "Apple Symbols", "Segoe UI Symbol", "Noto Sans Symbols", ui-monospace,
+    "SF Mono", Menlo, monospace;
 
   /* Ink on the void, brightest to faintest. */
   --ink: #ecebe6;
-  --ink-2: #aeb1b7;
-  --ink-3: #a0a4ad;
-  --ink-4: #959aa5;
+  --ink-2: #b3b6bc;
+  --ink-3: #9196a0;
+  --ink-4: #80858f;
   --void: #000;
 
   /* Near-opaque surfaces keep moving scenes readable without per-frame background blur. */
@@ -79,7 +83,6 @@
   --radius-lg: 20px;
   --radius-pill: 999px;
 
-  --blur: none;
   --shadow-float: 0 18px 50px rgb(0 0 0 / 45%), 0 2px 8px rgb(0 0 0 / 30%);
 
   --ease: cubic-bezier(0.2, 0.8, 0.2, 1);

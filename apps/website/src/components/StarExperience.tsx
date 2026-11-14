@@ -315,7 +315,7 @@ export const StarExperience = ({
         tone: "star",
       }}
       light={starLight(visual.temperatureKelvin)}
-      loading={{ detail: `${star.name} · spectral model`, title: "Resolving star" }}
+      loading={{ title: star.name }}
       panel={panel}
       sceneState={sceneState}
       travelPhase={travelPhase}

@@ -5,7 +5,6 @@ import {
   BLACK_HOLES,
   BLACK_HOLE_CATEGORIES,
   BLACK_HOLE_COLLECTIONS,
-  blackHoleKindLabel,
   blackHoleNotableTrait,
   collectBlackHoles,
   formatBlackHoleMass,
@@ -55,12 +54,11 @@ export const BlackHoleResult = ({
 }) => (
   <ResultCard
     facts={[
-      capitalize(blackHoleKindLabel(blackHole)),
       formatBlackHoleMass(blackHole.massSolar),
       formatDistance(blackHole),
+      ...(blackHole.status === "confirmed" ? [] : [capitalize(blackHole.status)]),
     ]}
     onSelect={() => onSelect(blackHole)}
-    subtitle={`${blackHole.catalogDesignation} · ${capitalize(blackHole.status)} · ${blackHole.host}`}
     title={blackHole.name}
     trait={blackHoleNotableTrait(blackHole)}
     visual={<BlackHoleCatalogVisual blackHole={blackHole} />}
@@ -108,12 +106,12 @@ export const BlackHoleCatalog = ({ onSelect }: BlackHoleCatalogProps) => {
   };
 
   const status =
-    archiveState === "loading"
-      ? "Loading observed horizons from the compact-object archive…"
-      : archiveState === "featured-only"
-        ? "The archive is unreachable, so only the curated horizons are shown."
-        : archiveState === "stale"
-          ? "Cached archive records · the live archive is unavailable"
+    archiveState === "featured-only"
+      ? "Archive unavailable. Showing featured black holes."
+      : archiveState === "stale"
+        ? "Archive unavailable. Showing saved records."
+        : archiveState === "loading"
+          ? ""
           : `${String(records.length)} black holes`;
 
   return (
@@ -159,23 +157,15 @@ export const BlackHoleCatalog = ({ onSelect }: BlackHoleCatalogProps) => {
 
       <ResultList id="black-hole-search-results" view={resultView}>
         {archiveState === "loading" && records.length === 0 ? (
-          <ResultState kind="loading">Finding observed horizons…</ResultState>
+          <ResultState kind="loading">Loading…</ResultState>
         ) : null}
         {archiveState !== "loading" && records.length === 0 ? (
-          <ResultState kind="empty">
-            No observed black hole matches that name or family.
-          </ResultState>
+          <ResultState kind="empty">No matches.</ResultState>
         ) : null}
         {records.map((blackHole) => (
           <BlackHoleResult key={blackHole.id} blackHole={blackHole} onSelect={onSelect} />
         ))}
       </ResultList>
-
-      <p className={catalogStyles["footnote"]}>
-        Every record keeps its catalog attribution. Masses and distances are published measurements;
-        anything unmeasured stays unavailable rather than estimated. The scenes themselves are
-        interpretive models of gravitational lensing.
-      </p>
     </section>
   );
 };

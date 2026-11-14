@@ -553,22 +553,22 @@ export const SOLAR_SYSTEM_CATALOG: readonly SolarSystemCatalogEntry[] = [
 export const SOLAR_SYSTEM_CATALOG_GROUPS = [
   {
     entries: [{ profile: SUN, type: "star" as const }],
-    label: "Sun · home star",
+    label: "Sun",
   },
   {
     entries: SOLAR_SYSTEM_PLANETS.map((profile) => ({ profile, type: "world" as const })),
-    label: "Planets · 8 worlds",
+    label: "Planets",
   },
   {
     entries: SOLAR_SYSTEM_DWARF_PLANETS.map((profile) => ({
       profile,
       type: "world" as const,
     })),
-    label: "Dwarf planets · 5 worlds",
+    label: "Dwarf planets",
   },
   ...SOLAR_SYSTEM_MOON_GROUPS.map(({ moons, parent }) => ({
     entries: moons.map((profile) => ({ profile, type: "world" as const })),
-    label: `${parent} system · ${moons.length} mapped moon${moons.length === 1 ? "" : "s"}`,
+    label: `Moons of ${parent}`,
   })),
 ] as const;
 

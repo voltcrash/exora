@@ -1,6 +1,5 @@
 import type { ExoplanetProfile, StarProfile } from "@exora/contracts";
 import { useMemo, useState } from "react";
-import { capitalize } from "../readable.ts";
 import type { SolarRegionProfile } from "../solar-regions.ts";
 import { SOLAR_SYSTEM_REGIONS } from "../solar-regions.ts";
 import { SOLAR_SYSTEM_CATALOG_GROUPS } from "../solar-system.ts";
@@ -22,12 +21,6 @@ const FILTERS: readonly { id: SolarFilter; label: string }[] = [
   { id: "moons", label: "Moons" },
   { id: "regions", label: "Regions" },
 ];
-
-const SURFACE_STATUS = {
-  mapped: "Surface mapped by spacecraft",
-  modeled: "Shape measured · surface unresolved",
-  unresolved: "Surface unresolved",
-} as const;
 
 export const SolarSystemCatalog = ({
   onSelectPlanet,
@@ -77,7 +70,7 @@ export const SolarSystemCatalog = ({
       <CatalogSearch
         label="Search the Solar System"
         onChange={setQuery}
-        placeholder="Search by name or SPK ID"
+        placeholder="Search"
         value={query}
       />
       <ChipRail
@@ -95,6 +88,11 @@ export const SolarSystemCatalog = ({
             {group.entries.map((entry) => {
               const identity = entry.profile.solarSystem;
               const slug = entry.profile.name.toLocaleLowerCase().replaceAll(" ", "-");
+              // CSS cannot decode KTX2, so only plain images become portraits.
+              const portrait =
+                identity?.texture && !identity.texture.path.endsWith(".ktx2")
+                  ? identity.texture.path
+                  : undefined;
               return (
                 <li key={entry.profile.id}>
                   <button
@@ -108,30 +106,12 @@ export const SolarSystemCatalog = ({
                     <span
                       className={styles["portrait"]}
                       data-body={slug}
-                      data-mapped={identity?.texture ? "" : undefined}
-                      style={
-                        identity?.texture
-                          ? { backgroundImage: `url(${identity.texture.path})` }
-                          : undefined
-                      }
+                      data-mapped={portrait ? "" : undefined}
+                      style={portrait ? { backgroundImage: `url(${portrait})` } : undefined}
                       aria-hidden="true"
                     />
                     <span className={styles["body-copy"]}>
-                      <small>
-                        {capitalize(identity?.bodyType.replace("-", " ") ?? "body")}
-                        {identity?.parent ? ` of ${identity.parent}` : ""}
-                        {" · "}
-                        {identity?.spkId
-                          ? `SPK ${identity.spkId}`
-                          : `NAIF ${String(identity?.naifId)}`}
-                      </small>
                       <strong>{entry.profile.name}</strong>
-                      <span>{identity?.summary}</span>
-                      {identity?.surfaceStatus ? (
-                        <em className={styles["evidence"]} data-status={identity.surfaceStatus}>
-                          {SURFACE_STATUS[identity.surfaceStatus]}
-                        </em>
-                      ) : null}
                     </span>
                   </button>
                 </li>
@@ -143,9 +123,7 @@ export const SolarSystemCatalog = ({
 
       {visibleRegions.length > 0 ? (
         <section className={styles["section"]}>
-          <h3 className={styles["section-title"]}>
-            Regions · statistical populations and measured boundaries
-          </h3>
+          <h3 className={styles["section-title"]}>Regions</h3>
           <ol className={styles["bodies"]}>
             {visibleRegions.map((region) => (
               <li key={region.id}>
@@ -155,17 +133,10 @@ export const SolarSystemCatalog = ({
                   onClick={() => onSelectRegion(region)}
                 >
                   <span className={styles["portrait"]} data-region={region.kind} aria-hidden="true">
-                    <Icon name="orbit" size={28} />
+                    <Icon name="orbit" size={20} />
                   </span>
                   <span className={styles["body-copy"]}>
-                    <small>
-                      Region of the {region.parent} · NAIF {region.anchorNaifId}
-                    </small>
                     <strong>{region.name}</strong>
-                    <span>{region.summary}</span>
-                    <em className={styles["evidence"]} data-status={region.evidence}>
-                      {capitalize(region.evidence.replaceAll("-", " "))} · sampled visualization
-                    </em>
                   </span>
                 </button>
               </li>
@@ -176,7 +147,7 @@ export const SolarSystemCatalog = ({
 
       {visibleGroups.length === 0 && visibleRegions.length === 0 ? (
         <p className={styles["status"]} role="status">
-          Nothing in the Solar System matches that. Try another name or filter.
+          No matches.
         </p>
       ) : null}
     </section>

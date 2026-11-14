@@ -2,7 +2,6 @@ import { useTypographySettled } from "../../use-typography-settled.ts";
 import styles from "./shell.module.css";
 
 interface LoadingScreenProps {
-  detail: string;
   /** Kept on screen regardless of the destination's state, as the app does before one exists. */
   standalone?: boolean;
   title: string;
@@ -13,7 +12,7 @@ interface LoadingScreenProps {
  * drawn once in the platform sans and again a moment later; the destination's `scene-ready` class
  * is what lifts it.
  */
-export const LoadingScreen = ({ detail, standalone = false, title }: LoadingScreenProps) => {
+export const LoadingScreen = ({ standalone = false, title }: LoadingScreenProps) => {
   const typographySettled = useTypographySettled();
   return (
     <div
@@ -27,7 +26,6 @@ export const LoadingScreen = ({ detail, standalone = false, title }: LoadingScre
         <circle className={styles["loading-body"]} cx="24" cy="4" r="3" />
       </svg>
       <p>{title}</p>
-      <small>{detail}</small>
     </div>
   );
 };

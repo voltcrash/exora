@@ -114,6 +114,12 @@ export const DestinationIdentity = ({
   }, []);
 
   const errors = links.filter((link) => link.error);
+  const traits = [classification, ...tags]
+    .map((trait) => capitalize(readable(trait)))
+    .filter(
+      (trait, index, all) =>
+        all.findIndex((t) => t.toLowerCase() === trait.toLowerCase()) === index,
+    );
 
   return (
     <section
@@ -123,19 +129,14 @@ export const DestinationIdentity = ({
       aria-labelledby={nameId}
     >
       <div className={cx("identity-head")} data-sheet-grip>
-        <p className={cx("identity-kind")}>
-          <span className={cx("identity-category")}>{capitalize(readable(category))}</span>
-          <span>{capitalize(readable(classification))}</span>
-        </p>
+        <p className={cx("identity-category")}>{capitalize(readable(category))}</p>
         <h1 className={cx("identity-name")} id={nameId} ref={heading}>
           {name}
         </h1>
         <ul className={cx("identity-tags")} aria-label={tagsLabel} data-sheet-peek-end>
-          {tags
-            .filter((tag) => readable(tag).toLowerCase() !== readable(classification).toLowerCase())
-            .map((tag) => (
-              <li key={tag}>{readable(tag)}</li>
-            ))}
+          {traits.map((trait) => (
+            <li key={trait}>{trait}</li>
+          ))}
         </ul>
       </div>
 

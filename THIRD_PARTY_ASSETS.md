@@ -312,14 +312,14 @@ curl -sL -o apps/website/public/ktx2/<file> https://cdn.babylonjs.com/ktx2Transc
 
 Keep the files byte-for-byte as published — do not run them through `vp fmt`.
 
-## Interface typeface
+## Interface typefaces
 
-The interface uses **Atkinson Hyperlegible Next**, designed by Braille Institute and Applied
-Design Works to make letters and numerals easier to distinguish. It is licensed under the
-SIL Open Font License 1.1 and shipped by `@fontsource-variable/atkinson-hyperlegible-next`.
-The package's `wght.css` declares the upright variable face, split by Unicode range. Hashed
-WOFF2 assets are served from the app's own origin and cached offline; no font service is contacted.
-See [Braille Institute](https://www.brailleinstitute.org/freefont/) and the package's `LICENSE`.
+The interface uses **IBM Plex Sans**, designed by Mike Abbink and Bold Monday for IBM, for text,
+and **Geist Mono**, designed by Vercel with Basement Studio, for numeric readings and keys. Both
+are licensed under the SIL Open Font License 1.1 and shipped by `@fontsource-variable/ibm-plex-sans`
+and `@fontsource-variable/geist-mono`. Each package's `wght.css` declares the upright variable face,
+split by Unicode range. Hashed WOFF2 assets are served from the app's own origin and cached offline;
+no font service is contacted. See each package's `LICENSE`.
 
 ## Star catalogue
 

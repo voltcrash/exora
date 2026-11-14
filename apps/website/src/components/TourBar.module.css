@@ -10,10 +10,7 @@
   border: 1px solid var(--hairline);
   border-radius: var(--radius-lg);
   background: var(--surface);
-  box-shadow: var(--shadow-float);
   transform: translateX(-50%);
-  backdrop-filter: var(--blur);
-  -webkit-backdrop-filter: var(--blur);
   transition:
     opacity var(--duration) var(--ease),
     visibility var(--duration) var(--ease);
@@ -39,7 +36,7 @@
   gap: 4px var(--space-3);
   color: var(--light);
   font-size: var(--text-sm);
-  font-weight: 560;
+  font-weight: 600;
 }
 
 .tour-count {
@@ -80,7 +77,7 @@
 
 .tour-caption strong {
   color: var(--ink);
-  font-weight: 560;
+  font-weight: 600;
 }
 
 .tour-controls {
@@ -161,7 +158,7 @@
 .catalog-card strong {
   font-size: var(--text-lg);
   font-stretch: var(--wide);
-  font-weight: 420;
+  font-weight: 400;
   letter-spacing: -0.01em;
 }
 
@@ -173,16 +170,6 @@
 .catalog-card small {
   color: var(--ink-3);
   font-size: var(--text-xs);
-}
-
-.catalog-start {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  margin-top: var(--space-2);
-  color: var(--light);
-  font-size: var(--text-sm);
-  font-weight: 560;
 }
 
 @media (max-width: 760px) {
