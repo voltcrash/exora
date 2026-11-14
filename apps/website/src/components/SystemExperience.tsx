@@ -689,7 +689,7 @@ export const SystemExperience = ({
         tone: "region",
       }}
       light={starLight(solar ? null : hostTemperature)}
-      loading={{ detail: `${hostStar} · measured orbital elements`, title: "Placing orbits" }}
+      loading={{ title: hostStar }}
       panel={panel}
       sceneState={sceneState}
       travelPhase={travelPhase}

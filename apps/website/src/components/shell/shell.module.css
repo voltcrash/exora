@@ -327,21 +327,13 @@
   font-weight: 500;
 }
 
-.loading small {
-  max-width: 32ch;
-  color: var(--ink-3);
-  font-size: var(--text-sm);
-}
-
 /* The copy is withheld rather than drawn in the platform sans and redrawn once the web font lands. */
-.loading p,
-.loading small {
+.loading p {
   opacity: 0;
   transition: opacity var(--duration) var(--ease);
 }
 
-.loading[data-type-settled] p,
-.loading[data-type-settled] small {
+.loading[data-type-settled] p {
   opacity: 1;
 }
 

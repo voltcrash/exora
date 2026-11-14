@@ -185,7 +185,7 @@ export const BlackHoleExperience = ({ blackHole, host, travelPhase }: BlackHoleE
         tone: "black-hole",
       }}
       light={diskLight(blackHole.visual.diskHueDegrees)}
-      loading={{ detail: `${blackHole.name} · horizon reference`, title: "Modelling spacetime" }}
+      loading={{ title: blackHole.name }}
       panel={panel}
       sceneState={sceneState}
       travelPhase={travelPhase}

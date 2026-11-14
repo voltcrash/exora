@@ -743,12 +743,7 @@ export const PlanetExperience = ({
         tone: subsystemActive ? "subsystem" : "world",
       }}
       light={starLight(custom ? null : observation.hostTemperatureKelvin)}
-      loading={{
-        detail: subsystemActive
-          ? `${planet.name} and its moons`
-          : `${planet.name} · seed ${recipe.seed.toString(16).toUpperCase()}`,
-        title: subsystemActive ? "Placing moons" : "Calculating world",
-      }}
+      loading={{ title: planet.name }}
       panel={panel}
       sceneState={sceneState}
       style={{ "--surface-transition": `${SURFACE_TRANSITION_MS}ms` } as CSSProperties}

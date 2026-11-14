@@ -28,7 +28,7 @@ interface DestinationShellProps {
   identity: DestinationIdentityProps;
   /** The local star's light as an `r g b` triplet; see `star-light.ts`. */
   light: string;
-  loading: { detail: string; title: string };
+  loading: { title: string };
   panel: DestinationPanelModel;
   sceneState: SceneState;
   style?: CSSProperties;
@@ -135,7 +135,7 @@ export const DestinationShell = ({
 
       {children}
 
-      <LoadingScreen title={loading.title} detail={loading.detail} />
+      <LoadingScreen title={loading.title} />
     </div>
   );
 };

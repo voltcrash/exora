@@ -151,7 +151,7 @@ export const RegionExperience = ({
         tone: "region",
       }}
       light={starLight(null)}
-      loading={{ detail: `${region.name} · ${evidenceLabel}`, title: "Building a scale model" }}
+      loading={{ title: region.name }}
       panel={panel}
       sceneState={sceneState}
       travelPhase={travelPhase}

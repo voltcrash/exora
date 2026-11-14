@@ -604,11 +604,7 @@ export const App = () => {
         />
       ) : null}
       {!activeObject ? (
-        <LoadingScreen
-          detail="Asking the archives for this destination"
-          standalone
-          title="Finding your destination"
-        />
+        <LoadingScreen standalone title="Loading" />
       ) : activeObject.type === "missing" ? (
         <RecoveryScreen
           action={activeObject.retry ? "Retry destination" : "Go to the featured world"}
