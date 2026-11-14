@@ -45,7 +45,7 @@ export const TopBar = ({ host, xrStatus }: TopBarProps) => {
         onClick={openPalette}
       >
         <Icon name="search" size={17} />
-        <span className={styles["search-label"]}>Go anywhere</span>
+        <span className={styles["search-label"]}>Search</span>
         <span className={styles["search-keys"]} aria-hidden="true">
           <Kbd>{`${MODIFIER_KEY} K`}</Kbd>
         </span>
