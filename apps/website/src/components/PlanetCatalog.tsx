@@ -281,24 +281,15 @@ export const PlanetCatalog = ({ onSelect }: PlanetCatalogProps) => {
   };
 
   const trimmed = query.trim();
+  // Only results worth counting are announced; loading and errors speak from the list itself.
   const status =
-    searchState === "loading"
-      ? trimmed
-        ? `Searching the NASA Exoplanet Archive for “${trimmed}”…`
-        : filtersOpen
-          ? "Gathering worlds to filter…"
-          : activeLabel
-            ? `Opening ${activeLabel.toLowerCase()}…`
-            : "Loading the catalog…"
-      : searchState === "error"
-        ? "The NASA Exoplanet Archive did not answer. Try again in a moment."
-        : trimmed
-          ? `${String(visiblePlanets.length)} worlds match “${trimmed}”`
-          : filtersOpen
-            ? `${String(visiblePlanets.length)} worlds fit these filters`
-            : activeLabel
-              ? `${String(visiblePlanets.length)} worlds · ${activeLabel}`
-              : "Every confirmed world, A to Z";
+    searchState !== "ready"
+      ? ""
+      : filtersOpen
+        ? `${String(visiblePlanets.length)} worlds fit these filters`
+        : trimmed || activeLabel
+          ? `${String(visiblePlanets.length)} worlds`
+          : "";
 
   return (
     <section
@@ -448,20 +439,16 @@ export const PlanetCatalog = ({ onSelect }: PlanetCatalogProps) => {
       ) : null}
 
       <ResultList id="planet-search-results" testId="catalog-results" view={resultView}>
-        {searchState === "loading" ? (
-          <ResultState kind="loading">Finding confirmed worlds…</ResultState>
-        ) : null}
+        {searchState === "loading" ? <ResultState kind="loading">Loading…</ResultState> : null}
         {searchState === "error" ? (
           <ResultState kind="error">
-            The search could not be completed.{" "}
-            <Button onClick={() => setRetry((value) => value + 1)}>Retry search</Button>
+            Archive unavailable.{" "}
+            <Button onClick={() => setRetry((value) => value + 1)}>Retry</Button>
           </ResultState>
         ) : null}
         {searchState === "ready" && visiblePlanets.length === 0 ? (
           <ResultState kind="empty">
-            {filtersOpen
-              ? "No worlds fit every filter. Widen one or two of them."
-              : "No confirmed planet matches that name, or anything close to it."}
+            {filtersOpen ? "No worlds fit every filter." : "No matches."}
           </ResultState>
         ) : null}
         {searchState === "ready"
@@ -472,11 +459,9 @@ export const PlanetCatalog = ({ onSelect }: PlanetCatalogProps) => {
         {searchState === "ready" && nextCursor !== null ? (
           <ResultState kind="more" ref={sentinelRef} testId="catalog-load-more">
             {loadingMore ? (
-              "Loading more worlds…"
+              "Loading…"
             ) : (
-              <Button onClick={loadMore}>
-                {pageError ? "Retry loading more" : "Load more worlds"}
-              </Button>
+              <Button onClick={loadMore}>{pageError ? "Retry" : "Load more"}</Button>
             )}
           </ResultState>
         ) : null}

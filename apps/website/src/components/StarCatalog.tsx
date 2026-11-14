@@ -226,19 +226,7 @@ export const StarCatalog = ({ onSelect }: StarCatalogProps) => {
 
   const trimmed = query.trim();
   const status =
-    searchState === "loading"
-      ? trimmed
-        ? `Looking up “${trimmed}” in SIMBAD…`
-        : activeLabel
-          ? `Opening ${activeLabel.toLowerCase()}…`
-          : "Loading the catalog…"
-      : searchState === "error"
-        ? "SIMBAD did not answer. Try again in a moment."
-        : trimmed
-          ? `${String(stars.length)} stars match “${trimmed}”`
-          : activeLabel
-            ? `${String(stars.length)} stars · ${activeLabel}`
-            : "Stars from SIMBAD, A to Z";
+    searchState === "ready" && (trimmed || activeLabel) ? `${String(stars.length)} stars` : "";
 
   return (
     <section className={catalogStyles["catalog"]} aria-label="Star catalog">
@@ -291,19 +279,15 @@ export const StarCatalog = ({ onSelect }: StarCatalogProps) => {
       ) : null}
 
       <ResultList id="star-search-results" view={resultView}>
-        {searchState === "loading" ? (
-          <ResultState kind="loading">Finding stars…</ResultState>
-        ) : null}
+        {searchState === "loading" ? <ResultState kind="loading">Loading…</ResultState> : null}
         {searchState === "error" ? (
           <ResultState kind="error">
-            The search could not be completed.{" "}
-            <Button onClick={() => setRetry((value) => value + 1)}>Retry search</Button>
+            SIMBAD unavailable.{" "}
+            <Button onClick={() => setRetry((value) => value + 1)}>Retry</Button>
           </ResultState>
         ) : null}
         {searchState === "ready" && stars.length === 0 ? (
-          <ResultState kind="empty">
-            No star matches that name, or anything close to it.
-          </ResultState>
+          <ResultState kind="empty">No matches.</ResultState>
         ) : null}
         {searchState === "ready"
           ? stars.map((star) => (
@@ -313,11 +297,9 @@ export const StarCatalog = ({ onSelect }: StarCatalogProps) => {
         {searchState === "ready" && nextCursor !== null ? (
           <ResultState kind="more" ref={sentinelRef} testId="star-catalog-load-more">
             {loadingMore ? (
-              "Loading more stars…"
+              "Loading…"
             ) : (
-              <Button onClick={loadMore}>
-                {pageError ? "Retry loading more" : "Load more stars"}
-              </Button>
+              <Button onClick={loadMore}>{pageError ? "Retry" : "Load more"}</Button>
             )}
           </ResultState>
         ) : null}
