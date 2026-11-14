@@ -178,13 +178,17 @@ export const StarCatalog = ({ onSelect }: StarCatalogProps) => {
     pageControllerRef.current = controller;
     setLoadingMore(true);
     setPageError(false);
+    let appended = false;
     void browseStars({ cursor: nextCursor, signal: controller.signal })
       .then((result) => {
         if (controller.signal.aborted) return;
         // Appending a page renders dozens of cards; as a transition it yields to scrolling.
+        // Loading ends in the same transition, so the observer re-arms only with the new cursor.
+        appended = true;
         startTransition(() => {
           setStars((current) => appendUniqueById(current, result.stars));
           setNextCursor(result.nextCursor);
+          setLoadingMore(false);
         });
       })
       .catch((error: unknown) => {
@@ -195,7 +199,7 @@ export const StarCatalog = ({ onSelect }: StarCatalogProps) => {
       .finally(() => {
         if (pageControllerRef.current !== controller) return;
         pageControllerRef.current = null;
-        setLoadingMore(false);
+        if (!appended) setLoadingMore(false);
       });
   }, [nextCursor]);
 

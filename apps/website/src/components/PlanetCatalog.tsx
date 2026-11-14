@@ -224,13 +224,17 @@ export const PlanetCatalog = ({ onSelect }: PlanetCatalogProps) => {
     pageControllerRef.current = controller;
     setLoadingMore(true);
     setPageError(false);
+    let appended = false;
     void loadPlanetFilterPool({ cursor: nextCursor, signal: controller.signal })
       .then((result) => {
         if (controller.signal.aborted) return;
         // Appending a page renders dozens of cards; as a transition it yields to scrolling.
+        // Loading ends in the same transition, so the observer re-arms only with the new cursor.
+        appended = true;
         startTransition(() => {
           setPlanets((current) => appendUniqueById(current, result.planets));
           setNextCursor(result.nextCursor);
+          setLoadingMore(false);
         });
       })
       .catch((error: unknown) => {
@@ -241,7 +245,7 @@ export const PlanetCatalog = ({ onSelect }: PlanetCatalogProps) => {
       .finally(() => {
         if (pageControllerRef.current !== controller) return;
         pageControllerRef.current = null;
-        setLoadingMore(false);
+        if (!appended) setLoadingMore(false);
       });
   }, [nextCursor]);
 
