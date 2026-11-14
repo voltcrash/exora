@@ -173,16 +173,6 @@
   font-size: var(--text-xs);
 }
 
-.catalog-start {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  margin-top: var(--space-2);
-  color: var(--light);
-  font-size: var(--text-sm);
-  font-weight: 600;
-}
-
 @media (max-width: 760px) {
   .tour {
     padding: var(--space-3) var(--space-3) var(--space-2) var(--space-4);
