@@ -7,6 +7,7 @@ import type { ForgeMode } from "./CustomPlanetBuilder.tsx";
 import { BrandMark } from "./shell/BrandMark.tsx";
 import { Button } from "./ui/Button.tsx";
 import { Icon, type IconName } from "./ui/Icon.tsx";
+import { Spinner } from "./ui/Spinner.tsx";
 import styles from "./DiscoverScreen.module.css";
 
 const BlackHoleCatalog = lazy(() =>
@@ -162,7 +163,7 @@ export const DiscoverScreen = ({
         <nav className={styles["nav"]} aria-label="Explore destinations">
           {NAVIGATION.map((group) => (
             <div key={group.label} className={styles["nav-group"]}>
-              <p className={styles["nav-label"]}>{group.label}</p>
+              <p className="visually-hidden">{group.label}</p>
               {group.sections.map((item) => (
                 <button
                   className={styles["nav-item"]}
@@ -183,6 +184,11 @@ export const DiscoverScreen = ({
             </div>
           ))}
         </nav>
+
+        <footer className={styles["resources"]}>
+          <a href="/about/">About</a>
+          <a href="/guides/">Guides and sources</a>
+        </footer>
       </aside>
 
       <div ref={stageRef} className={styles["stage"]} data-testid="discover-stage">
@@ -202,7 +208,14 @@ export const DiscoverScreen = ({
         </header>
 
         <main className={styles["main"]}>
-          <Suspense key={section} fallback={<p role="status">Loading destinations…</p>}>
+          <Suspense
+            key={section}
+            fallback={
+              <p className={styles["loading"]} role="status" aria-label="Loading destinations…">
+                <Spinner size={20} />
+              </p>
+            }
+          >
             {section === "solar" ? (
               <SolarSystemCatalog
                 onSelectPlanet={onSelectPlanet}
@@ -228,11 +241,6 @@ export const DiscoverScreen = ({
               />
             )}
           </Suspense>
-          <footer className={styles["resources"]}>
-            <a href="/about/">About Exora</a>
-            <a href="/explore/">Planet profiles and tours</a>
-            <a href="/guides/">Guides and data sources</a>
-          </footer>
         </main>
       </div>
     </dialog>

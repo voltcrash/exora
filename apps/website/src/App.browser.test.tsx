@@ -424,7 +424,9 @@ const openDiscoverSection = async (
   await userEvent.click(page.getByRole("button", { exact: true, name: "Explore" }));
   await expect.element(page.getByRole("dialog", { name: /Exoplanets/ })).toBeVisible();
   await userEvent.click(page.getByRole("button", { name: new RegExp(name) }).first());
-  await expect.element(page.getByText("Loading destinations…")).not.toBeInTheDocument();
+  await expect
+    .element(page.getByRole("status", { name: "Loading destinations…" }))
+    .not.toBeInTheDocument();
 };
 
 beforeEach(() => {
