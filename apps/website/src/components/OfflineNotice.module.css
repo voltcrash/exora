@@ -17,6 +17,4 @@
   font-weight: 500;
   transform: translateX(-50%);
   pointer-events: none;
-  backdrop-filter: var(--blur);
-  -webkit-backdrop-filter: var(--blur);
 }

@@ -131,8 +131,6 @@
   background: var(--surface);
   box-shadow: var(--shadow-float);
   pointer-events: auto;
-  backdrop-filter: var(--blur);
-  -webkit-backdrop-filter: var(--blur);
 }
 
 .panel-head {
@@ -594,8 +592,6 @@ button.body:hover .body-go {
     border-radius: 0;
     background: none;
     box-shadow: none;
-    backdrop-filter: none;
-    -webkit-backdrop-filter: none;
   }
 
   .panel-head {

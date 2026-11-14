@@ -170,8 +170,6 @@
   box-shadow: 0 6px 24px rgb(0 0 0 / 28%);
   font-size: var(--text-sm);
   text-align: left;
-  backdrop-filter: var(--blur);
-  -webkit-backdrop-filter: var(--blur);
   transition:
     border-color var(--duration-fast) var(--ease),
     color var(--duration-fast) var(--ease);
@@ -247,8 +245,6 @@
   background: var(--surface);
   font-size: var(--text-sm);
   transform: translateX(-50%);
-  backdrop-filter: var(--blur);
-  -webkit-backdrop-filter: var(--blur);
 }
 
 /* The way back from a cleared view */
@@ -407,8 +403,6 @@
     box-shadow: 0 -12px 40px rgb(0 0 0 / 40%);
     pointer-events: auto;
     touch-action: none;
-    backdrop-filter: var(--blur);
-    -webkit-backdrop-filter: var(--blur);
     transition: height var(--duration-slow) var(--ease);
   }
 

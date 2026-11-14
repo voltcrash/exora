@@ -146,8 +146,6 @@ body[data-presentation-mode="ar"] #render-canvas {
   font-size: var(--text-sm);
   text-align: center;
   transform: translateX(-50%);
-  backdrop-filter: var(--blur);
-  -webkit-backdrop-filter: var(--blur);
 }
 
 #ar-overlay .ar-background-toggle,
@@ -165,8 +163,6 @@ body[data-presentation-mode="ar"] #render-canvas {
   font-weight: 500;
   pointer-events: auto;
   touch-action: manipulation;
-  backdrop-filter: var(--blur);
-  -webkit-backdrop-filter: var(--blur);
 }
 
 #ar-overlay .ar-background-toggle {

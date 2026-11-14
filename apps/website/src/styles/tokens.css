@@ -79,7 +79,6 @@
   --radius-lg: 20px;
   --radius-pill: 999px;
 
-  --blur: none;
   --shadow-float: 0 18px 50px rgb(0 0 0 / 45%), 0 2px 8px rgb(0 0 0 / 30%);
 
   --ease: cubic-bezier(0.2, 0.8, 0.2, 1);

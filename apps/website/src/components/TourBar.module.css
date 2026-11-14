@@ -12,8 +12,6 @@
   background: var(--surface);
   box-shadow: var(--shadow-float);
   transform: translateX(-50%);
-  backdrop-filter: var(--blur);
-  -webkit-backdrop-filter: var(--blur);
   transition:
     opacity var(--duration) var(--ease),
     visibility var(--duration) var(--ease);
