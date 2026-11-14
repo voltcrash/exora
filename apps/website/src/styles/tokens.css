@@ -11,8 +11,12 @@
 
   /* Astronomical symbols fall through to a face that supplies them. */
   --font-sans:
-    "Atkinson Hyperlegible Next Variable", "Apple Symbols", "Segoe UI Symbol", "Noto Sans Symbols",
+    "IBM Plex Sans Variable", "Apple Symbols", "Segoe UI Symbol", "Noto Sans Symbols",
     ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
+  /* Readings, coordinates and keys: fixed-width digits that hold still as values change. */
+  --font-mono:
+    "Geist Mono Variable", "Apple Symbols", "Segoe UI Symbol", "Noto Sans Symbols", ui-monospace,
+    "SF Mono", Menlo, monospace;
 
   /* Ink on the void, brightest to faintest. */
   --ink: #ecebe6;

@@ -1,6 +1,7 @@
-import "@fontsource-variable/atkinson-hyperlegible-next/wght.css";
+import "@fontsource-variable/ibm-plex-sans/wght.css";
+import "@fontsource-variable/geist-mono/wght.css";
 
-const FACES = ["Atkinson Hyperlegible Next Variable"];
+const FACES = ["IBM Plex Sans Variable", "Geist Mono Variable"];
 
 const ARRIVED = "exora:web-fonts-ready";
 
@@ -17,8 +18,8 @@ const announce = (next: "loaded" | "failed"): void => {
 const request = (): void => {
   if (state !== "idle") return;
   state = "loading";
-  // The face ships with the bundle and is declared up front, but WebKit settles
-  // `document.fonts.ready` before it has begun fetching it, so it is asked for by name.
+  // The faces ship with the bundle and are declared up front, but WebKit settles
+  // `document.fonts.ready` before it has begun fetching them, so they are asked for by name.
   void Promise.all(FACES.map((face) => document.fonts.load(`1em "${face}"`))).then(
     () => announce("loaded"),
     () => announce("failed"),

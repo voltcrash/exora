@@ -20,7 +20,8 @@
     "@exora/contracts": "workspace:*",
     "@exora/planet-catalog": "workspace:*",
     "@exora/worldgen": "workspace:*",
-    "@fontsource-variable/atkinson-hyperlegible-next": "catalog:",
+    "@fontsource-variable/geist-mono": "catalog:",
+    "@fontsource-variable/ibm-plex-sans": "catalog:",
     "react": "catalog:",
     "react-dom": "catalog:"
   },
