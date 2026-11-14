@@ -531,6 +531,10 @@ test("readings stay out of the scene until opened and release the renderer when 
     expect(stubbedHost().renderSuspensions).toBe(1);
     await userEvent.click(handle);
     expect(stubbedHost().renderSuspensions).toBe(0);
+    const travel = document.querySelector<HTMLButtonElement>('[data-testid="world-intro"] button');
+    expect(travel).not.toBeNull();
+    act(() => travel!.focus());
+    expect(stubbedHost().renderSuspensions).toBe(1);
   } else {
     const drawer = page.getByTestId("panel-drawer");
     await expect.element(drawer).not.toBeVisible();
@@ -594,8 +598,8 @@ desktopTest("a black-hole deep link resolves without an archive request", async 
   mountApp("?blackHole=M87*");
 
   await expect.element(page.getByRole("heading", { level: 1 })).toMatchTextContent("M87*");
-  await expandPanel();
   await expect.element(page.getByText(/interpretive model of gravitational lensing/)).toBeVisible();
+  await expect.element(page.getByTestId("panel-drawer")).not.toBeVisible();
   expect(window.location.search).toBe("?blackHole=M87*");
   expect(document.querySelector('link[rel="canonical"]')?.getAttribute("href")).toContain(
     "?blackHole=M87*",

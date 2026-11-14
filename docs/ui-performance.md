@@ -1,8 +1,8 @@
 # Interface and responsiveness
 
 Exora's world is the primary view. The interface keeps the destination, travel actions and four
-headline readings visible. Show details opens the explanations, caveats, sources and scientific
-tabs. On phones, those readings share a sheet with the destination. The half-open sheet scrolls;
+headline readings visible. Rendering caveats stay visible beside the headline readings. Show details opens explanations,
+sources and scientific tabs. On phones, those readings share a sheet with the destination. The half-open sheet scrolls;
 the fully opened sheet pauses rendering. Hiding the interface or travelling resumes the scene.
 
 The interface uses self-hosted Atkinson Hyperlegible Next, larger small labels and stronger text

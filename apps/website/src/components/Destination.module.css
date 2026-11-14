@@ -250,6 +250,8 @@
 }
 
 .panel-note {
+  margin: 0 var(--space-5) var(--space-4);
+  line-height: var(--leading);
   color: var(--tone-caveat);
   font-size: var(--text-xs);
 }
@@ -555,11 +557,7 @@ button.body:hover .body-go {
 
 @media (max-width: 1080px) {
   .identity {
-    width: min(400px, calc(100vw - 360px - 3 * var(--edge)));
-  }
-
-  .panel {
-    width: 320px;
+    width: min(360px, calc(100vw - 312px - 3 * var(--edge)));
   }
 }
 
@@ -607,6 +605,11 @@ button.body:hover .body-go {
 
   .metrics {
     margin: var(--space-4) 0 0;
+  }
+
+  .panel-note {
+    margin-right: 0;
+    margin-left: 0;
   }
 
   .panel-toggle {

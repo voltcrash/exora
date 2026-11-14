@@ -165,6 +165,8 @@ export const DestinationPanel = ({ host, model, summary, note }: DestinationPane
         ))}
       </dl>
 
+      {note ? <p className={cx("panel-note")}>{readable(note)}</p> : null}
+
       <button
         className={cx("panel-toggle")}
         type="button"
@@ -193,7 +195,6 @@ export const DestinationPanel = ({ host, model, summary, note }: DestinationPane
             {active.id === tabs[0]?.id ? (
               <div className={cx("panel-about")}>
                 <p>{summary}</p>
-                {note ? <p className={cx("panel-note")}>{readable(note)}</p> : null}
               </div>
             ) : null}
             {active.blocks.map((block, index) => (

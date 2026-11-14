@@ -198,7 +198,9 @@ export const DestinationSheet = ({
         data-sheet-grip
         type="button"
         aria-expanded={snap !== "peek"}
-        aria-label={snap === "full" ? "Hide destination readings" : "Show destination readings"}
+        aria-label={
+          snap === "full" ? "Collapse destination readings" : "Details: expand destination readings"
+        }
         aria-controls="destination-sheet-content"
         onClick={() => setSnap(nextSnap)}
       >
