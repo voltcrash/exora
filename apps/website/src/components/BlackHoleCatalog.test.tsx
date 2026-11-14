@@ -3,13 +3,12 @@ import { expect, test, vi } from "vite-plus/test";
 import { BLACK_HOLES, findBlackHole } from "../black-holes.ts";
 import { BlackHoleResult } from "./BlackHoleCatalog.tsx";
 
-test("a result carries its name, family and measured mass, without restating confirmation", () => {
+test("a result carries its name and measured mass, without restating confirmation", () => {
   const markup = renderToStaticMarkup(
     <BlackHoleResult blackHole={BLACK_HOLES[0]!} onSelect={vi.fn()} />,
   );
 
   expect(markup).toContain("Sagittarius A*");
-  expect(markup).toContain("Supermassive");
   expect(markup).toContain("4.3 million M☉");
   expect(markup).not.toContain("Confirmed");
 });

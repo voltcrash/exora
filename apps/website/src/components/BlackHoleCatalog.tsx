@@ -5,7 +5,6 @@ import {
   BLACK_HOLES,
   BLACK_HOLE_CATEGORIES,
   BLACK_HOLE_COLLECTIONS,
-  blackHoleKindLabel,
   blackHoleNotableTrait,
   collectBlackHoles,
   formatBlackHoleMass,
@@ -55,7 +54,6 @@ export const BlackHoleResult = ({
 }) => (
   <ResultCard
     facts={[
-      capitalize(blackHoleKindLabel(blackHole)),
       formatBlackHoleMass(blackHole.massSolar),
       formatDistance(blackHole),
       ...(blackHole.status === "confirmed" ? [] : [capitalize(blackHole.status)]),
