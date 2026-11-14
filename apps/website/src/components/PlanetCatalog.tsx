@@ -293,13 +293,15 @@ export const PlanetCatalog = ({ onSelect }: PlanetCatalogProps) => {
   const trimmed = query.trim();
   // Only results worth counting are announced; loading and errors speak from the list itself.
   const status =
-    searchState !== "ready"
-      ? ""
-      : filtersOpen
-        ? `${String(visiblePlanets.length)} worlds fit these filters`
-        : trimmed || activeLabel
-          ? `${String(visiblePlanets.length)} worlds`
-          : "";
+    searchState === "error"
+      ? "Archive unavailable."
+      : searchState !== "ready"
+        ? ""
+        : filtersOpen
+          ? `${String(visiblePlanets.length)} worlds fit these filters`
+          : trimmed || activeLabel
+            ? `${String(visiblePlanets.length)} worlds`
+            : "";
 
   return (
     <section
@@ -452,7 +454,6 @@ export const PlanetCatalog = ({ onSelect }: PlanetCatalogProps) => {
         {searchState === "loading" ? <ResultState kind="loading">Loading…</ResultState> : null}
         {searchState === "error" ? (
           <ResultState kind="error">
-            Archive unavailable.{" "}
             <Button onClick={() => setRetry((value) => value + 1)}>Retry</Button>
           </ResultState>
         ) : null}

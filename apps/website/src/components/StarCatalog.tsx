@@ -228,7 +228,11 @@ export const StarCatalog = ({ onSelect }: StarCatalogProps) => {
 
   const trimmed = query.trim();
   const status =
-    searchState === "ready" && (trimmed || activeLabel) ? `${String(stars.length)} stars` : "";
+    searchState === "error"
+      ? "SIMBAD unavailable."
+      : searchState === "ready" && (trimmed || activeLabel)
+        ? `${String(stars.length)} stars`
+        : "";
 
   return (
     <section className={catalogStyles["catalog"]} aria-label="Star catalog">
@@ -284,7 +288,6 @@ export const StarCatalog = ({ onSelect }: StarCatalogProps) => {
         {searchState === "loading" ? <ResultState kind="loading">Loading…</ResultState> : null}
         {searchState === "error" ? (
           <ResultState kind="error">
-            SIMBAD unavailable.{" "}
             <Button onClick={() => setRetry((value) => value + 1)}>Retry</Button>
           </ResultState>
         ) : null}
