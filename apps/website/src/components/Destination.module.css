@@ -113,6 +113,8 @@
   border-radius: var(--radius-md);
   background: var(--surface);
   pointer-events: auto;
+  /* Opening details or a tab re-lays out only the panel, never the rest of the HUD. */
+  contain: layout style;
 }
 
 .metrics {

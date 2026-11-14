@@ -167,7 +167,6 @@
   border-radius: var(--radius-pill);
   color: var(--ink-3);
   background: var(--surface);
-  box-shadow: 0 6px 24px rgb(0 0 0 / 28%);
   font-size: var(--text-sm);
   text-align: left;
   transition:
