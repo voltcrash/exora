@@ -837,7 +837,7 @@ desktopTest(
 
     await openDiscoverSection("Solar System");
     await userEvent.click(page.getByRole("button", { exact: true, name: "Regions" }));
-    await userEvent.fill(page.getByPlaceholder("Search by name or SPK ID"), "Oort");
+    await userEvent.fill(page.getByPlaceholder("Search"), "Oort");
     const oortCloud = page.getByRole("button", { name: /Oort Cloud/ });
     await expect.element(oortCloud).toBeVisible();
     await userEvent.click(oortCloud);

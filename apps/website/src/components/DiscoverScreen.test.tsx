@@ -41,7 +41,7 @@ test("Explore starts directly in the Exoplanet catalog", async () => {
 test("the Solar System catalog keeps its regions", async () => {
   const markup = await discoverMarkup("solar");
 
-  expect(markup).toContain("Regions · statistical populations and measured boundaries");
+  expect(markup).toContain(">Regions<");
   expect(markup).not.toContain("Missions · optional trajectories and exploration sites");
   expect(markup).not.toContain("Comets · measured nuclei and simulated activity");
 });

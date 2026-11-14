@@ -94,16 +94,16 @@ describe("the local Solar System catalog", () => {
     expect(SOLAR_SYSTEM_MOONS).toHaveLength(21);
     expect(SOLAR_SYSTEM_CATALOG).toHaveLength(35);
     expect(SOLAR_SYSTEM_CATALOG_GROUPS.map(({ label }) => label)).toEqual([
-      "Sun · home star",
-      "Planets · 8 worlds",
-      "Dwarf planets · 5 worlds",
-      "Earth system · 1 mapped moon",
-      "Mars system · 2 mapped moons",
-      "Jupiter system · 4 mapped moons",
-      "Saturn system · 7 mapped moons",
-      "Uranus system · 5 mapped moons",
-      "Neptune system · 1 mapped moon",
-      "Pluto system · 1 mapped moon",
+      "Sun",
+      "Planets",
+      "Dwarf planets",
+      "Moons of Earth",
+      "Moons of Mars",
+      "Moons of Jupiter",
+      "Moons of Saturn",
+      "Moons of Uranus",
+      "Moons of Neptune",
+      "Moons of Pluto",
     ]);
     expect(new Set(SOLAR_SYSTEM_MOONS.map(({ solarSystem }) => solarSystem?.naifId)).size).toBe(21);
     expect(SOLAR_SYSTEM_MOONS.every(({ solarSystem }) => solarSystem?.texture)).toBe(true);
