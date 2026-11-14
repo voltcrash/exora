@@ -1,5 +1,13 @@
 import type { ExoplanetProfile } from "@exora/contracts";
-import { useCallback, useDeferredValue, useEffect, useMemo, useRef, useState } from "react";
+import {
+  startTransition,
+  useCallback,
+  useDeferredValue,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
 import {
   discoverPlanets,
   discoverRandomPlanet,
@@ -219,8 +227,11 @@ export const PlanetCatalog = ({ onSelect }: PlanetCatalogProps) => {
     void loadPlanetFilterPool({ cursor: nextCursor, signal: controller.signal })
       .then((result) => {
         if (controller.signal.aborted) return;
-        setPlanets((current) => appendUniqueById(current, result.planets));
-        setNextCursor(result.nextCursor);
+        // Appending a page renders dozens of cards; as a transition it yields to scrolling.
+        startTransition(() => {
+          setPlanets((current) => appendUniqueById(current, result.planets));
+          setNextCursor(result.nextCursor);
+        });
       })
       .catch((error: unknown) => {
         if (controller.signal.aborted) return;

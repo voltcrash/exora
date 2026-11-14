@@ -1,6 +1,6 @@
 import { Button } from "./ui/Button.tsx";
 import type { StarProfile } from "@exora/contracts";
-import { useCallback, useEffect, useRef, useState } from "react";
+import { startTransition, useCallback, useEffect, useRef, useState } from "react";
 import { browseStars, discoverRandomStar, discoverStars, searchStars } from "../api-client.ts";
 import { formatNumber } from "../planet-utils.tsx";
 import { starKindLabel } from "../star-utils.ts";
@@ -181,8 +181,11 @@ export const StarCatalog = ({ onSelect }: StarCatalogProps) => {
     void browseStars({ cursor: nextCursor, signal: controller.signal })
       .then((result) => {
         if (controller.signal.aborted) return;
-        setStars((current) => appendUniqueById(current, result.stars));
-        setNextCursor(result.nextCursor);
+        // Appending a page renders dozens of cards; as a transition it yields to scrolling.
+        startTransition(() => {
+          setStars((current) => appendUniqueById(current, result.stars));
+          setNextCursor(result.nextCursor);
+        });
       })
       .catch((error: unknown) => {
         if (controller.signal.aborted) return;
