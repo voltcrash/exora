@@ -9,16 +9,16 @@
 :root {
   color-scheme: dark;
 
-  /* Archivo has no astronomical symbols, so ☉ and ⊕ fall through to a face that does. */
+  /* Astronomical symbols fall through to a face that supplies them. */
   --font-sans:
-    "Archivo Variable", "Archivo", "Apple Symbols", "Segoe UI Symbol", "Noto Sans Symbols",
+    "Atkinson Hyperlegible Next Variable", "Apple Symbols", "Segoe UI Symbol", "Noto Sans Symbols",
     ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
 
   /* Ink on the void, brightest to faintest. */
   --ink: #ecebe6;
   --ink-2: #aeb1b7;
-  --ink-3: #7b7f88;
-  --ink-4: #50545c;
+  --ink-3: #a0a4ad;
+  --ink-4: #959aa5;
   --void: #000;
 
   /* Near-opaque surfaces keep moving scenes readable without per-frame background blur. */
@@ -46,21 +46,21 @@
   --tone-danger: #ff8f80;
 
   /* Type: a minor-third scale on a 15px body. */
-  --text-2xs: 0.6875rem;
-  --text-xs: 0.75rem;
-  --text-sm: 0.8125rem;
+  --text-2xs: 0.75rem;
+  --text-xs: 0.8125rem;
+  --text-sm: 0.875rem;
   --text-base: 0.9375rem;
   --text-md: 1.0625rem;
   --text-lg: 1.3125rem;
   --text-xl: 1.625rem;
   --text-2xl: 2.125rem;
-  --text-display: clamp(2.25rem, 3.4vw + 1rem, 4.25rem);
+  --text-display: clamp(2rem, 2.4vw + 1rem, 3rem);
 
   --leading-tight: 1.15;
   --leading: 1.5;
 
-  --wide: 118%;
-  --narrow: 88%;
+  --wide: 100%;
+  --narrow: 100%;
 
   /* Space: a 4px grid. */
   --space-1: 4px;

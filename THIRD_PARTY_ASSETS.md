@@ -314,13 +314,12 @@ Keep the files byte-for-byte as published — do not run them through `vp fmt`.
 
 ## Interface typeface
 
-The interface is set in Archivo, a variable family with width and weight axes, by Omnibus-Type
-(`github.com/Omnibus-Type/Archivo`), licensed under the SIL Open Font License 1.1. It arrives
-through the npm package `@fontsource-variable/archivo`, whose `wdth.css` declares the upright
-faces split by Unicode range, so the bundle emits hashed WOFF2 files that the service worker keeps
-with every other asset. It used to be fetched from Google Fonts, which put a third-party origin on
-the first paint and left the interface in a fallback face when offline; serving it from the page's
-own origin also let the content security policy drop both Google hosts.
+The interface uses **Atkinson Hyperlegible Next**, designed by Braille Institute and Applied
+Design Works to make letters and numerals easier to distinguish. It is licensed under the
+SIL Open Font License 1.1 and shipped by `@fontsource-variable/atkinson-hyperlegible-next`.
+The package's `wght.css` declares the upright variable face, split by Unicode range. Hashed
+WOFF2 assets are served from the app's own origin and cached offline; no font service is contacted.
+See [Braille Institute](https://www.brailleinstitute.org/freefont/) and the package's `LICENSE`.
 
 ## Star catalogue
 

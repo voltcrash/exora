@@ -1,6 +1,6 @@
-import "@fontsource-variable/archivo/wdth.css";
+import "@fontsource-variable/atkinson-hyperlegible-next/wght.css";
 
-const FACES = ["Archivo Variable"];
+const FACES = ["Atkinson Hyperlegible Next Variable"];
 
 const ARRIVED = "exora:web-fonts-ready";
 
@@ -27,7 +27,7 @@ const request = (): void => {
 
 /*
  * The typeface is asked for once the first frame is on screen, so the interface may be drawn
- * twice: once in the platform sans and again in Archivo. Anything whose layout was measured against
+ * twice: once in the platform sans and again in the web font. Anything whose layout was measured against
  * the first face has to hear about the second, and the FontFaceSet events that should say so are
  * not delivered by WebKit — so Exora announces the arrival itself.
  */
