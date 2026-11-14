@@ -63,3 +63,30 @@ test("a stalled worker releases every pending read after its deadline", async ()
   expect(CatalogWorker.instance.terminate).toHaveBeenCalledOnce();
   expect(vi.getTimerCount()).toBe(0);
 });
+
+test("planet reads fall back to the API after an initialized worker fails", async () => {
+  vi.resetModules();
+  vi.stubGlobal("Worker", CatalogWorker);
+  const client = await import("./api-client.ts");
+  const { featuredPlanet } = await import("./planet-profile.ts");
+  await client.preloadPlanetCatalog();
+  const api = vi.fn(async (input: string | URL | Request) => {
+    const path = typeof input === "string" ? input : input instanceof URL ? input.href : input.url;
+    return Response.json({
+      data: path.includes("/api/planets/") ? featuredPlanet : [featuredPlanet],
+      meta: {
+        cached: false,
+        source: "NASA Exoplanet Archive",
+        ...(path.includes("/api/planets/") ? {} : { count: 1, query: "kepler" }),
+      },
+    });
+  });
+  const first = client.loadPlanetByName("Kepler-22 b", api);
+  CatalogWorker.instance.onmessageerror?.();
+  expect((await first)?.planet).toEqual(featuredPlanet);
+  expect((await client.searchPlanets("kepler", { fetcher: api })).planets).toEqual([
+    featuredPlanet,
+  ]);
+  expect((await client.loadPlanetFilterPool({ fetcher: api })).planets).toEqual([featuredPlanet]);
+  expect(api).toHaveBeenCalledTimes(3);
+});
