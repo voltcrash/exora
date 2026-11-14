@@ -95,6 +95,11 @@ export const SolarSystemCatalog = ({
             {group.entries.map((entry) => {
               const identity = entry.profile.solarSystem;
               const slug = entry.profile.name.toLocaleLowerCase().replaceAll(" ", "-");
+              // CSS cannot decode KTX2, so only plain images become portraits.
+              const portrait =
+                identity?.texture && !identity.texture.path.endsWith(".ktx2")
+                  ? identity.texture.path
+                  : undefined;
               return (
                 <li key={entry.profile.id}>
                   <button
@@ -108,12 +113,8 @@ export const SolarSystemCatalog = ({
                     <span
                       className={styles["portrait"]}
                       data-body={slug}
-                      data-mapped={identity?.texture ? "" : undefined}
-                      style={
-                        identity?.texture
-                          ? { backgroundImage: `url(${identity.texture.path})` }
-                          : undefined
-                      }
+                      data-mapped={portrait ? "" : undefined}
+                      style={portrait ? { backgroundImage: `url(${portrait})` } : undefined}
                       aria-hidden="true"
                     />
                     <span className={styles["body-copy"]}>

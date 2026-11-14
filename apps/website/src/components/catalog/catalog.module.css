@@ -411,6 +411,66 @@
     0 0 40px rgb(255 114 32 / 45%);
 }
 
+.portrait[data-body="mercury"] {
+  background: radial-gradient(circle at 32% 28%, #d9d2c8, #9a928a 45%, #4a4541 80%, #1d1b1a);
+}
+
+.portrait[data-body="venus"] {
+  background: radial-gradient(circle at 32% 28%, #fff1cf, #e8c98e 40%, #b98b4e 72%, #4d3317);
+}
+
+.portrait[data-body="earth"] {
+  background:
+    radial-gradient(circle at 60% 40%, rgb(92 140 74 / 85%) 0 14%, transparent 26%),
+    radial-gradient(circle at 34% 64%, rgb(120 150 82 / 80%) 0 10%, transparent 20%),
+    radial-gradient(circle at 32% 28%, #cfe6ff, #3d7cc9 42%, #1b4a8c 72%, #071a38);
+}
+
+.portrait[data-body="mars"] {
+  background: radial-gradient(circle at 32% 28%, #ffcfa6, #d0703c 42%, #94401c 74%, #3a170a);
+}
+
+.portrait[data-body="jupiter"] {
+  background:
+    repeating-linear-gradient(
+      172deg,
+      rgb(255 255 255 / 0%) 0 9%,
+      rgb(150 92 55 / 45%) 9% 13%,
+      rgb(255 255 255 / 0%) 13% 19%
+    ),
+    radial-gradient(circle at 32% 28%, #fbe8cc, #d9b48a 42%, #9a6b45 74%, #3b2414);
+}
+
+.portrait[data-body="saturn"] {
+  background:
+    repeating-linear-gradient(176deg, rgb(255 255 255 / 0%) 0 12%, rgb(160 128 80 / 30%) 12% 16%),
+    radial-gradient(circle at 32% 28%, #fff4d6, #e3cf9e 42%, #a88c58 74%, #43361f);
+}
+
+.portrait[data-body="neptune"] {
+  background: radial-gradient(circle at 32% 28%, #c9dcff, #4f74e0 40%, #2a43a6 72%, #0c1645);
+}
+
+.portrait[data-body="io"] {
+  background: radial-gradient(circle at 32% 28%, #fff7b5, #e2c94f 42%, #b0782d 74%, #3f2a0e);
+}
+
+.portrait[data-body="europa"] {
+  background: radial-gradient(circle at 32% 28%, #fffaf0, #d9cbb4 44%, #9c8268 76%, #3a2e22);
+}
+
+.portrait[data-body="titan"] {
+  background: radial-gradient(circle at 32% 28%, #ffe2a8, #d39b45 42%, #965f1f 74%, #3a230a);
+}
+
+.portrait[data-body="pluto"] {
+  background: radial-gradient(circle at 32% 28%, #fbe7d0, #c79a73 44%, #7d5a3e 76%, #2e2015);
+}
+
+.portrait[data-body="triton"] {
+  background: radial-gradient(circle at 32% 28%, #fff2ec, #d8b8ae 44%, #8f7168 76%, #34282a);
+}
+
 .portrait[data-body="uranus"] {
   background: radial-gradient(circle at 32% 28%, #d8ffff, #91e4e8 36%, #58b9c4 68%, #1e6678);
 }
