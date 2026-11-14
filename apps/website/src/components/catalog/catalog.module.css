@@ -17,7 +17,7 @@
   align-items: center;
   gap: var(--space-3);
   min-width: 0;
-  height: 48px;
+  height: 44px;
   padding: 0 var(--space-4);
   border: 1px solid var(--hairline-strong);
   border-radius: var(--radius-md);
@@ -55,8 +55,14 @@
 }
 
 .random {
-  height: 48px;
+  flex: none;
+  width: 44px;
+  height: 44px;
   border-radius: var(--radius-md);
+}
+
+.random[data-error] {
+  color: var(--tone-caveat);
 }
 
 /* Chip rail */
@@ -500,18 +506,6 @@
 }
 
 @media (max-width: 760px) {
-  .search {
-    flex-wrap: wrap;
-  }
-
-  .search-field {
-    flex-basis: 100%;
-  }
-
-  .random {
-    flex: 1;
-  }
-
   .results {
     grid-template-columns: repeat(auto-fill, minmax(156px, 1fr));
     gap: var(--space-2);

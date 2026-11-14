@@ -59,11 +59,11 @@ export const CatalogSearch = ({
         icon="dice"
         disabled={randomBusy}
         aria-busy={randomBusy || undefined}
-        title={randomError ? "The archive did not answer. Try again." : undefined}
+        aria-label={randomLabel}
+        title={randomError ? "Archive unavailable. Try again." : randomLabel}
+        data-error={randomError || undefined}
         onClick={onRandom}
-      >
-        {randomLabel}
-      </Button>
+      />
     ) : null}
   </div>
 );
