@@ -4,7 +4,6 @@ import {
   blackHoleResponseSchema,
   blackHoleSearchResponseSchema,
   FEATURED_BLACK_HOLES,
-  ephemerisResponseSchema,
   planetPopulationResponseSchema,
   planetResponseSchema,
   planetSearchResponseSchema,
@@ -18,14 +17,6 @@ import {
   type BlackHoleRepository,
   VizierBlackHoleRepository,
 } from "./black-hole-archive.ts";
-import {
-  HORIZONS_API_VERSION,
-  HORIZONS_SOURCE,
-  HORIZONS_TARGETS,
-  HorizonsError,
-  type HorizonsRepository,
-  JplHorizonsRepository,
-} from "./horizons.ts";
 import {
   NasaArchiveError,
   NasaPlanetRepository,
@@ -52,8 +43,6 @@ import {
 
 interface CreateAppOptions {
   blackHoleRepository?: BlackHoleRepository;
-  horizonsRateLimiter?: RateLimiter;
-  horizonsRepository?: HorizonsRepository;
   populationRepository?: PopulationRepository;
   rateLimiter?: RateLimiter;
   repository?: PlanetRepository;
@@ -84,16 +73,6 @@ const renderApiError = (error: unknown, context: Context): Response => {
   if (error instanceof SimbadArchiveError) {
     return context.json(
       apiError("UPSTREAM_UNAVAILABLE", "SIMBAD star archive is temporarily unavailable."),
-      502,
-    );
-  }
-
-  if (error instanceof HorizonsError) {
-    return context.json(
-      apiError(
-        "UPSTREAM_UNAVAILABLE",
-        "JPL Horizons is temporarily unavailable and no cached ephemeris covers this time.",
-      ),
       502,
     );
   }
@@ -197,8 +176,6 @@ const starCollection = (
 
 export const createApp = ({
   blackHoleRepository = new VizierBlackHoleRepository(),
-  horizonsRateLimiter = createRateLimiter({ limit: 8, windowMs: 60_000 }),
-  horizonsRepository = new JplHorizonsRepository(),
   populationRepository = new NasaPopulationRepository(),
   rateLimiter = createRateLimiter(DEFAULT_RATE_LIMIT),
   repository = new NasaPlanetRepository(),
@@ -314,69 +291,6 @@ export const createApp = ({
         meta: {
           cached: result.cached,
           source: "BlackCAT / CDS VizieR",
-          stale: result.stale,
-        },
-      }),
-    );
-  });
-
-  app.get("/api/ephemerides", async (context) => {
-    const decision = horizonsRateLimiter.check(callerOf(context), Date.now());
-    context.header("Ephemeris-RateLimit-Limit", String(decision.limit));
-    context.header("Ephemeris-RateLimit-Remaining", String(decision.remaining));
-    if (!decision.allowed) {
-      context.header("Cache-Control", "no-store");
-      context.header("Retry-After", String(decision.retryAfterSeconds));
-      return context.json(
-        apiError("RATE_LIMITED", "Too many ephemeris requests. Please wait before trying again."),
-        429,
-      );
-    }
-
-    const at = context.req.query("at")?.trim() ?? "";
-    const epoch = new Date(at);
-    const minimum = Date.UTC(1900, 0, 1);
-    const maximum = Date.UTC(2101, 0, 1);
-    const isoDate = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d{1,3})?(?:Z|[+-]\d{2}:\d{2})$/;
-    if (
-      !isoDate.test(at) ||
-      !Number.isFinite(epoch.getTime()) ||
-      epoch.getTime() < minimum ||
-      epoch.getTime() >= maximum
-    ) {
-      return context.json(
-        apiError("INVALID_REQUEST", "Ephemeris time must be an ISO date between 1900 and 2100."),
-        400,
-      );
-    }
-
-    const requestedIds = context.req.query("ids")?.trim();
-    const naifIds = requestedIds
-      ? requestedIds.split(",").map((value) => Number.parseInt(value, 10))
-      : HORIZONS_TARGETS.map(({ naifId }) => naifId);
-    const supportedIds = new Set<number>(HORIZONS_TARGETS.map(({ naifId }) => naifId));
-    if (
-      naifIds.length < 1 ||
-      naifIds.length > HORIZONS_TARGETS.length ||
-      new Set(naifIds).size !== naifIds.length ||
-      naifIds.some((naifId) => !Number.isInteger(naifId) || !supportedIds.has(naifId))
-    ) {
-      return context.json(apiError("INVALID_REQUEST", "Ephemeris target list is invalid."), 400);
-    }
-
-    const result = await horizonsRepository.positions(naifIds, epoch);
-    setCachePolicy(context, CACHE_POLICY.liveLookup);
-    return context.json(
-      ephemerisResponseSchema.parse({
-        data: result.value,
-        meta: {
-          cached: result.cached,
-          center: "Sun (10)",
-          coordinateFrame: "Ecliptic J2000",
-          epoch: epoch.toISOString(),
-          retrievedAt: result.retrievedAt,
-          source: HORIZONS_SOURCE,
-          sourceVersion: HORIZONS_API_VERSION,
           stale: result.stale,
         },
       }),
