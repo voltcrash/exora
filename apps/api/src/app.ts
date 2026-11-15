@@ -95,10 +95,6 @@ const CACHE_POLICY = {
     browser: "public, max-age=60",
     cdn: "public, max-age=900, stale-while-revalidate=21600, stale-if-error=86400",
   },
-  liveLookup: {
-    browser: "public, max-age=60",
-    cdn: "public, max-age=300, stale-while-revalidate=86400, stale-if-error=86400",
-  },
   population: {
     browser: "public, max-age=3600",
     cdn: "public, max-age=43200, stale-while-revalidate=604800, stale-if-error=604800",
