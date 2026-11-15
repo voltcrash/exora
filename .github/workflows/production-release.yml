@@ -1,0 +1,98 @@
+name: Production deployment
+
+on:
+  workflow_run:
+    workflows: [Quality]
+    types: [completed]
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  actions: read
+
+concurrency:
+  group: cloudflare-production
+  cancel-in-progress: false
+
+env:
+  CI: "true"
+  WRANGLER_SEND_METRICS: "false"
+
+jobs:
+  deploy:
+    if: >-
+      github.repository == 'voltcrash/exora' &&
+      (
+        (github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main') ||
+        (
+          github.event_name == 'workflow_run' &&
+          github.event.workflow_run.event == 'push' &&
+          github.event.workflow_run.head_branch == 'main' &&
+          github.event.workflow_run.head_repository.full_name == github.repository &&
+          github.event.workflow_run.conclusion == 'success'
+        )
+      )
+    name: Deploy production
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    env:
+      # workflow_run's github.sha may already point at a newer main commit.
+      DEPLOYMENT_SHA: ${{ github.event_name == 'workflow_run' && github.event.workflow_run.head_sha || github.sha }}
+    environment:
+      name: Production
+      url: https://exora.voltcrash.com
+    steps:
+      - name: Check out the run's main snapshot
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ env.DEPLOYMENT_SHA }}
+          persist-credentials: false
+      - name: Require successful Quality for the deployment commit
+        uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
+        with:
+          script: |
+            const { requireSuccessfulProductionCI } = await import(`${process.env.GITHUB_WORKSPACE}/scripts/production-validation.mjs`);
+            const run = await requireSuccessfulProductionCI({ github, context, sha: process.env.DEPLOYMENT_SHA });
+            await core.summary.addLink('Validated Exora Quality', run.html_url).write();
+      - name: Check production credentials
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ vars.CLOUDFLARE_ACCOUNT_ID }}
+        run: |
+          for key in CLOUDFLARE_API_TOKEN CLOUDFLARE_ACCOUNT_ID; do
+            if [[ -z "${!key}" ]]; then
+              echo "::error::Configure $key in the Production environment or repository Actions settings. See docs/deployment.md."
+              exit 1
+            fi
+          done
+      - name: Set up Vite+ and install dependencies
+        uses: voidzero-dev/setup-vp@cab1ab9eaff52d4857875f4f2c016e36af8f2c76 # v1.22.0
+        with:
+          node-version-file: package.json
+          cache: true
+          run-install: |
+            args: ['--frozen-lockfile']
+      - name: Build production Worker and assets
+        run: vp run -r build
+        env:
+          VITE_VARIANT_LAUNCH_KEY: ${{ vars.VITE_VARIANT_LAUNCH_KEY }}
+      - name: Validate Worker deployment bundle
+        run: vp run deploy:check
+      - name: Check that this is still the latest main commit
+        id: revision
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          latest="$(gh api "repos/$GITHUB_REPOSITORY/commits/main" --jq .sha)"
+          if [[ "$latest" == "$DEPLOYMENT_SHA" ]]; then
+            echo "current=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "Skipping superseded main snapshot $DEPLOYMENT_SHA" >> "$GITHUB_STEP_SUMMARY"
+          fi
+      - name: Deploy production Worker and assets
+        if: steps.revision.outputs.current == 'true'
+        run: vp exec wrangler deploy
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ vars.CLOUDFLARE_ACCOUNT_ID }}
