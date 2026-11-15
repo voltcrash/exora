@@ -1,4 +1,8 @@
-import type { EphemerisVector } from "@exora/contracts";
+export interface OrbitalState {
+  epoch: string;
+  positionAu: Vector3Value;
+  velocityAuPerDay: Vector3Value;
+}
 
 const SOLAR_MU_AU3_PER_DAY2 = 0.000_295_912_208_285_591_1;
 
@@ -40,10 +44,7 @@ const solveEccentricAnomaly = (meanAnomaly: number, eccentricity: number): numbe
   return eccentricAnomaly;
 };
 
-export const propagateEphemerisVector = (
-  vector: EphemerisVector,
-  displayedAt: Date,
-): Vector3Value => {
+export const propagateEphemerisVector = (vector: OrbitalState, displayedAt: Date): Vector3Value => {
   const position = vector.positionAu;
   const elapsedDays = (displayedAt.getTime() - new Date(vector.epoch).getTime()) / 86_400_000;
   if (elapsedDays === 0) return { ...position };
@@ -95,7 +96,7 @@ export const propagateEphemerisVector = (
 };
 
 export const isEphemerisDerivedAt = (
-  vectors: readonly EphemerisVector[],
+  vectors: readonly OrbitalState[],
   displayedAt: Date,
 ): boolean => {
   const anchor = vectors[0]?.epoch;
