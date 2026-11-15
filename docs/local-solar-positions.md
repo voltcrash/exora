@@ -2,7 +2,8 @@
 
 The diorama computes dated positions entirely in the browser. There is no ephemeris API route,
 rate limiter, runtime Horizons dependency, or upstream failure state. The data and solver enter
-through the lazy diorama modules, not initial startup. After visiting the diorama online, the
+through a dynamic import when the Solar System diorama opens, not initial startup or
+exoplanet system views. After visiting the diorama online, the
 existing service worker can replay its hashed assets offline.
 
 ## Method and provenance

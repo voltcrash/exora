@@ -1,3 +1,6 @@
+export const MIN_SOLAR_TIME = Date.UTC(1900, 0, 1);
+export const MAX_SOLAR_TIME = Date.UTC(2101, 0, 1) - 1;
+
 export interface OrbitalState {
   epoch: string;
   positionAu: Vector3Value;

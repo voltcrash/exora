@@ -17,7 +17,7 @@ import {
   orbitPitches,
   type OrbitVoice,
 } from "../orbit-sonification.ts";
-import { MIN_SOLAR_TIME, MAX_SOLAR_TIME } from "../solar-orbits.ts";
+import { MIN_SOLAR_TIME, MAX_SOLAR_TIME } from "../solar-ephemeris.ts";
 import {
   bodyScaleLabel,
   bodySizeProvenance,
@@ -234,13 +234,17 @@ export const SystemExperience = ({
     const controller = new AbortController();
     setSceneState("loading");
 
-    void import("../system-scene.ts")
-      .then(({ createSystemWorld }) =>
+    void Promise.all([
+      import("../system-scene.ts"),
+      solar ? import("../solar-orbits.ts") : Promise.resolve(null),
+    ])
+      .then(([{ createSystemWorld }, orbitalModel]) =>
         abandoned
           ? null
           : host.mountWorld(
               () =>
                 createSystemWorld(host, {
+                  ...(orbitalModel ? { solarPositionsAt: orbitalModel.solarPositionsAt } : {}),
                   hostName: hostStar,
                   planets,
                   onSelectHostStar: () => void openHostStar(),
@@ -271,7 +275,7 @@ export const SystemExperience = ({
       controller.abort();
       worldRef.current = null;
     };
-  }, [cached, host, hostStar, onSelectHostStar, onSelectPlanet, onSelectStar, planets]);
+  }, [cached, host, hostStar, onSelectHostStar, onSelectPlanet, onSelectStar, planets, solar]);
 
   const drawn = layout?.orbits ?? [];
   const unplaced = layout?.unplaced ?? [];

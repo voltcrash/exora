@@ -23,7 +23,8 @@ import {
 import type { RenderQualityProfile } from "./render-quality.ts";
 import type { MountedWorld, SceneHost } from "./scene-host.ts";
 import { skyViewpointFrom } from "./sky-catalog.ts";
-import { solarPositionsAt } from "./solar-orbits.ts";
+import type { DerivedSolarPosition } from "./solar-orbits.ts";
+import type { Vector3Value } from "./solar-ephemeris.ts";
 import { tuneSolarWorldRecipe } from "./solar-system.ts";
 import { createStellarSurface, makeStarTravelTarget } from "./star-surface.ts";
 import { createStarfield } from "./star-visuals.ts";
@@ -46,6 +47,7 @@ const HABITABLE_ZONE_ALPHA = 0.16;
 const HABITABLE_ZONE_DEPTH = -0.004;
 
 export interface SystemWorldOptions {
+  solarPositionsAt?: (date: Date) => DerivedSolarPosition[];
   hostName: string;
   onFirstFrame: () => void;
   onSelectHostStar?: () => void;
@@ -335,7 +337,14 @@ const buildWorld = (
 
 export const createSystemWorld = (
   host: SceneHost,
-  { hostName, onFirstFrame, onSelectHostStar, onSelectWorld, planets }: SystemWorldOptions,
+  {
+    hostName,
+    onFirstFrame,
+    onSelectHostStar,
+    onSelectWorld,
+    planets,
+    solarPositionsAt,
+  }: SystemWorldOptions,
 ): SystemWorld => {
   const { camera, canvas, engine, profile, scene } = host;
   const layout = deriveSystemLayout(planets);
@@ -458,9 +467,7 @@ export const createSystemWorld = (
   applyPositions(0);
 
   let ephemerisEnabled = false;
-  let positions = new Map(
-    solarPositionsAt(new Date()).map((value) => [value.naifId, value.positionAu]),
-  );
+  let positions = new Map<number, Vector3Value>();
   const applyEphemerisPositions = (): void => {
     if (!ephemerisEnabled) return;
     for (const world of drawn) {
@@ -510,7 +517,9 @@ export const createSystemWorld = (
       if (enabled) applyEphemerisPositions();
     },
     setEphemerisTime: (epoch) => {
-      positions = new Map(solarPositionsAt(epoch).map((value) => [value.naifId, value.positionAu]));
+      positions = new Map(
+        (solarPositionsAt?.(epoch) ?? []).map((value) => [value.naifId, value.positionAu]),
+      );
       applyEphemerisPositions();
     },
     restoreDesktopView: () => camera.attachControl(canvas, true),

@@ -24,6 +24,7 @@ import { createSolarRegionWorld } from "./solar-region-scene.ts";
 import { findSolarRegion } from "./solar-regions.ts";
 import { findPlanetarySubsystem } from "./planetary-subsystems.ts";
 import { JUPITER } from "./solar-system.ts";
+import { solarPositionsAt } from "./solar-orbits.ts";
 import { createSystemWorld } from "./system-scene.ts";
 import { createSubsystemWorld } from "./subsystem-scene.ts";
 import { deriveRenderQuality } from "./render-quality.ts";
@@ -879,6 +880,7 @@ test("the Solar System diorama accepts and clears derived local positions", asyn
     hostName: "Sun",
     onFirstFrame: () => undefined,
     planets: [solarWorld],
+    solarPositionsAt,
   });
   await scope.seal();
   const body = scene.meshes.find((mesh) => mesh.name === `diorama-world-${solarWorld.id}`);

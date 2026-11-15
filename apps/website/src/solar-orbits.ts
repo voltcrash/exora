@@ -1,3 +1,4 @@
+import { MIN_SOLAR_TIME, MAX_SOLAR_TIME } from "./solar-ephemeris.ts";
 import bodies from "./data/solar-orbits.json";
 import { propagateEphemerisVector, type Vector3Value } from "./solar-ephemeris.ts";
 
@@ -6,9 +7,6 @@ export interface DerivedSolarPosition {
   positionAu: Vector3Value;
   provenance: "derived";
 }
-
-export const MIN_SOLAR_TIME = Date.UTC(1900, 0, 1);
-export const MAX_SOLAR_TIME = Date.UTC(2101, 0, 1) - 1;
 
 export const solarPositionsAt = (date: Date): DerivedSolarPosition[] => {
   const time = date.getTime();
