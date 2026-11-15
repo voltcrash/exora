@@ -5,13 +5,6 @@ const nonEmptyString = z.string().min(1);
 const nullableFiniteNumber = finiteNumber.nullable();
 const nullableString = z.string().nullable();
 const retrievedDate = z.string().regex(/^\d{4}-\d{2}-\d{2}$/);
-const timestamp = z.string().min(1);
-
-const vectorSchema = z.strictObject({
-  x: finiteNumber,
-  y: finiteNumber,
-  z: finiteNumber,
-});
 
 export const solarSystemSourceSchema = z.strictObject({
   archive: z.literal("NASA/JPL Solar System Dynamics"),
@@ -333,30 +326,6 @@ export const blackHoleSearchResponseSchema = z.strictObject({
   meta: blackHoleMetadataSchema.extend({
     count: z.number().int().nonnegative(),
     query: z.string(),
-  }),
-});
-
-export const ephemerisVectorSchema = z.strictObject({
-  epoch: timestamp,
-  name: nonEmptyString,
-  naifId: z.number().int(),
-  positionAu: vectorSchema,
-  solution: nonEmptyString,
-  spkId: nonEmptyString,
-  velocityAuPerDay: vectorSchema,
-});
-
-export const ephemerisResponseSchema = z.strictObject({
-  data: z.array(ephemerisVectorSchema).min(1),
-  meta: z.strictObject({
-    cached: z.boolean(),
-    center: z.literal("Sun (10)"),
-    coordinateFrame: z.literal("Ecliptic J2000"),
-    epoch: timestamp,
-    retrievedAt: timestamp,
-    source: z.literal("NASA/JPL Horizons API"),
-    sourceVersion: nonEmptyString,
-    stale: z.boolean(),
   }),
 });
 

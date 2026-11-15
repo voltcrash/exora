@@ -94,11 +94,3 @@ export const propagateEphemerisVector = (vector: OrbitalState, displayedAt: Date
     z: periapsis.z * alongPeriapsis + transverse.z * alongTransverse,
   };
 };
-
-export const isEphemerisDerivedAt = (
-  vectors: readonly OrbitalState[],
-  displayedAt: Date,
-): boolean => {
-  const anchor = vectors[0]?.epoch;
-  return anchor ? Math.abs(displayedAt.getTime() - new Date(anchor).getTime()) >= 1_000 : false;
-};
