@@ -118,3 +118,8 @@ Vite emits `terrain.worker-<hash>.js` under `/assets/`. The service worker cache
 immutable hashed assets after first use. The performance-budget script counts every emitted worker
 against the per-file limit, while only JavaScript referenced by the initial HTML counts against the
 initial-load limit. No worker chunk is added to the initial HTML.
+
+The November 2026 local-orbit/normal-map update measures 355,667 bytes of initial JavaScript
+(before this change: 356,050), against the unchanged 450,000-byte gate. The October number above
+is historical. The orbital state table and solver load with the diorama, outside that initial
+graph. Normal transfer measurements and device limits are in [texture compression](texture-compression.md).
