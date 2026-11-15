@@ -1,6 +1,6 @@
 import type { ExoplanetProfile, StarProfile } from "@exora/contracts";
 import { useEffect, useRef, useState } from "react";
-import { type SystemLoadResult } from "../api-client.ts";
+import type { SystemLoadResult } from "../api-client.ts";
 import { reachStar } from "../destination-cache.ts";
 import {
   present,
@@ -216,8 +216,8 @@ export const SystemExperience = ({
       previous = now;
       const requestedTime =
         displayedAtRef.current.getTime() + elapsed * playbackRate * playbackDirection;
-      const minimum = Date.UTC(1900, 0, 1);
-      const maximum = Date.UTC(2100, 11, 31, 23, 59, 59);
+      const minimum = MIN_SOLAR_TIME;
+      const maximum = MAX_SOLAR_TIME;
       const boundedTime = Math.min(maximum, Math.max(minimum, requestedTime));
       if (boundedTime !== requestedTime) setPlaying(false);
       const next = new Date(boundedTime);
@@ -258,7 +258,6 @@ export const SystemExperience = ({
         if (ephemerisRef.current) {
           world.setEphemerisTime(displayedAtRef.current);
           world.setEphemeris(true);
-          world.setEphemerisTime(displayedAtRef.current);
         }
         setLayout(world.layout);
       })
@@ -288,8 +287,8 @@ export const SystemExperience = ({
         <span>Local date and time</span>
         <input
           type="datetime-local"
-          min="1900-01-01T00:00:00"
-          max="2100-12-31T23:59:59"
+          min={localDateTimeValue(new Date(MIN_SOLAR_TIME))}
+          max={localDateTimeValue(new Date(MAX_SOLAR_TIME))}
           step="1"
           value={localDateTimeValue(displayedAt)}
           onChange={(event) => {
@@ -308,18 +307,10 @@ export const SystemExperience = ({
         />
       </label>
       <div className={styles["row"]}>
-        <Button
-          size="sm"
-
-          onClick={() => activateEphemeris(displayedAt)}
-        >
+        <Button size="sm" onClick={() => activateEphemeris(displayedAt)}>
           Use this date
         </Button>
-        <Button
-          size="sm"
-
-          onClick={() => activateEphemeris(new Date())}
-        >
+        <Button size="sm" onClick={() => activateEphemeris(new Date())}>
           Now
         </Button>
       </div>
