@@ -3,7 +3,6 @@ import {
   type ContractSchema,
   type BlackHoleProfile,
   type BlackHoleResponse,
-  type EphemerisResponse,
   type ExoplanetProfile,
   type PlanetPopulationResponse,
   type PlanetResponse,
@@ -24,7 +23,6 @@ const MAX_PLANET_NAME_LENGTH = 100;
 const PLANET_COLLECTION_TIMEOUT_MS = 30_000;
 const STAR_COLLECTION_TIMEOUT_MS = 12_000;
 const BLACK_HOLE_COLLECTION_TIMEOUT_MS = 12_000;
-const EPHEMERIS_TIMEOUT_MS = 20_000;
 const POPULATION_TIMEOUT_MS = 30_000;
 
 interface CollectionOptions {
@@ -41,7 +39,6 @@ type ContractModule = typeof import("@exora/contracts");
 type SchemaSelector<Schema extends ContractSchema> = (contracts: ContractModule) => Schema;
 
 const responseSchema = {
-  Ephemeris: (contracts: ContractModule) => contracts.ephemerisResponseSchema,
   BlackHole: (contracts: ContractModule) => contracts.blackHoleResponseSchema,
   BlackHoleSearch: (contracts: ContractModule) => contracts.blackHoleSearchResponseSchema,
   Planet: (contracts: ContractModule) => contracts.planetResponseSchema,
@@ -257,34 +254,6 @@ export const loadObservedBlackHoles = async (
     cached: response.meta.cached,
     stale: response.meta.stale,
   };
-};
-
-export const loadSolarEphemeris = async (
-  epoch: Date,
-  naifIds: readonly number[],
-  options: CollectionOptions = {},
-): Promise<EphemerisResponse> => {
-  const parameters = new URLSearchParams({
-    at: epoch.toISOString(),
-    ids: naifIds.join(","),
-  });
-  const response = await requestCollection(
-    `/api/ephemerides?${parameters.toString()}`,
-    options,
-    EPHEMERIS_TIMEOUT_MS,
-    "JPL ephemeris",
-    responseSchema.Ephemeris,
-  );
-  const expected = new Set(naifIds);
-  if (
-    response.data.length !== expected.size ||
-    response.data.some(
-      (vector) => !expected.has(vector.naifId) || vector.epoch !== response.meta.epoch,
-    )
-  ) {
-    throw new Error("JPL ephemeris returned a different target set or epoch.");
-  }
-  return response;
 };
 
 const requestPlanet = async (

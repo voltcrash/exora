@@ -10,7 +10,6 @@ import {
   loadPlanetByName,
   loadPlanetsByHost,
   loadPlanetsForStar,
-  loadSolarEphemeris,
   loadStarByName,
   searchPlanets,
   searchStars,
@@ -226,56 +225,6 @@ test("requests the next planet page from the archive cursor", async () => {
   });
 
   expect(result.nextCursor).toBe("Kepler-12 b");
-});
-
-test("loads validated Solar System vectors only through Exora's API", async () => {
-  const epoch = new Date("2026-08-24T12:00:00.000Z");
-  const result = await loadSolarEphemeris(epoch, [399], {
-    fetcher: async (input) => {
-      const path =
-        typeof input === "string" ? input : input instanceof URL ? input.href : input.url;
-      expect(path).toContain("/api/ephemerides?");
-      expect(path).toContain("ids=399");
-      expect(path).not.toContain("ssd.jpl.nasa.gov");
-      return Response.json({
-        data: [
-          {
-            epoch: epoch.toISOString(),
-            name: "Earth",
-            naifId: 399,
-            positionAu: { x: 1, y: 0, z: 0 },
-            solution: "DE441",
-            spkId: "399",
-            velocityAuPerDay: { x: 0, y: 0.0172, z: 0 },
-          },
-        ],
-        meta: {
-          cached: true,
-          center: "Sun (10)",
-          coordinateFrame: "Ecliptic J2000",
-          epoch: epoch.toISOString(),
-          retrievedAt: "2026-08-24T12:00:01.000Z",
-          source: "NASA/JPL Horizons API",
-          sourceVersion: "1.2",
-          stale: false,
-        },
-      });
-    },
-  });
-
-  expect(result).toMatchObject({ data: [{ naifId: 399 }], meta: { cached: true, stale: false } });
-});
-
-test("rejects a malformed Horizons contract instead of drawing unvalidated positions", async () => {
-  await expect(
-    loadSolarEphemeris(new Date("2026-08-24T12:00:00.000Z"), [399], {
-      fetcher: async () =>
-        Response.json({
-          data: [],
-          meta: { source: "NASA/JPL Horizons API", sourceVersion: "changed" },
-        }),
-    }),
-  ).rejects.toThrow("invalid response");
 });
 
 test("chooses a renderable surprise planet from a curated archive result", async () => {
