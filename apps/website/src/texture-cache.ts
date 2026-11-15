@@ -239,7 +239,7 @@ export const getSurfaceDetailTextures = (
             failed();
             texture.updateURL(
               NEUTRAL_TEXTURE_URLS[
-                isColor ? "color" : path.endsWith("normal.ktx2") ? "normal" : "roughness"
+                isColor ? "color" : path.endsWith("/normal-xy.ktx2") ? "normal" : "roughness"
               ],
               undefined,
               undefined,
@@ -259,7 +259,7 @@ export const getSurfaceDetailTextures = (
           scene,
           path.includes("/chemistry/")
             ? "color"
-            : path.endsWith("normal.ktx2")
+            : path.endsWith("/normal-xy.ktx2")
               ? "normal"
               : "roughness",
         ),
