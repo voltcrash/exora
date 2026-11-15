@@ -371,7 +371,7 @@ export const SystemExperience = ({
       </Button>
       <p className={styles["note"]}>
         {ephemeris
-          ? "Derived locally from bundled orbital states using blended two-body propagation. Heliocentric ecliptic J2000; UTC 1900–2100. Approximate visualization, not navigation."
+          ? "Derived locally from bundled orbital states using blended two-body propagation. Heliocentric ecliptic J2000; UTC 1900–2100. Worst sampled error 0.000332 AU across 65 checks; not a guaranteed bound. Earth and Pluto use system barycenters. Approximate visualization, not navigation."
           : "Catalog orbit shapes with seeded phases. Apply a date for derived local positions."}
       </p>
     </div>
