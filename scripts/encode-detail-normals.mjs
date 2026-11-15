@@ -9,7 +9,7 @@ if (!sourceDirectory || !outputDirectory || !process.env.KTX_BIN) {
   );
 }
 for (const family of ["basalt", "cracked", "granite", "ice", "regolith"]) {
-  const output = path.join(outputDirectory, family, "normal.ktx2");
+  const output = path.join(outputDirectory, family, "normal-xy.ktx2");
   mkdirSync(path.dirname(output), { recursive: true });
   execFileSync(
     path.join(process.env.KTX_BIN, "toktx"),

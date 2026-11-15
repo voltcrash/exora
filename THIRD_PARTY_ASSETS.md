@@ -228,27 +228,29 @@ palette, so the browser does not decode or upload all five sets.
 | `ice`      | Frozen caps and globally glaciated surfaces        | `Snow006`       | https://ambientcg.com/a/Snow006   | CC0 1.0 |
 
 Source archives were downloaded from
-`https://ambientcg.com/get?file=<AssetId>_2K-PNG.zip`. For each family, Exora keeps the 2K
-OpenGL normal map and the roughness map. Source 16-bit normals were converted to 8-bit RGB:
+`https://ambientcg.com/get?file=<AssetId>_2K-PNG.zip`. For each family, Exora uses the 2K
+OpenGL normal map and the roughness map as sources. Source 16-bit normals were converted to 8-bit RGB:
 browser GPU texture sampling is normalized 8-bit in this path, so this removes download weight
 without reducing the precision the shader consumes. Unused color, AO, displacement, scene, and
 material files are not shipped.
 
-`Rock063` is natively 2048×1024; the other four families are 2048×2048, and the encoded files keep
-those dimensions. The PNGs are the _source_: what ships is KTX2, so the GPU receives a compressed
+`Rock063` is natively 2048×1024; the other four families are 2048×2048, and roughness files retain
+those dimensions. Normals are half-size: 1024×512 for cracked, 1024×1024 for the other families.
+They store X/Y in R/G with constant B=0, A=1; shaders reconstruct Z. The original PNGs were recovered
+from `da9cb8a^`, not from shipped lossy KTX2. The PNGs are the _source_: what ships is KTX2, so the GPU receives a compressed
 format rather than decoding a full-size image. Normals are UASTC with Zstandard supercompression,
-roughness is the smaller ETC1S, and every file carries a complete mip chain — twelve levels at 2K —
+roughness is the smaller ETC1S, and every file carries a complete mip chain — eleven levels for normals, twelve for roughness —
 sampled with tier-specific anisotropic filtering. `docs/texture-compression.md` holds the encoder
 commands and the settings behind that split.
 
 Creator: ambientCG / Lennart Demes. Attribution is not legally required under CC0, but provenance
 is retained here.
 
-The ten shipped files are `textures/basalt/normal.ktx2`, `textures/basalt/roughness.ktx2`,
-`textures/cracked/normal.ktx2`, `textures/cracked/roughness.ktx2`,
-`textures/granite/normal.ktx2`, `textures/granite/roughness.ktx2`,
-`textures/ice/normal.ktx2`, `textures/ice/roughness.ktx2`,
-`textures/regolith/normal.ktx2`, and `textures/regolith/roughness.ktx2`.
+The ten shipped files are `textures/basalt/normal-xy.ktx2`, `textures/basalt/roughness.ktx2`,
+`textures/cracked/normal-xy.ktx2`, `textures/cracked/roughness.ktx2`,
+`textures/granite/normal-xy.ktx2`, `textures/granite/roughness.ktx2`,
+`textures/ice/normal-xy.ktx2`, `textures/ice/roughness.ktx2`,
+`textures/regolith/normal-xy.ktx2`, and `textures/regolith/roughness.ktx2`.
 
 ### Exora chemistry color-detail maps
 
@@ -268,7 +270,7 @@ baked directional lighting. The exact production prompt set is recorded in
 `docs/planet-texture-prompts.md`.
 
 On mobile, only the palette-selected 1K chemistry map is sampled. Desktop adds the two
-palette-selected 2K normal/roughness pairs. This keeps chemistry visible on constrained devices
+palette-selected 1K normal/2K roughness pairs. This keeps chemistry visible on constrained devices
 without paying the full physical-detail fragment cost.
 
 ## Babylon.js KTX2 runtime

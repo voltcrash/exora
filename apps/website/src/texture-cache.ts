@@ -72,7 +72,7 @@ export const SURFACE_DETAIL_FAMILIES: readonly SurfaceDetailFamily[] = [
 export const detailTexturePath = (
   family: SurfaceDetailFamily,
   map: "normal" | "roughness",
-): string => `/textures/${family}/${map}.ktx2`;
+): string => `/textures/${family}/${map === "normal" ? "normal-xy" : map}.ktx2`;
 
 export const chemistryTexturePath = (family: ChemistryDetailFamily): string =>
   `/textures/chemistry/${family}.ktx2`;
