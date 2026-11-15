@@ -39,6 +39,30 @@ const rows = (payload) => {
       return values.map((value) => Number(value.toPrecision(12)));
     });
 };
+if (process.argv.includes("--download")) {
+  await mkdir(directory, { recursive: true });
+  for (const [kind, file] of [
+    ["anchors", "solar-orbits.json"],
+    ["fixtures", "solar-orbits-fixtures.json"],
+  ]) {
+    const sources = JSON.parse(await readFile(`apps/website/src/data/${file}`, "utf8"));
+    for (const source of sources) {
+      const response = await fetch(source.sourceUrl);
+      if (!response.ok) throw new Error(`Horizons returned ${response.status} for ${source.name}`);
+      const payload = await response.json();
+      rows(payload);
+      await writeFile(
+        `${directory}/${source.name}-${kind}.json`,
+        JSON.stringify({
+          ...payload,
+          name: source.name,
+          naifId: source.naifId,
+          url: source.sourceUrl,
+        }),
+      );
+    }
+  }
+}
 const bodies = [];
 const fixtures = [];
 for (const name of names) {
@@ -47,6 +71,7 @@ for (const name of names) {
   bodies.push({
     name,
     naifId: anchors.naifId,
+    anchorTarget: anchors.result.match(/Target body name:\s*([^\n{]+)/)[1].trim(),
     solution: anchors.result.match(/Target body name:.*\{source:\s*([^}]+)\}/)[1].trim(),
     sourceUrl: anchors.url,
     states: rows(anchors),
