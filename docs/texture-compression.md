@@ -108,8 +108,8 @@ decoder requests from workers. Mobile Earth measured 1,732,960 → 2,233,777 byt
 audit scores; worker scheduling, caching, and deployment compression can change the totals. The
 two Vercel-hosted analytics scripts were stubbed identically because localhost does not serve them.
 
-Desktop Earth and Moon already exceed 7.5 MB when their existing rocky detail maps are included.
-This migration does not resolve that pre-existing route-level transfer issue. The extra cold-load
+At the time of the mosaic conversion, desktop Earth and Moon exceeded 7.5 MB when their existing rocky detail maps are included.
+The subsequent normal-map update below reduces those detail-map transfers. The extra cold-load
 bytes on some routes are accepted for GPU storage and worker-based transcoding; the default route
 and the 7.5 MB Lighthouse gate are unchanged in scope.
 
@@ -122,25 +122,83 @@ configuration had no console errors or failed requests after the identical local
 
 ## Rocky-world detail maps
 
-Rocky-world detail textures ship as KTX2 containers so Babylon can transcode them to a GPU-native
-compressed format. Normal maps use high-quality UASTC; roughness and chemistry maps use the smaller
-ETC1S/BasisLZ representation. Every file contains a complete mip chain.
+The five normal maps now store X/Y in R/G with B=0 and A=1, reconstructing positive Z in both
+orbital and surface shaders. They are 1024×1024, except cracked at 1024×512 (its source is
+rectangular). Roughness and chemistry maps are unchanged. These are tiling artistic materials,
+not measured planetary terrain.
 
-The committed files were encoded with Khronos KTX-Software 4.4.2. When replacing a source texture,
-run the matching command from the repository root (substitute the input and output paths):
+The PNG inputs were recovered from git before the original KTX2 conversion (`da9cb8a^`),
+not decoded from lossy KTX2 files. Encoding used the latest stable Khronos KTX-Software release,
+4.4.2, verified through the GitHub releases API on 2026-11-15. The official Darwin arm64 package
+SHA-256 is `500bd8f9d63358c3f3a0d83b724c8574436a72c37dc0e4bad90ec1ca38032c3c`.
+The binaries were extracted outside the repository.
 
 ```sh
-toktx --encode uastc --uastc_quality 3 --uastc_rdo_l 0.5 --zcmp 18 \
-  --genmipmap --filter lanczos4 --assign_oetf linear --normal_mode --normalize \
-  --input_swizzle rgb1 normal.ktx2 normal.png
-
-toktx --encode etc1s --clevel 5 --qlevel 180 --genmipmap --filter lanczos4 \
-  --assign_oetf linear roughness.ktx2 roughness.png
-
-toktx --encode etc1s --clevel 5 --qlevel 180 --genmipmap --filter lanczos4 \
-  --assign_oetf srgb chemistry.ktx2 chemistry.png
+SOURCE_DIR="$(mktemp -d /tmp/exora-normal-source.XXXXXX)"
+git archive da9cb8a^ apps/website/public/textures | tar -x -C "$SOURCE_DIR"
+KTX_BIN=/path/to/ktx/bin vpx scripts/encode-detail-normals.mjs \
+  "$SOURCE_DIR/apps/website/public/textures" apps/website/public/textures
+vp run quality:assets
 ```
 
-`rgb1` keeps normal data in RGB for the existing shader while `normal_mode` and `normalize` tune the
-encoder and mip generation for tangent-space normals. Validate generated assets with `ktx2check`
-before committing them.
+The script uses `toktx --encode uastc --uastc_quality 3 --uastc_rdo_l 0.5 --zcmp 18
+--threads 4 --genmipmap --filter lanczos4 --assign_oetf linear --normal_mode --normalize
+--input_swizzle rg01 --scale 0.5`, then `ktx validate`. `rg01` overrides normal_mode's default
+RGB=X/A=Y packing. Normalization and mip generation operate on the source normals before the
+encoding swizzle. There are eleven mip levels. Distinct `normal-xy.ktx2` URLs prevent older
+RGB shaders from reading the new channel layout during a deployment or service-worker update.
+
+### Channel and format evidence
+
+Babylon 9.33.1's vendored decoder was exercised in the app browser with capability flags for
+BC7, ASTC, ETC2, and no compressed formats. For the new basalt map it returned:
+
+| Capability   | Target                   | Full mip payload bytes |
+| ------------ | ------------------------ | ---------------------: |
+| Desktop BPTC | BC7 RGBA (`0x8e8c`)      |              1,398,128 |
+| Mobile ASTC  | ASTC 4×4 RGBA (`0x93b0`) |              1,398,128 |
+| ETC2         | ETC2 RGB (`0x9274`)      |                699,064 |
+| None         | RGBA8 (`0x8058`)         |              5,592,404 |
+
+All eleven levels decoded successfully. The fallback's first pixel was `[207,132,0,255]`,
+confirming R/G survive. Babylon defaults to RGBA8 on BC1/BC3-only hardware to avoid its slow
+UASTC conversion. It does **not** select BC5 simply because only two channels contain data.
+No global force-RG8 setting is used, since that would break colour textures sharing the loader.
+The shader samples `.rg` for every target and clamps the reconstructed square root at zero.
+Existing flat-normal fallbacks already have neutral R/G and need no pixel-layout change.
+These tests exercise the actual decoder, but supplied capability flags are not physical mobile
+GPU measurements. The size reduction mostly comes from halving dimensions, not a promise of
+halving GPU block size by dropping Z.
+
+### Transfer and visual measurements
+
+| Family    | Previous bytes |     New bytes |
+| --------- | -------------: | ------------: |
+| basalt    |      5,320,548 |     1,305,931 |
+| cracked   |      2,278,286 |       577,309 |
+| granite   |      4,892,217 |     1,216,808 |
+| ice       |      5,150,515 |     1,189,910 |
+| regolith  |      5,131,019 |     1,270,438 |
+| **Total** | **22,772,585** | **5,560,396** |
+
+The complete-file reduction is **75.6%**, including all mips. Palette-dependent per-route normal
+transfers are:
+
+| Primary / secondary        | Previous bytes | New bytes |
+| -------------------------- | -------------: | --------: |
+| basalt / regolith (Moon)   |     10,451,567 | 2,576,369 |
+| basalt / cracked           |      7,598,834 | 1,883,240 |
+| regolith / granite (Earth) |     10,023,236 | 2,487,246 |
+| ice / granite              |     10,042,732 | 2,406,718 |
+| basalt / granite           |     10,212,765 | 2,522,739 |
+| cracked / regolith         |      7,409,305 | 1,847,747 |
+
+Earth's six requested texture files total **12,075,284 → 4,539,294 bytes** (the after list was
+observed in the app browser). These are texture-body totals, not compressed whole-route transfer
+or Lighthouse scores. Mobile tiers omit PBR detail maps, so their normal-map transfer stays zero.
+
+Before/after captures of Earth in the real WebGL app, at orbit and after zooming down to the
+surface, showed no obvious loss of visible terrain relief at those distances. Rotation and water
+animation make them qualitative comparisons, not pixel-identical renders. Halving resolution
+necessarily discards fine texel detail; no claim is made of losslessness or exhaustive coverage
+of every family, viewing distance, or physical GPU. The 7.5 MB Lighthouse budget is unchanged.
