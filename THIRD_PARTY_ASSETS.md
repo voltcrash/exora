@@ -197,7 +197,7 @@ Permanent moon codes used by the authored view are: Earth `301`; Mars `401–402
 `508–509`, `514–516`; Saturn `601–611`, `615–618`, `635`; Uranus `701–715`; Neptune `801–808`;
 and Pluto `901–905`. Codes are recorded beside each body in `planetary-subsystems.ts`; the UI
 exposes them for every principal moon and in immersive mode. The scene is a catalogue display of
-mean elements, not a date-specific SPICE evaluation. Part 7's cached Horizons mode is intentionally
+mean elements, not a date-specific SPICE evaluation. The local dated-position model for planets is
 separate.
 
 No rendered magnetopause is claimed as a live boundary. Dayside/tail extents are representative
@@ -389,21 +389,23 @@ from a different HYG release means a new filename, and the URL in `sky-catalog.t
 - **Every star is one point of one size.** Apparent magnitude drives colour intensity, not point
   size, so the sky is flatter than the real one at the bright end.
 
-## Live Solar System ephemerides
+## Bundled Solar System orbital states
 
-Retrieved and contract-checked on **2026-08-24**. No ephemeris file is shipped to the browser.
-Exora's backend requests geometric heliocentric state vectors from the NASA/JPL Horizons API,
-validates signature source `NASA/JPL Horizons API` and payload version `1.2`, then caches the
-normalized answer. Every returned vector retains the permanent identity and Horizons' own
-major-body kernel or small-body orbital-solution label (for example `DE441` or `JPL#103`). Credit:
-NASA/JPL-Caltech Solar System Dynamics Group. Use terms: NASA/JPL factual scientific data; see the
-[JPL Image Use Policy](https://www.jpl.nasa.gov/jpl-image-use-policy/). Original API documentation:
-https://ssd-api.jpl.nasa.gov/doc/horizons.html.
+Retrieved on **2026-11-15** from NASA/JPL Horizons API 1.2. The browser bundles
+`apps/website/src/data/solar-orbits.json` (365-day heliocentric ecliptic J2000 state samples) and
+computes **derived** positions with blended two-body propagation. There is no live ephemeris
+request or server cache. The data retain exact source URLs, anchor target names, and JPL solution
+identifiers. Independent body-center comparisons are in `solar-orbits-fixtures.json`.
 
-All requests set center `500@10` (Sun body center), `EPHEM_TYPE=VECTORS`, `OUT_UNITS=AU-D`,
-`REF_PLANE=ECLIPTIC`, `REF_SYSTEM=ICRF`, `VEC_CORR=NONE`, and `VEC_TABLE=2`. The UTC epoch is the
-visitor's requested time. The links below are the original dynamic dataset URLs up to that epoch
-parameter; Exora supplies `TLIST` server-side and never exposes JPL as a browser dependency.
+Earth uses Earth–Moon barycenter anchors (3); Pluto uses system-barycenter anchors (9). Their
+rendered body IDs remain 399 and 999. The other eleven targets use body-center anchors.
+The supported interval is UTC 1900–2100. The worst error in 65 sampled comparisons is
+0.000331346 AU (about 49,569 km); this is not a guaranteed bound. See
+[the method, validation and regeneration commands](docs/local-solar-positions.md).
+Credit: NASA/JPL-Caltech Solar System Dynamics Group. Use terms: NASA/JPL factual scientific
+data; [JPL use policy](https://www.jpl.nasa.gov/jpl-image-use-policy/).
+The following table records body identities and source context; exact build-time requests,
+including the barycenter substitutions, are in the bundled data.
 
 | Body     | Mission / archive                        | Permanent NAIF / SPK ID        | Original URL                                                                          |
 | -------- | ---------------------------------------- | ------------------------------ | ------------------------------------------------------------------------------------- |
@@ -420,12 +422,6 @@ parameter; Exora supplies `TLIST` server-side and never exposes JPL as a browser
 | Eris     | JPL Horizons small-body orbital solution | NAIF/SPK `20136199`            | https://ssd.jpl.nasa.gov/api/horizons.api?format=json&COMMAND=%27DES%3D20136199%3B%27 |
 | Haumea   | JPL Horizons small-body orbital solution | NAIF/SPK `20136108`            | https://ssd.jpl.nasa.gov/api/horizons.api?format=json&COMMAND=%27DES%3D20136108%3B%27 |
 | Makemake | JPL Horizons small-body orbital solution | NAIF/SPK `20136472`            | https://ssd.jpl.nasa.gov/api/horizons.api?format=json&COMMAND=%27DES%3D20136472%3B%27 |
-
-The exact requested snapshot is measured/model-solved JPL data. Playback away from that anchor is
-an explicitly labelled two-body propagation using the returned position and velocity; it is not
-presented as a second Horizons solution. The orbit ribbons remain the existing simplified catalog
-orbits and are labelled separately. If Horizons is unavailable, only a still-valid stale cache
-entry for the exact target and epoch may be served, and the interface marks it `STALE CACHE`.
 
 ## Constellation boundaries
 
