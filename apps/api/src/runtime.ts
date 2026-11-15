@@ -1,5 +1,4 @@
 import { createApp } from "./app.ts";
-import { JplHorizonsRepository } from "./horizons.ts";
 import { NasaPlanetRepository } from "./nasa-archive.ts";
 import { bundledPlanetCatalog } from "./planet-catalog-snapshot.ts";
 import { SimbadStarRepository } from "./simbad-archive.ts";
@@ -10,7 +9,6 @@ export const createRuntimeApp = ({
 }: { trustedClientIpHeader?: string | undefined } = {}) =>
   createApp({
     blackHoleRepository: new VizierBlackHoleRepository(),
-    horizonsRepository: new JplHorizonsRepository(),
     repository: new NasaPlanetRepository({ catalog: bundledPlanetCatalog }),
     starRepository: new SimbadStarRepository(),
     ...(trustedClientIpHeader ? { trustedClientIpHeader } : {}),

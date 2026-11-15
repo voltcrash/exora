@@ -11,7 +11,7 @@ import { VertexData } from "@babylonjs/core/Meshes/mesh.vertexData.js";
 import { TransformNode } from "@babylonjs/core/Meshes/transformNode.js";
 import "@babylonjs/core/Meshes/instancedMesh.js";
 import type { Scene } from "@babylonjs/core/scene.js";
-import type { EphemerisVector, ExoplanetProfile } from "@exora/contracts";
+import type { ExoplanetProfile } from "@exora/contracts";
 import {
   deriveHostStar,
   deriveWorldRecipe,
@@ -23,7 +23,8 @@ import {
 import type { RenderQualityProfile } from "./render-quality.ts";
 import type { MountedWorld, SceneHost } from "./scene-host.ts";
 import { skyViewpointFrom } from "./sky-catalog.ts";
-import { propagateEphemerisVector } from "./solar-ephemeris.ts";
+import type { DerivedSolarPosition } from "./solar-orbits.ts";
+import type { Vector3Value } from "./solar-ephemeris.ts";
 import { tuneSolarWorldRecipe } from "./solar-system.ts";
 import { createStellarSurface, makeStarTravelTarget } from "./star-surface.ts";
 import { createStarfield } from "./star-visuals.ts";
@@ -46,6 +47,7 @@ const HABITABLE_ZONE_ALPHA = 0.16;
 const HABITABLE_ZONE_DEPTH = -0.004;
 
 export interface SystemWorldOptions {
+  solarPositionsAt?: (date: Date) => DerivedSolarPosition[];
   hostName: string;
   onFirstFrame: () => void;
   onSelectHostStar?: () => void;
@@ -61,7 +63,7 @@ export interface SystemWorld extends MountedWorld {
   onSightlineCrossing: (listener: (orbitIndex: number) => void) => () => void;
   /** Multiplies the diorama clock: 0 holds every world still, negative runs the orbits backwards. */
   setClockRate: (rate: number) => void;
-  setEphemeris: (vectors: readonly EphemerisVector[] | null) => void;
+  setEphemeris: (enabled: boolean) => void;
   setEphemerisTime: (epoch: Date) => void;
 }
 
@@ -335,7 +337,14 @@ const buildWorld = (
 
 export const createSystemWorld = (
   host: SceneHost,
-  { hostName, onFirstFrame, onSelectHostStar, onSelectWorld, planets }: SystemWorldOptions,
+  {
+    hostName,
+    onFirstFrame,
+    onSelectHostStar,
+    onSelectWorld,
+    planets,
+    solarPositionsAt,
+  }: SystemWorldOptions,
 ): SystemWorld => {
   const { camera, canvas, engine, profile, scene } = host;
   const layout = deriveSystemLayout(planets);
@@ -457,15 +466,14 @@ export const createSystemWorld = (
   };
   applyPositions(0);
 
-  let ephemerisByNaif: ReadonlyMap<number, EphemerisVector> | null = null;
-  let ephemerisTime = new Date(0);
+  let ephemerisEnabled = false;
+  let positions = new Map<number, Vector3Value>();
   const applyEphemerisPositions = (): void => {
-    if (!ephemerisByNaif) return;
+    if (!ephemerisEnabled) return;
     for (const world of drawn) {
       const naifId = world.orbit.planet.solarSystem?.naifId;
-      const vector = naifId === undefined ? undefined : ephemerisByNaif.get(naifId);
-      if (!vector) continue;
-      const position = propagateEphemerisVector(vector, ephemerisTime);
+      const position = naifId === undefined ? undefined : positions.get(naifId);
+      if (!position) continue;
       const radiusAu = Math.hypot(position.x, position.y, position.z);
       if (!Number.isFinite(radiusAu) || radiusAu <= 0) continue;
       const displayRadius = mapDistance(layout.mapping, radiusAu);
@@ -488,7 +496,7 @@ export const createSystemWorld = (
     const eye = scene.activeCamera?.globalPosition ?? camera.globalPosition;
     stellarSurface?.update(elapsed, eye);
     starfield.update(elapsed, eye);
-    if (ephemerisByNaif) applyEphemerisPositions();
+    if (ephemerisEnabled) applyEphemerisPositions();
     else applyPositions(orbitSeconds);
   });
 
@@ -504,14 +512,14 @@ export const createSystemWorld = (
     setClockRate: (rate) => {
       clockRate = Number.isFinite(rate) ? rate : 1;
     },
-    setEphemeris: (vectors) => {
-      ephemerisByNaif = vectors ? new Map(vectors.map((vector) => [vector.naifId, vector])) : null;
-      if (vectors?.[0]) ephemerisTime = new Date(vectors[0].epoch);
-      if (ephemerisByNaif) applyEphemerisPositions();
-      else applyPositions(orbitSeconds);
+    setEphemeris: (enabled) => {
+      ephemerisEnabled = enabled;
+      if (enabled) applyEphemerisPositions();
     },
     setEphemerisTime: (epoch) => {
-      ephemerisTime = epoch;
+      positions = new Map(
+        (solarPositionsAt?.(epoch) ?? []).map((value) => [value.naifId, value.positionAu]),
+      );
       applyEphemerisPositions();
     },
     restoreDesktopView: () => camera.attachControl(canvas, true),

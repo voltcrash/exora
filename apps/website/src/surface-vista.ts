@@ -142,10 +142,15 @@ vec3 triplanarBlend(vec3 surfaceNormal) {
 #endif
 
 #ifdef GROUND_DETAIL
+vec3 decodeDetailNormal(vec2 encoded) {
+  vec2 xy = encoded * 2.0 - 1.0;
+  return vec3(xy, sqrt(max(0.0, 1.0 - dot(xy, xy))));
+}
+
 vec3 triplanarNormal(sampler2D tex, vec3 point, vec3 blend, vec3 surfaceNormal) {
-  vec3 nx = texture2D(tex, point.yz).xyz * 2.0 - 1.0;
-  vec3 ny = texture2D(tex, point.xz).xyz * 2.0 - 1.0;
-  vec3 nz = texture2D(tex, point.xy).xyz * 2.0 - 1.0;
+  vec3 nx = decodeDetailNormal(texture2D(tex, point.yz).rg);
+  vec3 ny = decodeDetailNormal(texture2D(tex, point.xz).rg);
+  vec3 nz = decodeDetailNormal(texture2D(tex, point.xy).rg);
   nx = vec3(nx.xy + surfaceNormal.zy, abs(nx.z) * surfaceNormal.x);
   ny = vec3(ny.xy + surfaceNormal.xz, abs(ny.z) * surfaceNormal.y);
   nz = vec3(nz.xy + surfaceNormal.xy, abs(nz.z) * surfaceNormal.z);

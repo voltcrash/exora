@@ -7,13 +7,7 @@ export interface EdgeCache {
 const BROWSER_POLICY = "X-Exora-Browser-Cache-Control";
 const STORED_AT = "X-Exora-Stored-At";
 // Budgets belong to whoever triggered the fill, not to every later reader of the cached copy.
-const PER_CALLER_HEADERS = [
-  "RateLimit-Limit",
-  "RateLimit-Remaining",
-  "RateLimit-Reset",
-  "Ephemeris-RateLimit-Limit",
-  "Ephemeris-RateLimit-Remaining",
-];
+const PER_CALLER_HEADERS = ["RateLimit-Limit", "RateLimit-Remaining", "RateLimit-Reset"];
 
 interface EdgePolicy {
   maxAge: number;

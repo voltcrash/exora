@@ -1,4 +1,11 @@
-import type { EphemerisVector } from "@exora/contracts";
+export const MIN_SOLAR_TIME = Date.UTC(1900, 0, 1);
+export const MAX_SOLAR_TIME = Date.UTC(2101, 0, 1) - 1;
+
+export interface OrbitalState {
+  epoch: string;
+  positionAu: Vector3Value;
+  velocityAuPerDay: Vector3Value;
+}
 
 const SOLAR_MU_AU3_PER_DAY2 = 0.000_295_912_208_285_591_1;
 
@@ -40,10 +47,7 @@ const solveEccentricAnomaly = (meanAnomaly: number, eccentricity: number): numbe
   return eccentricAnomaly;
 };
 
-export const propagateEphemerisVector = (
-  vector: EphemerisVector,
-  displayedAt: Date,
-): Vector3Value => {
+export const propagateEphemerisVector = (vector: OrbitalState, displayedAt: Date): Vector3Value => {
   const position = vector.positionAu;
   const elapsedDays = (displayedAt.getTime() - new Date(vector.epoch).getTime()) / 86_400_000;
   if (elapsedDays === 0) return { ...position };
@@ -92,12 +96,4 @@ export const propagateEphemerisVector = (
     y: periapsis.y * alongPeriapsis + transverse.y * alongTransverse,
     z: periapsis.z * alongPeriapsis + transverse.z * alongTransverse,
   };
-};
-
-export const isEphemerisDerivedAt = (
-  vectors: readonly EphemerisVector[],
-  displayedAt: Date,
-): boolean => {
-  const anchor = vectors[0]?.epoch;
-  return anchor ? Math.abs(displayedAt.getTime() - new Date(anchor).getTime()) >= 1_000 : false;
 };

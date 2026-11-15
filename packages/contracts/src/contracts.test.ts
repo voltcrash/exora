@@ -3,8 +3,6 @@ import type { z } from "zod";
 import {
   apiErrorResponseSchema,
   detectionSignalSchema,
-  ephemerisResponseSchema,
-  ephemerisVectorSchema,
   exoplanetObservationSchema,
   exoplanetProfileSchema,
   planetKindSchema,
@@ -24,8 +22,6 @@ import {
   type ApiErrorResponse,
   type ApiMetadata,
   type DetectionSignal,
-  type EphemerisResponse,
-  type EphemerisVector,
   type ExoplanetObservation,
   type ExoplanetProfile,
   type PlanetKind,
@@ -65,7 +61,5 @@ test("exports contract types inferred from their schemas", () => {
   expectTypeOf<StarResponse>().toEqualTypeOf<z.infer<typeof starResponseSchema>>();
   expectTypeOf<StarSearchResponse>().toEqualTypeOf<z.infer<typeof starSearchResponseSchema>>();
 
-  expectTypeOf<EphemerisVector>().toEqualTypeOf<z.infer<typeof ephemerisVectorSchema>>();
-  expectTypeOf<EphemerisResponse>().toEqualTypeOf<z.infer<typeof ephemerisResponseSchema>>();
   expectTypeOf<ApiErrorResponse>().toEqualTypeOf<z.infer<typeof apiErrorResponseSchema>>();
 });

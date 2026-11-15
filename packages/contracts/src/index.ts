@@ -9,8 +9,6 @@ import {
   blackHoleSearchResponseSchema,
   blackHoleStatusSchema,
   detectionSignalSchema,
-  ephemerisResponseSchema,
-  ephemerisVectorSchema,
   exoplanetObservationSchema,
   exoplanetProfileSchema,
   massProvenanceSchema,
@@ -60,8 +58,6 @@ export type BlackHoleApiMetadata = z.infer<typeof blackHoleMetadataSchema>;
 export type BlackHoleResponse = z.infer<typeof blackHoleResponseSchema>;
 export type BlackHoleSearchResponse = z.infer<typeof blackHoleSearchResponseSchema>;
 
-export type EphemerisVector = z.infer<typeof ephemerisVectorSchema>;
-export type EphemerisResponse = z.infer<typeof ephemerisResponseSchema>;
 export type ApiErrorResponse = z.infer<typeof apiErrorResponseSchema>;
 
 export type ContractSchema = z.ZodType;

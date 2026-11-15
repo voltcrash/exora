@@ -245,32 +245,6 @@ const stubArchive = ({
 
     if (missing.includes(requested)) return new Response(null, { status: 404 });
 
-    if (url.pathname === "/api/ephemerides") {
-      const epoch = url.searchParams.get("at") ?? "2026-08-24T00:00:00.000Z";
-      const ids = (url.searchParams.get("ids") ?? "399").split(",").map(Number);
-      return Response.json({
-        data: ids.map((naifId) => ({
-          epoch,
-          name: `Body ${naifId}`,
-          naifId,
-          positionAu: { x: 1, y: naifId / 1_000, z: 0 },
-          solution: "DE441/JPL orbital solution",
-          spkId: String(naifId),
-          velocityAuPerDay: { x: 0, y: 0.01, z: 0 },
-        })),
-        meta: {
-          cached: true,
-          center: "Sun (10)",
-          coordinateFrame: "Ecliptic J2000",
-          epoch,
-          retrievedAt: epoch,
-          source: "NASA/JPL Horizons API",
-          sourceVersion: "1.2",
-          stale: false,
-        },
-      });
-    }
-
     if (url.pathname === "/api/black-holes") {
       return Response.json({
         data: [observedBlackHole],
@@ -901,9 +875,9 @@ desktopTest(
 );
 
 desktopTest(
-  "the Solar System diorama distinguishes cached JPL positions from catalog phases",
+  "the Solar System diorama computes dated positions without network requests",
   async () => {
-    stubArchive();
+    const calls = stubArchive();
     mountApp("?system=Sun");
 
     await expect.element(page.getByRole("heading", { level: 1 })).toMatchTextContent("Sun");
@@ -913,9 +887,8 @@ desktopTest(
       .toBeVisible();
     await userEvent.click(page.getByRole("button", { exact: true, name: "Now" }));
 
-    await expect
-      .element(page.getByText("JPL positions, cached on the server", { exact: true }))
-      .toBeVisible();
+    await expect.element(page.getByText("Derived local positions", { exact: true })).toBeVisible();
+    expect(calls.some((path) => path.includes("ephemerides"))).toBe(false);
     await expect.element(page.getByRole("button", { exact: true, name: "Play" })).toBeEnabled();
     await userEvent.click(page.getByRole("button", { exact: true, name: "Reverse" }));
     await expect

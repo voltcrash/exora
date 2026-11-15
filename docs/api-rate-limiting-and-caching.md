@@ -6,7 +6,7 @@ Exora does not currently need a durable application-level rate-limit store. The 
 read-only, and unauthenticated, so there is no paid-user quota or authorization boundary that must
 be exact. Planet search, browse, and exact-name reads use a committed NASA Exoplanet Archive
 snapshot bundled into the Worker, and cacheable successful GET responses carry shared-CDN
-freshness and stale-serving policies. The NASA, SIMBAD, and JPL adapters use
+freshness and stale-serving policies. The NASA and SIMBAD adapters use
 bounded per-instance caches, coalesce identical misses within an instance, and have tighter
 per-route request budgets where an upstream miss is relatively expensive.
 
@@ -119,7 +119,7 @@ headless Chromium. These are samples, not service-level guarantees:
 ## Escalation path
 
 If measurements demonstrate a need for globally enforceable request limits, prefer a Cloudflare
-WAF rate-limiting rule on `/api/*` or only the expensive JPL/SIMBAD paths. It executes at the edge
+WAF rate-limiting rule on `/api/*` or only the expensive SIMBAD paths. It executes at the edge
 before the Worker and upstream cost, uses Cloudflare's source identity, and needs no code. Start the
 rule in log mode, review its counts and Workers logs, then choose a threshold and `429` action.
 
@@ -127,3 +127,6 @@ Reference: [Cloudflare rate limiting rules](https://developers.cloudflare.com/wa
 
 A new distributed counter service is not justified while edge controls satisfy the demonstrated
 requirement.
+
+Solar System dated positions are computed locally from bundled orbital states. They have no API
+route, upstream request limiter, or server cache; see [method and limits](local-solar-positions.md).

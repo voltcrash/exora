@@ -197,7 +197,7 @@ Permanent moon codes used by the authored view are: Earth `301`; Mars `401–402
 `508–509`, `514–516`; Saturn `601–611`, `615–618`, `635`; Uranus `701–715`; Neptune `801–808`;
 and Pluto `901–905`. Codes are recorded beside each body in `planetary-subsystems.ts`; the UI
 exposes them for every principal moon and in immersive mode. The scene is a catalogue display of
-mean elements, not a date-specific SPICE evaluation. Part 7's cached Horizons mode is intentionally
+mean elements, not a date-specific SPICE evaluation. The local dated-position model for planets is
 separate.
 
 No rendered magnetopause is claimed as a live boundary. Dayside/tail extents are representative
@@ -228,27 +228,29 @@ palette, so the browser does not decode or upload all five sets.
 | `ice`      | Frozen caps and globally glaciated surfaces        | `Snow006`       | https://ambientcg.com/a/Snow006   | CC0 1.0 |
 
 Source archives were downloaded from
-`https://ambientcg.com/get?file=<AssetId>_2K-PNG.zip`. For each family, Exora keeps the 2K
-OpenGL normal map and the roughness map. Source 16-bit normals were converted to 8-bit RGB:
+`https://ambientcg.com/get?file=<AssetId>_2K-PNG.zip`. For each family, Exora uses the 2K
+OpenGL normal map and the roughness map as sources. Source 16-bit normals were converted to 8-bit RGB:
 browser GPU texture sampling is normalized 8-bit in this path, so this removes download weight
 without reducing the precision the shader consumes. Unused color, AO, displacement, scene, and
 material files are not shipped.
 
-`Rock063` is natively 2048×1024; the other four families are 2048×2048, and the encoded files keep
-those dimensions. The PNGs are the _source_: what ships is KTX2, so the GPU receives a compressed
+`Rock063` is natively 2048×1024; the other four families are 2048×2048, and roughness files retain
+those dimensions. Normals are half-size: 1024×512 for cracked, 1024×1024 for the other families.
+They store X/Y in R/G with constant B=0, A=1; shaders reconstruct Z. The original PNGs were recovered
+from `da9cb8a^`, not from shipped lossy KTX2. The PNGs are the _source_: what ships is KTX2, so the GPU receives a compressed
 format rather than decoding a full-size image. Normals are UASTC with Zstandard supercompression,
-roughness is the smaller ETC1S, and every file carries a complete mip chain — twelve levels at 2K —
+roughness is the smaller ETC1S, and every file carries a complete mip chain — eleven levels for normals, twelve for roughness —
 sampled with tier-specific anisotropic filtering. `docs/texture-compression.md` holds the encoder
 commands and the settings behind that split.
 
 Creator: ambientCG / Lennart Demes. Attribution is not legally required under CC0, but provenance
 is retained here.
 
-The ten shipped files are `textures/basalt/normal.ktx2`, `textures/basalt/roughness.ktx2`,
-`textures/cracked/normal.ktx2`, `textures/cracked/roughness.ktx2`,
-`textures/granite/normal.ktx2`, `textures/granite/roughness.ktx2`,
-`textures/ice/normal.ktx2`, `textures/ice/roughness.ktx2`,
-`textures/regolith/normal.ktx2`, and `textures/regolith/roughness.ktx2`.
+The ten shipped files are `textures/basalt/normal-xy.ktx2`, `textures/basalt/roughness.ktx2`,
+`textures/cracked/normal-xy.ktx2`, `textures/cracked/roughness.ktx2`,
+`textures/granite/normal-xy.ktx2`, `textures/granite/roughness.ktx2`,
+`textures/ice/normal-xy.ktx2`, `textures/ice/roughness.ktx2`,
+`textures/regolith/normal-xy.ktx2`, and `textures/regolith/roughness.ktx2`.
 
 ### Exora chemistry color-detail maps
 
@@ -268,7 +270,7 @@ baked directional lighting. The exact production prompt set is recorded in
 `docs/planet-texture-prompts.md`.
 
 On mobile, only the palette-selected 1K chemistry map is sampled. Desktop adds the two
-palette-selected 2K normal/roughness pairs. This keeps chemistry visible on constrained devices
+palette-selected 1K normal/2K roughness pairs. This keeps chemistry visible on constrained devices
 without paying the full physical-detail fragment cost.
 
 ## Babylon.js KTX2 runtime
@@ -387,21 +389,23 @@ from a different HYG release means a new filename, and the URL in `sky-catalog.t
 - **Every star is one point of one size.** Apparent magnitude drives colour intensity, not point
   size, so the sky is flatter than the real one at the bright end.
 
-## Live Solar System ephemerides
+## Bundled Solar System orbital states
 
-Retrieved and contract-checked on **2026-08-24**. No ephemeris file is shipped to the browser.
-Exora's backend requests geometric heliocentric state vectors from the NASA/JPL Horizons API,
-validates signature source `NASA/JPL Horizons API` and payload version `1.2`, then caches the
-normalized answer. Every returned vector retains the permanent identity and Horizons' own
-major-body kernel or small-body orbital-solution label (for example `DE441` or `JPL#103`). Credit:
-NASA/JPL-Caltech Solar System Dynamics Group. Use terms: NASA/JPL factual scientific data; see the
-[JPL Image Use Policy](https://www.jpl.nasa.gov/jpl-image-use-policy/). Original API documentation:
-https://ssd-api.jpl.nasa.gov/doc/horizons.html.
+Retrieved on **2026-11-15** from NASA/JPL Horizons API 1.2. The browser bundles
+`apps/website/src/data/solar-orbits.json` (365-day heliocentric ecliptic J2000 state samples) and
+computes **derived** positions with blended two-body propagation. There is no live ephemeris
+request or server cache. The data retain exact source URLs, anchor target names, and JPL solution
+identifiers. Independent body-center comparisons are in `solar-orbits-fixtures.json`.
 
-All requests set center `500@10` (Sun body center), `EPHEM_TYPE=VECTORS`, `OUT_UNITS=AU-D`,
-`REF_PLANE=ECLIPTIC`, `REF_SYSTEM=ICRF`, `VEC_CORR=NONE`, and `VEC_TABLE=2`. The UTC epoch is the
-visitor's requested time. The links below are the original dynamic dataset URLs up to that epoch
-parameter; Exora supplies `TLIST` server-side and never exposes JPL as a browser dependency.
+Earth uses Earth–Moon barycenter anchors (3); Pluto uses system-barycenter anchors (9). Their
+rendered body IDs remain 399 and 999. The other eleven targets use body-center anchors.
+The supported interval is UTC 1900–2100. The worst error in 65 sampled comparisons is
+0.000331346 AU (about 49,569 km); this is not a guaranteed bound. See
+[the method, validation and regeneration commands](docs/local-solar-positions.md).
+Credit: NASA/JPL-Caltech Solar System Dynamics Group. Use terms: NASA/JPL factual scientific
+data; [JPL use policy](https://www.jpl.nasa.gov/jpl-image-use-policy/).
+The following table records body identities and source context; exact build-time requests,
+including the barycenter substitutions, are in the bundled data.
 
 | Body     | Mission / archive                        | Permanent NAIF / SPK ID        | Original URL                                                                          |
 | -------- | ---------------------------------------- | ------------------------------ | ------------------------------------------------------------------------------------- |
@@ -418,12 +422,6 @@ parameter; Exora supplies `TLIST` server-side and never exposes JPL as a browser
 | Eris     | JPL Horizons small-body orbital solution | NAIF/SPK `20136199`            | https://ssd.jpl.nasa.gov/api/horizons.api?format=json&COMMAND=%27DES%3D20136199%3B%27 |
 | Haumea   | JPL Horizons small-body orbital solution | NAIF/SPK `20136108`            | https://ssd.jpl.nasa.gov/api/horizons.api?format=json&COMMAND=%27DES%3D20136108%3B%27 |
 | Makemake | JPL Horizons small-body orbital solution | NAIF/SPK `20136472`            | https://ssd.jpl.nasa.gov/api/horizons.api?format=json&COMMAND=%27DES%3D20136472%3B%27 |
-
-The exact requested snapshot is measured/model-solved JPL data. Playback away from that anchor is
-an explicitly labelled two-body propagation using the returned position and velocity; it is not
-presented as a second Horizons solution. The orbit ribbons remain the existing simplified catalog
-orbits and are labelled separately. If Horizons is unavailable, only a still-valid stale cache
-entry for the exact target and epoch may be served, and the interface marks it `STALE CACHE`.
 
 ## Constellation boundaries
 

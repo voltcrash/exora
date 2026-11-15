@@ -640,10 +640,15 @@ vec3 triplanarBlend(vec3 objectNormal) {
 #endif
 
 #ifdef SURFACE_MICRODETAIL
+vec3 decodeDetailNormal(vec2 encoded) {
+  vec2 xy = encoded * 2.0 - 1.0;
+  return vec3(xy, sqrt(max(0.0, 1.0 - dot(xy, xy))));
+}
+
 vec3 sampleTriplanarNormal(sampler2D tex, vec3 p, vec3 blend, vec3 objectNormal) {
-  vec3 nx = texture2D(tex, p.yz).xyz * 2.0 - 1.0;
-  vec3 ny = texture2D(tex, p.xz).xyz * 2.0 - 1.0;
-  vec3 nz = texture2D(tex, p.xy).xyz * 2.0 - 1.0;
+  vec3 nx = decodeDetailNormal(texture2D(tex, p.yz).rg);
+  vec3 ny = decodeDetailNormal(texture2D(tex, p.xz).rg);
+  vec3 nz = decodeDetailNormal(texture2D(tex, p.xy).rg);
 
   nx = vec3(nx.xy + objectNormal.zy, abs(nx.z) * objectNormal.x);
   ny = vec3(ny.xy + objectNormal.xz, abs(ny.z) * objectNormal.y);

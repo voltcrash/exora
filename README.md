@@ -154,11 +154,11 @@ and never lays out chrome of its own; Explore's catalogs are assembled from `com
 Production is one Cloudflare Worker with static assets, described by the committed
 `wrangler.jsonc`. The Deploy workflow builds and publishes `main` once the `CLOUDFLARE_API_TOKEN`
 and `CLOUDFLARE_ACCOUNT_ID` repository secrets exist, and reads `VITE_VARIANT_LAUNCH_KEY` from the
-repository variable of that name. The repository does not install wrangler; a manual deployment
-uses the latest release as a one-off command:
+repository variable of that name. Wrangler is a catalog dev dependency locked with its integrity in `pnpm-lock.yaml`; a manual deployment
+uses that same installed version:
 
 ```sh
-vp run deploy  # build every workspace, then pnpm dlx wrangler@latest deploy
+vp run deploy  # build every workspace, then the installed wrangler deploy
 ```
 
 The website builds to static files that Cloudflare serves directly. Only `/api/*` starts the
@@ -186,7 +186,7 @@ It serves the API first, then the built site with the same headers, rewrites, tr
 redirects and 404 page. Behind a reverse proxy, set `TRUSTED_CLIENT_IP_HEADER` to the header the
 proxy overwrites with the caller's address so rate limits apply per caller.
 
-The API answers planet search, browse, and exact-name reads from a committed snapshot of the NASA Exoplanet Archive and queries the live archive for everything else. Stars resolve through SIMBAD, which needs no registration or key; Solar System ephemerides resolve through NASA/JPL services.
+The API answers planet search, browse, and exact-name reads from a committed snapshot of the NASA Exoplanet Archive and queries the live archive for everything else. Stars resolve through SIMBAD, which needs no registration or key; Solar System dated positions are derived locally from bundled orbital states, with no ephemeris network request (see [method and accuracy](docs/local-solar-positions.md)).
 
 Planet search, browse pages, and exact-name lookups read `packages/planet-catalog/data/pscomppars.json`, a snapshot of the confirmed NASA catalog that a weekly workflow regenerates and proposes as a pull request. The API bundles it, so no instance downloads the catalog. The website loads it as a hashed asset in a module worker after the first scene, or when search opens, and then answers those reads off the main thread with the same matching, ranking, pagination, and nullable measurements. Until it loads, or if it fails, the website uses the API. Names and searches the snapshot lacks fall back to cached live TAP queries. Discovery collections and host-system queries keep their live-query caches. Stars use a twelve-hour cache, and all upstream requests have timeouts. Responses also carry `CDN-Cache-Control`, which the Worker's edge cache honours, so repeated reads never reach the archives.
 
@@ -219,7 +219,6 @@ flowchart TB
     subgraph Archives["Archives"]
         NASA["NASA Exoplanet Archive<br/>TAP"]
         SIMBAD["SIMBAD<br/>TAP, keyless"]
-        JPL["NASA/JPL<br/>Horizons"]
     end
 
     Desktop --> Static
@@ -229,10 +228,9 @@ flowchart TB
     Host --> Worldgen
 
     UI -->|/api/planets, /api/stars| Fn
-    Host -->|/api/ephemerides| Fn
+    Host -->|dated positions| Orbits["Bundled states + local Kepler solver"]
     Fn <-->|repeated reads| Edge
 
     Fn --> NASA
     Fn --> SIMBAD
-    Fn --> JPL
 ```

@@ -14,8 +14,10 @@ in `apps/website/public/_headers`; the API sets its own `X-Robots-Tag` and
 
 Local development uses `vp run dev` and needs no Cloudflare tooling. `vp run deploy:check` bundles
 the Worker and reads the asset directory without publishing, as the Quality workflow does on every
-pull request. For a manual deployment, run `vp run deploy`, which builds and then runs the latest
-wrangler through `pnpm dlx`. Do not add wrangler to the workspace dependencies.
+pull request. For a manual deployment, run `vp run deploy`, which builds and then runs the installed
+wrangler binary. Wrangler is a catalog dev dependency: the frozen lockfile fixes its version
+and integrity for both the dry run and production deploy. Update it through `vp add -Dw
+--save-catalog wrangler@latest`, then validate the dry run before shipping.
 
 The same `_headers` and `_redirects` files are read by Cloudflare Pages and Netlify, and by the Node
 server when `STATIC_ROOT` points at `apps/website/dist`, so the policy below holds on any of them.

@@ -227,7 +227,7 @@ test("offline and upstream-error delivery explicitly marks scientific responses 
       ? Response.json({ data: [], meta: { cached: false, stale: false } })
       : new Response(null, { status: 502 }),
   );
-  const request = () => new Request("https://exora.test/api/ephemerides?at=example");
+  const request = () => new Request("https://exora.test/api/stars?q=Vega");
   await worker.dispatch("fetch", request());
   online = false;
   const response = await worker.dispatch("fetch", request());
