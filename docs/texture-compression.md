@@ -194,7 +194,9 @@ transfers are:
 | cracked / regolith         |      7,409,305 | 1,847,747 |
 
 Earth's six requested texture files total **12,075,284 → 4,539,294 bytes** (the after list was
-observed in the app browser). These are texture-body totals, not compressed whole-route transfer
+observed in the app browser). Moon uses regolith/basalt, not Earth’s granite/regolith pair:
+its six texture files total **12,564,789 → 4,689,591 bytes**, with the after list verified in the
+production preview. These are texture-body totals, not compressed whole-route transfer
 or Lighthouse scores. Mobile tiers omit PBR detail maps, so their normal-map transfer stays zero.
 
 Before/after captures of Earth in the real WebGL app, at orbit and after zooming down to the
