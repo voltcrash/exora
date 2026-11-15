@@ -860,7 +860,7 @@ const mobileProfile = deriveRenderQuality({
   deviceMemory: 6,
 });
 
-test("the Solar System diorama accepts and clears authoritative Horizons positions", async () => {
+test("the Solar System diorama accepts and clears derived local positions", async () => {
   const { engine, host, scene } = createHarness();
   const scope = openWorldScope(scene);
   const solarWorld = {
@@ -884,22 +884,12 @@ test("the Solar System diorama accepts and clears authoritative Horizons positio
   const body = scene.meshes.find((mesh) => mesh.name === `diorama-world-${solarWorld.id}`);
   if (!body) throw new Error("Expected the Solar System world to be drawn.");
 
-  world.setEphemeris([
-    {
-      epoch: "2026-08-24T00:00:00.000Z",
-      name: "Earth",
-      naifId: 399,
-      positionAu: { x: 0, y: 1, z: 0.1 },
-      solution: "DE441",
-      spkId: "399",
-      velocityAuPerDay: { x: -0.017, y: 0, z: 0 },
-    },
-  ]);
-  expect(body.position.z).toBeGreaterThan(0);
-  expect(body.position.y).toBeGreaterThan(0);
+  world.setEphemerisTime(new Date("2026-08-24T00:00:00.000Z"));
+  world.setEphemeris(true);
+  expect(body.position.length()).toBeGreaterThan(0);
   world.setEphemerisTime(new Date("2026-08-25T00:00:00.000Z"));
   expect(() => scene.render()).not.toThrow();
-  world.setEphemeris(null);
+  world.setEphemeris(false);
 
   world.dispose();
   scope.dispose();
