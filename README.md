@@ -155,7 +155,7 @@ Production is one Cloudflare Worker with static assets, described by the committ
 `wrangler.jsonc`. The Deploy workflow builds and publishes `main` once the `CLOUDFLARE_API_TOKEN`
 and `CLOUDFLARE_ACCOUNT_ID` repository secrets exist, and reads `VITE_VARIANT_LAUNCH_KEY` from the
 repository variable of that name. Wrangler is a catalog dev dependency locked with its integrity in `pnpm-lock.yaml`; a manual deployment
-uses the latest release as a one-off command:
+uses that same installed version:
 
 ```sh
 vp run deploy  # build every workspace, then the installed wrangler deploy
