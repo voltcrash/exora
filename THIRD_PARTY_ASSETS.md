@@ -506,3 +506,15 @@ the longitude wraps and the poles converge. The channels have distinct uses.
 | `textures/fields/lithosphere.png` | Continental elevation | Mountain ridges | Mineral grain       |
 | `textures/fields/convection.png`  | Cloud density         | Zonal shear     | Turbulent filaments |
 | `textures/fields/photosphere.png` | Convection cells      | Active regions  | Bright plage        |
+
+## Original Blender small bodies
+
+These procedural studies are original Exora models. Run `art/model-small-bodies.py`
+in Blender to regenerate the geometry and vertex colors. Each GLB contains one
+centered mesh with its material embedded.
+
+| Model                        | Form                                            |
+| ---------------------------- | ----------------------------------------------- |
+| `models/impact-fragment.glb` | Pitted silicate with raised impact rims         |
+| `models/comet-nucleus.glb`   | Dark bilobed nucleus with a narrow neck         |
+| `models/ice-fragment.glb`    | Elongated ice-rich fragment with shallow basins |
