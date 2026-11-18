@@ -5,24 +5,6 @@ import { playwright } from "vite-plus/test/browser-playwright";
 import { discoveryPages } from "./discovery/plugin.ts";
 import { VARIANT_LAUNCH_INITIALIZER } from "./variant-launch-embed.ts";
 
-const dropWebGpuShaders = (): Plugin => {
-  // Exora ships WebGL only; prevent Babylon's WGSL modules entering the bundle.
-  const stub = "\0exora:webgpu-shader-stub";
-
-  return {
-    name: "exora:drop-webgpu-shaders",
-    enforce: "pre",
-    resolveId(source, importer) {
-      if (!source.includes("ShadersWGSL/")) return null;
-      if (!importer?.includes("@babylonjs")) return null;
-      return stub;
-    },
-    load(id) {
-      return id === stub ? "export {};" : null;
-    },
-  };
-};
-
 const variantLaunchSdk = (key: string): Plugin => ({
   name: "exora:variant-launch-sdk",
   transformIndexHtml: {
@@ -103,11 +85,6 @@ export default defineConfig(({ mode }) => {
                 test: /three[\\/]build[\\/]three\.core\.js$/,
                 includeDependenciesRecursively: false,
               },
-              {
-                name: "scene",
-                test: /@babylonjs[\\/]core[\\/]scene\.pure\.js$/,
-                includeDependenciesRecursively: false,
-              },
             ],
           },
         },
@@ -119,7 +96,6 @@ export default defineConfig(({ mode }) => {
       // The compiler memoises components and hooks, so a scene readout or search keystroke
       // re-renders only what it changed instead of whole destination trees.
       babel({ presets: [reactCompilerPreset()] }),
-      dropWebGpuShaders(),
       discoveryPages(),
     ],
     server: {

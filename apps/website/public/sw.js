@@ -3,12 +3,12 @@
  *
  * The app shell and everything with a content hash are kept after the first visit, so Exora opens
  * without a network; that includes the planet catalogue snapshot, so search and browse work too.
- * Textures, transcoders and the sky catalogue are served from cache and refreshed behind the
+ * Textures, Blender models and the sky catalogue are served from cache and refreshed behind the
  * scenes. Archive answers are always asked for fresh, and only when the network fails is the last
  * good answer used — the panels already say when data is cached.
  */
 
-const VERSION = "v3";
+const VERSION = "v4";
 const SHELL_CACHE = `exora-shell-${VERSION}`;
 const ASSET_CACHE = `exora-assets-${VERSION}`;
 const MEDIA_CACHE = `exora-media-${VERSION}`;
@@ -27,7 +27,7 @@ const routeFor = (pathname, mode) => {
   if (pathname.startsWith("/assets/")) return "immutable";
   if (pathname.startsWith("/api/")) return "archive";
   if (pathname === "/discovery.css") return "media";
-  if (/^\/(textures|ktx2|sky|models)\//.test(pathname)) return "media";
+  if (/^\/(textures|sky|models)\//.test(pathname)) return "media";
   if (/\.(png|svg|ico|webmanifest|jpg)$/.test(pathname)) return "media";
   return null;
 };

@@ -1,90 +1,31 @@
-import { expect, test, vi } from "vite-plus/test";
-import {
-  chemistryTexturePath,
-  createKeyedCache,
-  detailTexturePath,
-  surfaceDetailSelectionForPalette,
-} from "./texture-cache.ts";
+import { afterEach, expect, test, vi } from "vite-plus/test";
+import { RepeatWrapping, Texture, TextureLoader } from "three";
+import { loadPlanetFields } from "./three/planet-fields.ts";
 
-test("resolves surface detail assets to GPU-compressed KTX2 containers", () => {
-  expect(detailTexturePath("granite", "normal")).toBe("/textures/granite/normal-xy.ktx2");
-  expect(detailTexturePath("basalt", "roughness")).toBe("/textures/basalt/roughness.ktx2");
-  expect(chemistryTexturePath("sulfuric")).toBe("/textures/chemistry/sulfuric.ktx2");
-});
-
-test("reuses the same value for repeated requests instead of recreating it", () => {
-  const factory = vi.fn((path: string) => ({ path }));
-  const fallback = vi.fn((path: string) => ({ path: `fallback:${path}` }));
-  const cache = createKeyedCache(factory, fallback);
-
-  const first = cache.get("/textures/granite/normal-xy.ktx2");
-  const second = cache.get("/textures/granite/normal-xy.ktx2");
-
-  expect(second).toBe(first);
-  expect(factory).toHaveBeenCalledTimes(1);
-  expect(cache.size()).toBe(1);
-});
-
-test("creates independent values for distinct paths", () => {
-  const factory = vi.fn((path: string) => ({ path }));
-  const fallback = vi.fn((path: string) => ({ path: `fallback:${path}` }));
-  const cache = createKeyedCache(factory, fallback);
-
-  const normal = cache.get("/textures/basalt/normal-xy.ktx2");
-  const roughness = cache.get("/textures/basalt/roughness.ktx2");
-
-  expect(normal).not.toBe(roughness);
-  expect(cache.size()).toBe(2);
-});
-
-test("falls back once a factory fails, without retrying the bad load", () => {
-  const factory = vi.fn(() => {
-    throw new Error("decode failed");
-  });
-  const fallback = vi.fn((path: string) => ({ path: `fallback:${path}` }));
-  const cache = createKeyedCache(factory, fallback);
-
-  const first = cache.get("/textures/ice/normal-xy.ktx2");
-  const second = cache.get("/textures/ice/normal-xy.ktx2");
-
-  expect(first).toEqual({ path: "fallback:/textures/ice/normal-xy.ktx2" });
-  expect(second).toEqual({ path: "fallback:/textures/ice/normal-xy.ktx2" });
-  expect(factory).toHaveBeenCalledTimes(1);
-  expect(fallback).toHaveBeenCalledTimes(2);
-  expect(cache.size()).toBe(0);
-});
-
-test("selects chemistry and physical materials from the inferred rocky palette", () => {
-  expect(surfaceDetailSelectionForPalette("sulfuric-yellow")).toMatchObject({
-    chemistry: "sulfuric",
-    primary: "cracked",
-    secondary: "regolith",
-  });
-  expect(surfaceDetailSelectionForPalette("ice-blue")).toMatchObject({
-    chemistry: "ice",
-    primary: "ice",
-  });
-  expect(surfaceDetailSelectionForPalette("carbon-dark").chemistryStrength).toBeGreaterThan(
-    surfaceDetailSelectionForPalette("silicate-neutral").chemistryStrength,
+afterEach(() => vi.restoreAllMocks());
+test("each destination owns two longitude-wrapped Blender fields", async () => {
+  vi.spyOn(TextureLoader.prototype, "loadAsync").mockImplementation(
+    async () => new Texture<HTMLImageElement>(),
   );
+  const first = await loadPlanetFields(),
+    second = await loadPlanetFields();
+  expect(first.flow).not.toBe(second.flow);
+  expect(first.strata.wrapS).toBe(RepeatWrapping);
+  const release = vi.spyOn(first.flow, "dispose");
+  first.dispose();
+  expect(release).toHaveBeenCalledOnce();
+  second.dispose();
 });
-
-test("asynchronous failures enter fallback and become retryable after cooldown", () => {
-  const clock = vi.spyOn(Date, "now").mockReturnValue(1);
-  try {
-    let fail = (): void => undefined;
-    const factory = vi.fn((_path: string, onFailure: () => void) => {
-      fail = onFailure;
-      return "loading";
-    });
-    const cache = createKeyedCache(factory, () => "neutral");
-    expect(cache.get("texture")).toBe("loading");
-    fail();
-    expect(cache.get("texture")).toBe("neutral");
-    clock.mockReturnValue(60_002);
-    expect(cache.get("texture")).toBe("loading");
-    expect(factory).toHaveBeenCalledTimes(2);
-  } finally {
-    clock.mockRestore();
-  }
+test("a partially loaded pair releases the successful field and can be requested again", async () => {
+  const good = new Texture<HTMLImageElement>(),
+    release = vi.spyOn(good, "dispose");
+  const load = vi
+    .spyOn(TextureLoader.prototype, "loadAsync")
+    .mockResolvedValueOnce(good)
+    .mockRejectedValueOnce(Error("offline"));
+  await expect(loadPlanetFields()).rejects.toThrow();
+  expect(release).toHaveBeenCalledOnce();
+  load.mockImplementation(async () => new Texture<HTMLImageElement>());
+  const retry = await loadPlanetFields();
+  retry.dispose();
 });

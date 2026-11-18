@@ -81,7 +81,7 @@ test("header and rewrite files are parsed the way Cloudflare reads them", () => 
 
   expect(all?.pattern.test("/anything/at/all")).toBe(true);
   expect(assets?.pattern.test("/assets/x.js")).toBe(true);
-  expect(assets?.pattern.test("/textures/x.ktx2")).toBe(false);
+  expect(assets?.pattern.test("/textures/x.png")).toBe(false);
   expect(assets?.headers).toEqual([["B", "two: parts"]]);
   expect([...parseRewrites("/a /b 200\n/c /d 301\n# /e /f 200\n")]).toEqual([["/a", "/b"]]);
 });

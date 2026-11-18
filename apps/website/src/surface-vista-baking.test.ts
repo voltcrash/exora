@@ -1,4 +1,4 @@
-import { Vector3 } from "@babylonjs/core/Maths/math.vector.js";
+import { Vector3 } from "three";
 import { expect, test } from "vite-plus/test";
 import {
   bakeSurfaceOcclusion,

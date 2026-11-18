@@ -20,7 +20,12 @@ import {
 
 import { createOutcrops } from "./outcrops.ts";
 
-export function createLandscape(recipe: WorldRecipe, texture: Texture, segments: number) {
+export function createLandscape(
+  recipe: WorldRecipe,
+  texture: Texture,
+  segments: number,
+  neutralSurface = false,
+) {
   const root = new Group();
   const image = texture.image as HTMLImageElement;
   const canvas = document.createElement("canvas");
@@ -47,6 +52,7 @@ export function createLandscape(recipe: WorldRecipe, texture: Texture, segments:
   const rocky = recipe.renderer === "rocky" ? recipe.surface : null;
   const relief = recipe.renderer === "rocky" ? 3.5 + recipe.terrain.mountainHeight * 8 : 3.1;
   const baseHeight = (x: number, z: number) => {
+    if (neutralSurface) return 0;
     const basin = Math.min(1, Math.hypot(x, z - 5) / 36);
     const dunes = field(x * 0.24, z * 0.24, 0) - 0.48;
     const hills = field(x * 0.36, z * 0.36, 1);
@@ -54,7 +60,12 @@ export function createLandscape(recipe: WorldRecipe, texture: Texture, segments:
   };
   const water = rocky && rocky.waterLevel > 0 ? (rocky.waterLevel - 0.45) * relief : -Infinity;
 
-  const geo = new PlaneGeometry(136, 136, segments, segments).rotateX(-Math.PI / 2);
+  const geo = new PlaneGeometry(
+    neutralSurface ? 4000 : 136,
+    neutralSurface ? 4000 : 136,
+    neutralSurface ? 1 : segments,
+    neutralSurface ? 1 : segments,
+  ).rotateX(-Math.PI / 2);
   const pos = geo.getAttribute("position"),
     colors = new Float32Array(pos.count * 3);
   const palette =
@@ -79,13 +90,19 @@ export function createLandscape(recipe: WorldRecipe, texture: Texture, segments:
     pos.setY(i, h);
     color
       .copy(low)
-      .lerp(high, Math.min(1, Math.max(0, 0.2 + (h / relief) * 0.65 + field(x, z, 2) * 0.38)))
+      .lerp(
+        high,
+        neutralSurface
+          ? 0.5
+          : Math.min(1, Math.max(0, 0.2 + (h / relief) * 0.65 + field(x, z, 2) * 0.38)),
+      )
       .toArray(colors, i * 3);
   }
   geo.setAttribute("color", new BufferAttribute(colors, 3));
   geo.computeVertexNormals();
   // Interpolate the same two triangles as PlaneGeometry so the camera tracks the rendered ground.
   function floorAt(x: number, z: number) {
+    if (neutralSurface) return 0;
     const col = (x / 136 + 0.5) * segments,
       row = (z / 136 + 0.5) * segments;
     const c = Math.min(segments - 1, Math.max(0, Math.floor(col))),
@@ -111,24 +128,25 @@ export function createLandscape(recipe: WorldRecipe, texture: Texture, segments:
     new ShaderMaterial({
       uniforms: {
         detail: { value: texture },
+        neutral: { value: neutralSurface },
         horizon: { value: haze },
         keyColor: { value: new Color().setRGB(...recipe.star.color, SRGBColorSpace) },
         air: { value: Math.min(1, recipe.atmosphere.density + 0.11) },
       },
       vertexColors: true,
       vertexShader: `varying vec3 point,slope,tint;void main(){point=position;slope=normal;tint=color;gl_Position=projectionMatrix*modelViewMatrix*vec4(position,1.);}`,
-      fragmentShader: `uniform sampler2D detail;uniform vec3 horizon,keyColor;uniform float air;varying vec3 point,slope,tint;
+      fragmentShader: `uniform bool neutral;uniform sampler2D detail;uniform vec3 horizon,keyColor;uniform float air;varying vec3 point,slope,tint;
       void main(){vec2 uv=point.xz;vec3 fines=texture2D(detail,fract(uv*.038)).rgb;
         float grit=texture2D(detail,fract(uv*.28)).b;float rake=sin(uv.y*6.+fines.r*8.+.6*sin(uv.x*1.9));
         float lambert=max(0.,dot(normalize(slope),normalize(vec3(-.55,.24,-.8))));
-        vec3 clay=tint*(.66+.42*fines.b+.32*grit+.05*rake);
+        vec3 clay=neutral ? tint : tint*(.66+.42*fines.b+.32*grit+.05*rake);
         float veil=1.-exp(-length(cameraPosition-point)*(.005+.012*air));
         gl_FragColor=vec4(mix(clay*(.44+1.5*lambert)*keyColor,horizon,veil*.78),1.);
         #include <colorspace_fragment>
       }`,
     }),
   );
-  const ridges = Array.from({ length: 3 }, (_, layer) => {
+  const ridges = Array.from({ length: neutralSurface ? 0 : 3 }, (_, layer) => {
     const vertices: number[] = [],
       indices: number[] = [];
     for (let i = 0; i <= 360; i++) {
@@ -214,9 +232,10 @@ export function createLandscape(recipe: WorldRecipe, texture: Texture, segments:
   const sunlight = new DirectionalLight(sun, 2.15);
   sunlight.position.set(-0.55, 0.24, -0.8);
   root.add(sunlight, new HemisphereLight(air.clone().lerp(new Color("white"), 0.55), low, 0.9));
-  const clearRocks = rocky
-    ? createOutcrops(root, recipe.seed, high, rocky.iceCapStrength > 0.7, floorAt, water)
-    : null;
+  const clearRocks =
+    rocky && !neutralSurface
+      ? createOutcrops(root, recipe.seed, high, rocky.iceCapStrength > 0.7, floorAt, water)
+      : null;
   const sunOffset = star.position.clone();
   return {
     follow(x: number, z: number) {

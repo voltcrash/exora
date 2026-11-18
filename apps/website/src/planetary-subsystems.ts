@@ -11,7 +11,6 @@ export interface SubsystemMoon {
   retrograde?: boolean;
   shepherds?: string;
   surface: "mapped" | "unresolved";
-  texturePath?: string;
 }
 
 export interface SubsystemRing {
@@ -71,9 +70,6 @@ export interface PlanetarySubsystem {
   } | null;
 }
 
-const mappedTexture = (name: string): string =>
-  `/textures/solar-system/${name.toLocaleLowerCase().replaceAll(" ", "-")}.ktx2`;
-
 const moon = (
   name: string,
   naifId: number,
@@ -100,7 +96,6 @@ const moon = (
     ...(options.retrograde ? { retrograde: true } : {}),
     ...(options.shepherds ? { shepherds: options.shepherds } : {}),
     surface,
-    ...(surface === "mapped" ? { texturePath: mappedTexture(name) } : {}),
   };
 };
 
@@ -208,7 +203,7 @@ export const PLANETARY_SUBSYSTEMS: readonly PlanetarySubsystem[] = [
       note: "Patchy ultraviolet aurora observed above crustal magnetic fields, not a global oval.",
     },
     disclosure:
-      "Phobos and Deimos use JPL mean elements and retain their Viking-era mission mosaics. Radial distance and body size use separate display scales.",
+      "Phobos and Deimos use JPL mean elements. Radial distance and body size use separate display scales.",
     id: "mars",
     lagrangePoints: [],
     magnetosphere: null,
@@ -370,7 +365,7 @@ export const PLANETARY_SUBSYSTEMS: readonly PlanetarySubsystem[] = [
       note: "Localized ultraviolet aurora; the strongly tilted, offset field makes the pattern asymmetric.",
     },
     disclosure:
-      "The entire system is tilted with Uranus's equator. Voyager-resolved major moons keep their mosaics; small inner moons remain neutral unresolved silhouettes.",
+      "The entire system is tilted with Uranus's equator. Voyager-resolved major moons use procedural portraits; small inner moons remain neutral unresolved silhouettes.",
     id: "uranus",
     lagrangePoints: [],
     magnetosphere: {
@@ -422,7 +417,7 @@ export const PLANETARY_SUBSYSTEMS: readonly PlanetarySubsystem[] = [
       note: "Patchy aurora displaced by Neptune's strongly tilted and offset magnetic field.",
     },
     disclosure:
-      "Voyager-resolved Triton retains its mosaic. Inner moons and Nereid are unresolved neutral silhouettes; Neptune's ring arcs and magnetic boundaries are diagrammatic layers around measured tracks.",
+      "Voyager resolved Triton’s surface. Inner moons and Nereid are unresolved neutral silhouettes; Neptune's ring arcs and magnetic boundaries are diagrammatic layers around measured tracks.",
     id: "neptune",
     lagrangePoints: lagrangePair(4_498_400_000, "Sun–Neptune Trojan regions"),
     magnetosphere: {

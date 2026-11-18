@@ -1,6 +1,6 @@
 # iPhone AR with Variant Launch
 
-Exora uses standard Babylon.js WebXR `immersive-ar`; Variant Launch supplies that browser API
+Exora uses Three.js with WebXR `immersive-ar`. Variant Launch supplies that browser API
 inside an iOS App Clip viewer. The renderer does not serialize or export GLB/USDZ files. Android
 devices with native WebXR use the same AR session directly and do not need the iOS handoff.
 
