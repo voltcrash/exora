@@ -2,7 +2,7 @@ import type { StarProfile } from "@exora/contracts";
 import { useEffect, useState } from "react";
 import type { DestinationPanelModel } from "../destination-panel.ts";
 import { capitalize } from "../readable.ts";
-import type { SceneHost } from "../scene-host.ts";
+import type { Observatory } from "../three/observatory.ts";
 import type { SolarRegionProfile } from "../solar-regions.ts";
 import { findSolarStar } from "../solar-system.ts";
 import { starLight } from "../star-light.ts";
@@ -10,7 +10,7 @@ import type { TravelPhase } from "../travel-transition.ts";
 import { DestinationShell, type SceneState } from "./shell/DestinationShell.tsx";
 
 interface RegionExperienceProps {
-  host: SceneHost | null;
+  host: Observatory | null;
   onSelectStar: (star: StarProfile, cached: boolean) => void;
   region: SolarRegionProfile;
   travelPhase: TravelPhase;
@@ -32,7 +32,7 @@ export const RegionExperience = ({
     let abandoned = false;
     const controller = new AbortController();
     setSceneState("loading");
-    void import("../solar-region-scene.ts")
+    void import("../three/region.ts")
       .then(({ createSolarRegionWorld }) =>
         abandoned
           ? null

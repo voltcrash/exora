@@ -12,7 +12,7 @@ import {
 } from "../destination-panel.ts";
 import { formatNumber } from "../planet-utils.tsx";
 import { capitalize } from "../readable.ts";
-import type { SceneHost } from "../scene-host.ts";
+import type { Observatory } from "../three/observatory.ts";
 import { starLight } from "../star-light.ts";
 import { readStarHabitableZone } from "../star-habitable-zone.ts";
 import { hrSubject } from "../hr-diagram.ts";
@@ -24,7 +24,7 @@ import { HrDiagram } from "./HrDiagram.tsx";
 import { DestinationShell, type SceneState } from "./shell/DestinationShell.tsx";
 
 interface StarExperienceProps {
-  host: SceneHost | null;
+  host: Observatory | null;
   onSelectPlanet: (planet: ExoplanetProfile, cached: boolean) => void;
   onSelectSystem: (hostStar: string) => Promise<boolean>;
   result: StarLoadResult;
@@ -98,7 +98,7 @@ export const StarExperience = ({
     let abandoned = false;
     const controller = new AbortController();
     setSceneState("loading");
-    void import("../star-scene.ts")
+    void import("../three/star.ts")
       .then(({ createStarWorld }) =>
         abandoned
           ? null
