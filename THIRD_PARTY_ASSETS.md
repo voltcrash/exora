@@ -494,3 +494,15 @@ JPG is height data and remains unchanged.
 | `textures/solar-system/umbriel.ktx2`          | ETC1S/BasisLZ q220    | `df46a395f18d4d7b529d01a29b9fc3810ac9fc643f32343ac39c0c21c9d7a95e` |
 | `textures/solar-system/venus-mobile.ktx2`     | ETC1S/BasisLZ q220    | `4b985f633ab55cbb5e81f85de954a3d95ff09eb9ef32657f3dee0895bcc4dda5` |
 | `textures/solar-system/venus.ktx2`            | ETC1S/BasisLZ q220    | `e395bced59e95339efbdd002d4a0bbbf81fe323a6694f3a4039120560c80e789` |
+
+## Original Blender surface fields
+
+The following linear RGB data maps are original Exora artwork baked in Blender
+with `art/bake-world-fields.py`. Each field is sampled on the unit sphere so
+the longitude wraps and the poles converge. The channels have distinct uses.
+
+| Map                               | Red                   | Green           | Blue                |
+| --------------------------------- | --------------------- | --------------- | ------------------- |
+| `textures/fields/lithosphere.png` | Continental elevation | Mountain ridges | Mineral grain       |
+| `textures/fields/convection.png`  | Cloud density         | Zonal shear     | Turbulent filaments |
+| `textures/fields/photosphere.png` | Convection cells      | Active regions  | Bright plage        |
