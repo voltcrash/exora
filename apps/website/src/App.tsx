@@ -25,6 +25,7 @@ import { opensCommandPalette, type PaletteTarget } from "./command-palette.ts";
 import { togglesDiscoverShortcut } from "./discover-shortcut.ts";
 import type { ActiveTour } from "./tours.ts";
 import { TRAVEL_CROSS_MS, TRAVEL_REVEAL_MS, type TravelPhase } from "./travel-transition.ts";
+import { useObservatory } from "./three/use-observatory.ts";
 import { useSceneHost } from "./use-scene-host.ts";
 import type { SolarRegionProfile } from "./solar-regions.ts";
 import { ChromeContext, type ChromeActions } from "./chrome-context.ts";
@@ -81,11 +82,6 @@ export const App = () => {
     });
   }, []);
   const [canvas, setCanvas] = useState<HTMLCanvasElement | null>(null);
-  const {
-    host: sceneHost,
-    restart: restartSceneHost,
-    status: sceneHostStatus,
-  } = useSceneHost(canvas);
   const [discoverOpen, setDiscoverOpen] = useState(false);
   const [paletteOpen, setPaletteOpen] = useState(false);
   const [activeObject, setActiveObject] = useState<ActiveObject | null>(() => {
@@ -101,6 +97,21 @@ export const App = () => {
       ? null
       : defaultPlanetObject();
   });
+  const useThree =
+    activeObject?.type === "star" ||
+    activeObject?.type === "region" ||
+    (!activeObject &&
+      ["region", "star", "customStar"].some((key) =>
+        new URLSearchParams(window.location.search).has(key),
+      ));
+  const engine = useThree ? "three" : "legacy";
+  const legacy = useSceneHost(
+    engine === "legacy" && canvas?.dataset.exoraEngine === engine ? canvas : null,
+  );
+  const [rendererGeneration, setRendererGeneration] = useState(0);
+  const modern = useObservatory(useThree && canvas?.dataset.exoraEngine === engine ? canvas : null);
+  const { host: sceneHost, status: sceneHostStatus } = useThree ? modern : legacy;
+  const restartSceneHost = () => setRendererGeneration((current) => current + 1);
   const [systemHostName, setSystemHostName] = useState<string | null>(null);
 
   const [chromeHidden, setChromeHidden] = useState(false);
@@ -561,6 +572,8 @@ export const App = () => {
   return (
     <ChromeContext value={chrome}>
       <canvas
+        key={engine + rendererGeneration}
+        data-exora-engine={engine}
         ref={setCanvas}
         id="render-canvas"
         aria-label={
@@ -620,7 +633,7 @@ export const App = () => {
           <BlackHoleExperience
             key={activeObject.blackHole.id}
             blackHole={activeObject.blackHole}
-            host={sceneHost}
+            host={legacy.host}
             travelPhase={travelPhase}
           />
         </Suspense>
@@ -628,7 +641,7 @@ export const App = () => {
         <Suspense fallback={null}>
           <RegionExperience
             key={activeObject.region.id}
-            host={sceneHost}
+            host={modern.host}
             onSelectStar={selectStar}
             region={activeObject.region}
             travelPhase={travelPhase}
@@ -637,7 +650,7 @@ export const App = () => {
       ) : activeObject.type === "planet" ? (
         <PlanetExperience
           key={activeObject.result.planet.id}
-          host={sceneHost}
+          host={legacy.host}
           result={activeObject.result}
           onSelectHostStar={selectHostStar}
           onSelectPlanet={selectPlanet}
@@ -650,7 +663,7 @@ export const App = () => {
         <Suspense fallback={null}>
           <SystemExperience
             key={activeObject.result.hostStar}
-            host={sceneHost}
+            host={legacy.host}
             result={activeObject.result}
             onSelectHostStar={selectHostStar}
             onSelectPlanet={selectPlanet}
@@ -662,7 +675,7 @@ export const App = () => {
         <Suspense fallback={null}>
           <StarExperience
             key={activeObject.result.star.id}
-            host={sceneHost}
+            host={modern.host}
             result={activeObject.result}
             systemHostName={systemHostName}
             onSelectPlanet={selectPlanet}

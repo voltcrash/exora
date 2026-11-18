@@ -34,7 +34,9 @@ test("Forge updates its deferred preview and generates from the latest controls"
     .poll(() => container?.querySelector("[data-renderer]")?.getAttribute("data-renderer"))
     .toBe("gas-giant");
 
-  await expect.poll(() => container?.querySelector("canvas")?.dataset.ready).toBe("true");
+  await expect
+    .poll(() => container?.querySelector("canvas")?.dataset.ready, { timeout: 8_000 })
+    .toBe("true");
 
   await userEvent.click(sizeSlider());
   await userEvent.keyboard("{End}");

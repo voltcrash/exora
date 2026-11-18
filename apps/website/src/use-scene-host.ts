@@ -50,12 +50,13 @@ export const useSceneHost = (canvas: HTMLCanvasElement | null): SceneHostControl
   }, []);
 
   useEffect(() => {
+    setHost(null);
+    setStatus("initializing");
     if (!canvas) return;
     let cancelled = false;
     let ownedHost: SceneHost | null = null;
     let release = (_host: SceneHost): Promise<void> => Promise.resolve();
     let unsubscribe = (): void => undefined;
-    setStatus("initializing");
     const cancelStartup = afterFirstPaint(() => {
       if (cancelled) return;
       void preloadInitialScene(initialSceneAssetForSearch(window.location.search)).catch(

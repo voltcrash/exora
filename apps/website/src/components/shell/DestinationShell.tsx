@@ -2,7 +2,7 @@ import { useEffect, type CSSProperties, type ReactNode } from "react";
 import { prefetchPlanetCatalogWhenIdle } from "../../api-client.ts";
 import { useChrome } from "../../chrome-context.ts";
 import type { DestinationPanelModel } from "../../destination-panel.ts";
-import type { SceneHost } from "../../scene-host.ts";
+import type { ViewerControls } from "../../scene-host.ts";
 import { bindStyles } from "../../styles/bind-styles.ts";
 import type { TravelPhase } from "../../travel-transition.ts";
 import { useXrStatus } from "../../use-scene-readouts.ts";
@@ -24,7 +24,7 @@ interface DestinationShellProps {
   /** Extra state classes for the shell, such as `star-experience` or the planet's view mode. */
   className?: string;
   hints: readonly ControlHint[];
-  host: SceneHost | null;
+  host: ViewerControls | null;
   identity: DestinationIdentityProps;
   /** The local star's light as an `r g b` triplet; see `star-light.ts`. */
   light: string;
