@@ -71,6 +71,13 @@ export default defineConfig(({ mode }) => {
         },
         {
           extends: true,
+          optimizeDeps: {
+            include: [
+              "react/compiler-runtime",
+              "three/addons/controls/OrbitControls.js",
+              "three/addons/loaders/GLTFLoader.js",
+            ],
+          },
           test: {
             name: "browser",
             include: ["src/**/*.browser.test.tsx"],
