@@ -149,20 +149,32 @@ test.each([MARS, HAUMEA])(
   async (planet) => {
     const { host, canvas, close } = observer();
     const modes: string[] = [];
+    let firstFrame!: () => void;
+    const arrived = new Promise<void>((resolve) => {
+      firstFrame = resolve;
+    });
+    let onLand!: () => void;
+    const landed = new Promise<void>((resolve) => {
+      onLand = resolve;
+    });
     try {
       const recipe = tuneSolarWorldRecipe(planet, deriveWorldRecipe(planet));
       const world = await host.mountWorld(() =>
         createPlanetWorld(host, {
           planet,
           recipe,
-          onViewModeChange: (m) => modes.push(m),
-          onFirstFrame: () => {},
+          onViewModeChange: (mode) => {
+            modes.push(mode);
+            if (mode === "surface") onLand();
+          },
+          onFirstFrame: firstFrame,
         }),
       );
-      await new Promise(requestAnimationFrame);
+      await arrived;
       host.camera.position.set(0, 0, world!.nearDistance);
       host.controls.update();
-      await vi.waitFor(() => expect(modes).toContain("surface"));
+      await landed;
+      expect(modes.at(-1)).toBe("surface");
       if (planet === HAUMEA) expect(host.camera.position.y).toBeCloseTo(1.65);
       const before = host.camera.position.clone();
       window.dispatchEvent(new KeyboardEvent("keydown", { code: "KeyW" }));
@@ -181,7 +193,7 @@ test.each([MARS, HAUMEA])(
 test("the walking floor matches mesh vertices and the surface sun follows the observer", async () => {
   const recipe = tuneSolarWorldRecipe(MARS, deriveWorldRecipe(MARS));
   const fields = await loadPlanetFields();
-  const view = createLandscape(recipe, fields.strata, 32);
+  const view = createLandscape(recipe, fields.surface, 32);
   try {
     const ground = view.root.children.find(
       (o) => o instanceof Mesh && o.geometry.type === "PlaneGeometry",
