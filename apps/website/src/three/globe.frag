@@ -16,6 +16,9 @@ uniform float lava;
 uniform float bands;
 uniform float contrast;
 uniform float warp;
+uniform float veil;
+uniform float stormScale;
+uniform float stormCount;
 uniform float stormLatitude;
 uniform float stormStrength;
 uniform vec3 stormColor;
@@ -36,6 +39,49 @@ vec4 field(sampler2D tex, vec2 uv) {
   dy.x -= floor(dy.x + 0.5);
   return textureGrad(tex, uv, dx, dy);
 }
+vec3 cloudDeck(vec3 p) {
+  vec2 uv = globeUv(p);
+  float latitude = uv.y - 0.5;
+  float cycle = fract(time / 2048.0);
+  float shearOffset = 0.014 * sin(cycle * 6.2831853);
+  float zone = latitude * bands * 0.87 + seed * 6.28;
+  uv.x += seed + cycle + shearOffset * sin(zone);
+  float eyeMask = 0.0;
+  for (int i = 0; i < 3; i++) {
+    if (float(i) >= stormCount) break;
+    float id = float(i);
+    vec2 center = vec2(0.75 + fract(seed * 7.13) + id * 0.382, 0.5 + stormLatitude * 0.28);
+    center.y += id == 1.0 ? 0.19 : (id == 2.0 ? -0.12 : 0.0);
+    vec2 delta = vec2(fract(uv.x - center.x + 0.5) - 0.5, uv.y - center.y);
+    vec2 size = vec2(0.010, 0.006) * stormScale / (1.0 + id * 0.65);
+    vec2 ellipse = delta / size;
+    float radius = dot(ellipse, ellipse);
+    float swirl = exp(-radius * 0.66) * stormStrength * 4.8;
+    mat2 spin = mat2(cos(swirl), -sin(swirl), sin(swirl), cos(swirl));
+    uv += (spin * ellipse - ellipse) * size;
+    if (i == 0) eyeMask = exp(-radius * 1.7);
+  }
+
+  vec3 weather = field(flow, uv).rgb;
+  vec2 shearUv = vec2(uv.x + 0.074 * sin(zone + 2.5 * weather.g),
+                       uv.y + warp * (weather.r - 0.5) * 0.039);
+  vec3 shear = field(flow, shearUv).rgb;
+  float boundary = (shearUv.y - 0.5) * bands * 0.87;
+  boundary += 1.42 * sin(latitude * 15.0 + seed * 4.7) + 0.66 * sin(latitude * 35.0 - seed * 2.4);
+  float belt = 0.5 + 0.5 * sin(boundary);
+  float broad = 0.5 + 0.5 * sin(latitude * 25.0 - 0.8 + seed * 3.0);
+  float filaments = sin(boundary * 4.7 + shear.g * 6.0 + weather.r * 2.0);
+  float cloudHeight = 0.17 + 0.40 * belt + 0.18 * broad + 0.26 * shear.r + 0.10 * filaments;
+  cloudHeight = mix(0.55, cloudHeight, contrast);
+  vec3 belts = mix(lowColor, midColor, smoothstep(0.0, 0.54, cloudHeight));
+  belts = mix(belts, highColor, smoothstep(0.34, 0.87, cloudHeight));
+  float pole = smoothstep(0.25, 0.48, abs(latitude));
+  belts = mix(belts, mix(midColor, highColor, 0.27), pole * 0.55);
+  belts = mix(belts, stormColor, eyeMask * stormStrength * (0.64 + 0.36 * shear.b));
+  vec3 haze = mix(midColor, highColor, 0.28 + 0.17 * p.y);
+  return mix(belts, haze, veil) * (0.94 + 0.12 * shear.b);
+}
+
 void main() {
   vec3 p = normalize(vLocal);
   float offset = seed * 6.2831853;
@@ -65,24 +111,7 @@ void main() {
   float specular = (1.0 - land) * (1.0 - cover) * pow(max(dot(n, normalize(eye + light)), 0.0), 60.0);
   vec3 volcanic = vec3(1.6, 0.23, 0.025) * lava * pow(plate.g, 7.0) * land;
   if (bands > 0.0) {
-    vec2 gasUv = globeUv(p);
-    gasUv.x += seed + time * 0.0007;
-    vec2 stormDelta = vec2(fract(gasUv.x - seed * 0.37 + 0.5) - 0.5, gasUv.y - (0.5 + stormLatitude * 0.28));
-    vec2 ellipse = stormDelta / vec2(0.074, 0.037);
-    float vortex = exp(-dot(ellipse,ellipse));
-    float twist = vortex * 2.8 * stormStrength;
-    mat2 turn = mat2(cos(twist), -sin(twist), sin(twist), cos(twist));
-    gasUv += (turn * ellipse - ellipse) * vec2(0.074, 0.037);
-    vec3 gas = field(flow, gasUv).rgb;
-    float latitude = gasUv.y - 0.5;
-    float phase = latitude * bands * 1.6 + .92*sin(latitude*18.+seed*4.) + warp*(1.8*gas.r+gas.b);
-    float lanes = .5+.5*sin(phase);
-    float fine = .5+.5*sin(phase*3.1+.65*sin(phase*1.8)+gas.b*2.4);
-    float jet = .48+(lanes-.5)*(.25+.45*contrast)+.20*(fine-.5)+.23*(gas.r-.5);
-    albedo = mix(lowColor, midColor, smoothstep(.10,.74,jet));
-    albedo = mix(albedo, highColor, smoothstep(.36,.91,jet*.68+gas.g*.12+gas.b*.23));
-    albedo = mix(albedo, stormColor, vortex * stormStrength * (0.3 + 0.65 * gas.g));
-    albedo *= 0.69 + 0.38 * gas.b + 0.13 * gas.g;
+    albedo = cloudDeck(p);
     specular = 0.0;
     volcanic = vec3(0.0);
   }

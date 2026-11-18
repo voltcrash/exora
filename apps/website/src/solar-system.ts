@@ -668,13 +668,24 @@ export const tuneSolarWorldRecipe = (
           midColor: [0.63, 0.53, 0.34] as Rgb,
         }
       : {
-          deepColor: [0.11, 0.08, 0.07] as Rgb,
-          lightColor: [0.92, 0.82, 0.63] as Rgb,
-          midColor: [0.52, 0.33, 0.19] as Rgb,
+          deepColor: [0.34, 0.23, 0.19] as Rgb,
+          lightColor: [0.96, 0.89, 0.79] as Rgb,
+          midColor: [0.69, 0.47, 0.34] as Rgb,
         };
     return {
       ...base,
-      cloudBands: { ...base.cloudBands, ...cloudBands },
+      bandDetail: {
+        ...base.bandDetail,
+        haze: saturn ? 0.59 : 0.1,
+        bandContrast: saturn ? 0.64 : 1.12,
+      },
+      cloudBands: {
+        ...base.cloudBands,
+        ...cloudBands,
+        ...(saturn
+          ? {}
+          : { stormColor: [0.8, 0.37, 0.24] as Rgb, stormLatitude: -0.43, stormStrength: 0.94 }),
+      },
       rings: {
         bands: saturn ? 12 : 4,
         color: saturn ? [0.82, 0.74, 0.59] : [0.44, 0.34, 0.25],
@@ -689,6 +700,7 @@ export const tuneSolarWorldRecipe = (
   const uranus = identity.naifId === 799;
   return {
     ...base,
+    bandDetail: { ...base.bandDetail, haze: uranus ? 0.89 : 0.64 },
     atmosphereBands: {
       ...base.atmosphereBands,
       deepColor: uranus ? [0.07, 0.17, 0.2] : [0.02, 0.08, 0.24],
