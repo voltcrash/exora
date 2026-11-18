@@ -12,11 +12,8 @@ import {
 } from "@exora/worldgen";
 import { useDeferredValue, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { useTabList } from "../use-tab-list.ts";
-import {
-  BlackHoleCatalogVisual,
-  PlanetCatalogVisual,
-  StarCatalogVisual,
-} from "./CatalogVisual.tsx";
+import { BlackHoleCatalogVisual, StarCatalogVisual } from "./CatalogVisual.tsx";
+import { ForgePlanetPreview } from "./ForgePlanetPreview.tsx";
 import { Button } from "./ui/Button.tsx";
 import { TabBar } from "./ui/TabBar.tsx";
 import styles from "./CustomPlanetBuilder.module.css";
@@ -229,7 +226,7 @@ export const WorldForge = ({
   const preview = useMemo(() => {
     if (mode === "planet") {
       const world = generateCustomWorld(draftWorld);
-      return <PlanetCatalogVisual planet={world.planet} recipe={world.recipe} />;
+      return <ForgePlanetPreview world={world} />;
     }
     if (mode === "star") return <StarCatalogVisual star={generateCustomStar(draftStar).star} />;
     return <BlackHoleCatalogVisual blackHole={generateCustomBlackHole(draftBlackHole).blackHole} />;
