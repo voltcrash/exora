@@ -495,6 +495,10 @@ JPG is height data and remains unchanged.
 | `textures/solar-system/venus-mobile.ktx2`     | ETC1S/BasisLZ q220    | `4b985f633ab55cbb5e81f85de954a3d95ff09eb9ef32657f3dee0895bcc4dda5` |
 | `textures/solar-system/venus.ktx2`            | ETC1S/BasisLZ q220    | `e395bced59e95339efbdd002d4a0bbbf81fe323a6694f3a4039120560c80e789` |
 
+## Original catalog portraits
+
+`textures/catalog-portraits.webp` contains 40 original Blender portraits in eight columns. The first 35 depict Solar System destinations. The remaining five supply recipe-tinted catalog and Forge thumbnails. The swatches, surface noise, ring projections and lighting are defined in `art/bake-catalog.py`.
+
 ## Original Blender surface fields
 
 The following linear RGB data maps are original Exora artwork baked in Blender
