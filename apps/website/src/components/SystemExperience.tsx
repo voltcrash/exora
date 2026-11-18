@@ -10,7 +10,7 @@ import {
   type PanelFact,
 } from "../destination-panel.ts";
 import { formatNumber } from "../planet-utils.tsx";
-import type { SceneHost } from "../scene-host.ts";
+import type { Observatory } from "../three/observatory.ts";
 import {
   createOrbitVoice,
   nearestSimpleRatio,
@@ -30,7 +30,7 @@ import {
   type SystemLayout,
 } from "../system-layout.ts";
 import { starLight } from "../star-light.ts";
-import type { SystemWorld } from "../system-scene.ts";
+import type { SystemWorld } from "../three/system.ts";
 import type { TravelPhase } from "../travel-transition.ts";
 import { DestinationShell, type SceneState } from "./shell/DestinationShell.tsx";
 import { Button } from "./ui/Button.tsx";
@@ -38,7 +38,7 @@ import { Segmented } from "./ui/Segmented.tsx";
 import styles from "./SystemControls.module.css";
 
 interface SystemExperienceProps {
-  host: SceneHost | null;
+  host: Observatory | null;
   onSelectHostStar: (hostStar: string) => Promise<boolean>;
   onSelectPlanet: (planet: ExoplanetProfile, cached: boolean) => void;
   onSelectStar: (star: StarProfile, cached: boolean) => void;
@@ -235,7 +235,7 @@ export const SystemExperience = ({
     setSceneState("loading");
 
     void Promise.all([
-      import("../system-scene.ts"),
+      import("../three/system.ts"),
       solar ? import("../solar-orbits.ts") : Promise.resolve(null),
     ])
       .then(([{ createSystemWorld }, orbitalModel]) =>

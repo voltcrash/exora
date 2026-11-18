@@ -19,7 +19,7 @@ import { warmDestinations } from "../destination-cache.ts";
 import { compositionFacts, readComposition } from "../composition.ts";
 import { detectionFacts, readDetectionSignal } from "../detection-signal.ts";
 import { nextTransitFact, predictTransits } from "../transit-ephemeris.ts";
-import type { ViewMode } from "../planet-scene.ts";
+import type { ViewMode } from "../three/planet.ts";
 import { readHabitableZone } from "../habitable-zone-reading.ts";
 import { readProvenance } from "../measurement-provenance.ts";
 import { derivePlanetPhysics } from "../planet-physics.ts";
@@ -32,7 +32,7 @@ import {
 } from "../planet-utils.tsx";
 import type { PlanetarySubsystem } from "../planetary-subsystems.ts";
 import { capitalize } from "../readable.ts";
-import type { SceneHost } from "../scene-host.ts";
+import type { Observatory } from "../three/observatory.ts";
 import { starLight } from "../star-light.ts";
 import { SURFACE_TRANSITION_MS, type TravelPhase } from "../travel-transition.ts";
 import { DestinationShell, type SceneState } from "./shell/DestinationShell.tsx";
@@ -54,7 +54,7 @@ const TRANSIT_DATE_FORMAT = new Intl.DateTimeFormat(undefined, {
 });
 
 interface PlanetExperienceProps {
-  host: SceneHost | null;
+  host: Observatory | null;
   onSelectHostStar: (hostStar: string) => Promise<boolean>;
   onSelectPlanet: (planet: ExoplanetProfile, cached: boolean) => void;
   onSelectStar: (star: StarProfile, cached: boolean) => void;
@@ -66,13 +66,11 @@ interface PlanetExperienceProps {
 
 const visualNote = ({
   custom,
-  isMoon,
   solar,
   solarIdentity,
   subsystemActive,
 }: {
   custom: boolean;
-  isMoon: boolean;
   solar: boolean;
   solarIdentity: ExoplanetProfile["solarSystem"];
   subsystemActive: boolean;
@@ -82,21 +80,10 @@ const visualNote = ({
   }
   if (custom) return `Rebuilt from the recipe in its link · worldgen v${WORLDGEN_VERSION}.`;
   if (!solar) return "";
-  if (solarIdentity?.surfaceStatus === "unresolved") {
-    return "No spacecraft has resolved this surface, so it is drawn neutral within its measured constraints.";
+  if (solarIdentity?.surfaceStatus === "unresolved" || solarIdentity?.surfaceStatus === "modeled") {
+    return "Catalogued measurements set the scale. The surface is an original procedural illustration.";
   }
-  if (solarIdentity?.surfaceStatus === "modeled") {
-    return "Measured proportions; the surface itself is unresolved and drawn neutral.";
-  }
-  if (solarIdentity?.texture?.topography) {
-    return "Dawn's global mosaic over measured topography, lit by Exora.";
-  }
-  if (solarIdentity?.texture) {
-    return isMoon
-      ? "NASA mission mosaic on its measured rotation, lit by Exora."
-      : "Spacecraft global mosaic under an atmosphere and lighting modelled by Exora.";
-  }
-  return "A known planet, its atmosphere tuned to its measured physics.";
+  return "Original Blender surface fields, shaded using the world's catalogued properties.";
 };
 
 const subsystemLayers = (subsystem: PlanetarySubsystem): readonly PanelBody[] => [
@@ -244,7 +231,7 @@ export const PlanetExperience = ({
     setViewMode(subsystemActive ? "subsystem" : "orbit");
 
     const mount = subsystemActive
-      ? import("../subsystem-scene.ts").then(({ createSubsystemWorld }) =>
+      ? import("../three/subsystem.ts").then(({ createSubsystemWorld }) =>
           abandoned
             ? null
             : host.mountWorld(
@@ -263,7 +250,7 @@ export const PlanetExperience = ({
                 generation.signal,
               ),
         )
-      : import("../planet-scene.ts").then(({ createPlanetWorld }) =>
+      : import("../three/planet.ts").then(({ createPlanetWorld }) =>
           abandoned
             ? null
             : host.mountWorld(
@@ -283,8 +270,9 @@ export const PlanetExperience = ({
         );
 
     void mount.catch((error: unknown) => {
+      if (abandoned) return;
       console.error(error);
-      if (!abandoned) setSceneState("error");
+      setSceneState("error");
     });
 
     return () => {
@@ -731,7 +719,7 @@ export const PlanetExperience = ({
         ),
         name: formatPlanetName(planet.name),
         nameId: "world-name",
-        note: visualNote({ custom, isMoon, solar, solarIdentity, subsystemActive }),
+        note: visualNote({ custom, solar, solarIdentity, subsystemActive }),
         summary: (solar ? solarIdentity?.summary : recipe.summary) ?? recipe.summary,
         tags: [
           recipe.classification,
