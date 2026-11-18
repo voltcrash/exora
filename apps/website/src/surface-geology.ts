@@ -1,6 +1,7 @@
 import type { Rgb, RockyPaletteFamily, RockyWorldRecipe, WorldRecipe } from "@exora/worldgen";
 import { ICY_MOONS, MEASURED_GEOLOGY } from "./surface-geology-catalog.ts";
-import type { ChemistryDetailFamily, SurfaceDetailFamily } from "./texture-cache.ts";
+type SurfaceDetailFamily = "basalt" | "cracked" | "granite" | "ice" | "regolith";
+type ChemistryDetailFamily = "carbon" | "ice" | "oxidized" | "silicate" | "sulfuric";
 
 export type TerrainArchetype =
   | "impact-highlands"
