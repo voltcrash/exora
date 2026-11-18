@@ -46,7 +46,7 @@ test("orbit compression preserves measured parent-relative ordering", () => {
 test("unresolved small moons never claim a mapped surface", () => {
   for (const system of PLANETARY_SUBSYSTEMS) {
     for (const candidate of system.moons) {
-      if (candidate.surface === "unresolved") expect(candidate.texturePath).toBeUndefined();
+      if (candidate.surface === "unresolved") expect(candidate).not.toHaveProperty("texturePath");
     }
   }
 });

@@ -73,20 +73,6 @@ interface PlanetParameters {
   dimensionsKilometers?: readonly [number, number, number];
   surfaceNote?: string;
   surfaceStatus?: "mapped" | "modeled" | "unresolved";
-  texture?: {
-    credit: string;
-    license?: string;
-    mission?: string;
-    originalUrl?: string;
-    page: string;
-    topography?: {
-      credit: string;
-      license: string;
-      originalUrl: string;
-      path: string;
-      reliefScale: number;
-    };
-  };
 }
 
 const planet = ({
@@ -113,7 +99,6 @@ const planet = ({
   dimensionsKilometers,
   surfaceNote,
   surfaceStatus,
-  texture,
 }: PlanetParameters): ExoplanetProfile => ({
   hostStar: "Sun",
   id: `solar-system-${id}`,
@@ -152,27 +137,6 @@ const planet = ({
     summary,
     ...(surfaceNote ? { surfaceNote } : {}),
     ...(surfaceStatus ? { surfaceStatus } : {}),
-    ...(texture
-      ? {
-          texture: {
-            credit: texture.credit,
-            ...(texture.license ? { license: texture.license } : {}),
-            ...(texture.mission ? { mission: texture.mission } : {}),
-            ...(texture.originalUrl ? { originalUrl: texture.originalUrl } : {}),
-            path: `/textures/solar-system/${id}.ktx2`,
-            retrievedOn: "2026-08-23",
-            sourceUrl: texture.page,
-            ...(texture.topography
-              ? {
-                  topography: {
-                    ...texture.topography,
-                    retrievalDate: "2026-08-23",
-                  },
-                }
-              : {}),
-          },
-        }
-      : {}),
   },
   source: {
     archive: "NASA/JPL Solar System Dynamics",
@@ -199,10 +163,6 @@ export const MERCURY = planet({
   semiMajorAxisAu: 0.3871,
   summary:
     "The smallest planet and the fastest around the Sun: a metal-rich, cratered world with almost no atmosphere.",
-  texture: {
-    credit: "NASA MESSENGER / USGS Astrogeology",
-    page: "https://astrogeology.usgs.gov/search/map/mercury_messenger_mdis_global_mosaic_250m",
-  },
 });
 
 export const VENUS = planet({
@@ -223,10 +183,6 @@ export const VENUS = planet({
   semiMajorAxisAu: 0.7233,
   summary:
     "Earth's near-twin in size, wrapped in sulfuric clouds and a crushing greenhouse atmosphere hot enough to melt lead.",
-  texture: {
-    credit: "NASA Magellan / JPL-Caltech",
-    page: "https://science.nasa.gov/3d-resources/venus/",
-  },
 });
 
 export const EARTH = planet({
@@ -247,10 +203,6 @@ export const EARTH = planet({
   semiMajorAxisAu: 1,
   summary:
     "Our ocean world: the only place known to host life, with a living atmosphere and an active rocky surface.",
-  texture: {
-    credit: "NASA Goddard / MODIS Blue Marble",
-    page: "https://visibleearth.nasa.gov/images/57723/the-blue-marble",
-  },
 });
 
 export const MARS = planet({
@@ -271,10 +223,6 @@ export const MARS = planet({
   semiMajorAxisAu: 1.5237,
   summary:
     "A cold desert world of iron oxide, ancient rivers, planet-scale volcanoes, and the deepest canyon system we know.",
-  texture: {
-    credit: "NASA Viking / USGS / JPL-Caltech",
-    page: "https://science.nasa.gov/3d-resources/mars/",
-  },
 });
 
 export const JUPITER = planet({
@@ -297,10 +245,6 @@ export const JUPITER = planet({
   semiMajorAxisAu: 5.2028,
   summary:
     "The largest planet: a fast-spinning hydrogen giant whose jets, storms, and Great Red Spot reshape themselves in real time.",
-  texture: {
-    credit: "NASA Cassini ISS / JPL-Caltech / Space Science Institute",
-    page: "https://science.nasa.gov/photojournal/cassinis-best-maps-of-jupiter-cylindrical-map/",
-  },
 });
 
 export const SATURN = planet({
@@ -323,10 +267,6 @@ export const SATURN = planet({
   semiMajorAxisAu: 9.5388,
   summary:
     "A pale hydrogen giant encircled by the Solar System's most spectacular ring system: billions of shards of ice and rock.",
-  texture: {
-    credit: "NASA/JPL-Caltech Solar System Simulator",
-    page: "https://science.nasa.gov/3d-resources/saturn/",
-  },
 });
 
 export const URANUS = planet({
@@ -371,10 +311,6 @@ export const NEPTUNE = planet({
   semiMajorAxisAu: 30.0611,
   summary:
     "The farthest planet: a deep-blue ice giant with supersonic winds, transient dark storms, faint rings, and a captured moon.",
-  texture: {
-    credit: "NASA/JPL-Caltech Solar System Simulator",
-    page: "https://science.nasa.gov/3d-resources/neptune/",
-  },
 });
 
 export const SOLAR_SYSTEM_PLANETS = [
@@ -407,10 +343,6 @@ export const PLUTO = planet({
   semiMajorAxisAu: 39.482,
   summary:
     "A complex Kuiper Belt dwarf planet with blue haze, mountains of water ice, and the vast nitrogen glacier Sputnik Planitia.",
-  texture: {
-    credit: "NASA New Horizons / JHUAPL / SwRI",
-    page: "https://science.nasa.gov/resource/pluto-global-color-map/",
-  },
 });
 
 export const CERES = planet({
@@ -435,24 +367,8 @@ export const CERES = planet({
   summary:
     "The largest body in the main belt: a water-rich dwarf planet whose Dawn-mapped crust preserves brines, cryovolcanism, and Occator's bright salt deposits.",
   surfaceNote:
-    "Dawn FC global mosaic with stereo-derived HAMO topography. Illumination differences and the south-polar coverage limits remain visible; relief is displayed at measured scale.",
+    "Dawn mapped Ceres using its framing camera and stereo topography, with coverage limits near the south pole. Exora illustrates the surface procedurally.",
   surfaceStatus: "mapped",
-  texture: {
-    credit: "NASA/JPL-Caltech/UCLA/MPS/DLR/IDA · USGS Astrogeology",
-    license: "US Government work; cite mission product authors",
-    mission: "Dawn FC2 HAMO",
-    originalUrl:
-      "https://astrogeology.usgs.gov/ckan/dataset/6ad84c9a-1fad-4869-b4f6-b52c5c2ace36/resource/9f757a65-8d8a-4349-a72d-8062387574b3/download/ceres_dawn_fc_dlr_global_feb2016_1024.jpg",
-    page: "https://astrogeology.usgs.gov/search/map/ceres_dawn_fc_global_mosaic_140m",
-    topography: {
-      credit: "DLR · Dawn FC2 · USGS Astrogeology",
-      license: "US Government work; cite Preusker et al. (2016)",
-      originalUrl:
-        "https://astrogeology.usgs.gov/ckan/dataset/1a165f71-5f31-44b6-b770-63e53b53902e/resource/a407b289-19ab-451d-bd3d-e423b9949a08/download/ceres_dawn_fc_hamo_dtm_dlr_global_1024.jpg",
-      path: "/textures/solar-system/ceres-topography.jpg",
-      reliefScale: 0.032,
-    },
-  },
 });
 
 export const ERIS = planet({

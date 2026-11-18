@@ -59,10 +59,10 @@ describe("the local Solar System catalog", () => {
       "Makemake",
     ]);
     expect(pluto?.solarSystem).toMatchObject({ bodyType: "dwarf-planet", naifId: 999 });
-    expect(pluto?.solarSystem?.texture?.path).toBe("/textures/solar-system/pluto.ktx2");
+    expect(pluto?.solarSystem?.texture).toBeUndefined();
   });
 
-  it("uses Dawn imagery and topography for Ceres without hiding coverage limits", () => {
+  it("credits the Dawn measurements and describes coverage limits on Ceres", () => {
     const ceres = findSolarWorld("Ceres");
     expect(ceres?.solarSystem).toMatchObject({
       dimensionsKilometers: [964.4, 964.2, 891.8],
@@ -70,10 +70,7 @@ describe("the local Solar System catalog", () => {
       spkId: "20000001",
       surfaceStatus: "mapped",
     });
-    expect(ceres?.solarSystem?.texture?.path).toBe("/textures/solar-system/ceres.ktx2");
-    expect(ceres?.solarSystem?.texture?.topography?.path).toBe(
-      "/textures/solar-system/ceres-topography.jpg",
-    );
+    expect(ceres?.solarSystem?.texture).toBeUndefined();
     expect(ceres?.solarSystem?.surfaceNote).toMatch(/coverage limits/i);
   });
 
@@ -106,7 +103,9 @@ describe("the local Solar System catalog", () => {
       "Moons of Pluto",
     ]);
     expect(new Set(SOLAR_SYSTEM_MOONS.map(({ solarSystem }) => solarSystem?.naifId)).size).toBe(21);
-    expect(SOLAR_SYSTEM_MOONS.every(({ solarSystem }) => solarSystem?.texture)).toBe(true);
+    expect(
+      SOLAR_SYSTEM_MOONS.every(({ solarSystem }) => solarSystem?.surfaceStatus === "mapped"),
+    ).toBe(true);
   });
 
   it("keeps local moon orbits separate from heliocentric lighting distance", () => {
