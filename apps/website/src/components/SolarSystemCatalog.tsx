@@ -4,6 +4,7 @@ import type { SolarRegionProfile } from "../solar-regions.ts";
 import { SOLAR_SYSTEM_REGIONS } from "../solar-regions.ts";
 import { SOLAR_SYSTEM_CATALOG_GROUPS } from "../solar-system.ts";
 import { CatalogSearch, ChipRail } from "./catalog/CatalogParts.tsx";
+import { CatalogPortrait } from "./CatalogVisual.tsx";
 import { Icon } from "./ui/Icon.tsx";
 import styles from "./catalog/catalog.module.css";
 
@@ -86,13 +87,6 @@ export const SolarSystemCatalog = ({
           <h3 className={styles["section-title"]}>{group.label}</h3>
           <ol className={styles["bodies"]}>
             {group.entries.map((entry) => {
-              const identity = entry.profile.solarSystem;
-              const slug = entry.profile.name.toLocaleLowerCase().replaceAll(" ", "-");
-              // CSS cannot decode KTX2, so only plain images become portraits.
-              const portrait =
-                identity?.texture && !identity.texture.path.endsWith(".ktx2")
-                  ? identity.texture.path
-                  : undefined;
               return (
                 <li key={entry.profile.id}>
                   <button
@@ -103,13 +97,9 @@ export const SolarSystemCatalog = ({
                       else onSelectPlanet(entry.profile, true);
                     }}
                   >
-                    <span
-                      className={styles["portrait"]}
-                      data-body={slug}
-                      data-mapped={portrait ? "" : undefined}
-                      style={portrait ? { backgroundImage: `url(${portrait})` } : undefined}
-                      aria-hidden="true"
-                    />
+                    <span className={styles["portrait"]}>
+                      <CatalogPortrait name={entry.profile.name} />
+                    </span>
                     <span className={styles["body-copy"]}>
                       <strong>{entry.profile.name}</strong>
                     </span>
