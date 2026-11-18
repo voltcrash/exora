@@ -43,7 +43,7 @@ export type SystemWorld = Awaited<ReturnType<typeof createSystemWorld>>;
 export async function createSystemWorld(host: Observatory, options: SystemOptions) {
   const { planets, hostName, solarPositionsAt, onFirstFrame } = options;
   const layout = deriveSystemLayout(planets),
-    fields = await loadPlanetFields();
+    fields = await loadPlanetFields(planets.some((planet) => planet.kind === "rocky"));
   const root = new Group(),
     guides = new Group();
   root.add(guides);
@@ -122,7 +122,7 @@ export async function createSystemWorld(host: Observatory, options: SystemOption
     const recipe = tuneSolarWorldRecipe(orbit.planet, deriveWorldRecipe(orbit.planet));
     const globe = createPlanetGlobe(
       recipe,
-      fields.strata,
+      fields.surface,
       fields.flow,
       host.profile.systemBodySegments,
       { identity: orbit.planet.solarSystem },

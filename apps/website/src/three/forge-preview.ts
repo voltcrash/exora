@@ -1,5 +1,12 @@
 import type { WorldRecipe } from "@exora/worldgen";
-import { PerspectiveCamera, RepeatWrapping, Scene, TextureLoader, WebGLRenderer } from "three";
+import {
+  PerspectiveCamera,
+  RepeatWrapping,
+  Scene,
+  TextureLoader,
+  type Texture,
+  WebGLRenderer,
+} from "three";
 import { createPlanetGlobe } from "./planet-globe.ts";
 
 export function createForgePreview(
@@ -14,17 +21,16 @@ export function createForgePreview(
   const scene = new Scene();
   const loader = new TextureLoader();
   let live = true;
-  let loaded = 0;
+  let needsStrata = false;
+  let strata: Texture<HTMLImageElement> | null = null;
   const ready = () => {
-    loaded++;
-    if (live && loaded === 2) draw(0);
+    if (live) draw(0);
   };
   const error = () => {
     if (live) failed();
   };
-  const strata = loader.load("/textures/fields/lithosphere.png", ready, undefined, error);
   const flow = loader.load("/textures/fields/convection.png", ready, undefined, error);
-  strata.wrapS = flow.wrapS = RepeatWrapping;
+  flow.wrapS = RepeatWrapping;
   let globe: ReturnType<typeof createPlanetGlobe> | null = null;
   let width = 0,
     height = 0,
@@ -46,7 +52,8 @@ export function createForgePreview(
   canvas.addEventListener("webglcontextrestored", contextRestored);
   const reduced = matchMedia("(prefers-reduced-motion: reduce)");
   function draw(now: number) {
-    if (lost || !globe || !width || !height || loaded !== 2) return;
+    if (lost || !globe || !width || !height || !flow.image || (needsStrata && !strata?.image))
+      return;
     if (previous && now && !reduced.matches) elapsed += Math.min(0.05, (now - previous) / 1000);
     previous = now;
     globe.update(elapsed);
@@ -89,7 +96,21 @@ export function createForgePreview(
   return {
     setWorld(recipe: WorldRecipe) {
       globe?.dispose();
-      globe = createPlanetGlobe(recipe, strata, flow, 96);
+      needsStrata = recipe.renderer === "rocky";
+      if (needsStrata && !strata) {
+        strata = loader.load("/textures/fields/lithosphere.png", ready, undefined, () => {
+          if (!live) return;
+          strata?.dispose();
+          strata = null;
+          if (needsStrata) error();
+        });
+        strata.wrapS = RepeatWrapping;
+      }
+      if (needsStrata && !strata?.image && presented) {
+        presented = false;
+        failed();
+      }
+      globe = createPlanetGlobe(recipe, strata ?? flow, flow, 96);
       scene.add(globe.root);
       extent = Math.max(4.2, globe.extent);
       fit();
@@ -104,7 +125,7 @@ export function createForgePreview(
       document.removeEventListener("visibilitychange", animate);
       renderer.setAnimationLoop(null);
       globe?.dispose();
-      strata.dispose();
+      strata?.dispose();
       flow.dispose();
       renderer.dispose();
       renderer.forceContextLoss();

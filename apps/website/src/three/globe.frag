@@ -84,38 +84,39 @@ vec3 cloudDeck(vec3 p) {
 
 void main() {
   vec3 p = normalize(vLocal);
-  float offset = seed * 6.2831853;
-  vec3 q = normalize(p + 0.16 * sin(p.yzx * 4.0 + offset) + 0.09 * cos(p.zxy * 7.0 - offset));
-  vec2 uv = globeUv(q);
-  uv.x += seed;
-  vec3 weather = field(flow, vec2(uv.x + time * 0.0018, uv.y)).rgb;
-  vec3 plate = field(strata, uv).rgb;
   vec3 n = normalize(vNormal);
   vec3 eye = normalize(vEye);
   vec3 light = normalize(lightDirection);
   float mu = max(0.0, dot(n, eye));
   float direct = dot(n, light);
   float day = max(direct, 0.0);
-  float shore = water;
-  float land = water <= 0.0 ? 1.0 : smoothstep(shore - 0.008, shore + 0.008, plate.r);
-  float altitude = smoothstep(shore, 0.9, plate.r);
-  vec3 stone = mix(lowColor, midColor, clamp(plate.r * 1.15 + plate.b * 0.14, 0.0, 1.0));
-  stone = mix(stone, highColor, altitude * (0.4 + plate.g * 0.6));
-  stone *= 0.72 + plate.g * 0.18 + plate.b * 0.30;
-  vec3 sea = waterColor * mix(0.42, 1.35, smoothstep(shore - 0.13, shore, plate.r));
-  vec3 albedo = mix(sea, stone, land);
-  float frost = smoothstep(0.99 - ice * 0.50, 1.05 - ice * 0.2, abs(p.y) + plate.g * 0.05);
-  albedo = mix(albedo, vec3(0.74, 0.88, 0.94), frost * min(1.0, ice * 3.0));
-  float cover = smoothstep(0.91 - cloud * 0.48, 1.0 - cloud * 0.39, weather.r + 0.09 * weather.b);
-  albedo = mix(albedo, vec3(0.88, 0.90, 0.93), cover * min(cloud * 4.0, 1.0));
-  float specular = (1.0 - land) * (1.0 - cover) * pow(max(dot(n, normalize(eye + light)), 0.0), 60.0);
-  vec3 volcanic = vec3(1.6, 0.23, 0.025) * lava * pow(plate.g, 7.0) * land;
+  vec3 albedo = midColor;
+  float specular = 0.0;
+  vec3 volcanic = vec3(0.0);
   if (bands > 0.0) {
     albedo = cloudDeck(p);
-    specular = 0.0;
-    volcanic = vec3(0.0);
+  } else if (!unresolved) {
+    float offset = seed * 6.2831853;
+    vec3 q = normalize(p + 0.16 * sin(p.yzx * 4.0 + offset) + 0.09 * cos(p.zxy * 7.0 - offset));
+    vec2 uv = globeUv(q);
+    uv.x += seed;
+    vec3 weather = field(flow, vec2(uv.x + time * 0.0018, uv.y)).rgb;
+    vec3 plate = field(strata, uv).rgb;
+    float shore = water;
+    float land = water <= 0.0 ? 1.0 : smoothstep(shore - 0.008, shore + 0.008, plate.r);
+    float altitude = smoothstep(shore, 0.9, plate.r);
+    vec3 stone = mix(lowColor, midColor, clamp(plate.r * 1.15 + plate.b * 0.14, 0.0, 1.0));
+    stone = mix(stone, highColor, altitude * (0.4 + plate.g * 0.6));
+    stone *= 0.72 + plate.g * 0.18 + plate.b * 0.30;
+    vec3 sea = waterColor * mix(0.42, 1.35, smoothstep(shore - 0.13, shore, plate.r));
+    albedo = mix(sea, stone, land);
+    float frost = smoothstep(0.99 - ice * 0.50, 1.05 - ice * 0.2, abs(p.y) + plate.g * 0.05);
+    albedo = mix(albedo, vec3(0.74, 0.88, 0.94), frost * min(1.0, ice * 3.0));
+    float cover = smoothstep(0.91 - cloud * 0.48, 1.0 - cloud * 0.39, weather.r + 0.09 * weather.b);
+    albedo = mix(albedo, vec3(0.88, 0.90, 0.93), cover * min(cloud * 4.0, 1.0));
+    specular = (1.0 - land) * (1.0 - cover) * pow(max(dot(n, normalize(eye + light)), 0.0), 60.0);
+    volcanic = vec3(1.6, 0.23, 0.025) * lava * pow(plate.g, 7.0) * land;
   }
-  if (unresolved) { albedo = midColor; specular = 0.; volcanic = vec3(0.); }
   float scatter = pow(1.0 - mu, 3.8) * smoothstep(-0.35, 0.75, direct);
   vec3 color = albedo * (vec3(0.015, 0.023, 0.038) + sunlight * day * 1.55)
              + specular * 0.42 * day * sunlight + volcanic + airColor * air * scatter;

@@ -10,7 +10,7 @@ test("each destination owns two longitude-wrapped Blender fields", async () => {
   const first = await loadPlanetFields(),
     second = await loadPlanetFields();
   expect(first.flow).not.toBe(second.flow);
-  expect(first.strata.wrapS).toBe(RepeatWrapping);
+  expect(first.surface.wrapS).toBe(RepeatWrapping);
   const release = vi.spyOn(first.flow, "dispose");
   first.dispose();
   expect(release).toHaveBeenCalledOnce();
@@ -28,4 +28,16 @@ test("a partially loaded pair releases the successful field and can be requested
   load.mockImplementation(async () => new Texture<HTMLImageElement>());
   const retry = await loadPlanetFields();
   retry.dispose();
+});
+
+test("gas giants request only convection and dispose the shared surface field once", async () => {
+  const texture = new Texture<HTMLImageElement>();
+  const load = vi.spyOn(TextureLoader.prototype, "loadAsync").mockResolvedValue(texture);
+  const dispose = vi.spyOn(texture, "dispose");
+  const fields = await loadPlanetFields(false);
+  expect(load.mock.calls).toEqual([["/textures/fields/convection.png"]]);
+  expect(fields.surface).toBe(fields.flow);
+  expect(fields.flow.wrapS).toBe(RepeatWrapping);
+  fields.dispose();
+  expect(dispose).toHaveBeenCalledOnce();
 });
