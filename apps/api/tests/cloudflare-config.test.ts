@@ -75,8 +75,8 @@ test("the static site applies its browser security policy to every response", as
   expect(csp).toContain("frame-ancestors 'none'");
   expect(csp).toContain("object-src 'none'");
   expect(csp).toContain("worker-src 'self' blob:");
-  expect(csp).toContain("'wasm-unsafe-eval'");
-  expect(csp).toContain("'unsafe-eval'");
+  expect(csp).not.toContain("'wasm-unsafe-eval'");
+  expect(csp).not.toContain("'unsafe-eval'");
   expect(csp).toContain("https://launchar.app");
   expect(csp).toContain(`'sha256-${variantHash}'`);
   expect(csp).not.toContain("script-src 'self' 'unsafe-inline'");
@@ -87,7 +87,7 @@ test("hashed bundles are immutable and large scene assets revalidate in the back
 
   expect(rules.get("/assets/*")?.["cache-control"]).toBe("public, max-age=31536000, immutable");
   expect(rules.get("/sky/*")?.["cache-control"]).toBe("public, max-age=31536000, immutable");
-  for (const path of ["/textures/*", "/models/*", "/ktx2/*"]) {
+  for (const path of ["/textures/*", "/models/*"]) {
     expect(rules.get(path)?.["cache-control"]).toBe(
       "public, max-age=604800, stale-while-revalidate=2592000",
     );
