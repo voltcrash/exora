@@ -1,8 +1,8 @@
 import { useEffect, useState } from "react";
-import type { SceneHost, XrStatus } from "./scene-host.ts";
+import type { ViewerControls, XrStatus } from "./scene-host.ts";
 
 /** The renderer's frame rate, sampled once a second; "--" until the host exists. */
-export const useFrameRate = (host: SceneHost | null): string => {
+export const useFrameRate = (host: ViewerControls | null): string => {
   const [fps, setFps] = useState("--");
   useEffect(() => {
     setFps("--");
@@ -14,7 +14,7 @@ export const useFrameRate = (host: SceneHost | null): string => {
 };
 
 /** Whether this device can enter AR right now. */
-export const useXrStatus = (host: SceneHost | null): XrStatus => {
+export const useXrStatus = (host: ViewerControls | null): XrStatus => {
   const [status, setStatus] = useState<XrStatus>("checking");
   useEffect(() => {
     setStatus("checking");

@@ -1,5 +1,5 @@
 import { useChrome } from "../../chrome-context.ts";
-import type { SceneHost, XrStatus } from "../../scene-host.ts";
+import type { ViewerControls, XrStatus } from "../../scene-host.ts";
 import { Button } from "../ui/Button.tsx";
 import { Icon } from "../ui/Icon.tsx";
 import { Kbd, MODIFIER_KEY } from "../ui/Kbd.tsx";
@@ -16,7 +16,7 @@ const XR_LABELS: Partial<Record<XrStatus, string>> = {
 const XR_READY = new Set<XrStatus>(["ready-ar", "ready-ar-launch", "error"]);
 
 interface TopBarProps {
-  host: SceneHost | null;
+  host: ViewerControls | null;
   xrStatus: XrStatus;
 }
 

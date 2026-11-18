@@ -1,4 +1,4 @@
-import type { SceneHost } from "../../scene-host.ts";
+import type { ViewerControls } from "../../scene-host.ts";
 import { useCallback, useEffect, useRef, useState, type PointerEvent, type ReactNode } from "react";
 import styles from "./shell.module.css";
 
@@ -37,7 +37,7 @@ export const DestinationSheet = ({
   inXr,
 }: {
   children: ReactNode;
-  host: SceneHost | null;
+  host: ViewerControls | null;
   inXr: boolean;
 }) => {
   const [snap, setSnap] = useState<SheetSnap>("peek");

@@ -1,4 +1,4 @@
-import type { SceneHost } from "../scene-host.ts";
+import type { ViewerControls } from "../scene-host.ts";
 import { useEffect, useId, useState } from "react";
 import type { DestinationPanelModel, PanelBlock } from "../destination-panel.ts";
 import { readable, readableUnit } from "../readable.ts";
@@ -103,7 +103,7 @@ const PanelBlockView = ({ block }: { block: PanelBlock }) => {
 };
 
 interface DestinationPanelProps {
-  host: SceneHost | null;
+  host: ViewerControls | null;
   model: DestinationPanelModel;
   summary: string;
   note: string;

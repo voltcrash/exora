@@ -72,6 +72,11 @@ export interface SceneHost {
   suspendRendering: () => () => void;
 }
 
+export type ViewerControls = Pick<
+  SceneHost,
+  "getFps" | "onXrStatus" | "enterImmersive" | "qualityTier" | "suspendRendering"
+>;
+
 const createSceneHost = (canvas: HTMLCanvasElement): SceneHost => {
   const deviceNavigator = window.navigator as Navigator & { deviceMemory?: number };
   const profile = deriveRenderQuality({
