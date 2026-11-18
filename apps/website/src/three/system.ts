@@ -125,6 +125,7 @@ export async function createSystemWorld(host: Observatory, options: SystemOption
       fields.strata,
       fields.flow,
       host.profile.systemBodySegments,
+      { identity: orbit.planet.solarSystem },
     );
     globe.root.scale.setScalar(orbit.bodyRadiusSceneUnits / recipe.radiusSceneUnits);
     globe.root.traverse((item) => {

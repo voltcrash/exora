@@ -1,3 +1,4 @@
+import type { ExoplanetProfile } from "@exora/contracts";
 import type { WorldRecipe, Rgb } from "@exora/worldgen";
 import {
   Color,
@@ -21,7 +22,10 @@ export function createPlanetGlobe(
   strata: Texture,
   flow: Texture,
   segments: number,
-  drawRings = true,
+  {
+    drawRings = true,
+    identity,
+  }: { drawRings?: boolean; identity?: ExoplanetProfile["solarSystem"] } = {},
 ) {
   const rocky = recipe.renderer === "rocky" ? recipe.surface : null;
   const palette =
@@ -49,6 +53,9 @@ export function createPlanetGlobe(
       airColor: { value: linearColor(recipe.atmosphere.color) },
       sunlight: { value: linearColor(recipe.star.color) },
       lightDirection: { value: new Vector3() },
+      unresolved: {
+        value: identity?.surfaceStatus === "unresolved" || identity?.surfaceStatus === "modeled",
+      },
       seed: { value: recipe.seed / 4294967296 },
       air: { value: recipe.atmosphere.scatterStrength * recipe.atmosphere.density },
       cloud: { value: rocky?.cloudCover ?? 0 },
@@ -78,6 +85,12 @@ export function createPlanetGlobe(
     Math.max(8, Math.ceil(segments / 2)),
   );
   const body = new Mesh(geometry, material);
+  const axes = identity?.dimensionsKilometers;
+  if (axes) {
+    const [long, intermediate, polar] = axes;
+    const mean = Math.cbrt(long * intermediate * polar);
+    body.scale.set(long / mean, polar / mean, intermediate / mean);
+  }
   const root = new Group();
   root.rotation.z = recipe.axialTilt;
   root.add(body);
@@ -127,7 +140,10 @@ export function createPlanetGlobe(
     setLightDirection(direction: Vector3) {
       sun.copy(direction);
     },
-    extent: rings?.outerRadius ?? recipe.radiusSceneUnits,
+    extent: Math.max(
+      rings?.outerRadius ?? 0,
+      recipe.radiusSceneUnits * Math.max(body.scale.x, body.scale.y, body.scale.z),
+    ),
     update(seconds: number, spin = recipe.rotationSpeed) {
       body.rotation.y = seconds * spin;
       material.uniforms.time!.value = seconds;

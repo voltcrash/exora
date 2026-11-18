@@ -7,6 +7,7 @@ uniform vec3 waterColor;
 uniform vec3 airColor;
 uniform vec3 sunlight;
 uniform vec3 lightDirection;
+uniform bool unresolved;
 uniform float seed;
 uniform float water;
 uniform float ice;
@@ -85,6 +86,7 @@ void main() {
     specular = 0.0;
     volcanic = vec3(0.0);
   }
+  if (unresolved) { albedo = midColor; specular = 0.; volcanic = vec3(0.); }
   float scatter = pow(1.0 - mu, 3.8) * smoothstep(-0.35, 0.75, direct);
   vec3 color = albedo * (vec3(0.015, 0.023, 0.038) + sunlight * day * 1.55)
              + specular * 0.42 * day * sunlight + volcanic + airColor * air * scatter;

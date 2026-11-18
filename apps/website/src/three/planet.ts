@@ -37,7 +37,9 @@ export async function createPlanetWorld(
     signal.throwIfAborted();
   }
   const { camera, controls, canvas } = host;
-  const globe = createPlanetGlobe(recipe, fields.strata, fields.flow, host.profile.planetSegments);
+  const globe = createPlanetGlobe(recipe, fields.strata, fields.flow, host.profile.planetSegments, {
+    identity: planet.solarSystem,
+  });
   const hours =
     planet.solarSystem?.rotationPeriodHours ??
     (planet.source.table === "procedural"
@@ -50,7 +52,10 @@ export async function createPlanetWorld(
     space = new Group();
   const radius = recipe.radiusSceneUnits;
   const distance = Math.max(3.6 * radius, globe.extent * 3.2);
-  const nearDistance = radius * 1.28;
+  const neutralSurface =
+    planet.solarSystem?.surfaceStatus === "unresolved" ||
+    planet.solarSystem?.surfaceStatus === "modeled";
+  const nearDistance = (neutralSurface ? globe.extent : radius) * 1.28;
   const sun = new Mesh(
     new SphereGeometry(Math.max(0.4, recipe.star.radiusSceneUnits * 0.6), 28, 20),
     new MeshBasicMaterial({ color: new Color().setRGB(...recipe.star.color, SRGBColorSpace) }),
@@ -91,6 +96,7 @@ export async function createPlanetWorld(
         recipe,
         recipe.renderer === "rocky" ? fields.strata : fields.flow,
         host.profile.tier === "desktop" ? 224 : 120,
+        neutralSurface,
       );
       root.add(surface.root);
     }

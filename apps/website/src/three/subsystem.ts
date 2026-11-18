@@ -49,7 +49,7 @@ export async function createSubsystemWorld(
     fields.strata,
     fields.flow,
     segments / 2,
-    false,
+    { drawRings: false, identity: planet.solarSystem },
   );
   primary.root.scale.setScalar(primaryRadius / parentRecipe.radiusSceneUnits);
   equator.add(primary.root);
@@ -107,13 +107,10 @@ export async function createSubsystemWorld(
     const known = moon.surface === "mapped" ? findSolarWorld(moon.name) : null;
     const recipe = known ? tuneSolarWorldRecipe(known, deriveWorldRecipe(known)) : null;
     const globe = recipe
-      ? createPlanetGlobe(
-          recipe,
-          fields.strata,
-          fields.flow,
-          host.profile.systemBodySegments,
-          false,
-        )
+      ? createPlanetGlobe(recipe, fields.strata, fields.flow, host.profile.systemBodySegments, {
+          drawRings: false,
+          identity: known?.solarSystem,
+        })
       : null;
     const body =
       globe?.root ??
@@ -190,7 +187,8 @@ export async function createSubsystemWorld(
         ((elapsed * 2 * Math.PI * 0.025) / Math.max(0.1, Math.abs(m.moon.orbitalPeriodDays))) *
           (m.moon.retrograde ? -1 : 1);
       m.pivot.position.set(m.radius * Math.cos(angle), 0, -m.radius * Math.sin(angle));
-      m.globe?.update(elapsed);
+      m.globe?.update(elapsed, 0);
+      m.pivot.rotation.y = angle;
     }
     for (const marker of markers) {
       const reference = marker.moon?.pivot.position;
