@@ -23,7 +23,8 @@
     "@fontsource-variable/geist-mono": "catalog:",
     "@fontsource-variable/ibm-plex-sans": "catalog:",
     "react": "catalog:",
-    "react-dom": "catalog:"
+    "react-dom": "catalog:",
+    "three": "catalog:"
   },
   "devDependencies": {
     "@babel/core": "catalog:",
@@ -32,6 +33,7 @@
     "@types/node": "catalog:",
     "@types/react": "catalog:",
     "@types/react-dom": "catalog:",
+    "@types/three": "catalog:",
     "@vitejs/plugin-react": "catalog:",
     "@vitest/browser-playwright": "catalog:",
     "babel-plugin-react-compiler": "catalog:",

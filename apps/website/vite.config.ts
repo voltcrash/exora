@@ -92,6 +92,11 @@ export default defineConfig(({ mode }) => {
           codeSplitting: {
             groups: [
               {
+                name: "three-core",
+                test: /three[\\/]build[\\/]three\.core\.js$/,
+                includeDependenciesRecursively: false,
+              },
+              {
                 name: "scene",
                 test: /@babylonjs[\\/]core[\\/]scene\.pure\.js$/,
                 includeDependenciesRecursively: false,

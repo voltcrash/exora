@@ -30,6 +30,8 @@ catalog:
   "@rolldown/plugin-babel": ^0.3.1
   babel-plugin-react-compiler: ^1.0.0
   wrangler: ^4.162.0
+  three: ^0.187.0
+  "@types/three": ^0.187.0
 overrides:
   # Advisory patches for transitive development tooling still used by Vite+ and Lighthouse.
   # Drop an entry once its dependents ship the fixed version on their own.
