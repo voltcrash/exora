@@ -16,7 +16,6 @@
     "test:browser:full": "BROWSER_PROFILE=full vp test --project browser"
   },
   "dependencies": {
-    "@babylonjs/core": "catalog:",
     "@exora/contracts": "workspace:*",
     "@exora/planet-catalog": "workspace:*",
     "@exora/worldgen": "workspace:*",

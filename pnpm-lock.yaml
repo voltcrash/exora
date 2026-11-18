@@ -167,9 +167,6 @@ catalogs:
     '@babel/core':
       specifier: ^8.1.2
       version: 8.1.2
-    '@babylonjs/core':
-      specifier: ^9.33.1
-      version: 9.33.1
     '@fontsource-variable/geist-mono':
       specifier: ^5.3.0
       version: 5.3.0
@@ -299,9 +296,6 @@ importers:
 
   apps/website:
     dependencies:
-      '@babylonjs/core':
-        specifier: 'catalog:'
-        version: 9.33.1
       '@exora/contracts':
         specifier: workspace:*
         version: link:../../packages/contracts
@@ -499,9 +493,6 @@ packages:
   '@babel/types@8.1.2':
     resolution: {integrity: sha512-uXt6qt2f5G61jZwNIzK1RKu7l5Xjt1VXtPPOGuVveha9fxbx0QM94U1kM4pFZKTRLjWK+X8vmwjwbIemJjiQTA==}
     engines: {node: ^22.18.0 || >=24.11.0}
-
-  '@babylonjs/core@9.33.1':
-    resolution: {integrity: sha512-NoIfREw4QeoXzRPpXnbUpmxxPIjuRi9iS4xFDbPgXHiLwCeHSI13DJHF8YB2gKHp6rA6T5R7BAevPvWHklvXWQ==}
 
   '@blazediff/core@1.10.0':
     resolution: {integrity: sha512-AOQff0zgR7cGsZL+4E7hVkmujoPUpm0J9xzWGWZj5wCjd3gmxESXAPfKyuzs93VdpQNFhHlBhfOjrcZ+XTERtQ==}
@@ -3501,8 +3492,6 @@ snapshots:
     dependencies:
       '@babel/helper-string-parser': 8.1.2
       '@babel/helper-validator-identifier': 8.0.6
-
-  '@babylonjs/core@9.33.1': {}
 
   '@blazediff/core@1.10.0': {}
 
