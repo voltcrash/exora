@@ -334,7 +334,7 @@ export const renderBody = (page: DiscoveryPage): string =>
   <footer>${link("/", "Launch the 3D explorer")}${link("/guides/data-and-methods/", "Sources and methods")}${link("https://github.com/voltcrash/exora", "GitHub")}<p>Visualizations are simulated. Catalog measurements, derived quantities and inferred appearance are distinguished.</p></footer></div>`;
 
 export const renderDocument = (page: DiscoveryPage): string =>
-  `<!doctype html><html lang="en"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">${renderHead(page)}<meta name="theme-color" content="#080b12"><link rel="icon" href="/exora-orbit.svg" type="image/svg+xml"><link rel="apple-touch-icon" href="/apple-touch-icon.png"><link rel="stylesheet" href="/discovery.css"></head><body>${renderBody(page)}</body></html>`;
+  `<!doctype html><html lang="en"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">${renderHead(page)}<meta name="theme-color" content="#080b12"><link rel="icon" href="/icon-192.png" type="image/png"><link rel="apple-touch-icon" href="/apple-touch-icon.png"><link rel="stylesheet" href="/discovery.css"></head><body>${renderBody(page)}</body></html>`;
 
 export const buildSitemap = (pages: readonly DiscoveryPage[]): string =>
   `<?xml version="1.0" encoding="UTF-8"?>\n<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n${[homepage, ...pages].map((page) => `  <url><loc>${escapeHtml(`${SITE_ORIGIN}${page.path}`)}</loc></url>`).join("\n")}\n</urlset>\n`;

@@ -16,7 +16,7 @@ const ARCHIVE_CACHE = `exora-archive-${VERSION}`;
 const CACHES = [SHELL_CACHE, ASSET_CACHE, MEDIA_CACHE, ARCHIVE_CACHE];
 const MEDIA_LIMIT = 160;
 const ARCHIVE_LIMIT = 240;
-const SHELL = ["/", "/manifest.webmanifest", "/exora-orbit.svg", "/icon-192.png"];
+const SHELL = ["/", "/manifest.webmanifest", "/icon-192.png"];
 // Keep hashed snapshots available to clients running an earlier deployment.
 const ARCHIVE_MAX_AGE_MS = 7 * 86_400_000;
 
