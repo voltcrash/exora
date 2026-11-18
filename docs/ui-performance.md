@@ -29,7 +29,7 @@ distinct ink levels that stay above 4.5:1 on the panel surface.
 
 ## Implementation choices
 
-- Keep React 19 and Babylon.js. A framework replacement would leave the expensive work unchanged.
+- Profile React updates and the Three.js draw loop independently when investigating frame time.
 - Compile components with React Compiler 1.0 through the `@vitejs/plugin-react` Babel preset, so
   readouts, travel state and search re-render only what changed. The native Rust compiler is
   experimental and requires an `oxc-transform-react` release older than the current one.

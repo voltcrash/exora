@@ -15,11 +15,7 @@ starts or its URL opens. The scene host, initial scene preload, world mounting, 
 callbacks do not wait for any of these features. Browser regressions cover opening both chart tabs
 after the world is ready, and restoring, advancing, and leaving a tour.
 
-With React DOM and these deferrals, the October 2026 production build emits 447,506 bytes of initial
-JavaScript across ten files, or 143,242 bytes after gzipping each file and summing the results.
-The largest emitted JavaScript file is 375,542 bytes. Both the 450 kB initial limit and 400 kB
-per-file limit remain unchanged. These are build-output sizes, not total route transfer or
-first-scene timings; the latter also depend on dynamically loaded renderer assets and the device.
+The website build measures initial and largest-file JavaScript separately. Destination modules, Blender fields and the stellar catalog load as their views need them.
 
 ## Lighthouse
 
@@ -62,64 +58,8 @@ vp run website#build
 vp run quality:lighthouse           # desktop and mobile Lighthouse reports
 ```
 
-## Warning-only metrics
+## Interpreting graphics measurements
 
-The overall performance category and total blocking time remain warnings. Exora starts a live
-Babylon.js render loop during the audit, and GPU-less CI runners can fall back to SwiftShader.
-Scheduling software-rendered frames competes with Lighthouse's main-thread probes, so total blocking
-time and the composite score derived from it vary even when the application code and stable paint
-timings do not. Keeping these metrics warning-only prevents GPU-less runners from turning that
-variation into brittle hard failures.
+The composite performance score and total blocking time are warnings. Three.js draws throughout the audit, and software rendering on GPU-less CI competes for main-thread time. Compare the device, viewport, rendering backend and scene when recording frame rate. The website build prints measured JavaScript sizes and enforces the byte limits above.
 
-Unused JavaScript also remains a warning. Lighthouse measures coverage only during its short load
-window; Babylon's mesh and math modules contain paths used after interaction, travel, WebXR entry,
-context recovery, and KTX2 capability selection. Removing those paths or deferring renderer startup
-would make the initial scene unrepresentative. Application and optional-feature code should still
-be split when it can be deferred without delaying the first scene; the warning is retained to make
-regressions visible rather than converting Babylon's necessary runtime surface into a brittle hard
-failure.
-
-The August 2026 audit reduced eager JavaScript from 390,515 bytes to about 266 kB by deferring the
-Solar System/geology catalogs, custom-link helpers, development XR emulator, and runtime API schemas.
-The remaining desktop coverage estimate is about 95 kB: roughly 59 kB in Babylon mesh/math paths and
-36 kB in the React/application chunk. Those values are diagnostic rather than budgets because the
-exact coverage depends on how many initial renderer tasks finish inside Lighthouse's sampling window.
-
-## Terrain CPU benchmark
-
-Run `vpx apps/website/scripts/benchmark-terrain.ts` from the repository root to sample 100,000
-Mars terrain heights over six runs (the first warms the runtime). On Node 24.22.1 on an
-Icestorm-M1 CPU, the five warmed runs at commit `7e2af576` took 249.65, 248.73, 248.74,
-248.62, and 248.90 ms. Precomputing the eight fixed noise gradients took 99.88, 99.19,
-100.52, 99.30, and 99.29 ms, a 60% reduction in the median. The checksum was
-2328.326724431223 in both versions; a separate direct comparison of all 100,000 heights matched
-exactly. This measures terrain sampling, not end-to-end loading or frame rate. Initial JavaScript
-remained 295,205 bytes in both production builds.
-
-Planet displacement and surface heightfield/material-channel sampling, far-field filtering,
-occlusion, and sunlight baking now run in a module worker. The worker returns transferable typed
-arrays; Babylon normal computation, mesh updates, materials, and scatter placement stay on the main
-thread. The synchronous fallback uses the same kernels and arithmetic, including Float64 positions
-when Babylon supplied JavaScript numbers. `WORLDGEN_VERSION` is unchanged. Cancellation terminates
-the job, and scene/parent disposal guards prevent late results from creating or updating meshes.
-Worker startup, execution, message, or timeout failures retry synchronously.
-
-`vp run website#test:browser:desktop` includes real Chromium module-worker comparisons for Earth,
-Mars, Mercury, and Venus. Every returned array is compared byte for byte with the synchronous path.
-The desktop Mars bake test also reports synchronous main-thread time, worker dispatch main-thread
-time, and worker wall time separately. One headless Chromium development-test run on the aarch64
-container with Node 24.22.1 measured 104.30 ms, 0.20 ms, and 155.10 ms respectively for a 208 × 208
-cell grid. This single sample includes worker startup/module loading in wall time and excludes
-Babylon mesh construction, return-message handling, and frame scheduling. It demonstrates removal
-of the blocking numerical loop, not an end-to-end loading or frame-rate improvement; rerun locally
-for representative hardware measurements.
-
-Vite emits `terrain.worker-<hash>.js` under `/assets/`. The service worker caches it with other
-immutable hashed assets after first use. The performance-budget script counts every emitted worker
-against the per-file limit, while only JavaScript referenced by the initial HTML counts against the
-initial-load limit. No worker chunk is added to the initial HTML.
-
-The November 2026 local-orbit/normal-map update measures 355,661 bytes of initial JavaScript
-(before this change: 356,050), against the unchanged 450,000-byte gate. The October number above
-is historical. The orbital state table and solver load with the diorama, outside that initial
-graph. Normal transfer measurements and device limits are in [texture compression](texture-compression.md).
+The terrain benchmark and worker tests measure the numerical geology kernels independently. The live Three.js surface interpolates its walking height from the same triangles it draws. The browser suite checks that correspondence and exercises landing, walking and returning to orbit.

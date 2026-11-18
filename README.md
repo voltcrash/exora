@@ -5,7 +5,7 @@ Search indexing, AI crawler access and post-deployment verification are covered 
 
 ## Purpose
 
-Exora turns catalogued astronomy into a place you can stand in. It reads confirmed exoplanets from the NASA Exoplanet Archive and stars from SIMBAD, derives a deterministic visual recipe from each object's measured properties, and renders that recipe as a real-time Babylon.js world you can orbit on a desktop or place on a table in phone AR.
+Exora turns catalogued astronomy into a place you can stand in. It reads confirmed exoplanets from the NASA Exoplanet Archive and stars from SIMBAD, derives a deterministic visual recipe from each object's measured properties, and renders that recipe as a real-time Three.js world you can orbit on a desktop or place on a table in phone AR.
 
 Every world is a reading of a catalog row, never observed imagery. Exora keeps the three tiers apart at the type level and in the interface: **measured** values are printed verbatim from the archive, **derived** values come from established physics applied to those measurements, and **inferred** appearance is a cautious probabilistic read carrying its own confidence. A field the catalog never reported stays `null` rather than being backfilled with a plausible number.
 
@@ -29,12 +29,12 @@ The system diorama is where that discipline is most visible, because a picture o
 - **Stellar catalog:** Resolve stars by exact identifier through SIMBAD's keyless TAP service, with twelve stellar collections spanning nearby stars, solar analogs, blue giants, binaries, variables, and stellar remnants.
 - **Deterministic world recipes:** A shared, versioned `worldgen` package maps an object's physical properties to a visual class, palette family, terrain, cloud, and ring recipe. The same catalog row always produces the same world, and `WORLDGEN_VERSION` invalidates persisted recipes when the rules change.
 - **Physically motivated renderers:** Procedural gas-giant bands and storms, methane-hazed ice giants with ring systems, and displaced rocky terrain with oceans, ice caps, and lava driven by inferred chemistry.
-- **Surface vistas built from geology:** Standing on a world means standing in its landform provinces — crater-saturated highlands, dune seas, canyon systems, lava fields, fractured ice, folded ranges — mixed per world and blended across a patch that runs to a real horizon. For a Solar System body the provinces, palette, crater density, relief and sky are stated from mission science rather than inferred: Io has no impact craters because nothing on it survives long enough to keep one, Venus has almost none, Europa's relief is a fraction of a rocky planet's, and the Moon's sky is black at noon. Sunlight is baked per vertex into the terrain and everything standing on it, so a low sun throws real shadows, and each world is exposed the way a camera would expose for it.
-- **One resolved star implementation:** Photosphere with multi-scale convection, a supergranular magnetic network, limb-brightened faculae, deterministic starspots, limb darkening, corona, and glare — shared by the star scene and by every host star hanging in a planet's sky.
+- **Walking on worlds** uses a seeded height field for both the terrain mesh and camera footing. Rocky surfaces have instanced Blender outcrops. Oceans, distant ridges, atmospheric haze and a horizon-relative sun pick up the world recipe.
+- **Stellar surfaces** combine animated photospheric convection, plage, starspots, limb darkening, a corona and seeded prominence arcs.
 - **World Forge:** A seeded, reproducible builder for procedural planets, custom stars, and black holes, using the same recipe engines as the catalogs.
 - **Persistent immersive session:** The engine, scene, camera, and WebXR session outlive the active destination, so entering and leaving AR does not rebuild the viewing context.
-- **iPhone and Android AR:** The immersive control selects native `immersive-ar` on a phone that supports it and uses Variant Launch's App Clip handoff on iPhone. AR presents the existing Babylon world at tabletop scale over camera passthrough, with hit-tested placement, drag repositioning, and pinch scaling — no GLB or USDZ export path.
-- **Adaptive rendering budget:** Separate desktop and mobile profiles govern shader octaves, sphere tessellation, star count, texture detail, and render scale.
+- **iPhone and Android AR:** The immersive control selects native `immersive-ar` on a phone that supports it and uses Variant Launch's App Clip handoff on iPhone. AR presents the existing Three.js world at tabletop scale over camera passthrough, with hit-tested placement, drag repositioning, and pinch scaling — no GLB or USDZ export path.
+- **Adaptive rendering** varies the sphere and terrain resolution, stellar point count, ray steps and render scale with the device.
 - **Graceful degradation:** A committed planet catalog snapshot, bundled into the API and loaded by the browser, answers planet search, browse and exact-name reads without reaching NASA, and the browser uses the API until it has loaded. A twelve-hour star cache and a bundled local profile keep the experience alive when SIMBAD or the API is unreachable.
 
 ## Keyboard
@@ -51,7 +51,7 @@ The system diorama is where that discipline is most visible, because a picture o
 ## Stack
 
 - **Toolchain and monorepo:** Vite+ (`vp`), pnpm workspaces with a version catalog, TypeScript
-- **Web:** React 19 with React DOM, Vite, Babylon.js 9 (WebGL2 + WebXR)
+- **Web:** React 19 with React DOM, Vite, Three.js (WebGL2 + WebXR)
 - **API:** Hono on Cloudflare Workers; Node 26 for local development
 - **Data sources:** NASA Exoplanet Archive TAP, SIMBAD TAP (CDS, Strasbourg), and NASA/JPL APIs
 - **Hosting:** One Cloudflare Worker with static assets at `exora.voltcrash.com`
@@ -127,7 +127,7 @@ Follow the [iPhone AR deployment and smoke-test guide](docs/iphone-ar.md) for Va
 
 ```text
 apps/api                 Hono API with NASA, SIMBAD, and JPL adapters
-apps/website             React interface and the Babylon.js scene host
+apps/website             React interface and the Three.js scene host
 packages/contracts       Shared API, exoplanet, and star types
 packages/planet-catalog  Committed NASA catalog snapshot and the planet search code both apps share
 packages/worldgen        Deterministic data-to-world recipe engine
@@ -147,7 +147,7 @@ components/catalog         Search, collection rail and result cards shared by ev
 A destination describes itself to `DestinationShell` through an identity and a `DestinationPanelModel`
 and never lays out chrome of its own; Explore's catalogs are assembled from `components/catalog`.
 
-`packages/worldgen` is the only place a catalog row becomes an appearance, so the API and browser renderer describe an object the same way. Texture provenance and licensing for the close-range detail maps are recorded in [THIRD_PARTY_ASSETS.md](THIRD_PARTY_ASSETS.md).
+`packages/worldgen` is the only place a catalog row becomes an appearance, so the API and browser renderer describe an object the same way. The Blender source scripts and provenance for the artwork are recorded in [THIRD_PARTY_ASSETS.md](THIRD_PARTY_ASSETS.md).
 
 ## Current deployment architecture
 
@@ -194,7 +194,7 @@ quotas. See [API rate limiting and caching](docs/api-rate-limiting-and-caching.m
 boundary, shared-cache behavior, operational tradeoffs, and the evidence threshold for adding a
 globally enforced control.
 
-The browser holds one Babylon engine for the lifetime of the page. Worlds are built into and removed from that single scene, which is what lets travel between destinations reuse one engine and XR session.
+The browser holds one Three.js renderer for the lifetime of the page. Worlds are built into and removed from that single scene, which is what lets travel between destinations reuse one engine and XR session.
 
 ```mermaid
 flowchart TB
@@ -205,7 +205,7 @@ flowchart TB
 
     subgraph Browser["Browser runtime"]
         UI["React interface<br/>catalogs + World Forge"]
-        Host["Scene host<br/>one Babylon engine + XR session"]
+        Host["Scene host<br/>one Three.js renderer + XR session"]
         Worldgen["@exora/worldgen<br/>deterministic recipes"]
     end
 
