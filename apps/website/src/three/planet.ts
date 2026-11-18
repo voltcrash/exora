@@ -31,15 +31,21 @@ export async function createPlanetWorld(
   options: PlanetOptions,
 ): Promise<Observation> {
   const { planet, recipe, onViewModeChange, signal } = options;
-  const fields = await loadPlanetFields();
+  const fields = await loadPlanetFields(recipe.renderer === "rocky");
   if (signal?.aborted) {
     fields.dispose();
     signal.throwIfAborted();
   }
   const { camera, controls, canvas } = host;
-  const globe = createPlanetGlobe(recipe, fields.strata, fields.flow, host.profile.planetSegments, {
-    identity: planet.solarSystem,
-  });
+  const globe = createPlanetGlobe(
+    recipe,
+    fields.surface,
+    fields.flow,
+    host.profile.planetSegments,
+    {
+      identity: planet.solarSystem,
+    },
+  );
   const hours =
     planet.solarSystem?.rotationPeriodHours ??
     (planet.source.table === "procedural"
@@ -94,7 +100,7 @@ export async function createPlanetWorld(
     if (!surface) {
       surface = createLandscape(
         recipe,
-        recipe.renderer === "rocky" ? fields.strata : fields.flow,
+        fields.surface,
         host.profile.tier === "desktop" ? 224 : 120,
         neutralSurface,
       );

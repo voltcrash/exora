@@ -46,7 +46,7 @@ export async function createSubsystemWorld(
   const parentRecipe = tuneSolarWorldRecipe(planet, deriveWorldRecipe(planet));
   const primary = createPlanetGlobe(
     { ...parentRecipe, axialTilt: 0 },
-    fields.strata,
+    fields.surface,
     fields.flow,
     segments / 2,
     { drawRings: false, identity: planet.solarSystem },
@@ -107,7 +107,7 @@ export async function createSubsystemWorld(
     const known = moon.surface === "mapped" ? findSolarWorld(moon.name) : null;
     const recipe = known ? tuneSolarWorldRecipe(known, deriveWorldRecipe(known)) : null;
     const globe = recipe
-      ? createPlanetGlobe(recipe, fields.strata, fields.flow, host.profile.systemBodySegments, {
+      ? createPlanetGlobe(recipe, fields.surface, fields.flow, host.profile.systemBodySegments, {
           drawRings: false,
           identity: known?.solarSystem,
         })
