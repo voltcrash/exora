@@ -157,6 +157,9 @@ export function createObservatory(canvas: HTMLCanvasElement) {
       if (sky) sky.mesh.visible = !enabled;
       if (enabled) sync();
     },
+    (visible) => {
+      if (sky) sky.mesh.visible = visible;
+    },
   );
   function draw(now: number, frame?: XRFrame) {
     if (disposed || status === "context-lost" || status === "failed") return;
@@ -194,17 +197,32 @@ export function createObservatory(canvas: HTMLCanvasElement) {
       }
     } catch (error) {
       notify("render-failed");
+      sync();
       console.error("[renderer]", error);
     }
   }
   const sync = () => {
     previous = 0;
     renderer.setAnimationLoop(
-      !disposed && (renderer.xr.isPresenting || (!suspended && !document.hidden)) ? draw : null,
+      !disposed &&
+        status !== "context-lost" &&
+        status !== "failed" &&
+        (renderer.xr.isPresenting || (!suspended && !document.hidden))
+        ? draw
+        : null,
     );
   };
-  const lost = () => notify("context-lost");
+  let recoveryDeadline: ReturnType<typeof setTimeout> | undefined;
+  const lost = () => {
+    notify("context-lost");
+    sync();
+    clearTimeout(recoveryDeadline);
+    recoveryDeadline = setTimeout(() => {
+      if (!disposed && status === "context-lost") notify("render-failed");
+    }, 30_000);
+  };
   const restored = () => {
+    clearTimeout(recoveryDeadline);
     notify("context-restored");
     sync();
   };
@@ -253,8 +271,8 @@ export function createObservatory(canvas: HTMLCanvasElement) {
       build: () => W | Promise<W>,
       signal?: AbortSignal,
     ): Promise<W | null> {
-      const generation = ++version;
       if (disposed || signal?.aborted) return null;
+      const generation = ++version;
       if (phase === "departing" && !reduced.matches) setPhase("crossing");
       let candidate: W;
       try {
@@ -265,6 +283,7 @@ export function createObservatory(canvas: HTMLCanvasElement) {
       }
       if (disposed || signal?.aborted || generation !== version) {
         candidate.dispose();
+        if (!disposed && generation === version) setPhase("idle");
         return null;
       }
       active?.root.removeFromParent();
@@ -276,6 +295,7 @@ export function createObservatory(canvas: HTMLCanvasElement) {
       world.add(candidate.root);
       if (phase !== "crossing") setPhase("idle");
       active = candidate;
+      immersive.worldChanged();
       controls.reset();
       controls.target.set(0, 0, 0);
       controls.minDistance = candidate.nearDistance;
@@ -289,6 +309,7 @@ export function createObservatory(canvas: HTMLCanvasElement) {
       if (disposed) return;
       disposed = true;
       version++;
+      clearTimeout(recoveryDeadline);
       renderer.setAnimationLoop(null);
       canvas.removeEventListener("pointerdown", onDown);
       canvas.removeEventListener("pointerup", onUp);

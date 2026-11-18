@@ -1,64 +1,51 @@
-import { afterEach, expect, test, vi } from "vite-plus/test";
-import { acquireSceneHost } from "./scene-host.ts";
-import { createBlackHoleWorld } from "./black-hole-scene.ts";
-import { BLACK_HOLES } from "./black-holes.ts";
+import { expect, test, vi } from "vite-plus/test";
+import { Group } from "three";
+import { createObservatory } from "./three/observatory.ts";
 
-const xrRuntime = vi.hoisted(() => ({ initialize: vi.fn() }));
-vi.mock("./xr-runtime.ts", () => ({
-  WebXRDefaultExperience: { CreateAsync: () => xrRuntime.initialize() },
-}));
-vi.mock("./scene-xr-integration.ts", () => ({
-  createXrIntegration: () => ({
-    destination: { launchUrl: null },
-    dispose: vi.fn(),
-    isArSupported: () => true,
-    markEntering: vi.fn(),
-    markInXr: vi.fn(),
-    markReady: vi.fn(),
-    markFailed: vi.fn(),
-    onStatus: () => () => undefined,
-  }),
-}));
-
-afterEach(() => vi.restoreAllMocks());
-
-test("only the latest live destination mounts after pending AR initialization settles", async () => {
-  vi.spyOn(window, "matchMedia").mockReturnValue({ matches: true } as MediaQueryList);
-  let rejectEntry = (_reason: Error): void => undefined;
-  const initialization = new Promise<never>((_resolve, reject) => {
+test("a world can be superseded while the browser is waiting for AR permission", async () => {
+  const previous = Object.getOwnPropertyDescriptor(navigator, "xr");
+  let rejectEntry!: (reason: Error) => void;
+  const request = new Promise<XRSession>((_resolve, reject) => {
     rejectEntry = reject;
   });
-  xrRuntime.initialize.mockReturnValue(initialization);
+  const requestSession = vi.fn(() => request);
+  Object.defineProperty(navigator, "xr", {
+    configurable: true,
+    value: { isSessionSupported: async () => true, requestSession },
+  });
   const canvas = document.createElement("canvas");
   document.body.append(canvas);
-  const host = await acquireSceneHost(canvas);
+  const host = createObservatory(canvas);
   try {
-    await host.mountWorld(() =>
-      createBlackHoleWorld(host, { blackHole: BLACK_HOLES[0]!, onFirstFrame: () => undefined }),
-    );
-    const entry = host.enterImmersive().catch(() => undefined);
-    await expect.poll(() => xrRuntime.initialize.mock.calls.length).toBeGreaterThan(0);
-    const obsolete = vi.fn(() => ({ dispose: vi.fn(), restoreDesktopView: vi.fn() }));
-    const cancelled = vi.fn(() => ({ dispose: vi.fn(), restoreDesktopView: vi.fn() }));
-    const latest = vi.fn(() => ({ dispose: vi.fn(), restoreDesktopView: vi.fn() }));
-    const first = host.mountWorld(obsolete);
-    const controller = new AbortController();
-    const second = host.mountWorld(cancelled, controller.signal);
-    controller.abort();
-    const third = host.mountWorld(latest);
-    expect(latest).not.toHaveBeenCalled();
-    rejectEntry(new Error("AR access declined"));
-    await entry;
-    expect(await first).toBeNull();
-    expect(await second).toBeNull();
-    expect(await third).not.toBeNull();
-    expect(obsolete).not.toHaveBeenCalled();
-    expect(cancelled).not.toHaveBeenCalled();
-    expect(latest).toHaveBeenCalledOnce();
+    const statuses: string[] = [];
+    host.onXrStatus((s) => statuses.push(s));
+    await vi.waitFor(() => expect(statuses).toContain("ready-ar"));
+    const enter = host.enterImmersive().catch((error: unknown) => error);
+    await vi.waitFor(() => expect(requestSession).toHaveBeenCalledOnce());
+    const candidate = () => ({
+      root: new Group(),
+      onFirstFrame: vi.fn(),
+      distance: 6,
+      nearDistance: 1,
+      farDistance: 10,
+      dispose: vi.fn(),
+    });
+    const old = candidate(),
+      current = candidate();
+    const pending = host.mountWorld(() => old);
+    await host.mountWorld(() => current);
+    expect(await pending).toBeNull();
+    expect(old.dispose).toHaveBeenCalledOnce();
+    const denied = Error("AR permission denied");
+    rejectEntry(denied);
+    expect(await enter).toBe(denied);
+    expect(host.scene.getObjectById(current.root.id)).toBe(current.root);
+    expect(statuses.at(-1)).toBe("error");
+    expect(document.getElementById("ar-overlay")).toBeNull();
   } finally {
-    const disposing = host.dispose();
-    expect(host.dispose()).toBe(disposing);
-    await disposing;
+    host.dispose();
     canvas.remove();
+    if (previous) Object.defineProperty(navigator, "xr", previous);
+    else Reflect.deleteProperty(navigator, "xr");
   }
 });
