@@ -6,10 +6,10 @@ const sources = import.meta.glob<string>("./**/*.{ts,tsx}", {
   query: "?raw",
 });
 
-test("the renderer stays WebGL, so dropping Babylon's WGSL shaders is safe", () => {
+test("the viewer uses one WebGL renderer across destinations", () => {
   const offenders = Object.entries(sources)
     .filter(([path]) => !path.endsWith("webgl-only.test.ts"))
-    .filter(([, source]) => source.includes("WebGPUEngine"))
+    .filter(([, source]) => source.includes("WebGPUEngine") || source.includes("@babylonjs/"))
     .map(([path]) => path);
 
   expect(offenders).toEqual([]);
@@ -17,5 +17,5 @@ test("the renderer stays WebGL, so dropping Babylon's WGSL shaders is safe", () 
 
 test("the guard reads real sources rather than silently matching nothing", () => {
   expect(Object.keys(sources).length).toBeGreaterThan(20);
-  expect(sources["./scene-lifecycle.ts"]).toContain("new Engine(");
+  expect(sources["./three/observatory.ts"]).toContain("new WebGLRenderer(");
 });

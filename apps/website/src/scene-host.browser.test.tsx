@@ -1,66 +1,203 @@
-import { expect, test } from "vite-plus/test";
-import { acquireSceneHost } from "./scene-host.ts";
-import { createBlackHoleWorld } from "./black-hole-scene.ts";
-import { BLACK_HOLES } from "./black-holes.ts";
+import { Group, Mesh } from "three";
+import { expect, test, vi } from "vite-plus/test";
+import { deriveWorldRecipe } from "@exora/worldgen";
+import { createObservatory } from "./three/observatory.ts";
+import { createPlanetWorld } from "./three/planet.ts";
+import { createLandscape } from "./three/landscape.ts";
+import { loadPlanetFields } from "./three/planet-fields.ts";
+import { HAUMEA, MARS, tuneSolarWorldRecipe } from "./solar-system.ts";
 
-test("a real WebGL host draws, suspends, resumes and releases its scene", async () => {
+function observer() {
   const canvas = document.createElement("canvas");
-  canvas.width = 240;
-  canvas.height = 180;
+  canvas.style.width = "240px";
+  canvas.style.height = "160px";
   document.body.append(canvas);
-  const host = await acquireSceneHost(canvas);
+  const host = createObservatory(canvas);
+  return {
+    host,
+    canvas,
+    close: () => {
+      host.dispose();
+      canvas.remove();
+    },
+  };
+}
+const candidate = () => ({
+  root: new Group(),
+  distance: 8,
+  nearDistance: 1,
+  farDistance: 20,
+  onFirstFrame: vi.fn(),
+  dispose: vi.fn(),
+});
+test("world replacement keeps the live scene through failures, cancellation and superseded builds", async () => {
+  const { host, close } = observer();
   try {
-    let drawn = false;
-    const world = await host.mountWorld(() =>
-      createBlackHoleWorld(host, {
-        blackHole: BLACK_HOLES[0]!,
-        onFirstFrame: () => {
-          drawn = true;
-        },
-      }),
+    const first = candidate();
+    const scene = host.scene;
+    await host.mountWorld(() => first);
+    await vi.waitFor(() => expect(first.onFirstFrame).toHaveBeenCalledOnce());
+    await expect(host.mountWorld(() => Promise.reject(Error("missing field")))).rejects.toThrow(
+      "missing field",
     );
-    expect(world).not.toBeNull();
-    await expect.poll(() => drawn).toBe(true);
-    let frames = 0;
-    const observer = host.scene.onAfterRenderObservable.add(() => {
-      frames += 1;
+    expect(scene.getObjectById(first.root.id)).toBe(first.root);
+    let resolveBuild!: (value: ReturnType<typeof candidate>) => void;
+    const pending = new Promise<ReturnType<typeof candidate>>((resolve) => {
+      resolveBuild = resolve;
     });
-    const release = host.suspendRendering();
-    const paused = frames;
-    await new Promise<void>((resolve) =>
-      requestAnimationFrame(() => requestAnimationFrame(() => resolve())),
-    );
-    expect(frames).toBe(paused);
-    release();
-    await expect.poll(() => frames).toBeGreaterThan(paused);
-    host.scene.onAfterRenderObservable.remove(observer);
+    const superseded = host.mountWorld(() => pending);
+    const last = candidate();
+    await host.mountWorld(() => last);
+    const old = candidate();
+    resolveBuild(old);
+    expect(await superseded).toBeNull();
+    expect(old.dispose).toHaveBeenCalledOnce();
+    expect(first.dispose).toHaveBeenCalledOnce();
+    expect(scene.getObjectById(last.root.id)).toBe(last.root);
+    const controller = new AbortController();
+    const cancelled = candidate();
+    const building = host.mountWorld(() => cancelled, controller.signal);
+    controller.abort();
+    expect(await building).toBeNull();
+    expect(cancelled.dispose).toHaveBeenCalledOnce();
+    const afterClose = candidate();
+    const loading = host.mountWorld(() => afterClose);
+    host.dispose();
+    expect(await loading).toBeNull();
+    expect(afterClose.dispose).toHaveBeenCalledOnce();
+    expect(last.dispose).toHaveBeenCalledOnce();
   } finally {
-    await host.dispose();
-    expect(host.scene.isDisposed).toBe(true);
-    canvas.remove();
+    close();
   }
 });
 
-test("a real failed texture becomes a ready neutral map for existing materials", async () => {
-  const { getSurfaceDetailTextures, surfaceDetailSelectionForPalette } =
-    await import("./texture-cache.ts");
-  const canvas = document.createElement("canvas");
-  document.body.append(canvas);
-  const host = await acquireSceneHost(canvas);
+test("narrow screens preserve horizontal framing and landscape screens preserve vertical framing", async () => {
+  const { host, canvas, close } = observer();
   try {
-    const selection = surfaceDetailSelectionForPalette("basaltic-dark");
-    const maps = getSurfaceDetailTextures(
-      host.scene,
-      {
-        ...selection,
-        primary: "missing-state-machine-probe" as typeof selection.primary,
-      },
-      true,
-    );
-    await expect.poll(() => maps.primary.normal.url?.startsWith("data:image/png")).toBe(true);
-    await expect.poll(() => maps.primary.normal.isReady()).toBe(true);
+    expect(host.camera.fov).toBeCloseTo(42);
+    canvas.style.height = "480px";
+    await vi.waitFor(() => expect(host.camera.aspect).toBeCloseTo(0.5));
+    expect(
+      (2 * Math.atan(Math.tan((host.camera.fov * Math.PI) / 360) * host.camera.aspect) * 180) /
+        Math.PI,
+    ).toBeCloseTo(42);
+    canvas.style.width = "0";
+    await new Promise(requestAnimationFrame);
+    expect(Number.isFinite(host.camera.fov)).toBe(true);
   } finally {
-    await host.dispose();
-    canvas.remove();
+    close();
+  }
+});
+
+test("suspensions nest and a lost graphics context recovers on its first complete frame", async () => {
+  const { host, close } = observer();
+  try {
+    const status: string[] = [];
+    host.onRendererStatus((s) => status.push(s));
+    const calls = vi.spyOn(host.renderer, "render");
+    const a = host.suspendRendering(),
+      b = host.suspendRendering();
+    a();
+    a();
+    await new Promise(requestAnimationFrame);
+    expect(calls).not.toHaveBeenCalled();
+    b();
+    await vi.waitFor(() => expect(calls).toHaveBeenCalled());
+    host.renderer.forceContextLoss();
+    await vi.waitFor(() => expect(status.at(-1)).toBe("context-lost"));
+    const count = calls.mock.calls.length;
+    const release = host.suspendRendering();
+    release();
+    await new Promise(requestAnimationFrame);
+    expect(calls).toHaveBeenCalledTimes(count);
+    host.renderer.forceContextRestore();
+    await vi.waitFor(() => expect(status.slice(-2)).toEqual(["recovering", "ready"]));
+  } finally {
+    close();
+  }
+});
+
+test("an unrecovered context offers a restart, and a frame failure stops subsequent drawing", async () => {
+  const { host, canvas, close } = observer();
+  try {
+    const status: string[] = [];
+    host.onRendererStatus((s) => status.push(s));
+    vi.useFakeTimers({ toFake: ["setTimeout", "clearTimeout"] });
+    canvas.dispatchEvent(new Event("webglcontextlost", { cancelable: true }));
+    vi.advanceTimersByTime(30000);
+    expect(status.at(-1)).toBe("failed");
+    vi.useRealTimers();
+    canvas.dispatchEvent(new Event("webglcontextrestored"));
+    const failed = vi.spyOn(host.renderer, "render").mockImplementation(() => {
+      throw Error("test frame failure");
+    });
+    const error = vi.spyOn(console, "error").mockImplementation(() => {});
+    await vi.waitFor(() => expect(failed).toHaveBeenCalledOnce());
+    expect(status.at(-1)).toBe("failed");
+    expect(error).toHaveBeenCalled();
+    await new Promise(requestAnimationFrame);
+    expect(failed).toHaveBeenCalledOnce();
+    error.mockRestore();
+  } finally {
+    vi.useRealTimers();
+    close();
+  }
+});
+
+test.each([MARS, HAUMEA])(
+  "$name lands, walks at reduced animation speed and returns to orbit",
+  async (planet) => {
+    const { host, canvas, close } = observer();
+    const modes: string[] = [];
+    try {
+      const recipe = tuneSolarWorldRecipe(planet, deriveWorldRecipe(planet));
+      const world = await host.mountWorld(() =>
+        createPlanetWorld(host, {
+          planet,
+          recipe,
+          onViewModeChange: (m) => modes.push(m),
+          onFirstFrame: () => {},
+        }),
+      );
+      await new Promise(requestAnimationFrame);
+      host.camera.position.set(0, 0, world!.nearDistance);
+      host.controls.update();
+      await vi.waitFor(() => expect(modes).toContain("surface"));
+      if (planet === HAUMEA) expect(host.camera.position.y).toBeCloseTo(1.65);
+      const before = host.camera.position.clone();
+      window.dispatchEvent(new KeyboardEvent("keydown", { code: "KeyW" }));
+      world!.update!(0, host.camera, 0.2);
+      window.dispatchEvent(new KeyboardEvent("keyup", { code: "KeyW" }));
+      expect(host.camera.position.distanceTo(before)).toBeGreaterThan(0.1);
+      canvas.dispatchEvent(new WheelEvent("wheel", { deltaY: 10, cancelable: true }));
+      expect(modes.at(-1)).toBe("orbit");
+      expect(host.controls.enableRotate).toBe(true);
+    } finally {
+      close();
+    }
+  },
+);
+
+test("the walking floor matches mesh vertices and the surface sun follows the observer", async () => {
+  const recipe = tuneSolarWorldRecipe(MARS, deriveWorldRecipe(MARS));
+  const fields = await loadPlanetFields();
+  const view = createLandscape(recipe, fields.strata, 32);
+  try {
+    const ground = view.root.children.find(
+      (o) => o instanceof Mesh && o.geometry.type === "PlaneGeometry",
+    ) as Mesh;
+    const vertices = ground.geometry.getAttribute("position");
+    for (const index of [33, 122, 480])
+      expect(view.floorAt(vertices.getX(index), vertices.getZ(index))).toBeCloseTo(
+        vertices.getY(index),
+        3,
+      );
+    const original = view.star.position.clone();
+    view.follow(7, -4);
+    expect(view.star.position.x - original.x).toBeCloseTo(7);
+    expect(view.star.position.z - original.z).toBeCloseTo(-4);
+  } finally {
+    view.dispose();
+    fields.dispose();
   }
 });

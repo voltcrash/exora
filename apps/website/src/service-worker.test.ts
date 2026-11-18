@@ -90,7 +90,7 @@ test("requests are routed by what they are", async () => {
   expect(route("/assets/pscomppars-abc123.json", "cors")).toBe("immutable");
   expect(route("/api/planets/TRAPPIST-1%20e", "cors")).toBe("archive");
   expect(route("/sky/hyg-v44-vmag65.bin", "cors")).toBe("media");
-  expect(route("/textures/solar-system/earth.ktx2", "cors")).toBe("media");
+  expect(route("/textures/fields/lithosphere.png", "cors")).toBe("media");
   expect(route("/sw.js", "cors")).toBeNull();
 });
 
@@ -152,7 +152,7 @@ test("failed archive answers are never cached", async () => {
   await worker.dispatch("fetch", new Request("https://exora.test/api/stars/Vega"));
   status = 200;
 
-  expect([...(worker.stores.get("exora-archive-v3")?.keys() ?? [])]).toEqual([]);
+  expect([...(worker.stores.get("exora-archive-v4")?.keys() ?? [])]).toEqual([]);
 });
 
 test("activation removes caches from earlier versions only", async () => {
@@ -189,7 +189,7 @@ test("the planet catalogue snapshot is kept offline and earlier client versions 
   await worker.dispatch("fetch", snapshot("old111"));
   await worker.dispatch("fetch", new Request("https://exora.test/assets/index-abc123.js"));
   await worker.dispatch("fetch", snapshot("new222"));
-  expect([...worker.stores.get("exora-assets-v3")!.keys()]).toEqual([
+  expect([...worker.stores.get("exora-assets-v4")!.keys()]).toEqual([
     "https://exora.test/assets/pscomppars-old111.json",
     "https://exora.test/assets/index-abc123.js",
     "https://exora.test/assets/pscomppars-new222.json",
@@ -201,9 +201,9 @@ test("the planet catalogue snapshot is kept offline and earlier client versions 
 });
 
 test.each([
-  "/textures/solar-system/earth.ktx2",
-  "/textures/solar-system/ganymede-mobile.ktx2",
-  "/ktx2/msc_basis_transcoder.wasm",
+  "/textures/fields/lithosphere.png",
+  "/textures/fields/photosphere.png",
+  "/models/comet-nucleus.glb",
 ])("cached binary media remains intact offline: %s", async (path) => {
   let online = true;
   const bytes = new Uint8Array([0, 127, 128, 255]);
