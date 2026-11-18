@@ -17,7 +17,7 @@ import {
 } from "../renderer-recovery.ts";
 
 import { createImmersive } from "./immersive.ts";
-import type { TravelPhase } from "../travel-transition.ts";
+import { TRAVEL_REVEAL_MS, type TravelPhase } from "../travel-transition.ts";
 export type Observatory = ReturnType<typeof createObservatory>;
 
 import { createNightSky } from "./sky.ts";
@@ -30,7 +30,7 @@ export interface Observation {
   nearDistance: number;
   farDistance: number;
   onFirstFrame(): void;
-  update?(delta: number, camera: PerspectiveCamera): void;
+  update?(delta: number, camera: PerspectiveCamera, inputDelta: number): void;
   pick?(object: Object3D): void;
   dispose(): void;
 }
@@ -79,7 +79,11 @@ export function createObservatory(canvas: HTMLCanvasElement) {
       1 - ((e.clientY - rect.top) / rect.height) * 2,
     );
     ray.setFromCamera(pointer, camera);
-    const hit = ray.intersectObject(active.root)[0];
+    const hit = ray.intersectObject(active.root).find(({ object }) => {
+      for (let item: Object3D | null = object; item; item = item.parent)
+        if (!item.visible) return false;
+      return true;
+    });
     if (hit) active.pick(hit.object);
   };
   canvas.addEventListener("pointerdown", onDown);
@@ -120,6 +124,7 @@ export function createObservatory(canvas: HTMLCanvasElement) {
   let firstFrame = false;
   const phaseListeners = new Set<(phase: TravelPhase) => void>();
   let phase: TravelPhase = "idle";
+  let revealAt = 0;
   const setPhase = (next: TravelPhase) => {
     phase = next;
     for (const listener of phaseListeners) listener(next);
@@ -173,12 +178,19 @@ export function createObservatory(canvas: HTMLCanvasElement) {
     try {
       immersive.frame(frame);
       if (!renderer.xr.isPresenting) controls.update();
-      active?.update?.(reduced.matches ? 0 : Math.min(0.05, seconds), camera);
+      const delta = Math.min(0.05, seconds);
+      active?.update?.(reduced.matches ? 0 : delta, camera, delta);
       renderer.render(scene, camera);
       notify("frame-rendered");
       if (firstFrame && active) {
         firstFrame = false;
         active.onFirstFrame();
+        if (phase === "crossing") {
+          setPhase("arriving");
+          revealAt = now + TRAVEL_REVEAL_MS;
+        }
+      } else if (phase === "arriving" && now >= revealAt) {
+        setPhase("idle");
       }
     } catch (error) {
       notify("render-failed");
@@ -243,6 +255,7 @@ export function createObservatory(canvas: HTMLCanvasElement) {
     ): Promise<W | null> {
       const generation = ++version;
       if (disposed || signal?.aborted) return null;
+      if (phase === "departing" && !reduced.matches) setPhase("crossing");
       let candidate: W;
       try {
         candidate = await build();
@@ -261,7 +274,7 @@ export function createObservatory(canvas: HTMLCanvasElement) {
       sky.mesh.visible = !immersive.isInXr();
       scene.add(sky.mesh);
       world.add(candidate.root);
-      setPhase("idle");
+      if (phase !== "crossing") setPhase("idle");
       active = candidate;
       controls.reset();
       controls.target.set(0, 0, 0);
