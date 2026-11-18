@@ -5,7 +5,6 @@ import { page, userEvent } from "vite-plus/test/browser/context";
 import { createRoot, type Root } from "react-dom/client";
 import { afterEach, beforeEach, expect, test, vi } from "vite-plus/test";
 import { App } from "./App.tsx";
-import { acquireSceneHost } from "./scene-host.ts";
 import { featuredPlanet } from "./planet-profile.ts";
 import { BLACK_HOLES } from "./black-holes.ts";
 import "./styles/tokens.css";
@@ -32,13 +31,13 @@ const mountedWorld = () => ({
   setEphemerisTime: () => undefined,
 });
 
-vi.mock("./scene-host.ts", () => {
+const stubbedHost = vi.hoisted(() => {
   let insideXr = false;
   const host = {
     beginTravel: () => undefined,
     cancelTravel: vi.fn(),
     camera: null,
-    canvas: null,
+    canvas: null as HTMLCanvasElement | null,
     dispose: () => undefined,
     engine: null,
     enterImmersive: async () => {
@@ -79,25 +78,17 @@ vi.mock("./scene-host.ts", () => {
     scene: null,
   };
 
-  return {
-    acquireSceneHost: () => host,
-    recreateSceneHost: () => host,
-    releaseSceneHost: async () => host.dispose(),
-  };
+  return () => host;
 });
+vi.mock("./three/observatory.ts", () => ({
+  createObservatory(canvas: HTMLCanvasElement) {
+    const host = stubbedHost();
+    host.canvas = canvas;
+    return host;
+  },
+}));
 
-const stubbedHost = (): {
-  renderSuspensions: number;
-  setInXr: (value: boolean) => void;
-  cancelTravel: () => void;
-} =>
-  acquireSceneHost(document.createElement("canvas")) as unknown as {
-    renderSuspensions: number;
-    setInXr: (value: boolean) => void;
-    cancelTravel: () => void;
-  };
-
-vi.mock("./planet-scene.ts", () => ({
+vi.mock("./three/planet.ts", () => ({
   createPlanetWorld: (
     _host: unknown,
     options: {
@@ -112,28 +103,28 @@ vi.mock("./planet-scene.ts", () => ({
   },
 }));
 
-vi.mock("./subsystem-scene.ts", () => ({
+vi.mock("./three/subsystem.ts", () => ({
   createSubsystemWorld: (_host: unknown, options: { onFirstFrame: () => void }) => {
     options.onFirstFrame();
     return mountedWorld();
   },
 }));
 
-vi.mock("./star-scene.ts", () => ({
+vi.mock("./three/star.ts", () => ({
   createStarWorld: (_host: unknown, options: { onFirstFrame: () => void }) => {
     options.onFirstFrame();
     return { ...mountedWorld(), setSystemWorlds: () => undefined };
   },
 }));
 
-vi.mock("./black-hole-scene.ts", () => ({
+vi.mock("./three/black-hole.ts", () => ({
   createBlackHoleWorld: (_host: unknown, options: { onFirstFrame: () => void }) => {
     options.onFirstFrame();
     return mountedWorld();
   },
 }));
 
-vi.mock("./solar-region-scene.ts", () => ({
+vi.mock("./three/region.ts", () => ({
   createSolarRegionWorld: (_host: unknown, options: { onFirstFrame: () => void }) => {
     options.onFirstFrame();
     return mountedWorld();
@@ -147,7 +138,7 @@ vi.mock("./mission-scene.ts", () => ({
   },
 }));
 
-vi.mock("./system-scene.ts", async () => {
+vi.mock("./three/system.ts", async () => {
   const { deriveSystemLayout } = await import("./system-layout.ts");
   return {
     createSystemWorld: (

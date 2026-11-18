@@ -518,3 +518,5 @@ centered mesh with its material embedded.
 | `models/impact-fragment.glb` | Pitted silicate with raised impact rims         |
 | `models/comet-nucleus.glb`   | Dark bilobed nucleus with a narrow neck         |
 | `models/ice-fragment.glb`    | Elongated ice-rich fragment with shallow basins |
+
+The accretion disk uses an original 1024 × 256 Blender bake, `textures/fields/accretion.png`. The shader reads azimuth along the horizontal axis and disk radius along the vertical axis. Red controls filament density, green traces compression bands, and blue varies local emission. Regenerate the data with `art/bake-accretion.py` from Blender's Python Console.

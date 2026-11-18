@@ -7,14 +7,14 @@ import {
 import { deriveBlackHolePhysics } from "../black-hole-physics.ts";
 import { presentTabs, type DestinationPanelModel, type PanelMetric } from "../destination-panel.ts";
 import { capitalize } from "../readable.ts";
-import type { SceneHost } from "../scene-host.ts";
+import type { Observatory } from "../three/observatory.ts";
 import { diskLight } from "../star-light.ts";
 import type { TravelPhase } from "../travel-transition.ts";
 import { DestinationShell, type SceneState } from "./shell/DestinationShell.tsx";
 
 interface BlackHoleExperienceProps {
   blackHole: BlackHoleProfile;
-  host: SceneHost | null;
+  host: Observatory | null;
   travelPhase: TravelPhase;
 }
 
@@ -71,7 +71,7 @@ export const BlackHoleExperience = ({ blackHole, host, travelPhase }: BlackHoleE
     let abandoned = false;
     const controller = new AbortController();
     setSceneState("loading");
-    void import("../black-hole-scene.ts")
+    void import("../three/black-hole.ts")
       .then(({ createBlackHoleWorld }) =>
         abandoned
           ? null
