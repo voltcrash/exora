@@ -4,6 +4,7 @@ import {
   RingGeometry,
   MeshBasicMaterial,
   Quaternion,
+  Vector2,
   Vector3,
   type WebGLRenderer,
   type Scene,
@@ -17,6 +18,7 @@ export function createImmersive(
   world: Group,
   extent: () => number,
   change: (active: boolean) => void,
+  showSky: (visible: boolean) => void = () => {},
 ) {
   const support = createXrIntegration({
     getLaunchUrl: getVariantLaunchUrl,
@@ -49,6 +51,7 @@ export function createImmersive(
   let space = false;
   const background = () => {
     renderer.setClearAlpha(space ? 1 : 0);
+    showSky(space);
     backdrop.textContent = space ? "Show camera" : "Hide camera";
     backdrop.setAttribute("aria-pressed", String(space));
   };
@@ -65,30 +68,59 @@ export function createImmersive(
   const scale = new Vector3(),
     rotation = new Quaternion();
   const place = () => {
-    if (!marker.visible) return;
+    if (!marker.visible || performance.now() < ignoreSelectUntil) return;
     marker.matrix.decompose(world.position, rotation, scale);
     world.position.y += 0.16;
     world.visible = true;
     placed = true;
-    hint.textContent = "Tap a surface to move · Pinch to scale";
+    hint.textContent = "Drag to move · Pinch to scale";
   };
-  let span = 0;
-  overlay.addEventListener("touchmove", (event) => {
-    const a = event.touches[0],
-      b = event.touches[1];
-    if (!a || !b || !placed) return;
-    const next = Math.hypot(a.clientX - b.clientX, a.clientY - b.clientY);
-    if (span && next) {
+  const pointers = new Map<number, Vector2>();
+  const right = new Vector3(),
+    forward = new Vector3();
+  let ignoreSelectUntil = 0;
+  overlay.addEventListener("pointerdown", (event) => {
+    if (!placed || (event.target instanceof Element && event.target.closest("button"))) return;
+    pointers.set(event.pointerId, new Vector2(event.clientX, event.clientY));
+    if (overlay.hasPointerCapture(event.pointerId) || !event.isTrusted) return;
+    overlay.setPointerCapture(event.pointerId);
+  });
+  overlay.addEventListener("pointermove", (event) => {
+    const old = pointers.get(event.pointerId);
+    if (!old) return;
+    const dx = event.clientX - old.x,
+      dy = event.clientY - old.y;
+    if (!dx && !dy) return;
+    ignoreSelectUntil = performance.now() + 400;
+    const other = [...pointers.values()].find((point) => point !== old);
+    if (other) {
+      const before = other.distanceTo(old);
+      old.set(event.clientX, event.clientY);
       const base = 0.6 / Math.max(1, extent());
-      world.scale.setScalar(
-        Math.min(base * 5, Math.max(base * 0.2, (world.scale.x * next) / span)),
-      );
+      if (before > 0)
+        world.scale.setScalar(
+          Math.min(
+            base * 5,
+            Math.max(base * 0.2, (world.scale.x * other.distanceTo(old)) / before),
+          ),
+        );
+    } else {
+      old.set(event.clientX, event.clientY);
+      const camera = renderer.xr.getCamera();
+      right.setFromMatrixColumn(camera.matrixWorld, 0);
+      right.y = 0;
+      right.normalize();
+      forward.set(-right.z, 0, right.x);
+      world.position.addScaledVector(right, dx * 0.0015).addScaledVector(forward, dy * 0.0015);
     }
-    span = next;
   });
-  overlay.addEventListener("touchend", () => {
-    span = 0;
-  });
+  const release = (event: PointerEvent) => {
+    if (pointers.delete(event.pointerId) && performance.now() < ignoreSelectUntil)
+      ignoreSelectUntil = performance.now() + 400;
+  };
+  overlay.addEventListener("pointerup", release);
+  overlay.addEventListener("pointercancel", release);
+  const preventGesture = (event: Event) => event.preventDefault();
   const end = () => {
     hits?.cancel();
     hits = null;
@@ -98,6 +130,10 @@ export function createImmersive(
     overlay.hidden = true;
     overlay.remove();
     delete document.body.dataset.presentationMode;
+    delete document.documentElement.dataset.presentationMode;
+    document.removeEventListener("gesturestart", preventGesture);
+    pointers.clear();
+    ignoreSelectUntil = 0;
     world.visible = true;
     world.scale.setScalar(1);
     world.position.set(0, 0, 0);
@@ -152,7 +188,9 @@ export function createImmersive(
         background();
         hint.textContent = "Move to find a surface · Tap to place";
         overlay.hidden = false;
-        document.body.dataset.presentationMode = "ar";
+        document.body.dataset.presentationMode = document.documentElement.dataset.presentationMode =
+          "ar";
+        document.addEventListener("gesturestart", preventGesture, { passive: false });
         change(true);
         support.markInXr();
       } catch (error) {
@@ -162,6 +200,13 @@ export function createImmersive(
         throw error;
       } finally {
         entering = false;
+      }
+    },
+    worldChanged() {
+      pointers.clear();
+      if (session && hits) {
+        world.scale.setScalar(0.6 / Math.max(1, extent()));
+        background();
       }
     },
     frame(frame?: XRFrame) {
