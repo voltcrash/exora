@@ -21,6 +21,7 @@ export function createPlanetGlobe(
   strata: Texture,
   flow: Texture,
   segments: number,
+  drawRings = true,
 ) {
   const rocky = recipe.renderer === "rocky" ? recipe.surface : null;
   const palette =
@@ -54,6 +55,8 @@ export function createPlanetGlobe(
       lava: { value: rocky?.lavaStrength ?? 0 },
       water: { value: rocky?.waterLevel ?? 0 },
       ice: { value: rocky?.iceCapStrength ?? 0 },
+      contrast: { value: recipe.renderer === "rocky" ? 0 : recipe.bandDetail.bandContrast },
+      warp: { value: recipe.renderer === "rocky" ? 0 : recipe.bandDetail.bandWarp },
       bands: { value: recipe.renderer === "rocky" ? 0 : recipe.bandDetail.bandCount * Math.PI },
       stormLatitude: { value: "stormLatitude" in palette ? palette.stormLatitude : 0 },
       stormStrength: { value: "stormStrength" in palette ? palette.stormStrength : 0 },
@@ -78,7 +81,7 @@ export function createPlanetGlobe(
   const root = new Group();
   root.rotation.z = recipe.axialTilt;
   root.add(body);
-  const rings = recipe.rings?.opacity ? recipe.rings : null;
+  const rings = drawRings && recipe.rings?.opacity ? recipe.rings : null;
   const ring =
     rings &&
     new Mesh(
@@ -121,9 +124,12 @@ export function createPlanetGlobe(
   };
   return {
     root,
+    setLightDirection(direction: Vector3) {
+      sun.copy(direction);
+    },
     extent: rings?.outerRadius ?? recipe.radiusSceneUnits,
-    update(seconds: number) {
-      body.rotation.y = seconds * recipe.rotationSpeed;
+    update(seconds: number, spin = recipe.rotationSpeed) {
+      body.rotation.y = seconds * spin;
       material.uniforms.time!.value = seconds;
     },
     dispose() {
