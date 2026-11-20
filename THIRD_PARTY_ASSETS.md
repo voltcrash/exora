@@ -207,6 +207,31 @@ The row corrected by Nancy G. Roman on 1999-12-30 (#229) is included as distribu
 
 `textures/catalog-portraits.webp` contains 40 original Blender portraits in eight columns. The first 35 depict Solar System destinations. The remaining five supply recipe-tinted catalog and Forge thumbnails. The swatches, surface noise, ring projections and lighting are defined in `art/bake-catalog.py`.
 
+## Solar System planet models
+
+The eight orbit globes use NASA planetary visualizations. Exora refits the mapped meshes to
+their source ellipsoids in Blender, preserves the source UVs, and renders the eight catalog
+portraits in `textures/solar-planets.webp` from the exported geometry and materials.
+The atmospheric maps depict representative cloud patterns and colors. They are static
+visualizations. Saturn uses the source ring texture. The faint rings of the other giants
+use the subsystem catalog's radial boundaries and illustrative opacities.
+
+| Shipped model                                                    | Source                                                                             |
+| ---------------------------------------------------------------- | ---------------------------------------------------------------------------------- |
+| `models/planets/mercury.glb`, `models/planets/mercury-small.glb` | [NASA VTAD · Mercury](https://science.nasa.gov/resource/mercury-3d-model/)         |
+| `models/planets/venus.glb`, `models/planets/venus-small.glb`     | [NASA VTAD · Venus](https://science.nasa.gov/resource/venus-3d-model/)             |
+| `models/planets/earth.glb`, `models/planets/earth-small.glb`     | [NASA VTAD · Earth](https://science.nasa.gov/resource/earth-with-clouds-3d-model/) |
+| `models/planets/mars.glb`, `models/planets/mars-small.glb`       | [NASA JPL-Caltech · Mars](https://science.nasa.gov/resource/planet-mars-3d-model/) |
+| `models/planets/jupiter.glb`, `models/planets/jupiter-small.glb` | [NASA VTAD · Jupiter](https://science.nasa.gov/resource/jupiter-3d-model/)         |
+| `models/planets/saturn.glb`, `models/planets/saturn-small.glb`   | [NASA VTAD · Saturn](https://science.nasa.gov/resource/saturn-3d-model/)           |
+| `models/planets/uranus.glb`, `models/planets/uranus-small.glb`   | [NASA VTAD · Uranus](https://science.nasa.gov/resource/uranus-3d-model/)           |
+| `models/planets/neptune.glb`, `models/planets/neptune-small.glb` | [NASA VTAD · Neptune](https://science.nasa.gov/resource/neptune-3d-model/)         |
+
+Regenerate the models and portraits with
+`blender -b --python-exit-code 1 -P art/model-solar-planets.py -- /path/to/source-cache`.
+The script downloads the source GLBs on first use. NASA's
+[media usage guidelines](https://www.nasa.gov/nasa-brand-center/images-and-media/) apply.
+
 ## Original Blender surface fields
 
 The following linear RGB data maps are original Exora artwork baked in Blender
