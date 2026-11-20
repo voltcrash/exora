@@ -57,6 +57,7 @@ export function createLandscape(
   constrained = false,
   weather = texture,
   planet?: ExoplanetProfile,
+  parentModel?: Group,
 ) {
   const root = new Group();
   const surfaceSunDirection = siteSun(recipe.seed);
@@ -180,7 +181,7 @@ export function createLandscape(
   if (air > 0) root.add(sky);
   const parent =
     terrain && air < 0.5
-      ? createHorizonPlanet(planet, recipe.seed, texture, weather, surfaceSunDirection)
+      ? createHorizonPlanet(planet, recipe.seed, texture, weather, surfaceSunDirection, parentModel)
       : null;
   if (parent) root.add(parent.root);
 
