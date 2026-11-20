@@ -186,6 +186,7 @@ export interface SimbadStarRepositoryOptions {
   cacheTtlMs?: number;
   fetcher?: Fetcher;
   now?: () => number;
+  /** Budget for one query across every SIMBAD host it tries. */
   timeoutMs?: number;
 }
 
@@ -522,13 +523,16 @@ export class SimbadStarRepository implements StarRepository {
    */
   async #fetchPayload(adql: string): Promise<SimbadPayload> {
     if (this.#now() >= this.#preferredUntil) this.#preferredEndpoint = 0;
-    const failures: unknown[] = [];
     const first = this.#preferredEndpoint;
     const count = SIMBAD_TAP_ENDPOINTS.length;
+    const deadline = Date.now() + this.#timeoutMs;
+    const failures: unknown[] = [];
     for (let offset = 0; offset < count; offset += 1) {
       const index = (first + offset) % count;
+      // Half of what is left, so a host that hangs still leaves time for the mirrors after it.
+      const budget = (deadline - Date.now()) / Math.min(2, count - offset);
       try {
-        const payload = await this.#request(SIMBAD_TAP_ENDPOINTS[index]!, adql);
+        const payload = await this.#request(SIMBAD_TAP_ENDPOINTS[index]!, adql, budget);
         if (index !== first) {
           this.#preferredEndpoint = index;
           this.#preferredUntil = this.#now() + PRIMARY_RECHECK_MS;
@@ -543,7 +547,7 @@ export class SimbadStarRepository implements StarRepository {
     });
   }
 
-  async #request(endpoint: string, adql: string): Promise<SimbadPayload> {
+  async #request(endpoint: string, adql: string, timeoutMs: number): Promise<SimbadPayload> {
     const url = new URL(endpoint);
     url.searchParams.set("request", "doQuery");
     url.searchParams.set("lang", "adql");
@@ -552,7 +556,7 @@ export class SimbadStarRepository implements StarRepository {
 
     const response = await this.#fetcher(url, {
       headers: { accept: "application/json" },
-      signal: AbortSignal.timeout(this.#timeoutMs),
+      signal: AbortSignal.timeout(Math.max(1, Math.round(timeoutMs))),
     });
     if (!response.ok) {
       throw new SimbadArchiveError(
