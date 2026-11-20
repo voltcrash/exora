@@ -1,3 +1,4 @@
+import { siteBearing } from "./surface-landing.ts";
 import type { SurfaceGeology, TerrainArchetype } from "./surface-geology.ts";
 
 export interface TerrainSample {
@@ -78,65 +79,6 @@ const fbm = (x: number, z: number, seed: number, octaves: number, gain = 0.5): n
   return normalization > 0 ? sum / normalization : 0;
 };
 
-const ridged = (x: number, z: number, seed: number, octaves: number, gain = 0.5): number => {
-  let amplitude = 1;
-  let frequency = 1;
-  let sum = 0;
-  let normalization = 0;
-  let weight = 1;
-  for (let octave = 0; octave < octaves; octave += 1) {
-    let value = 1 - Math.abs(gradientNoise(x * frequency, z * frequency, seed + octave * 197));
-    value *= value * weight;
-    weight = clamp01(value * 2.1);
-    sum += amplitude * value;
-    normalization += amplitude;
-    amplitude *= gain;
-    frequency *= 2.07;
-  }
-  return normalization > 0 ? sum / normalization : 0;
-};
-
-interface CellResult {
-  cell: number;
-  f1: number;
-  f2: number;
-}
-
-const cellResult: CellResult = { cell: 0, f1: 0, f2: 0 };
-
-const cellular = (x: number, z: number, seed: number, jitter = 0.85): CellResult => {
-  const xi = Math.floor(x);
-  const zi = Math.floor(z);
-  let f1 = 16;
-  let f2 = 16;
-  let cell = 0;
-
-  for (let ox = -1; ox <= 1; ox += 1) {
-    for (let oz = -1; oz <= 1; oz += 1) {
-      const cx = xi + ox;
-      const cz = zi + oz;
-      const h = hash2(cx, cz, seed);
-      const px = cx + 0.5 + (((h & 0xff) / 255) * 2 - 1) * 0.5 * jitter;
-      const pz = cz + 0.5 + ((((h >>> 8) & 0xff) / 255) * 2 - 1) * 0.5 * jitter;
-      const dx = px - x;
-      const dz = pz - z;
-      const distance = Math.sqrt(dx * dx + dz * dz);
-      if (distance < f1) {
-        f2 = f1;
-        f1 = distance;
-        cell = h;
-      } else if (distance < f2) {
-        f2 = distance;
-      }
-    }
-  }
-
-  cellResult.cell = cell;
-  cellResult.f1 = f1;
-  cellResult.f2 = f2;
-  return cellResult;
-};
-
 const craterLayer = (
   x: number,
   z: number,
@@ -160,311 +102,79 @@ const craterLayer = (
       if ((h & 0xff) / 255 > density) continue;
 
       const sizeRoll = ((h >>> 8) & 0xff) / 255;
-      const radius = cellSize * (0.14 + sizeRoll * sizeRoll * 0.42);
+      const radius = cellSize * (0.16 + sizeRoll * sizeRoll * 0.33);
       const centerX = (cx + 0.5 + ((((h >>> 16) & 0xff) / 255) * 2 - 1) * 0.42) * cellSize;
       const centerZ = (cz + 0.5 + ((((h >>> 24) & 0xff) / 255) * 2 - 1) * 0.42) * cellSize;
       const dx = x - centerX;
       const dz = z - centerZ;
       const distance = Math.sqrt(dx * dx + dz * dz) / radius;
-      if (distance > 2.4) continue;
+      if (distance > 2.2) continue;
 
-      const rough = gradientNoise(x * 0.35, z * 0.35, seed + (h & 0xffff)) * 0.12;
-      const depth = depthScale * radius * (0.22 - sizeRoll * 0.08);
-
-      if (distance < 0.82) {
-        const bowl = 1 - (distance / 0.82) * (distance / 0.82);
-        displacement -= depth * bowl * (1 + rough);
-        if (sizeRoll > 0.72 && distance < 0.26) {
-          displacement += depth * 0.85 * (1 - distance / 0.26) ** 1.4;
-        }
-      } else if (distance < 1.16) {
-        const rim = 1 - Math.abs(distance - 0.95) / 0.21;
-        displacement += depth * 0.55 * Math.max(0, rim) * (1 + rough * 2);
-      } else {
-        const ejecta = (1 - (distance - 1.16) / 1.24) ** 3;
-        displacement += depth * 0.16 * Math.max(0, ejecta) * (0.6 + rough * 3);
-      }
+      const rough = gradientNoise(x * 0.35, z * 0.35, seed + (h & 0xffff));
+      const depth = depthScale * radius * (0.28 - sizeRoll * 0.09);
+      const bowl = 1 - smoothstep(0.25 + sizeRoll * 0.25, 0.95, distance);
+      const rim = smoothstep(0.57, 0.99, distance) * (1 - smoothstep(1, 1.48, distance));
+      const ejecta = smoothstep(0.86, 1.08, distance) * (1 - smoothstep(1.16, 2.2, distance));
+      const peak = smoothstep(0.72, 1, sizeRoll) * (1 - smoothstep(0, 0.24, distance));
+      displacement +=
+        depth *
+        (-bowl + rim * (0.52 + rough * 0.16) + ejecta * (0.11 + rough * 0.09) + peak * 0.62);
     }
   }
 
   return displacement;
 };
 
-const craterField = (x: number, z: number, seed: number, density: number): number =>
-  craterLayer(x, z, seed + 11, 62, density * 0.55, 1) +
-  craterLayer(x, z, seed + 29, 19, density * 0.72, 0.9) +
-  craterLayer(x, z, seed + 53, 5.5, density * 0.85, 0.8) +
-  craterLayer(x, z, seed + 71, 1.7, density * 0.6, 0.7);
-
-interface FieldContext {
-  windCos: number;
-  windSin: number;
-  craterDensity: number;
-  erosion: number;
-  seed: number;
-  featureScale: number;
-  strataSpacing: number;
-  strataStrength: number;
+interface Massif {
+  x: number;
+  z: number;
+  width: number;
+  length: number;
+  height: number;
+  angle: number;
 }
 
-const stratify = (
-  height: number,
-  context: FieldContext,
-  amount: number,
-  jitter: number,
-): number => {
-  const strength = context.strataStrength * amount * 0.34;
-  if (strength <= 0.001) return height;
-  const spacing = Math.max(0.35, context.strataSpacing * 2.4);
-  const phase = height / spacing + jitter * 0.22;
-  const stepped = Math.floor(phase) + smoothstep(0.32, 0.8, phase - Math.floor(phase));
-  return lerp(height, stepped * spacing + jitter * spacing * 0.13, strength);
-};
-
-type ArchetypeField = (x: number, z: number, context: FieldContext, out: TerrainSample) => number;
-
-const impactHighlands: ArchetypeField = (x, z, context, out) => {
-  const base = fbm(x * 0.012, z * 0.012, context.seed + 3, 4) * 0.55;
-  const craters = craterField(x, z, context.seed, Math.max(0.15, context.craterDensity));
-  const height = base + craters * 0.42;
-  const rubble = fbm(x * 0.4, z * 0.4, context.seed + 17, 2);
-  out.regolith = clamp01(0.62 - craters * 0.5 + rubble * 0.15);
-  out.scarp = clamp01(Math.abs(craters) * 0.9);
-  out.frost = 0;
-  out.molten = 0;
-  return height;
-};
-
-const regolithPlain: ArchetypeField = (x, z, context, out) => {
-  const swell = fbm(x * 0.009, z * 0.009, context.seed + 5, 3) * 0.5;
-  const dimples = craterLayer(x, z, context.seed + 91, 4.2, context.craterDensity * 0.5, 0.55);
-  const rippleX = x * context.windCos + z * context.windSin;
-  const ripple = Math.sin(rippleX * 1.9 + fbm(x * 0.09, z * 0.09, context.seed + 7, 2) * 4) * 0.012;
-  out.regolith = clamp01(0.86 + fbm(x * 0.2, z * 0.2, context.seed + 9, 2) * 0.12);
-  out.scarp = 0.04;
-  out.frost = 0;
-  out.molten = 0;
-  return swell + dimples * 0.3 + ripple;
-};
-
-const floodBasalt: ArchetypeField = (x, z, context, out) => {
-  const plain = fbm(x * 0.008, z * 0.008, context.seed + 13, 3) * 0.16;
-  const wrinkleAxis = x * 0.021 + z * 0.006;
-  const wrinkle =
-    ridged(wrinkleAxis, z * 0.05, context.seed + 23, 3) ** 2.4 *
-    (0.35 + fbm(x * 0.01, z * 0.01, context.seed + 31, 2) * 0.3);
-  const cell = cellular(x * 0.02, z * 0.02, context.seed + 37, 0.9);
-  const channel = smoothstep(0.09, 0.0, cell.f2 - cell.f1) * 0.22;
-  const height = plain + wrinkle * 0.5 - channel;
-  out.regolith = clamp01(0.35 + channel * 1.6);
-  out.scarp = clamp01(wrinkle * 1.4 + channel * 0.8);
-  out.frost = 0;
-  out.molten = 0;
-  return stratify(height, context, 0.35, plain / 0.16);
-};
-
-const duneSea: ArchetypeField = (x, z, context, out) => {
-  const along = (x * context.windCos + z * context.windSin) / context.featureScale;
-  const across = (-x * context.windSin + z * context.windCos) / context.featureScale;
-  const meander = fbm(across * 0.02, along * 0.006, context.seed + 41, 3) * 9;
-  const draa = fbm(along * 0.006, across * 0.004, context.seed + 43, 2);
-  const wavelength = 19 * context.featureScale * (1 + draa * 0.4);
-  const phase = ((along + meander) / wavelength) % 1;
-  const t = phase < 0 ? phase + 1 : phase;
-  const profile = t < 0.72 ? (t / 0.72) ** 1.35 : 1 - (t - 0.72) / 0.28;
-  const crestBreak = fbm(across * 0.05, along * 0.05, context.seed + 47, 3) * 0.3;
-  const height = (profile - 0.45) * (1.15 + draa * 0.55) + draa * 0.45 + crestBreak * 0.12;
-  const ripple =
-    Math.sin(along * 1.6 + fbm(along * 0.1, across * 0.1, context.seed + 49, 2) * 5) * 0.01;
-  out.regolith = 1;
-  out.scarp = clamp01((t > 0.74 && t < 0.98 ? 0.35 : 0) * 0.6);
-  out.frost = 0;
-  out.molten = 0;
-  return height + ripple;
-};
-
-const yardangBadlands: ArchetypeField = (x, z, context, out) => {
-  const along = (x * context.windCos + z * context.windSin) / context.featureScale;
-  const across = (-x * context.windSin + z * context.windCos) / context.featureScale;
-  const warpX = fbm(across * 0.03, along * 0.008, context.seed + 59, 2) * 3;
-  const carve = ridged(across * 0.11 + warpX * 0.05, along * 0.014, context.seed + 61, 4);
-  const platform = fbm(along * 0.007, across * 0.009, context.seed + 67, 3) * 0.5;
-  const raw = platform + (carve ** 1.6 - 0.3) * 0.85;
-  const height = stratify(
-    raw,
-    context,
-    1,
-    fbm(across * 0.4, along * 0.4, context.seed + 63, 2) * 2,
-  );
-  const flank = clamp01((1 - carve) * 1.5);
-  out.regolith = clamp01(0.3 + flank * 0.5);
-  out.scarp = clamp01((carve - 0.42) * 2.4);
-  out.frost = 0;
-  out.molten = 0;
-  return height;
-};
-
-const canyonRift: ArchetypeField = (x, z, context, out) => {
-  const scale = 0.0075 / context.featureScale;
-  const warpX = fbm(x * 0.004, z * 0.004, context.seed + 71, 2) * 40;
-  const warpZ = fbm(x * 0.004 + 5.1, z * 0.004 - 3.7, context.seed + 73, 2) * 40;
-  const cell = cellular((x + warpX) * scale, (z + warpZ) * scale, context.seed + 79, 0.95);
-  const edge = cell.f2 - cell.f1;
-  const plateau = fbm(x * 0.006, z * 0.006, context.seed + 83, 3) * 0.34 + 0.42;
-  const cut = 1 - smoothstep(0, 0.42, edge);
-  const depth = cut ** 1.7;
-  const floorNoise = fbm(x * 0.05, z * 0.05, context.seed + 89, 3) * 0.06;
-  const talus = smoothstep(0.06, 0.3, edge) * (1 - smoothstep(0.3, 0.5, edge)) * 0.12;
-  const height =
-    stratify(plateau - depth * 1.35 + talus, context, 0.9, floorNoise / 0.06) + floorNoise * depth;
-  out.regolith = clamp01(0.25 + depth * 0.55);
-  out.scarp = clamp01(smoothstep(0.02, 0.24, edge) * (1 - smoothstep(0.24, 0.48, edge)) * 1.6);
-  out.frost = 0;
-  out.molten = 0;
-  return height;
-};
-
-const volcanicShield: ArchetypeField = (x, z, context, out) => {
-  const scale = 0.0055 / context.featureScale;
-  const cell = cellular(x * scale, z * scale, context.seed + 97, 0.75);
-  const size = 0.55 + ((cell.cell >>> 12) & 0xff) / 255;
-  const radial = cell.f1 / size;
-  const flank = Math.exp(-(radial * radial) * 2.4);
-  const caldera = smoothstep(0.2, 0.05, radial) * 0.55;
-  const fissures = ridged(x * 0.05, z * 0.05, context.seed + 101, 3) ** 3 * flank * 0.3;
-  const apron = fbm(x * 0.02, z * 0.02, context.seed + 103, 3) * 0.16;
-  const height = flank * 0.95 - caldera * flank + fissures + apron - 0.3;
-  out.regolith = clamp01(0.55 - flank * 0.3);
-  out.scarp = clamp01(caldera * 1.4 + fissures * 2);
-  out.frost = 0;
-  out.molten = 0;
-  return height;
-};
-
-const lavaFields: ArchetypeField = (x, z, context, out) => {
-  const cell = cellular(x * 0.035, z * 0.035, context.seed + 107, 0.95);
-  const edge = cell.f2 - cell.f1;
-  const plate = ((cell.cell >>> 7) & 0xff) / 255;
-  const crack = 1 - smoothstep(0, 0.11, edge);
-  const surface = fbm(x * 0.06, z * 0.06, context.seed + 109, 3) * 0.12;
-  const ropey = Math.sin(cell.f1 * 34 + plate * 8) * 0.02 * (1 - crack);
-  const vents = smoothstep(
-    0.62,
-    0.88,
-    fbm(x * 0.014, z * 0.014, context.seed + 113, 3) * 0.5 + 0.5,
-  );
-  const height = (plate - 0.5) * 0.22 + surface - crack * 0.16 - vents * 0.25 + ropey;
-  out.regolith = clamp01(0.2 + (1 - crack) * 0.2);
-  out.scarp = clamp01(crack * 1.2);
-  out.frost = 0;
-  out.molten = clamp01(crack * 1.15 + vents * 1.1);
-  return height;
-};
-
-const glacialPlain: ArchetypeField = (x, z, context, out) => {
-  const swell = fbm(x * 0.007, z * 0.007, context.seed + 127, 3) * 0.55;
-  const cell = cellular(x * 0.06, z * 0.06, context.seed + 131, 0.8);
-  const pit = smoothstep(0.42, 0.06, cell.f1) * 0.16;
-  const along = x * context.windCos + z * context.windSin;
-  const sastrugi =
-    ridged(
-      along * 0.5,
-      (-x * context.windSin + z * context.windCos) * 0.06,
-      context.seed + 137,
-      2,
-    ) * 0.035;
-  const nunatak = smoothstep(
-    0.78,
-    0.95,
-    fbm(x * 0.01, z * 0.01, context.seed + 139, 3) * 0.5 + 0.5,
-  );
-  const height = swell - pit + sastrugi + nunatak * 0.5;
-  out.regolith = clamp01(0.25 + pit * 2);
-  out.scarp = clamp01(nunatak * 1.6 + pit * 1.4);
-  out.frost = clamp01(1 - nunatak * 1.4);
-  out.molten = 0;
-  return height;
-};
-
-const fracturedIce: ArchetypeField = (x, z, context, out) => {
-  const scale = 0.02 / context.featureScale;
-  const warpX = fbm(x * 0.006, z * 0.006, context.seed + 149, 2) * 18;
-  const cell = cellular((x + warpX) * scale, z * scale, context.seed + 151, 0.9);
-  const edge = cell.f2 - cell.f1;
-  const plate = cell.cell;
-  const ridgePair =
-    Math.exp(-(((edge - 0.055) / 0.035) ** 2)) - Math.exp(-((edge / 0.03) ** 2)) * 0.55;
-  const secondary = cellular(x * scale * 3.1 + 7.3, z * scale * 3.1, context.seed + 157, 0.9);
-  const hairline = Math.exp(-(((secondary.f2 - secondary.f1) / 0.05) ** 2)) * 0.22;
-  const chaos = smoothstep(0.68, 0.9, fbm(x * 0.012, z * 0.012, context.seed + 163, 3) * 0.5 + 0.5);
-  const raft = chaos * (((plate >>> 5) & 0xff) / 255 - 0.5) * 0.9;
-  const plain = fbm(x * 0.02, z * 0.02, context.seed + 167, 3) * 0.12;
-  out.regolith = clamp01(0.3 + chaos * 0.3);
-  out.scarp = clamp01(Math.abs(ridgePair) * 1.6 + chaos * 0.8);
-  out.frost = clamp01(0.9 - chaos * 0.4);
-  out.molten = 0;
-  return plain + ridgePair * 1.15 + hairline * 0.35 + raft;
-};
-
-const foldedMountains: ArchetypeField = (x, z, context, out) => {
-  const scale = 0.011 / context.featureScale;
-  const warpX = fbm(x * 0.004, z * 0.004, context.seed + 173, 2) * 26;
-  const warpZ = fbm(x * 0.004 - 8.2, z * 0.004 + 2.9, context.seed + 179, 2) * 26;
-  const sharp = ridged((x + warpX) * scale, (z + warpZ) * scale, context.seed + 181, 5, 0.52);
-  const rounded = fbm((x + warpX) * scale, (z + warpZ) * scale, context.seed + 181, 4) * 0.5 + 0.5;
-  const relief = lerp(sharp, rounded, context.erosion * 0.45);
-  const massif = fbm(x * 0.0035, z * 0.0035, context.seed + 191, 2) * 0.5 + 0.5;
-  const peak = relief ** 1.25 * (0.4 + massif * 1.15);
-  const talus = (1 - relief) ** 2 * 0.18 * (0.4 + context.erosion);
-  const detail = fbm(x * 0.09, z * 0.09, context.seed + 193, 3) * 0.05 * relief;
-  out.regolith = clamp01(0.2 + talus * 3 + (1 - relief) * 0.35);
-  out.scarp = clamp01((relief - 0.52) * 2.6);
-  out.frost = clamp01((peak - 0.55) * 2.2);
-  out.molten = 0;
-  return peak * 1.75 + talus + detail - 0.55;
-};
-
-const coastalShelf: ArchetypeField = (x, z, context, out) => {
-  const swell = fbm(x * 0.006, z * 0.006, context.seed + 197, 4) * 0.9;
-  const headland = ridged(x * 0.014, z * 0.014, context.seed + 199, 3) ** 2 * 0.45;
-  const height = swell + headland - 0.18;
-  const nearDatum = 1 - smoothstep(0, 0.28, Math.abs(height));
-  const bench = nearDatum * Math.round(height / 0.06) * 0.06 * 0.5;
-  out.regolith = clamp01(0.4 + nearDatum * 0.5);
-  out.scarp = clamp01(headland * 1.8);
-  out.frost = 0;
-  out.molten = 0;
-  return lerp(height, bench + height * 0.5, nearDatum * 0.5);
-};
-
-const saltPan: ArchetypeField = (x, z, context, out) => {
-  const cell = cellular(x * 0.16, z * 0.16, context.seed + 211, 0.7);
-  const rim = Math.exp(-(((cell.f2 - cell.f1) / 0.045) ** 2)) * 0.035;
-  const coarse = cellular(x * 0.03, z * 0.03, context.seed + 223, 0.7);
-  const coarseRim = Math.exp(-(((coarse.f2 - coarse.f1) / 0.05) ** 2)) * 0.05;
-  const basin = fbm(x * 0.005, z * 0.005, context.seed + 227, 2) * 0.09;
-  out.regolith = clamp01(0.7 - rim * 6);
-  out.scarp = clamp01((rim + coarseRim) * 8);
-  out.frost = clamp01(0.55 + basin * 2);
-  out.molten = 0;
-  return basin + rim + coarseRim;
-};
-
-const ARCHETYPE_FIELDS: Readonly<Record<TerrainArchetype, ArchetypeField>> = {
-  "canyon-rift": canyonRift,
-  "coastal-shelf": coastalShelf,
-  "dune-sea": duneSea,
-  "flood-basalt": floodBasalt,
-  "folded-mountains": foldedMountains,
-  "fractured-ice": fracturedIce,
-  "glacial-plain": glacialPlain,
-  "impact-highlands": impactHighlands,
-  "lava-fields": lavaFields,
-  "regolith-plain": regolithPlain,
-  "salt-pan": saltPan,
-  "volcanic-shield": volcanicShield,
-  "yardang-badlands": yardangBadlands,
-};
+function makeMassifs(seed: number): Massif[] {
+  const roll = (index: number, lane: number) => hash2(index, lane, seed) / 4294967296;
+  const make = (
+    x: number,
+    z: number,
+    width: number,
+    length: number,
+    height: number,
+    i: number,
+  ) => ({
+    x,
+    z,
+    width: width * (0.82 + 0.38 * roll(i, 1)),
+    length: length * (0.85 + 0.4 * roll(i, 2)),
+    height: height * (0.76 + 0.47 * roll(i, 3)),
+    angle: roll(i, 4) * Math.PI * 2,
+  });
+  const massifs = [
+    make(-22 + roll(0, 0) * 7, 56, 14, 19, 17, 0),
+    make(23 + roll(1, 0) * 13, 88, 22, 34, 28, 1),
+    make(-27 + roll(2, 0) * 19, 162, 24, 40, 36, 2),
+    make(-62, 109, 32, 47, 38, 3),
+  ];
+  for (let i = 4; i < 39; i++) {
+    const angle = roll(i, 5) * Math.PI * 2;
+    const distance = 57 + 207 * roll(i, 6);
+    const foreground = Math.sin(angle) > 0 && Math.abs(Math.cos(angle)) < 0.53 && distance < 177;
+    const scale = (0.44 + 1.58 * roll(i, 7)) * (foreground ? 0.49 : 1);
+    massifs.push(
+      make(
+        Math.cos(angle) * distance,
+        Math.sin(angle) * distance,
+        17 * scale,
+        23 * scale,
+        (9 + distance * 0.1) * scale,
+        i,
+      ),
+    );
+  }
+  return massifs;
+}
 
 export interface TerrainField {
   geology: SurfaceGeology;
@@ -472,126 +182,181 @@ export interface TerrainField {
   sample: (x: number, z: number, out: TerrainSample) => TerrainSample;
 }
 
-const nearFieldRelief = (radius: number): number => 0.38 + smoothstep(4, 58, radius) * 0.62;
-
-const primarySample = createTerrainSample();
-const secondarySample = createTerrainSample();
-
-export const createTerrainField = (geology: SurfaceGeology): TerrainField => {
-  const provinceList = geology.provinces.length > 0 ? geology.provinces : [];
-  const context: FieldContext = {
-    craterDensity: geology.craterDensity,
-    erosion: clamp01(1 - geology.strataStrength * 0.4),
-    featureScale: Math.max(0.35, geology.featureScale),
-    seed: geology.seed | 0,
-    strataSpacing: geology.strataSpacing,
-    strataStrength: geology.strataStrength,
-    windCos: Math.cos(geology.windDirection),
-    windSin: Math.sin(geology.windDirection),
-  };
-
-  const cumulative: number[] = [];
-  let running = 0;
-  for (const province of provinceList) {
-    running += province.weight;
-    cumulative.push(running);
+export function createTerrainField(geology: SurfaceGeology): TerrainField {
+  const { seed, provinces } = geology;
+  if (provinces.length === 0) {
+    const flat = { ...createTerrainSample(), regolith: 1 };
+    return { geology, height: () => 0, sample: (_x, _z, out) => Object.assign(out, flat) };
   }
-  const total = running > 0 ? running : 1;
+  const yaw = siteBearing(seed);
+  const sin = Math.sin(yaw);
+  const cos = Math.cos(yaw);
+  const massifs = makeMassifs(seed);
+  const scale = Math.min(1.6, Math.max(0.72, geology.featureScale));
+  const uplift = Math.min(1.5, Math.max(0.45, geology.relief / 4));
+  const phase = (hash2(3, 7, seed) / 4294967296) * 12;
+  const ordered = provinces
+    .map((p, index) => ({ ...p, index }))
+    .sort((a, b) => b.weight - a.weight);
+  const total = ordered.reduce((sum, p) => sum + p.weight, 0) || 1;
+  const blendWidths = ordered.map((p, i) =>
+    Math.min(0.055, (0.49 * Math.min(p.weight, ordered[i + 1]?.weight ?? 0)) / total),
+  );
+  const first = createTerrainSample(),
+    next = createTerrainSample();
 
-  let signature = 0;
-  for (let index = 1; index < provinceList.length; index += 1) {
-    if ((provinceList[index]?.weight ?? 0) > (provinceList[signature]?.weight ?? 0)) {
-      signature = index;
-    }
-  }
+  function sample(worldX: number, worldZ: number, out: TerrainSample): TerrainSample {
+    const x = (worldX * cos + worldZ * sin) / scale;
+    const z = (worldX * sin - worldZ * cos) / scale;
+    const regional = fbm(x * 0.017 + 2.7, z * 0.017, seed, 3);
+    const detail = fbm(x * 0.082, z * 0.082 + 8.1, seed + 7, 3);
+    const drainage = fbm(x * 0.042, z * 0.042, seed + 19, 3);
+    const braid =
+      5 * Math.sin(z * 0.049 + phase) + 2.6 * Math.sin(z * 0.112 - phase) + regional * 3;
 
-  const provinceAt = (hash: number): number => {
-    const roll = ((hash >>> 3) & 0xffff) / 65_536;
-    const target = roll * total;
-    for (let index = 0; index < cumulative.length; index += 1) {
-      if (target <= (cumulative[index] ?? 0)) return index;
-    }
-    return Math.max(0, cumulative.length - 1);
-  };
-
-  const territoryScale = 0.0125 / Math.max(0.35, geology.featureScale);
-
-  const landingCell =
-    provinceList.length === 0
-      ? 0
-      : cellular(
-          fbm(0, 0, context.seed + 907, 2) * 62 * territoryScale,
-          fbm(12.7, -4.3, context.seed + 911, 2) * 62 * territoryScale,
-          context.seed + 919,
-          0.95,
-        ).cell;
-
-  const sample = (x: number, z: number, out: TerrainSample): TerrainSample => {
-    if (provinceList.length === 0) {
-      out.height = 0;
-      out.frost = 0;
-      out.molten = 0;
-      out.province = 0;
-      out.regolith = 1;
-      out.scarp = 0;
-      return out;
-    }
-
-    const warpX = fbm(x * 0.0035, z * 0.0035, context.seed + 907, 2) * 62;
-    const warpZ = fbm(x * 0.0035 + 12.7, z * 0.0035 - 4.3, context.seed + 911, 2) * 62;
-    const territory = cellular(
-      (x + warpX) * territoryScale,
-      (z + warpZ) * territoryScale,
-      context.seed + 919,
-      0.95,
+    // The landing opens into the dominant province. Other provinces cross the route beyond it.
+    const apron =
+      1 - smoothstep(10, 55, Math.abs(x) - Math.max(0, z) * 0.3 + Math.max(0, -z) * 0.68);
+    const territory = clamp01(
+      (0.51 + fbm(x * 0.021, z * 0.021, seed + 901, 2) * 0.9) * (1 - apron),
     );
-    const primaryIndex = territory.cell === landingCell ? signature : provinceAt(territory.cell);
-    const boundary = territory.f2 - territory.f1;
-    const blend = 1 - smoothstep(0.02, 0.16, boundary);
-    const neighbourIndex = provinceAt(
-      hash2(
-        Math.round(x * territoryScale * 4),
-        Math.round(z * territoryScale * 4),
-        context.seed + 929,
-      ),
-    );
-
-    const primaryArchetype = provinceList[primaryIndex]?.archetype ?? "regolith-plain";
-    const primaryField = ARCHETYPE_FIELDS[primaryArchetype];
-    let height = primaryField(x, z, context, primarySample);
-    out.frost = primarySample.frost;
-    out.molten = primarySample.molten;
-    out.regolith = primarySample.regolith;
-    out.scarp = primarySample.scarp;
-    out.province = primaryIndex;
-
-    if (blend > 0.004 && neighbourIndex !== primaryIndex) {
-      const neighbourArchetype = provinceList[neighbourIndex]?.archetype ?? "regolith-plain";
-      const neighbourHeight = ARCHETYPE_FIELDS[neighbourArchetype](x, z, context, secondarySample);
-      const weight = blend * 0.5;
-      height = lerp(height, neighbourHeight, weight);
-      out.frost = lerp(out.frost, secondarySample.frost, weight);
-      out.molten = lerp(out.molten, secondarySample.molten, weight);
-      out.regolith = lerp(out.regolith, secondarySample.regolith, weight);
-      out.scarp = lerp(out.scarp, secondarySample.scarp, weight);
+    let index = 0,
+      limit = ordered[0]!.weight / total;
+    while (index + 1 < ordered.length && territory > limit + blendWidths[index]!) {
+      index++;
+      limit += ordered[index]!.weight / total;
     }
 
-    const radius = Math.sqrt(x * x + z * z);
-    const scaled = height * geology.relief * nearFieldRelief(radius);
-    const regional = fbm(x * 0.0125, z * 0.0125, context.seed + 937, 3) * geology.relief * 0.22;
+    function shape(kind: TerrainArchetype, result: TerrainSample) {
+      result.height = regional * 1.2 + detail * 0.22;
+      result.regolith = 0.65 + regional * 0.25;
+      result.scarp = 0;
+      result.frost = 0;
+      result.molten = 0;
+      let relief = 0;
+      if (kind === "dune-sea" || geology.medium === "cloud") {
+        if (geology.medium === "cloud") {
+          const billow = fbm(x * 0.036 + regional * 1.7, z * 0.029, seed + 41, 5);
+          const bank = smoothstep(-0.22, 0.55, regional + billow * 0.36);
+          result.height = 12 * regional + 18 * bank + billow * (5 + 9 * bank);
+          result.regolith = bank;
+          result.scarp = clamp01(0.5 - billow);
+        } else {
+          const wind = x * 0.74 + z * 0.48;
+          const cross = z * 0.75 - x * 0.47;
+          const angle = wind * 0.193 + 1.8 * Math.sin(cross * 0.057 + phase) + regional * 3.6;
+          const t = angle / (2 * Math.PI) - Math.floor(angle / (2 * Math.PI));
+          const stoss = smoothstep(0, 0.79, t);
+          const slip = 1 - smoothstep(0.79, 1, t);
+          const envelope =
+            0.36 + smoothstep(-0.35, 0.47, regional + 0.25 * Math.sin(cross * 0.037));
+          result.height += (stoss * slip - 0.25) * (6.8 + 7 * smoothstep(10, 85, z)) * envelope;
+          result.regolith = 0.98;
+          result.scarp = smoothstep(0.79, 0.85, t) * (1 - smoothstep(0.93, 1, t)) * 0.17;
+        }
+      } else if (kind === "fractured-ice" || kind === "glacial-plain" || kind === "salt-pan") {
+        const shear = x - braid + z * 0.29;
+        const seam = Math.min(Math.abs(shear - 8), Math.abs(shear + 22 + regional * 6));
+        const joint = 1 - smoothstep(0.25, 2.7, seam);
+        const ridge = Math.exp(-(((seam - 3.7) / 2.25) ** 2));
+        const raft = fbm((x + z * 0.35) * 0.048, z * 0.011, seed + 56, 3);
+        const compression = kind === "fractured-ice" ? 1 : kind === "glacial-plain" ? 0.53 : 0.12;
+        result.height += (ridge * (2.3 + drainage * 2.8) - joint * 1.5 + raft * 2.7) * compression;
+        result.frost = clamp01(0.92 - joint * 0.74 + ridge * 0.12);
+        result.scarp = clamp01(joint + ridge * 0.28);
+        result.regolith = 0.24;
+      } else if (kind === "impact-highlands" || kind === "regolith-plain") {
+        const distance = Math.hypot((x + 4) / 32, (z - 32) / 36) + drainage * 0.065;
+        const crater = 1 - smoothstep(0.55, 1, distance);
+        const rim = Math.exp(-(((distance - 1.02) / 0.14) ** 2));
+        const highland = smoothstep(0.15, 0.52, regional) * 8;
+        const age = kind === "impact-highlands" ? 1 : 0.32;
+        result.height +=
+          age * (-8.6 * crater + rim * (3.3 + detail * 1.8) + highland) +
+          craterLayer(x, z, seed + 13, 24, geology.craterDensity, 1.45) +
+          craterLayer(x, z, seed + 26, 5.6, geology.craterDensity * 0.85, 0.9);
+        result.scarp = clamp01(rim + highland * 0.09);
+        result.regolith = 0.78 - result.scarp * 0.45;
+      } else {
+        const volcanic =
+          kind === "lava-fields" || kind === "volcanic-shield" || kind === "flood-basalt";
+        const alpine = kind === "folded-mountains" || kind === "coastal-shelf";
+        for (const m of massifs) {
+          const dx = (x - m.x) / m.width,
+            dz = (z - m.z) / m.length;
+          if (Math.abs(dx) > 2.2 || Math.abs(dz) > 2.2) continue;
+          const theta = Math.atan2(dz, dx);
+          const lobes = 0.12 * Math.cos(theta * 3 + m.angle) + 0.08 * Math.sin(theta * 5 - m.angle);
+          const radius = Math.hypot(dx, dz) * (1 + lobes) + drainage * 0.19 + detail * 0.05;
+          let profile: number;
+          if (alpine) {
+            const buttress = 0.27 * Math.cos(theta * 5 + m.angle + regional * 2.7);
+            const strike = dx * Math.cos(m.angle) + dz * Math.sin(m.angle);
+            const cross = dz * Math.cos(m.angle) - dx * Math.sin(m.angle);
+            const crest =
+              0.48 * Math.abs(strike) + 1.28 * Math.abs(cross + 0.23 * Math.sin(strike * 4.4));
+            const spur = radius * 0.52 + crest * 0.48 + drainage * (0.12 + 0.12 * radius);
+            profile =
+              Math.max(0, 1 - Math.max(0, spur + buttress * Math.min(1, radius)) / 1.85) ** 1.67;
+            profile *= (1.38 + 0.26 * drainage) * (kind === "coastal-shelf" ? 0.6 : 1);
+          } else if (volcanic) {
+            profile =
+              Math.max(0, 1 - radius / 1.7) ** 1.45 - (1 - smoothstep(0.21, 0.48, radius)) * 0.42;
+          } else {
+            const pediment = (1 - smoothstep(0.46, 1.55, radius)) * 0.27;
+            const cliff = (1 - smoothstep(0.52, 0.73, radius)) * 0.57;
+            const cap = (1 - smoothstep(0.4, 0.54, radius)) * 0.17;
+            const flute = Math.abs(Math.sin(theta * 7 + m.angle + drainage * 2.9));
+            profile =
+              (pediment + cliff + cap) * (1 - 0.21 * flute * smoothstep(0.12, 0.64, radius));
+            profile += (1 - smoothstep(0.08, 0.36, radius + 0.13 * flute)) * 0.19;
+          }
+          relief = Math.max(relief, m.height * profile);
+        }
+        result.height += relief * 0.77;
+        if (alpine) {
+          const valley = 1 - smoothstep(2, 13, Math.abs(x - braid + z * 0.12));
+          result.height += 2.4 - valley * 5.2 + drainage * (1.1 + relief * 0.23);
+          result.scarp = smoothstep(2.5, 16, relief);
+          result.frost = smoothstep(11, 32, relief + 13 * drainage + 4 * detail);
+        } else if (volcanic) {
+          const fault = Math.abs(x - braid - 2.5 - z * 0.12);
+          const crust = smoothstep(1.7, 3.8, fault);
+          const levee = Math.exp(-(((fault - 4.5) / 2.8) ** 2));
+          const channelFloor = z * 0.018 - 1.35 + regional * 0.3;
+          result.height = lerp(channelFloor, result.height + levee * 1.5 + detail * 0.9, crust);
+          result.molten = kind === "flood-basalt" ? 0 : (1 - crust) * geology.lavaGlow;
+          result.scarp = clamp01(0.68 + drainage - regional * 0.42 + levee * 0.4);
+          result.regolith = clamp01(0.23 + regional * 0.88 + 0.28 * crust);
+        } else {
+          const wash = 1 - smoothstep(2, 9, Math.abs(x - braid));
+          result.height += drainage * (1.4 + relief * 0.055) - wash * 1.6;
+          result.scarp = smoothstep(2, 10, relief);
+          result.regolith = clamp01(0.7 + wash * 0.2 - result.scarp * 0.51);
+        }
+      }
+      result.height *= uplift;
+      result.frost *= smoothstep(0, 0.25, geology.frostCoverage);
+    }
 
-    out.height = Number.isFinite(scaled) ? scaled + regional : 0;
-    out.regolith = clamp01(out.regolith * (0.35 + geology.regolithDepth * 0.9));
-    out.frost = clamp01(out.frost * geology.frostCoverage * 1.6);
-    out.molten = clamp01(out.molten * geology.lavaGlow);
+    const primary = ordered[index]!;
+    shape(primary.archetype, first);
+    Object.assign(out, first);
+    out.province = primary.index;
+    const secondary = ordered[index + 1];
+    const width = blendWidths[index]!;
+    if (secondary && territory > limit - width) {
+      const t = smoothstep(limit - width, limit + width, territory);
+      shape(secondary.archetype, next);
+      out.height = lerp(first.height, next.height, t);
+      out.regolith = lerp(first.regolith, next.regolith, t);
+      out.scarp = lerp(first.scarp, next.scarp, t);
+      out.frost = lerp(first.frost, next.frost, t);
+      out.molten = lerp(first.molten, next.molten, t);
+      if (t > 0.5) out.province = secondary.index;
+    }
     return out;
-  };
-
+  }
   const scratch = createTerrainSample();
-
-  return {
-    geology,
-    height: (x, z) => sample(x, z, scratch).height,
-    sample,
-  };
-};
+  return { geology, sample, height: (x, z) => sample(x, z, scratch).height };
+}

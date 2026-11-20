@@ -17,8 +17,8 @@ export const inverseSurfaceGradeAxis = (x: number): number => {
 };
 
 export const SURFACE_GRID_RESOLUTION: Readonly<Record<RenderQualityProfile["tier"], number>> = {
-  desktop: 208,
-  mobile: 132,
+  desktop: 272,
+  mobile: 144,
 };
 
 export const bakeSurfaceSunVisibility = (

@@ -12,8 +12,13 @@ import {
 } from "three";
 import { skyViewpointFrom } from "../sky-catalog.ts";
 import { createPlanetGlobe } from "./planet-globe.ts";
+import { loadTerrainScans } from "./terrain-scans.ts";
 import { loadPlanetFields } from "./planet-fields.ts";
-import { createLandscape } from "./landscape.ts";
+import { createLandscape, siteSun, type LandscapeTerrain } from "./landscape.ts";
+import { cloudDeckGeology, deriveSurfaceGeology } from "../surface-geology.ts";
+import { SURFACE_EYE_HEIGHT, SURFACE_WALK_LIMIT } from "../surface-landing.ts";
+import { SURFACE_GRID_RESOLUTION } from "../surface-vista-baking.ts";
+import { runTerrainJob } from "../terrain-worker-client.ts";
 import type { Observatory, Observation } from "./observatory.ts";
 
 export type ViewMode = "orbit" | "surface" | "transition" | "subsystem";
@@ -73,6 +78,50 @@ export async function createPlanetWorld(
   space.add(sun, globe.root);
   root.add(space);
   let surface: ReturnType<typeof createLandscape> | null = null;
+  const surfaceAbort = new AbortController();
+  let surfaceTerrain: LandscapeTerrain | null = null;
+  let scans: Awaited<ReturnType<typeof loadTerrainScans>> = null;
+  let terrainStarted = false;
+  let terrainError: Error | undefined;
+
+  function prepareTerrain() {
+    terrainStarted = true;
+    const identity = planet.solarSystem ? { naifId: planet.solarSystem.naifId } : null;
+    const geology = deriveSurfaceGeology(recipe, identity) ?? cloudDeckGeology(recipe);
+    if (!geology) return;
+    const signal = surfaceAbort.signal;
+    if (geology.medium === "rock") {
+      const anisotropy = Math.min(
+        host.profile.anisotropicFiltering,
+        host.renderer.capabilities.getMaxAnisotropy(),
+      );
+      void loadTerrainScans(geology, anisotropy).then((loaded) => {
+        if (signal.aborted) loaded?.dispose();
+        else if (loaded) {
+          scans = loaded;
+          surface?.setScans(loaded.ground, loaded.cliff);
+        }
+      });
+    }
+    void runTerrainJob(
+      {
+        kind: "surface",
+        input: {
+          geology,
+          resolution: SURFACE_GRID_RESOLUTION[host.profile.tier],
+          sunDirection: siteSun(recipe.seed),
+        },
+      },
+      signal,
+    )
+      .then((result) => {
+        if (result?.kind === "surface") surfaceTerrain = { geology, data: result.data };
+      })
+      .catch((cause: unknown) => {
+        if (!signal.aborted)
+          terrainError = new Error("Could not generate the landing terrain", { cause });
+      });
+  }
   let mode: "orbit" | "surface" = "orbit",
     attached = false,
     elapsed = 0;
@@ -81,11 +130,13 @@ export async function createPlanetWorld(
     mouse = new Vector2();
   const keys = new Set<string>(),
     fingers = new Map<number, Vector2>();
+  const touchStart = new Vector2();
+  let walkAfter = Infinity;
   let yaw = 0,
     pitch = 0,
     pinch = 0;
   function look() {
-    walk.y = surface!.floorAt(walk.x, walk.z) + 1.65;
+    walk.y = surface!.floorAt(walk.x, walk.z) + SURFACE_EYE_HEIGHT;
     camera.position.copy(walk);
     surface!.follow(walk.x, walk.z);
     direction.set(
@@ -96,16 +147,22 @@ export async function createPlanetWorld(
     controls.target.copy(walk).add(direction);
     camera.lookAt(controls.target);
   }
+  let previousShadows = false;
   function land() {
     if (!surface) {
       surface = createLandscape(
         recipe,
         fields.surface,
-        host.profile.tier === "desktop" ? 224 : 120,
-        neutralSurface,
+        surfaceTerrain,
+        host.profile.tier === "mobile",
+        fields.flow,
+        planet,
       );
+      if (scans) surface.setScans(scans.ground, scans.cliff);
       root.add(surface.root);
     }
+    previousShadows = host.renderer.shadowMap.enabled;
+    host.renderer.shadowMap.enabled = !!surfaceTerrain && surfaceTerrain.geology.medium === "rock";
     mode = "surface";
     space.visible = false;
     surface.root.visible = true;
@@ -113,13 +170,15 @@ export async function createPlanetWorld(
     controls.enableDamping = false;
     controls.minDistance = 0.2;
     controls.maxDistance = 100;
-    walk.set(0, 0, 5);
-    yaw = -0.22;
-    pitch = 0.035;
+    const landing = surface.landing;
+    walk.set(landing.x, 0, landing.z);
+    yaw = landing.yaw;
+    pitch = 0.055;
     look();
     onViewModeChange("surface");
   }
   function orbit() {
+    host.renderer.shadowMap.enabled = previousShadows;
     mode = "orbit";
     space.visible = true;
     if (surface) surface.root.visible = false;
@@ -131,6 +190,7 @@ export async function createPlanetWorld(
     controls.update();
     keys.clear();
     fingers.clear();
+    walkAfter = Infinity;
     pinch = 0;
     onViewModeChange("orbit");
   }
@@ -154,17 +214,23 @@ export async function createPlanetWorld(
   const blur = () => {
     keys.clear();
     fingers.clear();
+    walkAfter = Infinity;
     pinch = 0;
   };
   const down = (e: PointerEvent) => {
     if (mode !== "surface" || host.isInXr()) return;
     mouse.set(e.clientX, e.clientY);
     fingers.set(e.pointerId, new Vector2(e.clientX, e.clientY));
+    touchStart.copy(mouse);
+    walkAfter =
+      e.pointerType === "touch" && fingers.size === 1 ? performance.now() + 340 : Infinity;
     canvas.setPointerCapture(e.pointerId);
   };
   const move = (e: PointerEvent) => {
     if (!fingers.has(e.pointerId) || mode !== "surface") return;
-    fingers.get(e.pointerId)!.set(e.clientX, e.clientY);
+    const point = fingers.get(e.pointerId)!.set(e.clientX, e.clientY);
+    if (performance.now() < walkAfter && point.distanceToSquared(touchStart) > 64)
+      walkAfter = Infinity;
     if (fingers.size === 2) {
       const [a, b] = fingers.values();
       const span = a!.distanceTo(b!);
@@ -179,6 +245,7 @@ export async function createPlanetWorld(
   };
   const up = (e: PointerEvent) => {
     fingers.delete(e.pointerId);
+    walkAfter = Infinity;
     pinch = 0;
     for (const point of fingers.values()) mouse.copy(point);
   };
@@ -194,6 +261,7 @@ export async function createPlanetWorld(
       attached = true;
       const events = { signal: listeners.signal };
       canvas.addEventListener("wheel", wheel, { ...events, passive: false });
+      canvas.addEventListener("webglcontextrestored", () => surface?.updateShadows(), events);
       canvas.addEventListener("pointerdown", down, events);
       canvas.addEventListener("pointermove", move, events);
       canvas.addEventListener("pointerup", up, events);
@@ -211,19 +279,38 @@ export async function createPlanetWorld(
         if (mode === "surface") orbit();
         return;
       }
-      if (mode === "orbit" && controls.getDistance() <= nearDistance * 1.025) land();
+      if (mode === "orbit") {
+        const approach = controls.getDistance() / nearDistance;
+        if (!neutralSurface && !terrainStarted && approach <= 1.25) prepareTerrain();
+        if (approach <= 1.025) {
+          if (terrainError) throw terrainError;
+          if (neutralSurface || surfaceTerrain) land();
+        }
+      }
       if (mode === "surface") {
-        const forward = Number(keys.has("KeyW")) - Number(keys.has("KeyS")),
+        surface?.update(delta);
+        const forward =
+            Number(keys.has("KeyW") || performance.now() >= walkAfter) - Number(keys.has("KeyS")),
           right = Number(keys.has("KeyD")) - Number(keys.has("KeyA"));
         const step = (inputDelta * 4.1) / Math.max(1, Math.hypot(forward, right));
-        walk.x = Math.max(
-          -63,
-          Math.min(63, walk.x + step * (Math.sin(yaw) * forward + Math.cos(yaw) * right)),
+        const nextX = Math.max(
+          -SURFACE_WALK_LIMIT,
+          Math.min(
+            SURFACE_WALK_LIMIT,
+            walk.x + step * (Math.sin(yaw) * forward + Math.cos(yaw) * right),
+          ),
         );
-        walk.z = Math.max(
-          -63,
-          Math.min(63, walk.z + step * (-Math.cos(yaw) * forward + Math.sin(yaw) * right)),
+        const nextZ = Math.max(
+          -SURFACE_WALK_LIMIT,
+          Math.min(
+            SURFACE_WALK_LIMIT,
+            walk.z + step * (-Math.cos(yaw) * forward + Math.sin(yaw) * right),
+          ),
         );
+        if (!surface?.blocks?.(walk.x, walk.z, nextX, nextZ, walk.y)) {
+          walk.x = nextX;
+          walk.z = nextZ;
+        }
         look();
       }
     },
@@ -232,9 +319,12 @@ export async function createPlanetWorld(
     },
     dispose() {
       listeners.abort();
+      surfaceAbort.abort();
       if (attached && mode === "surface")
         controls.enableRotate = controls.enableZoom = controls.enableDamping = true;
+      if (mode === "surface") host.renderer.shadowMap.enabled = previousShadows;
       surface?.dispose();
+      scans?.dispose();
       globe.dispose();
       fields.dispose();
       sun.geometry.dispose();

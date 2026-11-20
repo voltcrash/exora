@@ -1,11 +1,14 @@
-import { Group, Mesh } from "three";
+import { DirectionalLight, Group, Mesh, Vector3 } from "three";
 import { expect, test, vi } from "vite-plus/test";
 import { deriveWorldRecipe } from "@exora/worldgen";
 import { createObservatory } from "./three/observatory.ts";
 import { createPlanetWorld } from "./three/planet.ts";
+import { SURFACE_WALK_LIMIT } from "./surface-landing.ts";
 import { createLandscape } from "./three/landscape.ts";
 import { loadPlanetFields } from "./three/planet-fields.ts";
 import { HAUMEA, MARS, tuneSolarWorldRecipe } from "./solar-system.ts";
+import { buildSurfaceTerrain } from "./surface-terrain-kernel.ts";
+import { surfaceTerrainFixture } from "./terrain-test-fixtures.ts";
 
 function observer() {
   const canvas = document.createElement("canvas");
@@ -181,6 +184,44 @@ test.each([MARS, HAUMEA])(
       world!.update!(0, host.camera, 0.2);
       window.dispatchEvent(new KeyboardEvent("keyup", { code: "KeyW" }));
       expect(host.camera.position.distanceTo(before)).toBeGreaterThan(0.1);
+      if (planet === MARS) {
+        const sunlight = world!.root.getObjectByProperty("type", "DirectionalLight");
+        if (!(sunlight instanceof DirectionalLight)) throw Error("Missing surface shadows");
+        const lost = new Promise<void>((resolve) => {
+          canvas.addEventListener("webglcontextlost", () => resolve(), { once: true });
+        });
+        host.renderer.forceContextLoss();
+        await lost;
+        await new Promise(requestAnimationFrame);
+        sunlight.shadow.needsUpdate = false;
+        const shadowRestored = new Promise<boolean>((resolve) => {
+          canvas.addEventListener(
+            "webglcontextrestored",
+            () => resolve(sunlight.shadow.needsUpdate),
+            { once: true },
+          );
+        });
+        host.renderer.forceContextRestore();
+        expect(await shadowRestored).toBe(true);
+        const capture = vi.spyOn(canvas, "setPointerCapture").mockImplementation(() => {});
+        const now = vi.spyOn(performance, "now");
+        try {
+          now.mockReturnValue(0);
+          const event = { pointerType: "touch", pointerId: 7, clientX: 100, clientY: 80 };
+          canvas.dispatchEvent(new PointerEvent("pointerdown", event));
+          const held = host.camera.position.clone();
+          now.mockReturnValue(360);
+          world!.update!(0, host.camera, 0.2);
+          expect(host.camera.position.distanceTo(held)).toBeGreaterThan(0.1);
+          canvas.dispatchEvent(new PointerEvent("pointerup", event));
+          const released = host.camera.position.clone();
+          world!.update!(0, host.camera, 0.2);
+          expect(host.camera.position.distanceTo(released)).toBeLessThan(0.001);
+        } finally {
+          now.mockRestore();
+          capture.mockRestore();
+        }
+      }
       canvas.dispatchEvent(new WheelEvent("wheel", { deltaY: 10, cancelable: true }));
       expect(modes.at(-1)).toBe("orbit");
       expect(host.controls.enableRotate).toBe(true);
@@ -193,10 +234,13 @@ test.each([MARS, HAUMEA])(
 test("the walking floor matches mesh vertices and the surface sun follows the observer", async () => {
   const recipe = tuneSolarWorldRecipe(MARS, deriveWorldRecipe(MARS));
   const fields = await loadPlanetFields();
-  const view = createLandscape(recipe, fields.surface, 32);
+  const request = surfaceTerrainFixture(MARS, 32);
+  if (request.kind !== "surface") throw new Error("Expected a surface request");
+  const data = buildSurfaceTerrain(request.input);
+  const view = createLandscape(recipe, fields.surface, { geology: request.input.geology, data });
   try {
     const ground = view.root.children.find(
-      (o) => o instanceof Mesh && o.geometry.type === "PlaneGeometry",
+      (object) => object instanceof Mesh && object.geometry.hasAttribute("masks"),
     ) as Mesh;
     const vertices = ground.geometry.getAttribute("position");
     for (const index of [33, 122, 480])
@@ -204,12 +248,53 @@ test("the walking floor matches mesh vertices and the surface sun follows the ob
         vertices.getY(index),
         3,
       );
+    const sunlight = view.root.getObjectByProperty("type", "DirectionalLight");
+    if (!(sunlight instanceof DirectionalLight)) throw Error("Missing surface sun");
+    view.root.updateMatrixWorld(true);
+    sunlight.shadow.updateMatrices(sunlight);
+    for (const x of [-SURFACE_WALK_LIMIT, SURFACE_WALK_LIMIT]) {
+      for (const z of [-SURFACE_WALK_LIMIT, SURFACE_WALK_LIMIT]) {
+        const clip = new Vector3(x, view.floorAt(x, z), z).project(sunlight.shadow.camera);
+        expect(Math.max(Math.abs(clip.x), Math.abs(clip.y), Math.abs(clip.z))).toBeLessThan(1);
+      }
+    }
     const original = view.star.position.clone();
     view.follow(7, -4);
     expect(view.star.position.x - original.x).toBeCloseTo(7);
     expect(view.star.position.z - original.z).toBeCloseTo(-4);
   } finally {
     view.dispose();
+    fields.dispose();
+  }
+});
+
+test("the Martian window admits walkers through its opening and blocks its stone foot", async () => {
+  const fields = await loadPlanetFields();
+  const request = surfaceTerrainFixture(MARS, 32);
+  if (request.kind !== "surface") throw new Error("Expected a surface request");
+  const landscape = createLandscape(
+    tuneSolarWorldRecipe(MARS, deriveWorldRecipe(MARS)),
+    fields.surface,
+    {
+      geology: request.input.geology,
+      data: buildSurfaceTerrain(request.input),
+    },
+  );
+  try {
+    const arch = await vi.waitFor(() => {
+      const mesh = landscape.root.getObjectByName("sandstone-window");
+      if (!mesh) throw new Error("Waiting for the sandstone window");
+      return mesh;
+    });
+    const crossesStone = (x: number) => {
+      const start = arch.localToWorld(new Vector3(x, 1.65, 8));
+      const end = arch.localToWorld(new Vector3(x, 1.65, -8));
+      return landscape.blocks?.(start.x, start.z, end.x, end.z, start.y);
+    };
+    expect(crossesStone(0.4)).toBe(false);
+    expect(crossesStone(-5.5)).toBe(true);
+  } finally {
+    landscape.dispose();
     fields.dispose();
   }
 });

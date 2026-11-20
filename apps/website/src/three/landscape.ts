@@ -1,255 +1,277 @@
-import type { WorldRecipe } from "@exora/worldgen";
+import type { ExoplanetProfile } from "@exora/contracts";
+import type { Rgb, WorldRecipe } from "@exora/worldgen";
 import {
   BackSide,
   BufferAttribute,
-  Color,
   BufferGeometry,
-  Float32BufferAttribute,
+  Color,
   DirectionalLight,
+  UniformsLib,
+  UniformsUtils,
   Group,
   HemisphereLight,
   Mesh,
   MeshBasicMaterial,
-  MeshStandardMaterial,
   PlaneGeometry,
+  RepeatWrapping,
   ShaderMaterial,
+  TextureLoader,
   SphereGeometry,
   SRGBColorSpace,
+  Vector2,
+  Vector3,
   type Texture,
 } from "three";
 
+import { siteBearing, sitePosition, SURFACE_WALK_LIMIT } from "../surface-landing.ts";
+import { createTerrainField, createTerrainSample } from "../surface-terrain.ts";
+import type { SurfaceGeology } from "../surface-geology.ts";
+import { createSurfaceFloor, type SurfaceTerrainData } from "../surface-terrain-kernel.ts";
+import landscapeFragment from "./landscape.frag?raw";
+import landscapeVertex from "./landscape.vert?raw";
+import skyFragment from "./surface-sky.frag?raw";
+import { createHorizonPlanet } from "./moon-horizon.ts";
+import { createShoreline } from "./shoreline.ts";
+import { createCloudHeights } from "./cloud-deck.ts";
+import { SURFACE_HALF_EXTENT } from "../surface-vista-baking.ts";
+import { createLandmarks } from "./landmarks.ts";
+import { createAlpineForest } from "./alpine-forest.ts";
 import { createOutcrops } from "./outcrops.ts";
+
+export const siteSun = (seed: number) => {
+  const { x, z } = sitePosition(seed, -0.94, -0.17);
+  return new Vector3(x, 0.42, z).normalize();
+};
+const sunDistance = 620;
+const color = (rgb: Rgb) => new Color().setRGB(...rgb);
+
+export interface LandscapeTerrain {
+  geology: SurfaceGeology;
+  data: SurfaceTerrainData;
+}
 
 export function createLandscape(
   recipe: WorldRecipe,
   texture: Texture,
-  segments: number,
-  neutralSurface = false,
+  terrain: LandscapeTerrain | null,
+  constrained = false,
+  weather = texture,
+  planet?: ExoplanetProfile,
 ) {
   const root = new Group();
-  const image = texture.image as HTMLImageElement;
-  const canvas = document.createElement("canvas");
-  canvas.width = image.width;
-  canvas.height = image.height;
-  const context = canvas.getContext("2d", { willReadFrequently: true })!;
-  context.drawImage(image, 0, 0);
-  const { data } = context.getImageData(0, 0, canvas.width, canvas.height);
-  const offset = recipe.seed / 4294967296;
-  function field(x: number, z: number, channel: number) {
-    const ix = ((((x / 138 + offset) % 1) + 1) % 1) * image.width;
-    const iz = ((((z / 144 + offset * 2.89) % 1) + 1) % 1) * image.height;
-    const u = Math.floor(ix),
-      v = Math.floor(iz),
-      fx = ix - u,
-      fz = iz - v;
-    const sample = (a: number, b: number) =>
-      data[((b % image.height) * image.width + (a % image.width)) * 4 + channel]! / 255;
-    return (
-      (sample(u, v) * (1 - fx) + sample(u + 1, v) * fx) * (1 - fz) +
-      (sample(u, v + 1) * (1 - fx) + sample(u + 1, v + 1) * fx) * fz
-    );
-  }
-  const rocky = recipe.renderer === "rocky" ? recipe.surface : null;
-  const relief = recipe.renderer === "rocky" ? 3.5 + recipe.terrain.mountainHeight * 8 : 3.1;
-  const baseHeight = (x: number, z: number) => {
-    if (neutralSurface) return 0;
-    const basin = Math.min(1, Math.hypot(x, z - 5) / 36);
-    const dunes = field(x * 0.24, z * 0.24, 0) - 0.48;
-    const hills = field(x * 0.36, z * 0.36, 1);
-    return (dunes * 0.48 + basin * basin * hills * 0.28 + field(x, z, 2) * 0.019) * relief;
-  };
-  const water = rocky && rocky.waterLevel > 0 ? (rocky.waterLevel - 0.45) * relief : -Infinity;
+  const surfaceSunDirection = siteSun(recipe.seed);
+  const geology = terrain?.geology;
+  const cloudDeck = geology?.medium === "cloud";
+  const alpineForest = planet?.solarSystem?.naifId === 399 && geology?.medium === "rock";
+  const air = geology?.hazeDensity ?? 0;
+  const skyTint = geology ? color(geology.skyColor) : new Color(0);
+  if (geology && cloudDeck) skyTint.lerp(color(geology.ramp[2]!), 0.73);
+  const sunTint = new Color().setRGB(...recipe.star.color, SRGBColorSpace);
+  const sunLight = sunTint.clone().lerp(new Color(1, 1, 1), 0.42);
+  const neutralColor = new Color(0.29, 0.31, 0.33);
+  const ramp = geology?.ramp.map(color) ?? Array<Color>(5).fill(neutralColor);
+  const water =
+    geology && geology.liquidLevel !== null
+      ? (geology.liquidLevel - 0.42) * geology.relief * 1.15
+      : -Infinity;
+  const terrainFloor = terrain ? createSurfaceFloor(terrain.data) : () => 0;
+  const floorAt = (x: number, z: number) =>
+    Math.max(water, terrainFloor(x, z)) + (cloudDeck ? 10.5 : 0);
+  const geometry =
+    terrain && !cloudDeck
+      ? new BufferGeometry()
+          .setAttribute("position", new BufferAttribute(terrain.data.positions, 3))
+          .setAttribute("masks", new BufferAttribute(terrain.data.colors, 4))
+          .setAttribute("shade", new BufferAttribute(terrain.data.shade, 2))
+          .setIndex(new BufferAttribute(terrain.data.indices, 1))
+      : new PlaneGeometry(4000, 4000).rotateX(-Math.PI / 2);
+  geometry.computeVertexNormals();
 
-  const geo = new PlaneGeometry(
-    neutralSurface ? 4000 : 136,
-    neutralSurface ? 4000 : 136,
-    neutralSurface ? 1 : segments,
-    neutralSurface ? 1 : segments,
-  ).rotateX(-Math.PI / 2);
-  const pos = geo.getAttribute("position"),
-    colors = new Float32Array(pos.count * 3);
-  const palette =
-    recipe.renderer === "rocky"
-      ? recipe.surface
-      : recipe.renderer === "gas-giant"
-        ? recipe.cloudBands
-        : recipe.atmosphereBands;
-  const low = new Color().setRGB(
-    ...("lowColor" in palette ? palette.lowColor : palette.deepColor),
-    SRGBColorSpace,
-  );
-  const high = new Color().setRGB(
-    ...("highColor" in palette ? palette.highColor : palette.lightColor),
-    SRGBColorSpace,
-  );
-  const color = new Color();
-  for (let i = 0; i < pos.count; i++) {
-    const x = pos.getX(i),
-      z = pos.getZ(i);
-    const h = baseHeight(x, z);
-    pos.setY(i, h);
-    color
-      .copy(low)
-      .lerp(
-        high,
-        neutralSurface
-          ? 0.5
-          : Math.min(1, Math.max(0, 0.2 + (h / relief) * 0.65 + field(x, z, 2) * 0.38)),
-      )
-      .toArray(colors, i * 3);
-  }
-  geo.setAttribute("color", new BufferAttribute(colors, 3));
-  geo.computeVertexNormals();
-  // Interpolate the same two triangles as PlaneGeometry so the camera tracks the rendered ground.
-  function floorAt(x: number, z: number) {
-    if (neutralSurface) return 0;
-    const col = (x / 136 + 0.5) * segments,
-      row = (z / 136 + 0.5) * segments;
-    const c = Math.min(segments - 1, Math.max(0, Math.floor(col))),
-      r = Math.min(segments - 1, Math.max(0, Math.floor(row)));
-    const u = col - c,
-      v = row - r,
-      a = r * (segments + 1) + c;
-    const north = pos.getY(a + 1),
-      west = pos.getY(a + segments + 1);
-    return Math.max(
-      water,
-      u + v <= 1
-        ? pos.getY(a) * (1 - u - v) + north * u + west * v
-        : north * (1 - v) + west * (1 - u) + pos.getY(a + segments + 2) * (u + v - 1),
-    );
-  }
-  const haze = new Color()
-    .setRGB(...recipe.atmosphere.color, SRGBColorSpace)
-    .lerp(high, 0.42)
-    .multiplyScalar(0.65);
+  const offset = recipe.seed / 4_294_967_296;
+  const time = { value: 0 };
   const ground = new Mesh(
-    geo,
+    geometry,
     new ShaderMaterial({
+      lights: true,
       uniforms: {
+        ...UniformsUtils.clone(UniformsLib.lights),
+        time,
+        cliffScan: { value: texture },
+        hasScans: { value: false },
+        lavaGlow: { value: geology?.lavaGlow ?? 0 },
         detail: { value: texture },
-        neutral: { value: neutralSurface },
-        horizon: { value: haze },
-        keyColor: { value: new Color().setRGB(...recipe.star.color, SRGBColorSpace) },
-        air: { value: Math.min(1, recipe.atmosphere.density + 0.11) },
+        detailOffset: { value: new Vector2(offset, offset * 2.89) },
+        ramp: { value: ramp },
+        regolith: { value: geology ? color(geology.regolithColor) : neutralColor },
+        bedrock: { value: geology ? color(geology.bedrockColor) : neutralColor },
+        frost: { value: geology ? color(geology.frostColor) : neutralColor },
+        lava: { value: geology ? color(geology.lavaColor) : neutralColor },
+        oxide: {
+          value: geology?.detail.chemistry === "oxidized" ? geology.detail.chemistryStrength : 0,
+        },
+        skyTint: { value: skyTint },
+        sunTint: { value: sunLight },
+        sunDirection: { value: surfaceSunDirection },
+        air: { value: air },
+        neutral: { value: !terrain },
+        vegetated: { value: alpineForest },
+        strata: { value: geology?.strataStrength ?? 0 },
+        strataSpacing: { value: Math.max(0.24, (geology?.strataSpacing ?? 1) * 0.42) },
+        datum: { value: Number.isFinite(water) ? water : -1000 },
       },
-      vertexColors: true,
-      vertexShader: `varying vec3 point,slope,tint;void main(){point=position;slope=normal;tint=color;gl_Position=projectionMatrix*modelViewMatrix*vec4(position,1.);}`,
-      fragmentShader: `uniform bool neutral;uniform sampler2D detail;uniform vec3 horizon,keyColor;uniform float air;varying vec3 point,slope,tint;
-      void main(){vec2 uv=point.xz;vec3 fines=texture2D(detail,fract(uv*.038)).rgb;
-        float grit=texture2D(detail,fract(uv*.28)).b;float rake=sin(uv.y*6.+fines.r*8.+.6*sin(uv.x*1.9));
-        float lambert=max(0.,dot(normalize(slope),normalize(vec3(-.55,.24,-.8))));
-        vec3 clay=neutral ? tint : tint*(.66+.42*fines.b+.32*grit+.05*rake);
-        float veil=1.-exp(-length(cameraPosition-point)*(.005+.012*air));
-        gl_FragColor=vec4(mix(clay*(.44+1.5*lambert)*keyColor,horizon,veil*.78),1.);
-        #include <colorspace_fragment>
-      }`,
+      vertexShader: landscapeVertex,
+      fragmentShader: landscapeFragment,
     }),
   );
-  const ridges = Array.from({ length: neutralSurface ? 0 : 3 }, (_, layer) => {
-    const vertices: number[] = [],
-      indices: number[] = [];
-    for (let i = 0; i <= 360; i++) {
-      const a = (i * Math.PI) / 180,
-        r = 76 + 14 * layer,
-        x = r * Math.cos(a),
-        z = r * Math.sin(a);
-      const shale = field(x * 0.21 + layer * 14, z * 0.21 - layer * 11, 0);
-      const crest = rocky
-        ? relief * (0.3 + 0.36 * layer + 1.4 * shale + 0.25 * field(x * 0.5, z * 0.5, 2))
-        : relief * (0.4 + shale);
-      vertices.push(x, -11, z, x, crest, z);
-      if (i > 0) {
-        let j = i * 2;
-        indices.push(j - 2, j - 1, j, j - 1, j + 1, j);
-      }
-    }
-    const geometry = new BufferGeometry();
-    geometry.setAttribute("position", new Float32BufferAttribute(vertices, 3));
-    geometry.setIndex(indices);
-    const mesh = new Mesh(
-      geometry,
-      new MeshBasicMaterial({
-        color: high
-          .clone()
-          .lerp(haze, 0.46 + 0.16 * layer)
-          .multiplyScalar(0.54 + 0.11 * layer),
-        side: BackSide,
-      }),
-    );
-    root.add(mesh);
-    return mesh;
-  });
-  root.add(ground);
+  ground.castShadow = ground.receiveShadow = !!terrain && !cloudDeck;
+  if (!cloudDeck) root.add(ground);
   const sea =
-    rocky && Number.isFinite(water)
-      ? new Mesh(
-          new PlaneGeometry(136, 136).rotateX(-Math.PI / 2),
-          new MeshStandardMaterial({
-            color: new Color().setRGB(...rocky.waterColor, SRGBColorSpace),
-            roughness: 0.22,
-            metalness: 0.13,
-          }),
-        )
+    terrain && Number.isFinite(water)
+      ? createShoreline(terrain, water, constrained, skyTint, sunLight, surfaceSunDirection, time)
       : null;
-  if (sea) {
-    sea.position.y = water;
-    root.add(sea);
-  }
-  const air = new Color().setRGB(...recipe.atmosphere.color, SRGBColorSpace);
-  const sun = new Color().setRGB(...recipe.star.color, SRGBColorSpace);
+  if (sea) root.add(sea);
+  const cloudHeights =
+    terrain && cloudDeck
+      ? createCloudHeights(terrain.data, terrainFloor, surfaceSunDirection)
+      : null;
+  const billows = cloudDeck ? new TextureLoader().load("/textures/fields/billows.png") : null;
+  if (billows) billows.wrapS = billows.wrapT = RepeatWrapping;
   const sky = new Mesh(
-    new SphereGeometry(160, 40, 28),
+    new SphereGeometry(760, 40, 28),
     new ShaderMaterial({
       side: BackSide,
-      depthWrite: recipe.atmosphere.density > 0.03,
+      defines: cloudHeights ? { CLOUD_STEPS: constrained ? 16 : 26 } : {},
+      transparent: true,
+      depthWrite: false,
       uniforms: {
         air: { value: air },
-        sun: { value: sun },
-        density: { value: recipe.atmosphere.density },
+        time,
+        cover: {
+          value: cloudDeck ? 0.35 : recipe.renderer === "rocky" ? recipe.surface.cloudCover : 0,
+        },
+        weather: { value: weather },
+        cloudHeights: { value: cloudHeights },
+        billows: { value: billows },
+        heightRange: { value: new Vector2(terrain?.data.low ?? 0, terrain?.data.high ?? 1) },
+        cloudExtent: { value: SURFACE_HALF_EXTENT },
+        cloudLight: { value: ramp[4] },
+        cloudDark: { value: ramp[0]!.clone().multiplyScalar(0.52) },
+        seedOffset: { value: new Vector2(offset, offset * 2.89) },
+        skyTint: { value: skyTint },
+        sunTint: { value: sunLight },
+        sunDirection: { value: surfaceSunDirection },
       },
       vertexShader:
         "varying vec3 bearing;void main(){bearing=position;gl_Position=projectionMatrix*modelViewMatrix*vec4(position,1.);}",
-      fragmentShader: `varying vec3 bearing;uniform vec3 air,sun;uniform float density;void main(){
-    vec3 p=normalize(bearing);float altitude=max(0.,p.y);float haze=exp(-altitude*6.);
-    float beam=max(0.,dot(p,normalize(vec3(-.55,.24,-.8))));
-    vec3 c=air*(.045+.48*haze)*density+sun*pow(beam,14.)*(.22*haze*density);
-    gl_FragColor=vec4(c,1.);
-    #include <colorspace_fragment>
-    }`,
+      fragmentShader: skyFragment,
     }),
   );
   const star = new Mesh(
     new SphereGeometry(
-      Math.max(0.25, Math.min(8, 135 * Math.tan(recipe.star.apparentRadiusRadians))),
+      Math.max(0.65, Math.min(26, sunDistance * Math.tan(recipe.star.apparentRadiusRadians))),
       32,
       20,
     ),
-    new MeshBasicMaterial({ color: sun }),
+    new MeshBasicMaterial({ color: sunTint.clone().lerp(new Color(1, 1, 1), 0.25) }),
   );
-  star.position.set(-0.55, 0.24, -0.8).normalize().multiplyScalar(135);
-  root.add(sky, star);
-  const sunlight = new DirectionalLight(sun, 2.15);
-  sunlight.position.set(-0.55, 0.24, -0.8);
-  root.add(sunlight, new HemisphereLight(air.clone().lerp(new Color("white"), 0.55), low, 0.9));
-  const clearRocks =
-    rocky && !neutralSurface
-      ? createOutcrops(root, recipe.seed, high, rocky.iceCapStrength > 0.7, floorAt, water)
+  const sunOffset = surfaceSunDirection.clone().multiplyScalar(sunDistance);
+  star.position.copy(sunOffset);
+  root.add(star);
+  if (air > 0) root.add(sky);
+  const parent =
+    terrain && air < 0.5
+      ? createHorizonPlanet(planet, recipe.seed, texture, weather, surfaceSunDirection)
       : null;
-  const sunOffset = star.position.clone();
+  if (parent) root.add(parent.root);
+
+  const sunlight = new DirectionalLight(sunLight, 2.35);
+  const shadowExtent = (SURFACE_WALK_LIMIT + 12) * Math.SQRT2;
+  sunlight.position.copy(surfaceSunDirection).multiplyScalar(shadowExtent * 1.8);
+  sunlight.castShadow = !!terrain && !cloudDeck;
+  sunlight.shadow.mapSize.setScalar(constrained ? 1024 : 2048);
+  Object.assign(sunlight.shadow.camera, {
+    left: -shadowExtent,
+    right: shadowExtent,
+    top: shadowExtent,
+    bottom: -shadowExtent,
+    near: 1,
+    far: shadowExtent * 3.5,
+  });
+  sunlight.shadow.camera.updateProjectionMatrix();
+  sunlight.shadow.autoUpdate = false;
+  sunlight.shadow.normalBias = 0.09;
+  sunlight.shadow.bias = -0.0003;
+  const updateShadows = () => {
+    sunlight.shadow.needsUpdate = true;
+  };
+  updateShadows();
+  const formations =
+    geology?.medium === "rock"
+      ? createLandmarks(root, geology, terrainFloor, ground.material, updateShadows)
+      : null;
+  root.add(
+    sunlight,
+    new HemisphereLight(skyTint.clone().lerp(new Color(1, 1, 1), 0.62), ramp[1]!, 0.82),
+  );
+  const clearRocks =
+    geology?.medium === "rock"
+      ? createOutcrops(root, geology, terrainFloor, water, constrained, updateShadows)
+      : null;
+  const landing = sitePosition(recipe.seed, 0, -7);
+  if (terrain && (Number.isFinite(water) || terrain.geology.lavaGlow > 0)) {
+    const surface = createTerrainField(terrain.geology);
+    const sample = createTerrainSample();
+    for (const across of [-8, 8, -14, 14, -23, 23]) {
+      surface.sample(landing.x, landing.z, sample);
+      if (terrainFloor(landing.x, landing.z) > water + 0.3 && sample.molten < 0.03) break;
+      Object.assign(landing, sitePosition(recipe.seed, across, -11));
+    }
+  }
+  const forest = alpineForest
+    ? createAlpineForest(
+        root,
+        recipe.seed,
+        terrainFloor,
+        water,
+        landing,
+        constrained,
+        updateShadows,
+      )
+    : null;
   return {
+    updateShadows,
     follow(x: number, z: number) {
       sky.position.set(x, 0, z);
-      star.position.copy(sunOffset);
-      star.position.x += x;
-      star.position.z += z;
+      parent?.follow(x, z);
+      star.position.set(sunOffset.x + x, sunOffset.y, sunOffset.z + z);
     },
     root,
     star,
     floorAt,
+    blocks(x: number, z: number, nextX: number, nextZ: number, eyeY: number) {
+      if (x === nextX && z === nextZ) return false;
+      return !!(forest?.blocks(nextX, nextZ) || formations?.blocks(x, z, nextX, nextZ, eyeY));
+    },
+    landing: { ...landing, yaw: siteBearing(recipe.seed) },
+    update(delta: number) {
+      time.value += delta;
+    },
+    setScans(sediment: Texture, cliff: Texture) {
+      ground.material.uniforms.detail!.value = sediment;
+      ground.material.uniforms.cliffScan!.value = cliff;
+      ground.material.uniforms.hasScans!.value = true;
+    },
     dispose() {
+      billows?.dispose();
+      cloudHeights?.dispose();
+      parent?.dispose();
+      formations?.dispose();
+      forest?.dispose();
       clearRocks?.();
-      for (const mesh of [ground, sea, sky, star, ...ridges]) {
+      sunlight.dispose();
+      sea?.geometry.dispose();
+      sea?.dispose();
+      for (const mesh of [ground, sky, star]) {
         mesh?.geometry.dispose();
         mesh?.material.dispose();
       }

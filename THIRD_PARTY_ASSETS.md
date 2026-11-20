@@ -219,6 +219,19 @@ the longitude wraps and the poles converge. The channels have distinct uses.
 | `textures/fields/convection.png`  | Cloud density         | Zonal shear     | Turbulent filaments |
 | `textures/fields/photosphere.png` | Convection cells      | Active regions  | Bright plage        |
 
+## Ground materials
+
+Exora packs the tangent-space normals and luminance of these 1k Poly Haven scans in Blender
+with `art/pack-terrain-scans.py`. The local geology supplies the surface colors. The scans are
+distributed under [CC0](https://polyhaven.com/license).
+
+| File                          | Source                                                 | Artists                           |
+| ----------------------------- | ------------------------------------------------------ | --------------------------------- |
+| `textures/terrain/scree.webp` | [Rocky Gravel](https://polyhaven.com/a/rocky_gravel)   | Dimitrios Savva and Dario Barresi |
+| `textures/terrain/sand.webp`  | [Gravelly Sand](https://polyhaven.com/a/gravelly_sand) | Dario Barresi                     |
+| `textures/terrain/frost.webp` | [Snow 03](https://polyhaven.com/a/snow_03)             | Rob Tuytel                        |
+| `textures/terrain/cliff.webp` | [Rock Face 04](https://polyhaven.com/a/rock_face_04)   | Dimitrios Savva                   |
+
 ## Original Blender small bodies
 
 These procedural studies are original Exora models. Run `art/model-small-bodies.py`
@@ -231,4 +244,17 @@ centered mesh with its material embedded.
 | `models/comet-nucleus.glb`   | Dark bilobed nucleus with a narrow neck         |
 | `models/ice-fragment.glb`    | Elongated ice-rich fragment with shallow basins |
 
+`models/terrain-outcrops.glb` contains five original Blender meshes for local
+exploration. The pebble, boulder, slab, spire, and ice shard use clipped rock faces and
+vertex pigment. Regenerate them with `art/model-terrain-outcrops.py` in Blender.
+
+`art/sculpt-landmarks.py` builds three original local formations in Blender.
+`models/sandstone-window.glb` contains a wind-cut arch with a through passage.
+`models/pressure-ice.glb` contains tilted ice plates. `models/basalt-joints.glb`
+contains fractured columns of cooled lava.
+
 The accretion disk uses an original 1024 × 256 Blender bake, `textures/fields/accretion.png`. The shader reads azimuth along the horizontal axis and disk radius along the vertical axis. Red controls filament density, green traces compression bands, and blue varies local emission. Regenerate the data with `art/bake-accretion.py` from Blender's Python Console.
+
+The original cloud billows in `textures/fields/billows.png` store lobe height and horizontal gradients for gas and ice giants. Regenerate the tile with `art/bake-cloud-billows.py` in Blender.
+
+The original `models/alpine-fir.glb` uses layered boughs and an embedded needle-spray atlas for the forests on Earth. Regenerate it in Blender with `art/sculpt-alpine-fir.py`.

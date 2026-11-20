@@ -1,0 +1,99 @@
+#include <common>
+#include <packing>
+#include <lights_pars_begin>
+#include <shadowmap_pars_fragment>
+#include <shadowmask_pars_fragment>
+
+uniform sampler2D detail, cliffScan;
+uniform vec3 ramp[5], regolith, bedrock, frost, lava, skyTint, sunTint, sunDirection;
+uniform float air, strata, strataSpacing, datum, lavaGlow, oxide, time;
+uniform vec2 detailOffset;
+uniform bool neutral, hasScans, vegetated;
+varying vec3 groundPoint, groundNormal;
+varying vec4 surfaceMask;
+varying vec2 terrainShade;
+
+float valueNoise(vec2 p) {
+  vec2 i = floor(p), f = fract(p);
+  f = f * f * (3. - 2. * f);
+  vec4 h = fract(sin(dot(i,vec2(27.1, 51.7)) + vec4(0., 27.1, 51.7, 78.8)) * 4375.13);
+  return mix(mix(h.x,h.y,f.x),mix(h.z,h.w,f.x),f.y);
+}
+
+void main() {
+  vec3 P = groundPoint, N = normalize(groundNormal);
+  vec3 V = normalize(cameraPosition - P);
+  float distanceToEye = length(cameraPosition - P);
+  vec3 color;
+  if (neutral) {
+    color = ramp[2] * (.52 + .72 * max(dot(N, sunDirection), 0.));
+  } else {
+    vec2 field = P.xz * .062 + detailOffset * 8.;
+    float deposit = .57 * valueNoise(field) + .29 * valueNoise(field * 2.87) + .14 * valueNoise(field * 8.1);
+    vec3 weights = pow(abs(N), vec3(4.));
+    weights /= max(.001, weights.x + weights.y + weights.z);
+    vec3 axis = sign(N);
+    float exposure = clamp(surfaceMask.y * .48 + (1. - abs(N.y)) * 1.43, 0., 1.);
+    float crust = clamp(surfaceMask.x * (.67 + .36 * deposit), 0., 1.);
+    float ice = surfaceMask.z;
+    vec3 microNormal = N;
+    float albedo = 1.;
+    if (hasScans) {
+      vec2 tile = P.xz * .32 + detailOffset;
+      vec3 ground = texture2D(detail, tile).rgb;
+      vec3 rockX = texture2D(cliffScan, vec2(-axis.x * P.z, P.y) * .22 + detailOffset).rgb;
+      vec3 rockZ = texture2D(cliffScan, vec2(axis.z * P.x, P.y) * .22 - detailOffset).rgb;
+      vec3 top = texture2D(cliffScan, tile * .57 + .37).rgb;
+      ground = mix(ground, top, exposure * (1. - ice * .8));
+      vec3 rock = rockX * weights.x + ground * weights.y + rockZ * weights.z;
+      vec2 nx = rockX.rg * 2. - 1., ny = ground.rg * 2. - 1., nz = rockZ.rg * 2. - 1.;
+      vec3 slopes = vec3(0., nx.y, -axis.x * nx.x) * weights.x
+                  + vec3(ny.x, 0., ny.y) * weights.y
+                  + vec3(axis.z * nz.x, nz.y, 0.) * weights.z;
+      microNormal = normalize(N + (slopes - N * dot(slopes, N)) * .93);
+      albedo = pow(max(.045, rock.b * 2.), 1.8);
+    }
+    float layer = P.y * .49 / max(.45,strataSpacing) + P.x * .023 + .92 * valueNoise(field * .68);
+    float mineral = valueNoise(vec2(layer * 2.4, 1.7)) + .38 * valueNoise(vec2(layer * 9.7, 5.));
+    vec3 stone = mix(bedrock * .56, ramp[3], (.17 + .34 * smoothstep(.24,.99, mineral)) * strata);
+    vec3 fines = mix(ramp[1], regolith, .38 + .62 * deposit);
+    color = mix(stone, fines, crust * (1. - exposure * .91));
+    if (vegetated) {
+      float grass = smoothstep(datum + .12, datum + 1.5, P.y)
+                  * (1. - smoothstep(8., 18., P.y + 5. * deposit))
+                  * smoothstep(.73, .92, N.y) * (1. - ice);
+      vec3 turf = mix(vec3(.045, .073, .031), vec3(.20, .218, .079), deposit);
+      color = mix(color, turf, grass * (.5 + .72 * deposit));
+    }
+    color *= (.69 + .55 * deposit) * albedo;
+    color *= mix(vec3(1.), vec3(1.35, .63, .41), oxide * (1.2 + deposit));
+    float snow = ice * smoothstep(.34,.91, N.y + .24 * (deposit - .5));
+    float lens = valueNoise(vec2(P.y * 1.8 + .21 * P.x + .65 * deposit, 9.));
+    vec3 oldIce = mix(vec3(.077,.23,.32), vec3(.38,.60,.66), .17 + .52 * lens);
+    color = mix(color, mix(oldIce, frost * .72, snow) * mix(albedo, 1., .52), ice);
+    if (lavaGlow > .05) {
+      vec3 cooled = mix(vec3(.024,.018,.021), bedrock * .63, deposit) * albedo;
+      color = mix(cooled, color, smoothstep(.20,.60, crust + .25 * (deposit-.5)));
+    }
+    float direct = max(dot(microNormal, sunDirection), 0.);
+    vec3 ambient = mix(vec3(.14,.157,.20), vec3(.27,.26,.29) + skyTint * .18, air);
+    float shadow = min(terrainShade.y, getShadowMask());
+    color *= ambient * (.42 + .71 * terrainShade.x) + sunTint * (1.46 * direct * shadow);
+    color += ice * (.024 + .12 * pow(max(0., dot(microNormal,normalize(sunDirection + V))), 28.)) * shadow;
+    float flow = surfaceMask.w * smoothstep(.42,.95,N.y);
+    if (flow > .001) {
+      float fracture = valueNoise(P.xz * 2.7 + .23 * sin(time * .22)) * .22 + deposit * .22;
+      float hot = smoothstep(.05,.56, flow * (1.08 - fracture));
+      vec2 cooledPlate = P.xz * vec2(.74, 1.18) + deposit * .9;
+      float plate = valueNoise(cooledPlate) * .71 + .29 * valueNoise(cooledPlate * 4. + time * .014);
+      float skin = smoothstep(.43, .61, plate);
+      vec3 melt = mix(lava * vec3(.7,.085,.025), lava * vec3(2.4,1.8,.85), hot * (1. - skin));
+      color = mix(color, mix(melt, vec3(.049,.018,.014) * albedo, skin * .95), hot);
+    }
+    if (P.y < datum) color *= .58;
+    float fog = 1. - exp(-distanceToEye * air * .0125);
+    color = mix(color, skyTint * .62 + sunTint * air * .075, fog * .94);
+  }
+  gl_FragColor = vec4(color / (1. + .34 * color), 1.);
+  #include <colorspace_fragment>
+}

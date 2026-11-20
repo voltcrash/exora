@@ -29,13 +29,15 @@ The system diorama is where that discipline is most visible, because a picture o
 - **Stellar catalog:** Resolve stars by exact identifier through SIMBAD's keyless TAP service, with twelve stellar collections spanning nearby stars, solar analogs, blue giants, binaries, variables, and stellar remnants.
 - **Deterministic world recipes:** A shared, versioned `worldgen` package maps an object's physical properties to a visual class, palette family, terrain, cloud, and ring recipe. The same catalog row always produces the same world, and `WORLDGEN_VERSION` invalidates persisted recipes when the rules change.
 - **Physically motivated renderers:** Procedural gas-giant bands and storms, methane-hazed ice giants with ring systems, and displaced rocky terrain with oceans, ice caps, and lava driven by inferred chemistry.
-- **Walking on worlds** uses a seeded height field for both the terrain mesh and camera footing. Rocky surfaces have instanced Blender outcrops. Oceans, distant ridges, atmospheric haze and a horizon-relative sun pick up the world recipe.
+- **Walking on worlds** lets you cross an impact basin, follow a volcanic fissure or pass under a sandstone arch. Local landscapes are seeded interpretations of each world's geology. On mapped moons, the parent planet's apparent size follows its mean orbital distance. Its position in the landing sky is illustrative. On a touchscreen, hold to walk, drag to look and pinch inward to return to orbit.
 - **Stellar surfaces** combine animated photospheric convection, plage, starspots, limb darkening, a corona and seeded prominence arcs.
 - **World Forge:** A seeded, reproducible builder for procedural planets, custom stars, and black holes, using the same recipe engines as the catalogs.
 - **Persistent immersive session:** The engine, scene, camera, and WebXR session outlive the active destination, so entering and leaving AR does not rebuild the viewing context.
 - **iPhone and Android AR:** The immersive control selects native `immersive-ar` on a phone that supports it and uses Variant Launch's App Clip handoff on iPhone. AR presents the existing Three.js world at tabletop scale over camera passthrough, with hit-tested placement, drag repositioning, and pinch scaling — no GLB or USDZ export path.
 - **Adaptive rendering** varies the sphere and terrain resolution, stellar point count, ray steps and render scale with the device.
 - **Graceful degradation:** A committed planet catalog snapshot, bundled into the API and loaded by the browser, answers planet search, browse and exact-name reads without reaching NASA, and the browser uses the API until it has loaded. A twelve-hour star cache and a bundled local profile keep the experience alive when SIMBAD or the API is unreachable.
+
+![Walking views of the Martian sandstone window, Europa’s ice ridge, Io’s lava channel and an alpine lake on Earth](docs/images/landing-sites.webp)
 
 ## Keyboard
 
