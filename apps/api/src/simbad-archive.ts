@@ -184,8 +184,6 @@ const STAR_DISCOVERY_FILTERS: Record<StarDiscoveryCategory, { order: string; whe
 
 export interface SimbadStarRepositoryOptions {
   cacheTtlMs?: number;
-  /** TAP sync endpoints, tried in order until one answers. */
-  endpoints?: readonly string[];
   fetcher?: Fetcher;
   now?: () => number;
   timeoutMs?: number;
@@ -394,7 +392,6 @@ type CachedStarQuery = Omit<StarQueryResult, "cached">;
 export class SimbadStarRepository implements StarRepository {
   readonly #cache = createArchiveCache<CachedStarQuery>();
   readonly #cacheTtlMs: number;
-  readonly #endpoints: readonly string[];
   readonly #fetcher: Fetcher;
   readonly #now: () => number;
   readonly #requests = createRequestCoalescer<StarQueryResult>();
@@ -404,7 +401,6 @@ export class SimbadStarRepository implements StarRepository {
 
   constructor(options: SimbadStarRepositoryOptions = {}) {
     this.#cacheTtlMs = options.cacheTtlMs ?? 1000 * 60 * 60 * 12;
-    this.#endpoints = options.endpoints ?? SIMBAD_TAP_ENDPOINTS;
     this.#fetcher = options.fetcher ?? globalFetch;
     this.#now = options.now ?? Date.now;
     this.#timeoutMs = options.timeoutMs ?? 10_000;
@@ -527,10 +523,11 @@ export class SimbadStarRepository implements StarRepository {
   async #fetchPayload(adql: string): Promise<SimbadPayload> {
     if (this.#now() >= this.#preferredUntil) this.#preferredEndpoint = 0;
     const failures: unknown[] = [];
-    for (let offset = 0; offset < this.#endpoints.length; offset += 1) {
-      const index = (this.#preferredEndpoint + offset) % this.#endpoints.length;
+    const count = SIMBAD_TAP_ENDPOINTS.length;
+    for (let offset = 0; offset < count; offset += 1) {
+      const index = (this.#preferredEndpoint + offset) % count;
       try {
-        const payload = await this.#request(this.#endpoints[index]!, adql);
+        const payload = await this.#request(SIMBAD_TAP_ENDPOINTS[index]!, adql);
         if (index !== this.#preferredEndpoint) {
           this.#preferredEndpoint = index;
           this.#preferredUntil = this.#now() + PRIMARY_RECHECK_MS;
