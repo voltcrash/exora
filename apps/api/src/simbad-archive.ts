@@ -523,12 +523,13 @@ export class SimbadStarRepository implements StarRepository {
   async #fetchPayload(adql: string): Promise<SimbadPayload> {
     if (this.#now() >= this.#preferredUntil) this.#preferredEndpoint = 0;
     const failures: unknown[] = [];
+    const first = this.#preferredEndpoint;
     const count = SIMBAD_TAP_ENDPOINTS.length;
     for (let offset = 0; offset < count; offset += 1) {
-      const index = (this.#preferredEndpoint + offset) % count;
+      const index = (first + offset) % count;
       try {
         const payload = await this.#request(SIMBAD_TAP_ENDPOINTS[index]!, adql);
-        if (index !== this.#preferredEndpoint) {
+        if (index !== first) {
           this.#preferredEndpoint = index;
           this.#preferredUntil = this.#now() + PRIMARY_RECHECK_MS;
         }
