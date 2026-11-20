@@ -239,6 +239,7 @@ export function createLandscape(
       )
     : null;
   return {
+    updateShadows,
     follow(x: number, z: number) {
       sky.position.set(x, 0, z);
       parent?.follow(x, z);

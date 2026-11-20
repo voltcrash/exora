@@ -261,6 +261,7 @@ export async function createPlanetWorld(
       attached = true;
       const events = { signal: listeners.signal };
       canvas.addEventListener("wheel", wheel, { ...events, passive: false });
+      canvas.addEventListener("webglcontextrestored", () => surface?.updateShadows(), events);
       canvas.addEventListener("pointerdown", down, events);
       canvas.addEventListener("pointermove", move, events);
       canvas.addEventListener("pointerup", up, events);

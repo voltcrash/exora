@@ -185,6 +185,24 @@ test.each([MARS, HAUMEA])(
       window.dispatchEvent(new KeyboardEvent("keyup", { code: "KeyW" }));
       expect(host.camera.position.distanceTo(before)).toBeGreaterThan(0.1);
       if (planet === MARS) {
+        const sunlight = world!.root.getObjectByProperty("type", "DirectionalLight");
+        if (!(sunlight instanceof DirectionalLight)) throw Error("Missing surface shadows");
+        const lost = new Promise<void>((resolve) => {
+          canvas.addEventListener("webglcontextlost", () => resolve(), { once: true });
+        });
+        host.renderer.forceContextLoss();
+        await lost;
+        await new Promise(requestAnimationFrame);
+        sunlight.shadow.needsUpdate = false;
+        const shadowRestored = new Promise<boolean>((resolve) => {
+          canvas.addEventListener(
+            "webglcontextrestored",
+            () => resolve(sunlight.shadow.needsUpdate),
+            { once: true },
+          );
+        });
+        host.renderer.forceContextRestore();
+        expect(await shadowRestored).toBe(true);
         const capture = vi.spyOn(canvas, "setPointerCapture").mockImplementation(() => {});
         const now = vi.spyOn(performance, "now");
         try {
