@@ -154,7 +154,12 @@ export async function createPlanetWorld(
   }
   function land() {
     if (!surface) {
-      surface = createLandscape(recipe, surfaceDetail ?? fields.surface, surfaceTerrain);
+      surface = createLandscape(
+        recipe,
+        surfaceDetail ?? fields.surface,
+        surfaceTerrain,
+        host.profile.tier === "mobile",
+      );
       root.add(surface.root);
     }
     mode = "surface";

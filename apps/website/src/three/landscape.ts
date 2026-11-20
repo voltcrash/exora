@@ -40,6 +40,7 @@ export function createLandscape(
   recipe: WorldRecipe,
   texture: Texture,
   terrain: LandscapeTerrain | null,
+  constrained = false,
 ) {
   const root = new Group();
   const geology = terrain?.geology;
@@ -159,7 +160,7 @@ export function createLandscape(
   );
   const clearRocks =
     geology?.medium === "rock"
-      ? createOutcrops(root, recipe.seed, ramp[2]!, geology.frostCoverage > 0.64, floorAt, water)
+      ? createOutcrops(root, geology, terrainFloor, water, constrained)
       : null;
   return {
     follow(x: number, z: number) {
