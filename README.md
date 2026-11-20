@@ -37,6 +37,8 @@ The system diorama is where that discipline is most visible, because a picture o
 - **Adaptive rendering** varies the sphere and terrain resolution, stellar point count, ray steps and render scale with the device.
 - **Graceful degradation:** A committed planet catalog snapshot, bundled into the API and loaded by the browser, answers planet search, browse and exact-name reads without reaching NASA, and the browser uses the API until it has loaded. A twelve-hour star cache and a bundled local profile keep the experience alive when SIMBAD or the API is unreachable.
 
+![Walking views of the Martian sandstone window, Europa’s ice ridge, Io’s lava channel and an alpine lake on Earth](docs/images/landing-sites.webp)
+
 ## Keyboard
 
 | Key                   | Does                                           |
