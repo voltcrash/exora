@@ -6,6 +6,8 @@ import { createPlanetWorld } from "./three/planet.ts";
 import { createLandscape } from "./three/landscape.ts";
 import { loadPlanetFields } from "./three/planet-fields.ts";
 import { HAUMEA, MARS, tuneSolarWorldRecipe } from "./solar-system.ts";
+import { buildSurfaceTerrain } from "./surface-terrain-kernel.ts";
+import { surfaceTerrainFixture } from "./terrain-test-fixtures.ts";
 
 function observer() {
   const canvas = document.createElement("canvas");
@@ -193,10 +195,13 @@ test.each([MARS, HAUMEA])(
 test("the walking floor matches mesh vertices and the surface sun follows the observer", async () => {
   const recipe = tuneSolarWorldRecipe(MARS, deriveWorldRecipe(MARS));
   const fields = await loadPlanetFields();
-  const view = createLandscape(recipe, fields.surface, 32);
+  const request = surfaceTerrainFixture(MARS, 32);
+  if (request.kind !== "surface") throw new Error("Expected a surface request");
+  const data = buildSurfaceTerrain(request.input);
+  const view = createLandscape(recipe, fields.surface, { geology: request.input.geology, data });
   try {
     const ground = view.root.children.find(
-      (o) => o instanceof Mesh && o.geometry.type === "PlaneGeometry",
+      (object) => object instanceof Mesh && object.geometry.hasAttribute("masks"),
     ) as Mesh;
     const vertices = ground.geometry.getAttribute("position");
     for (const index of [33, 122, 480])

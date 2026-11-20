@@ -5,15 +5,21 @@ import {
   Group,
   Mesh,
   MeshBasicMaterial,
+  RepeatWrapping,
   SphereGeometry,
   SRGBColorSpace,
+  TextureLoader,
+  type Texture,
   Vector2,
   Vector3,
 } from "three";
 import { skyViewpointFrom } from "../sky-catalog.ts";
 import { createPlanetGlobe } from "./planet-globe.ts";
 import { loadPlanetFields } from "./planet-fields.ts";
-import { createLandscape } from "./landscape.ts";
+import { createLandscape, surfaceSunDirection, type LandscapeTerrain } from "./landscape.ts";
+import { cloudDeckGeology, deriveSurfaceGeology } from "../surface-geology.ts";
+import { SURFACE_GRID_RESOLUTION } from "../surface-vista-baking.ts";
+import { runTerrainJob } from "../terrain-worker-client.ts";
 import type { Observatory, Observation } from "./observatory.ts";
 
 export type ViewMode = "orbit" | "surface" | "transition" | "subsystem";
@@ -73,6 +79,55 @@ export async function createPlanetWorld(
   space.add(sun, globe.root);
   root.add(space);
   let surface: ReturnType<typeof createLandscape> | null = null;
+  const surfaceAbort = new AbortController();
+  let surfaceTerrain: LandscapeTerrain | null = null;
+  let surfaceDetail: Texture | null = null;
+  let terrainStarted = false;
+  let terrainError: Error | undefined;
+
+  function prepareTerrain() {
+    terrainStarted = true;
+    const identity = planet.solarSystem ? { naifId: planet.solarSystem.naifId } : null;
+    const geology = deriveSurfaceGeology(recipe, identity) ?? cloudDeckGeology(recipe);
+    if (!geology) return;
+    const signal = surfaceAbort.signal;
+    if (geology.medium === "rock") {
+      void new TextureLoader()
+        .loadAsync("/textures/fields/terrain-materials.png")
+        .then((texture) => {
+          if (signal.aborted) {
+            texture.dispose();
+            return;
+          }
+          texture.wrapS = texture.wrapT = RepeatWrapping;
+          texture.anisotropy = Math.min(
+            host.profile.anisotropicFiltering,
+            host.renderer.capabilities.getMaxAnisotropy(),
+          );
+          surfaceDetail = texture;
+          surface?.setDetail(texture);
+        })
+        .catch(() => undefined);
+    }
+    void runTerrainJob(
+      {
+        kind: "surface",
+        input: {
+          geology,
+          resolution: SURFACE_GRID_RESOLUTION[host.profile.tier],
+          sunDirection: surfaceSunDirection,
+        },
+      },
+      signal,
+    )
+      .then((result) => {
+        if (result?.kind === "surface") surfaceTerrain = { geology, data: result.data };
+      })
+      .catch((cause: unknown) => {
+        if (!signal.aborted)
+          terrainError = new Error("Could not generate the landing terrain", { cause });
+      });
+  }
   let mode: "orbit" | "surface" = "orbit",
     attached = false,
     elapsed = 0;
@@ -98,12 +153,7 @@ export async function createPlanetWorld(
   }
   function land() {
     if (!surface) {
-      surface = createLandscape(
-        recipe,
-        fields.surface,
-        host.profile.tier === "desktop" ? 224 : 120,
-        neutralSurface,
-      );
+      surface = createLandscape(recipe, surfaceDetail ?? fields.surface, surfaceTerrain);
       root.add(surface.root);
     }
     mode = "surface";
@@ -211,7 +261,14 @@ export async function createPlanetWorld(
         if (mode === "surface") orbit();
         return;
       }
-      if (mode === "orbit" && controls.getDistance() <= nearDistance * 1.025) land();
+      if (mode === "orbit") {
+        const approach = controls.getDistance() / nearDistance;
+        if (!neutralSurface && !terrainStarted && approach <= 1.25) prepareTerrain();
+        if (approach <= 1.025) {
+          if (terrainError) throw terrainError;
+          if (neutralSurface || surfaceTerrain) land();
+        }
+      }
       if (mode === "surface") {
         const forward = Number(keys.has("KeyW")) - Number(keys.has("KeyS")),
           right = Number(keys.has("KeyD")) - Number(keys.has("KeyA"));
@@ -232,9 +289,11 @@ export async function createPlanetWorld(
     },
     dispose() {
       listeners.abort();
+      surfaceAbort.abort();
       if (attached && mode === "surface")
         controls.enableRotate = controls.enableZoom = controls.enableDamping = true;
       surface?.dispose();
+      surfaceDetail?.dispose();
       globe.dispose();
       fields.dispose();
       sun.geometry.dispose();
