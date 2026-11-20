@@ -1,8 +1,9 @@
-import { Group, Mesh, Vector3 } from "three";
+import { DirectionalLight, Group, Mesh, Vector3 } from "three";
 import { expect, test, vi } from "vite-plus/test";
 import { deriveWorldRecipe } from "@exora/worldgen";
 import { createObservatory } from "./three/observatory.ts";
 import { createPlanetWorld } from "./three/planet.ts";
+import { SURFACE_WALK_LIMIT } from "./surface-landing.ts";
 import { createLandscape } from "./three/landscape.ts";
 import { loadPlanetFields } from "./three/planet-fields.ts";
 import { HAUMEA, MARS, tuneSolarWorldRecipe } from "./solar-system.ts";
@@ -229,6 +230,16 @@ test("the walking floor matches mesh vertices and the surface sun follows the ob
         vertices.getY(index),
         3,
       );
+    const sunlight = view.root.getObjectByProperty("type", "DirectionalLight");
+    if (!(sunlight instanceof DirectionalLight)) throw Error("Missing surface sun");
+    view.root.updateMatrixWorld(true);
+    sunlight.shadow.updateMatrices(sunlight);
+    for (const x of [-SURFACE_WALK_LIMIT, SURFACE_WALK_LIMIT]) {
+      for (const z of [-SURFACE_WALK_LIMIT, SURFACE_WALK_LIMIT]) {
+        const clip = new Vector3(x, view.floorAt(x, z), z).project(sunlight.shadow.camera);
+        expect(Math.max(Math.abs(clip.x), Math.abs(clip.y), Math.abs(clip.z))).toBeLessThan(1);
+      }
+    }
     const original = view.star.position.clone();
     view.follow(7, -4);
     expect(view.star.position.x - original.x).toBeCloseTo(7);

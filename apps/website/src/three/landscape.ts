@@ -23,7 +23,7 @@ import {
   type Texture,
 } from "three";
 
-import { siteBearing, sitePosition } from "../surface-landing.ts";
+import { siteBearing, sitePosition, SURFACE_WALK_LIMIT } from "../surface-landing.ts";
 import { createTerrainField, createTerrainSample } from "../surface-terrain.ts";
 import type { SurfaceGeology } from "../surface-geology.ts";
 import { createSurfaceFloor, type SurfaceTerrainData } from "../surface-terrain-kernel.ts";
@@ -185,16 +185,17 @@ export function createLandscape(
   if (parent) root.add(parent.root);
 
   const sunlight = new DirectionalLight(sunLight, 2.35);
-  sunlight.position.copy(surfaceSunDirection).multiplyScalar(160);
+  const shadowExtent = (SURFACE_WALK_LIMIT + 12) * Math.SQRT2;
+  sunlight.position.copy(surfaceSunDirection).multiplyScalar(shadowExtent * 1.8);
   sunlight.castShadow = !!terrain && !cloudDeck;
-  sunlight.shadow.mapSize.setScalar(constrained ? 512 : 1024);
+  sunlight.shadow.mapSize.setScalar(constrained ? 1024 : 2048);
   Object.assign(sunlight.shadow.camera, {
-    left: -74,
-    right: 74,
-    top: 80,
-    bottom: -76,
-    near: 25,
-    far: 325,
+    left: -shadowExtent,
+    right: shadowExtent,
+    top: shadowExtent,
+    bottom: -shadowExtent,
+    near: 1,
+    far: shadowExtent * 3.5,
   });
   sunlight.shadow.camera.updateProjectionMatrix();
   sunlight.shadow.autoUpdate = false;
