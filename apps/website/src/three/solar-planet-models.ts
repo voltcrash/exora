@@ -121,7 +121,6 @@ export function createSolarGlobe(recipe: WorldRecipe, model: Group, drawRings: b
     for (const ring of subsystem.rings) {
       const inner = ring.innerRadiusKilometers / subsystem.parentRadiusKilometers;
       const outer = ring.outerRadiusKilometers / subsystem.parentRadiusKilometers;
-      extent = Math.max(extent, outer);
       const geometry = new RingGeometry(inner, outer, 128);
       const material = new MeshBasicMaterial({
         color: new Color().setRGB(...ring.color, SRGBColorSpace),
@@ -131,6 +130,7 @@ export function createSolarGlobe(recipe: WorldRecipe, model: Group, drawRings: b
         side: DoubleSide,
       });
       const mesh = new Mesh(geometry, material);
+      mesh.raycast = () => {};
       mesh.rotation.x = -Math.PI / 2;
       mesh.scale.setScalar(recipe.radiusSceneUnits);
       root.add(mesh);
