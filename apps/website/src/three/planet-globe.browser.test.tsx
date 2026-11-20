@@ -97,6 +97,10 @@ test("the eight Solar System GLBs render with mapped surfaces and the source pol
       const recipe = tuneSolarWorldRecipe(profile, deriveWorldRecipe(profile));
       const globe = createPlanetGlobe(recipe, fields.surface, fields.flow, 64, { model });
       try {
+        expect(globe.extent / recipe.radiusSceneUnits).toBeCloseTo(
+          profile === SATURN ? 2.33 : 1,
+          2,
+        );
         expect(Boolean(globe.root.getObjectByName("Rings"))).toBe(profile === SATURN);
         scene.add(globe.root);
         camera.position.z = recipe.radiusSceneUnits * 4;
