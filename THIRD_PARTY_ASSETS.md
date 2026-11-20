@@ -240,4 +240,9 @@ centered mesh with its material embedded.
 exploration. The boulder, slab, spire, and ice shard use clipped rock faces and
 vertex pigment. Regenerate them with `art/model-terrain-outcrops.py` in Blender.
 
+`art/sculpt-landmarks.py` builds three original local formations in Blender.
+`models/sandstone-window.glb` contains a wind-cut arch with a through passage.
+`models/pressure-ice.glb` contains tilted ice plates. `models/basalt-joints.glb`
+contains fractured columns of cooled lava.
+
 The accretion disk uses an original 1024 × 256 Blender bake, `textures/fields/accretion.png`. The shader reads azimuth along the horizontal axis and disk radius along the vertical axis. Red controls filament density, green traces compression bands, and blue varies local emission. Regenerate the data with `art/bake-accretion.py` from Blender's Python Console.
