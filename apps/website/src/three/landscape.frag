@@ -63,12 +63,12 @@ void main() {
     }
     float layer = P.y * .49 / max(.45,strataSpacing) + P.x * .023 + .92 * valueNoise(field * .68);
     float mineral = valueNoise(vec2(layer * 2.4, 1.7)) + .38 * valueNoise(vec2(layer * 9.7, 5.));
-    vec3 stone = mix(bedrock * .56, ramp[3], smoothstep(.24,.99, mineral) * (.32 + .47 * strata));
+    vec3 stone = mix(bedrock * .56, ramp[3], (.17 + .34 * smoothstep(.24,.99, mineral)) * strata);
     vec3 fines = mix(ramp[1], regolith, .38 + .62 * deposit);
     color = mix(stone, fines, crust * (1. - exposure * .91));
     color *= (.69 + .55 * deposit) * albedo;
     float snow = ice * smoothstep(.34,.91, N.y + .24 * (deposit - .5));
-    color = mix(color, mix(vec3(.105,.225,.30), frost * .67, snow) * albedo, ice);
+    color = mix(color, mix(vec3(.075,.22,.31), frost * .68, snow) * mix(albedo, 1., .52), ice);
     if (lavaGlow > .05) {
       vec3 cooled = mix(vec3(.024,.018,.021), bedrock * .63, deposit) * albedo;
       color = mix(cooled, color, smoothstep(.20,.60, crust + .25 * (deposit-.5)));
@@ -82,8 +82,11 @@ void main() {
     if (flow > .001) {
       float fracture = valueNoise(P.xz * 2.7 + .23 * sin(time * .22)) * .22 + deposit * .22;
       float hot = smoothstep(.05,.56, flow * (1.08 - fracture));
-      vec3 melt = mix(vec3(.93,.049,.004), vec3(2.35,.82,.085), hot * hot);
-      color = mix(color, melt * (.84 + .16 * albedo), hot);
+      vec2 cooledPlate = P.xz * vec2(.74, 1.18) + deposit * .9;
+      float plate = valueNoise(cooledPlate) * .71 + .29 * valueNoise(cooledPlate * 4. + time * .014);
+      float skin = smoothstep(.43, .61, plate);
+      vec3 melt = mix(vec3(.61,.025,.002), vec3(2.4,.73,.06), hot * (1. - skin));
+      color = mix(color, mix(melt, vec3(.049,.018,.014) * albedo, skin * .95), hot);
     }
     if (P.y < datum) color *= .58;
     float fog = 1. - exp(-distanceToEye * air * .0125);

@@ -33,8 +33,8 @@ import { createLandmarks } from "./landmarks.ts";
 import { createOutcrops } from "./outcrops.ts";
 
 export const siteSun = (seed: number) => {
-  const { x, z } = sitePosition(seed, -0.84, -0.38);
-  return new Vector3(x, 0.52, z).normalize();
+  const { x, z } = sitePosition(seed, -0.94, -0.17);
+  return new Vector3(x, 0.42, z).normalize();
 };
 const sunDistance = 620;
 const color = (rgb: Rgb) => new Color().setRGB(...rgb);
@@ -224,6 +224,13 @@ export function createLandscape(
     geology?.medium === "rock"
       ? createOutcrops(root, geology, terrainFloor, water, constrained, updateShadows)
       : null;
+  const landing = sitePosition(recipe.seed, 0, -7);
+  if (terrain && Number.isFinite(water)) {
+    for (const across of [-8, 8, -14, 14, -23, 23]) {
+      if (terrainFloor(landing.x, landing.z) > water + 0.3) break;
+      Object.assign(landing, sitePosition(recipe.seed, across, -11));
+    }
+  }
   return {
     follow(x: number, z: number) {
       sky.position.set(x, 0, z);
@@ -234,7 +241,7 @@ export function createLandscape(
     star,
     floorAt,
     blocks: formations?.blocks,
-    landing: { ...sitePosition(recipe.seed, 0, -7), yaw: siteBearing(recipe.seed) },
+    landing: { ...landing, yaw: siteBearing(recipe.seed) },
     update(delta: number) {
       time.value += delta;
     },

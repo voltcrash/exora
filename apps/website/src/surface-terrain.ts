@@ -154,13 +154,14 @@ function makeMassifs(seed: number): Massif[] {
   const massifs = [
     make(-22 + roll(0, 0) * 7, 56, 14, 19, 17, 0),
     make(23 + roll(1, 0) * 13, 88, 22, 34, 28, 1),
-    make(-9 + roll(2, 0) * 14, 151, 35, 42, 41, 2),
+    make(-27 + roll(2, 0) * 19, 162, 24, 40, 36, 2),
     make(-62, 109, 32, 47, 38, 3),
   ];
   for (let i = 4; i < 39; i++) {
     const angle = roll(i, 5) * Math.PI * 2;
     const distance = 57 + 207 * roll(i, 6);
-    const scale = 0.46 + 1.68 * roll(i, 7);
+    const foreground = Math.sin(angle) > 0 && Math.abs(Math.cos(angle)) < 0.53 && distance < 177;
+    const scale = (0.44 + 1.58 * roll(i, 7)) * (foreground ? 0.49 : 1);
     massifs.push(
       make(
         Math.cos(angle) * distance,
@@ -293,11 +294,14 @@ export function createTerrainField(geology: SurfaceGeology): TerrainField {
             const pediment = (1 - smoothstep(0.46, 1.55, radius)) * 0.27;
             const cliff = (1 - smoothstep(0.52, 0.73, radius)) * 0.57;
             const cap = (1 - smoothstep(0.4, 0.54, radius)) * 0.17;
-            profile = pediment + cliff + cap;
+            const flute = Math.abs(Math.sin(theta * 7 + m.angle + drainage * 2.9));
+            profile =
+              (pediment + cliff + cap) * (1 - 0.21 * flute * smoothstep(0.12, 0.64, radius));
+            profile += (1 - smoothstep(0.08, 0.36, radius + 0.13 * flute)) * 0.19;
           }
           relief = Math.max(relief, m.height * profile);
         }
-        result.height += relief;
+        result.height += relief * 0.77;
         if (alpine) {
           const valley = 1 - smoothstep(2, 13, Math.abs(x - braid + z * 0.12));
           result.height += 2.4 - valley * 5.2 + drainage * (1.1 + relief * 0.23);
@@ -307,7 +311,8 @@ export function createTerrainField(geology: SurfaceGeology): TerrainField {
           const fault = Math.abs(x - braid - 2.5 - z * 0.12);
           const crust = smoothstep(1.7, 3.8, fault);
           const levee = Math.exp(-(((fault - 4.5) / 2.8) ** 2));
-          result.height += levee * 1.5 - (1 - crust) * 1.25 + detail * 0.9;
+          const channelFloor = z * 0.018 - 1.35 + regional * 0.3;
+          result.height = lerp(channelFloor, result.height + levee * 1.5 + detail * 0.9, crust);
           result.molten = kind === "flood-basalt" ? 0 : (1 - crust) * geology.lavaGlow;
           result.scarp = clamp01(0.68 + drainage - regional * 0.42 + levee * 0.4);
           result.regolith = clamp01(0.23 + regional * 0.88 + 0.28 * crust);

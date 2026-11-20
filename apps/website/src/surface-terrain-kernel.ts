@@ -1,3 +1,4 @@
+import { inciseDrainage } from "./surface-drainage.ts";
 import type { SurfaceGeology } from "./surface-geology.ts";
 import { createTerrainField, createTerrainSample } from "./surface-terrain.ts";
 import {
@@ -58,6 +59,18 @@ export const buildSurfaceTerrain = ({ geology, resolution, sunDirection }: Surfa
     }
   }
 
+  const erosion = geology.provinces.reduce(
+    (sum, province) =>
+      sum +
+      (["canyon-rift", "yardang-badlands", "folded-mountains", "coastal-shelf"].includes(
+        province.archetype,
+      )
+        ? province.weight
+        : 0),
+    0,
+  );
+  if (geology.medium === "rock" && erosion > 0.12)
+    inciseDrainage(heights, positions, resolution, erosion * 0.94);
   bandlimitSurfaceFarField(heights, resolution);
   let low = Number.POSITIVE_INFINITY;
   let high = Number.NEGATIVE_INFINITY;
