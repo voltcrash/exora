@@ -11,6 +11,7 @@ export const SIMBAD_TAP_ENDPOINTS = [
   "https://simbad.idia.ac.za/simbad/sim-tap/sync",
   "https://simbad.cfa.harvard.edu/simbad/sim-tap/sync",
 ] as const;
+const PRIMARY_RECHECK_MS = 5 * 60_000;
 const FEATURED_NAMES = [
   "Altair",
   "Antares",
@@ -398,6 +399,8 @@ export class SimbadStarRepository implements StarRepository {
   readonly #now: () => number;
   readonly #requests = createRequestCoalescer<StarQueryResult>();
   readonly #timeoutMs: number;
+  #preferredEndpoint = 0;
+  #preferredUntil = 0;
 
   constructor(options: SimbadStarRepositoryOptions = {}) {
     this.#cacheTtlMs = options.cacheTtlMs ?? 1000 * 60 * 60 * 12;
@@ -517,12 +520,22 @@ export class SimbadStarRepository implements StarRepository {
     });
   }
 
-  /** Asks each endpoint in turn, moving on only when one is unreachable or not answering TAP. */
+  /**
+   * Asks each endpoint in turn, moving on only when one is unreachable or not answering TAP.
+   * A mirror that answers is asked first until the primary is due for another try.
+   */
   async #fetchPayload(adql: string): Promise<SimbadPayload> {
+    if (this.#now() >= this.#preferredUntil) this.#preferredEndpoint = 0;
     const failures: unknown[] = [];
-    for (const endpoint of this.#endpoints) {
+    for (let offset = 0; offset < this.#endpoints.length; offset += 1) {
+      const index = (this.#preferredEndpoint + offset) % this.#endpoints.length;
       try {
-        return await this.#request(endpoint, adql);
+        const payload = await this.#request(this.#endpoints[index]!, adql);
+        if (index !== this.#preferredEndpoint) {
+          this.#preferredEndpoint = index;
+          this.#preferredUntil = this.#now() + PRIMARY_RECHECK_MS;
+        }
+        return payload;
       } catch (error) {
         failures.push(error);
       }
