@@ -75,14 +75,15 @@ bm.free()
 export("sandstone-window", [arch])
 
 
-def prism(name, x, y, width, depth, height, sides, ice):
+def basalt_prism(x, y, height):
+    width, depth, sides = .9, .85, 6
     verts, faces = [], []
-    tilt_x = rng.uniform(-.52, .52) if ice else rng.uniform(-.13, .05)
-    tilt_y = rng.uniform(-.24, .24) if ice else -.08
+    tilt_x = rng.uniform(-.13, .05)
+    tilt_y = -.08
     tip = [rng.uniform(-.12, .13) for _ in range(sides)]
     angle = rng.uniform(-.25, .25)
     outline = [rng.uniform(.75, 1.08) for _ in range(sides)]
-    for level, widen in [(-.37, 1.11), (.12, 1), (.73, .90), (1, .73 if ice else .93)]:
+    for level, widen in [(-.37, 1.11), (.12, 1), (.73, .90), (1, .93)]:
         for i in range(sides):
             a = tau * i / sides + angle
             h = height * (level + tip[i] * (.94 if level == 1 else .14))
@@ -95,29 +96,61 @@ def prism(name, x, y, width, depth, height, sides, ice):
             a, b = ring * sides + i, ring * sides + (i + 1) % sides
             faces.append((a, b, b + sides, a + sides))
     faces.append(tuple(range(3 * sides, 4 * sides)))
-    obj = mesh(name, verts, faces)
+    obj = mesh("Cooling joint", verts, faces)
     bevel = obj.modifiers.new("Chipped edges", "BEVEL")
-    bevel.width = min(width, depth) * (.15 if ice else .085)
+    bevel.width = min(width, depth) * .085
     bevel.segments = 1
     bpy.context.view_layer.objects.active = obj
     bpy.ops.object.modifier_apply(modifier=bevel.name)
     return obj
 
 
-plates = []
-for i in range(21):
-    x = rng.uniform(-8, 8)
-    y = rng.uniform(-2.5, 2.5) + x * .19
-    height = (1.6 + 5 * exp(-((x + 1.7) / 4.6) ** 2)) * rng.uniform(.64, 1.17)
-    plates.append(prism("Thrust plate", x, y, rng.uniform(.58, 1.67), rng.uniform(.47, 1.3),
-                        height, rng.randrange(4, 8), True))
+def pressure_plate(index):
+    x, y = rng.uniform(-9, 9), rng.uniform(-2.7, 2.7)
+    ridge = exp(-((x + 1.7) / 5.3) ** 2)
+    span = rng.uniform(1.5, 4.1)
+    length = (2.2 + ridge * 3.9) * rng.uniform(.67, 1.12)
+    angle = rng.uniform(.38, 1.26) * (-1 if index % 4 == 0 else 1)
+    bearing = rng.uniform(-.81, .81) + (pi if index % 3 == 0 else 0)
+    thickness = rng.uniform(.32, .89)
+    outline = [(-.85, -.22), (-1, .37), (-.81, .88), (-.14, 1.05), (.54, .93),
+               (.92, .68), (1, .28), (.62, -.18)]
+    verts = []
+    rim = [(across * span * rng.uniform(.85, 1.12), up * length * rng.uniform(.82, 1.15))
+           for across, up in outline]
+    for face in (0, 1):
+        for across, up in rim:
+            depth = up * cos(angle) - face * thickness * sin(angle)
+            h = up * sin(abs(angle)) + face * thickness * cos(angle)
+            verts.append((x + across * cos(bearing) - depth * sin(bearing),
+                          y + x * .24 + across * sin(bearing) + depth * cos(bearing),
+                          h - .32 + rng.uniform(-.12, .12)))
+    n = len(rim)
+    faces = [tuple(range(n)), tuple(reversed(range(n, n * 2)))]
+    faces.extend((i, i + n, (i + 1) % n + n, (i + 1) % n) for i in range(n))
+    obj = mesh("Rafted ice sheet", verts, faces)
+    bm = bmesh.new()
+    bm.from_mesh(obj.data)
+    bmesh.ops.recalc_face_normals(bm, faces=bm.faces)
+    bm.to_mesh(obj.data)
+    bm.free()
+    bevel = obj.modifiers.new("Fractured lip", "BEVEL")
+    bevel.width = thickness * .16
+    bevel.segments = 1
+    bpy.context.view_layer.objects.active = obj
+    bpy.ops.object.modifier_apply(modifier=bevel.name)
+    return obj
+
+
+plates = [pressure_plate(i) for i in range(24)]
 export("pressure-ice", plates)
 
+rng = Random(8307)
 columns = []
 for row in range(4):
     for col in range(9):
         x = (col + .5 * (row % 2) - 4) * 1.29
         y = (row - 1.5) * 1.15
         height = max(.6, 2 + 3.8 * exp(-((x - .8) / 3.2) ** 2) + .55 * row + rng.uniform(-1, .8))
-        columns.append(prism("Cooling joint", x, y, .9, .85, height, 6, False))
+        columns.append(basalt_prism(x, y, height))
 export("basalt-joints", columns)

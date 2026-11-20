@@ -61,7 +61,9 @@ void main() {
     color *= (.69 + .55 * deposit) * albedo;
     color *= mix(vec3(1.), vec3(1.35, .63, .41), oxide * (1.2 + deposit));
     float snow = ice * smoothstep(.34,.91, N.y + .24 * (deposit - .5));
-    color = mix(color, mix(vec3(.075,.22,.31), frost * .68, snow) * mix(albedo, 1., .52), ice);
+    float lens = valueNoise(vec2(P.y * 1.8 + .21 * P.x + .65 * deposit, 9.));
+    vec3 oldIce = mix(vec3(.077,.23,.32), vec3(.38,.60,.66), .17 + .52 * lens);
+    color = mix(color, mix(oldIce, frost * .72, snow) * mix(albedo, 1., .52), ice);
     if (lavaGlow > .05) {
       vec3 cooled = mix(vec3(.024,.018,.021), bedrock * .63, deposit) * albedo;
       color = mix(cooled, color, smoothstep(.20,.60, crust + .25 * (deposit-.5)));
