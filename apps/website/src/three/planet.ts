@@ -130,6 +130,8 @@ export async function createPlanetWorld(
     mouse = new Vector2();
   const keys = new Set<string>(),
     fingers = new Map<number, Vector2>();
+  const touchStart = new Vector2();
+  let walkAfter = Infinity;
   let yaw = 0,
     pitch = 0,
     pinch = 0;
@@ -188,6 +190,7 @@ export async function createPlanetWorld(
     controls.update();
     keys.clear();
     fingers.clear();
+    walkAfter = Infinity;
     pinch = 0;
     onViewModeChange("orbit");
   }
@@ -211,17 +214,23 @@ export async function createPlanetWorld(
   const blur = () => {
     keys.clear();
     fingers.clear();
+    walkAfter = Infinity;
     pinch = 0;
   };
   const down = (e: PointerEvent) => {
     if (mode !== "surface" || host.isInXr()) return;
     mouse.set(e.clientX, e.clientY);
     fingers.set(e.pointerId, new Vector2(e.clientX, e.clientY));
+    touchStart.copy(mouse);
+    walkAfter =
+      e.pointerType === "touch" && fingers.size === 1 ? performance.now() + 340 : Infinity;
     canvas.setPointerCapture(e.pointerId);
   };
   const move = (e: PointerEvent) => {
     if (!fingers.has(e.pointerId) || mode !== "surface") return;
-    fingers.get(e.pointerId)!.set(e.clientX, e.clientY);
+    const point = fingers.get(e.pointerId)!.set(e.clientX, e.clientY);
+    if (performance.now() < walkAfter && point.distanceToSquared(touchStart) > 64)
+      walkAfter = Infinity;
     if (fingers.size === 2) {
       const [a, b] = fingers.values();
       const span = a!.distanceTo(b!);
@@ -236,6 +245,7 @@ export async function createPlanetWorld(
   };
   const up = (e: PointerEvent) => {
     fingers.delete(e.pointerId);
+    walkAfter = Infinity;
     pinch = 0;
     for (const point of fingers.values()) mouse.copy(point);
   };
@@ -278,7 +288,8 @@ export async function createPlanetWorld(
       }
       if (mode === "surface") {
         surface?.update(delta);
-        const forward = Number(keys.has("KeyW")) - Number(keys.has("KeyS")),
+        const forward =
+            Number(keys.has("KeyW") || performance.now() >= walkAfter) - Number(keys.has("KeyS")),
           right = Number(keys.has("KeyD")) - Number(keys.has("KeyA"));
         const step = (inputDelta * 4.1) / Math.max(1, Math.hypot(forward, right));
         const nextX = Math.max(

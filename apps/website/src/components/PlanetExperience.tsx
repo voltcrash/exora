@@ -688,6 +688,9 @@ export const PlanetExperience = ({
 
   const hints = [
     { key: "Drag", meaning: viewMode === "surface" ? "Look around" : "Orbit" },
+    ...(viewMode === "surface" && navigator.maxTouchPoints > 0
+      ? [{ key: "Hold", meaning: "Walk forward" }]
+      : []),
     {
       key: "Scroll",
       meaning:

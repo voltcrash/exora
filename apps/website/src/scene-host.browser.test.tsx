@@ -183,6 +183,26 @@ test.each([MARS, HAUMEA])(
       world!.update!(0, host.camera, 0.2);
       window.dispatchEvent(new KeyboardEvent("keyup", { code: "KeyW" }));
       expect(host.camera.position.distanceTo(before)).toBeGreaterThan(0.1);
+      if (planet === MARS) {
+        const capture = vi.spyOn(canvas, "setPointerCapture").mockImplementation(() => {});
+        const now = vi.spyOn(performance, "now");
+        try {
+          now.mockReturnValue(0);
+          const event = { pointerType: "touch", pointerId: 7, clientX: 100, clientY: 80 };
+          canvas.dispatchEvent(new PointerEvent("pointerdown", event));
+          const held = host.camera.position.clone();
+          now.mockReturnValue(360);
+          world!.update!(0, host.camera, 0.2);
+          expect(host.camera.position.distanceTo(held)).toBeGreaterThan(0.1);
+          canvas.dispatchEvent(new PointerEvent("pointerup", event));
+          const released = host.camera.position.clone();
+          world!.update!(0, host.camera, 0.2);
+          expect(host.camera.position.distanceTo(released)).toBeLessThan(0.001);
+        } finally {
+          now.mockRestore();
+          capture.mockRestore();
+        }
+      }
       canvas.dispatchEvent(new WheelEvent("wheel", { deltaY: 10, cancelable: true }));
       expect(modes.at(-1)).toBe("orbit");
       expect(host.controls.enableRotate).toBe(true);
