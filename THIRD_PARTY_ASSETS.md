@@ -219,6 +219,11 @@ the longitude wraps and the poles converge. The channels have distinct uses.
 | `textures/fields/convection.png`  | Cloud density         | Zonal shear     | Turbulent filaments |
 | `textures/fields/photosphere.png` | Convection cells      | Active regions  | Bright plage        |
 
+`textures/fields/terrain-materials.png` is an original 512 × 512 Blender bake for local
+terrain. Red packs wind ripples and sand grain, green packs fractured bedrock, and
+blue packs ice faults and grain. The bake samples a periodic domain so the channels
+tile across the ground. Regenerate it with `art/bake-terrain-materials.py` in Blender.
+
 ## Original Blender small bodies
 
 These procedural studies are original Exora models. Run `art/model-small-bodies.py`
