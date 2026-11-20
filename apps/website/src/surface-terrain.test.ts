@@ -203,3 +203,40 @@ test("a vista's worth of ground samples in a frame's worth of time", () => {
   expect(count).toBeGreaterThan(39_000);
   expect(elapsed).toBeLessThan(2_500);
 });
+
+test("the mesh and material masks stay continuous where two provinces meet", () => {
+  const field = createTerrainField({
+    ...fieldFor(MARS).geology,
+    provinces: [
+      { archetype: "regolith-plain", weight: 0.5 },
+      { archetype: "canyon-rift", weight: 0.5 },
+    ],
+    craterDensity: 0,
+  });
+  const a = createTerrainSample();
+  const b = createTerrainSample();
+  let crossings = 0;
+  for (let z = -150; z <= 150; z += 10) {
+    for (let x = -150; x < 150; x += 1) {
+      field.sample(x, z, a);
+      field.sample(x + 1, z, b);
+      if (a.province === b.province) continue;
+
+      let low = x;
+      let high = x + 1;
+      const province = a.province;
+      for (let step = 0; step < 12; step++) {
+        const midpoint = (low + high) / 2;
+        field.sample(midpoint, z, a);
+        if (a.province === province) low = midpoint;
+        else high = midpoint;
+      }
+      field.sample(low, z, a);
+      field.sample(high, z, b);
+      expect(Math.abs(a.height - b.height)).toBeLessThan(0.005);
+      expect(Math.abs(a.regolith - b.regolith)).toBeLessThan(0.005);
+      crossings++;
+    }
+  }
+  expect(crossings).toBeGreaterThan(10);
+});

@@ -104,15 +104,23 @@ interface CellResult {
 
 const cellResult: CellResult = { cell: 0, f1: 0, f2: 0 };
 
-const cellular = (x: number, z: number, seed: number, jitter = 0.85): CellResult => {
+const cellular = (
+  x: number,
+  z: number,
+  seed: number,
+  jitter = 0.85,
+  neighbourhood?: { hashes: Uint32Array; distances: Float64Array },
+): CellResult => {
   const xi = Math.floor(x);
   const zi = Math.floor(z);
   let f1 = 16;
   let f2 = 16;
   let cell = 0;
+  let index = 0;
 
-  for (let ox = -1; ox <= 1; ox += 1) {
-    for (let oz = -1; oz <= 1; oz += 1) {
+  const reach = neighbourhood ? 2 : 1;
+  for (let ox = -reach; ox <= reach; ox += 1) {
+    for (let oz = -reach; oz <= reach; oz += 1) {
       const cx = xi + ox;
       const cz = zi + oz;
       const h = hash2(cx, cz, seed);
@@ -120,7 +128,12 @@ const cellular = (x: number, z: number, seed: number, jitter = 0.85): CellResult
       const pz = cz + 0.5 + ((((h >>> 8) & 0xff) / 255) * 2 - 1) * 0.5 * jitter;
       const dx = px - x;
       const dz = pz - z;
-      const distance = Math.sqrt(dx * dx + dz * dz);
+      const distance = dx * dx + dz * dz;
+      if (neighbourhood) {
+        neighbourhood.hashes[index] = h;
+        neighbourhood.distances[index] = distance;
+        index += 1;
+      }
       if (distance < f1) {
         f2 = f1;
         f1 = distance;
@@ -132,8 +145,8 @@ const cellular = (x: number, z: number, seed: number, jitter = 0.85): CellResult
   }
 
   cellResult.cell = cell;
-  cellResult.f1 = f1;
-  cellResult.f2 = f2;
+  cellResult.f1 = Math.sqrt(f1);
+  cellResult.f2 = Math.sqrt(f2);
   return cellResult;
 };
 
@@ -526,6 +539,9 @@ export const createTerrainField = (geology: SurfaceGeology): TerrainField => {
           0.95,
         ).cell;
 
+  const neighbourhood = { hashes: new Uint32Array(25), distances: new Float64Array(25) };
+  const indexForCell = (hash: number) => (hash === landingCell ? signature : provinceAt(hash));
+
   const sample = (x: number, z: number, out: TerrainSample): TerrainSample => {
     if (provinceList.length === 0) {
       out.height = 0;
@@ -544,17 +560,13 @@ export const createTerrainField = (geology: SurfaceGeology): TerrainField => {
       (z + warpZ) * territoryScale,
       context.seed + 919,
       0.95,
+      neighbourhood,
     );
-    const primaryIndex = territory.cell === landingCell ? signature : provinceAt(territory.cell);
-    const boundary = territory.f2 - territory.f1;
-    const blend = 1 - smoothstep(0.02, 0.16, boundary);
-    const neighbourIndex = provinceAt(
-      hash2(
-        Math.round(x * territoryScale * 4),
-        Math.round(z * territoryScale * 4),
-        context.seed + 929,
-      ),
-    );
+    const primaryIndex = indexForCell(territory.cell);
+    const closestDistance = territory.f1;
+    const closestHash = territory.cell;
+    const blendWidth = 0.19;
+    const blend = territory.f2 - closestDistance < blendWidth;
 
     const primaryArchetype = provinceList[primaryIndex]?.archetype ?? "regolith-plain";
     const primaryField = ARCHETYPE_FIELDS[primaryArchetype];
@@ -565,15 +577,25 @@ export const createTerrainField = (geology: SurfaceGeology): TerrainField => {
     out.scarp = primarySample.scarp;
     out.province = primaryIndex;
 
-    if (blend > 0.004 && neighbourIndex !== primaryIndex) {
-      const neighbourArchetype = provinceList[neighbourIndex]?.archetype ?? "regolith-plain";
-      const neighbourHeight = ARCHETYPE_FIELDS[neighbourArchetype](x, z, context, secondarySample);
-      const weight = blend * 0.5;
-      height = lerp(height, neighbourHeight, weight);
-      out.frost = lerp(out.frost, secondarySample.frost, weight);
-      out.molten = lerp(out.molten, secondarySample.molten, weight);
-      out.regolith = lerp(out.regolith, secondarySample.regolith, weight);
-      out.scarp = lerp(out.scarp, secondarySample.scarp, weight);
+    if (blend) {
+      let weightTotal = 1;
+      const outerDistanceSquared = (closestDistance + blendWidth) ** 2;
+      for (let index = 0; index < neighbourhood.hashes.length; index += 1) {
+        const distanceSquared = neighbourhood.distances[index]!;
+        const hash = neighbourhood.hashes[index]!;
+        if (hash === closestHash || distanceSquared >= outerDistanceSquared) continue;
+        const cellIndex = indexForCell(hash);
+        const archetype = provinceList[cellIndex]?.archetype ?? "regolith-plain";
+        const weight = 1 - smoothstep(0, blendWidth, Math.sqrt(distanceSquared) - closestDistance);
+        const fraction = weight / (weightTotal + weight);
+        const neighbourHeight = ARCHETYPE_FIELDS[archetype](x, z, context, secondarySample);
+        height = lerp(height, neighbourHeight, fraction);
+        out.frost = lerp(out.frost, secondarySample.frost, fraction);
+        out.molten = lerp(out.molten, secondarySample.molten, fraction);
+        out.regolith = lerp(out.regolith, secondarySample.regolith, fraction);
+        out.scarp = lerp(out.scarp, secondarySample.scarp, fraction);
+        weightTotal += weight;
+      }
     }
 
     const radius = Math.sqrt(x * x + z * z);
