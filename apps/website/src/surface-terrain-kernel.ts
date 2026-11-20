@@ -24,9 +24,6 @@ export const buildSurfaceTerrain = ({ geology, resolution, sunDirection }: Surfa
   const indices = new Uint32Array(resolution * resolution * 6);
   const sample = createTerrainSample();
 
-  let low = Number.POSITIVE_INFINITY;
-  let high = Number.NEGATIVE_INFINITY;
-
   for (let iz = 0; iz <= resolution; iz += 1) {
     const z = gradeSurfaceAxis((iz / resolution) * 2 - 1);
     for (let ix = 0; ix <= resolution; ix += 1) {
@@ -41,8 +38,6 @@ export const buildSurfaceTerrain = ({ geology, resolution, sunDirection }: Surfa
       colors[index * 4 + 1] = sample.scarp;
       colors[index * 4 + 2] = sample.frost;
       colors[index * 4 + 3] = sample.molten;
-      if (sample.height < low) low = sample.height;
-      if (sample.height > high) high = sample.height;
     }
   }
 
@@ -54,18 +49,18 @@ export const buildSurfaceTerrain = ({ geology, resolution, sunDirection }: Surfa
       const bottomLeft = topLeft + stride;
       const bottomRight = bottomLeft + 1;
       indices[cursor] = topLeft;
-      indices[cursor + 1] = topRight;
-      indices[cursor + 2] = bottomLeft;
+      indices[cursor + 1] = bottomLeft;
+      indices[cursor + 2] = topRight;
       indices[cursor + 3] = topRight;
-      indices[cursor + 4] = bottomRight;
-      indices[cursor + 5] = bottomLeft;
+      indices[cursor + 4] = bottomLeft;
+      indices[cursor + 5] = bottomRight;
       cursor += 6;
     }
   }
 
   bandlimitSurfaceFarField(heights, resolution);
-  low = Number.POSITIVE_INFINITY;
-  high = Number.NEGATIVE_INFINITY;
+  let low = Number.POSITIVE_INFINITY;
+  let high = Number.NEGATIVE_INFINITY;
   for (let index = 0; index < vertexCount; index += 1) {
     const height = heights[index] ?? 0;
     positions[index * 3 + 1] = height;
@@ -84,3 +79,32 @@ export const buildSurfaceTerrain = ({ geology, resolution, sunDirection }: Surfa
 };
 
 export type SurfaceTerrainData = ReturnType<typeof buildSurfaceTerrain>;
+
+export const createSurfaceFloor = ({ positions, heights }: SurfaceTerrainData) => {
+  const stride = Math.sqrt(heights.length);
+  const findSpan = (value: number, offset: number, step: number) => {
+    let low = 0;
+    let high = stride - 1;
+    while (high - low > 1) {
+      const middle = (high + low) >>> 1;
+      if (positions[offset + step * middle]! <= value) low = middle;
+      else high = middle;
+    }
+    return low;
+  };
+
+  return (x: number, z: number): number => {
+    const col = findSpan(x, 0, 3);
+    const row = findSpan(z, 2, stride * 3);
+    const x0 = positions[col * 3]!;
+    const z0 = positions[row * stride * 3 + 2]!;
+    const u = Math.min(1, Math.max(0, (x - x0) / (positions[col * 3 + 3]! - x0)));
+    const v = Math.min(1, Math.max(0, (z - z0) / (positions[(row + 1) * stride * 3 + 2]! - z0)));
+    const index = row * stride + col;
+    const east = heights[index + 1]!;
+    const south = heights[index + stride]!;
+    return u + v <= 1
+      ? heights[index]! * (1 - u - v) + east * u + south * v
+      : east * (1 - v) + south * (1 - u) + heights[index + stride + 1]! * (u + v - 1);
+  };
+};
