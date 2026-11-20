@@ -74,6 +74,13 @@ test("the same world builds the same ground on every visit", () => {
   }
 });
 
+test("a geology with no mapped provinces returns a level regolith floor", () => {
+  const field = createTerrainField({ ...fieldFor(MARS).geology, provinces: [] });
+  const out = { height: 12, scarp: 1, frost: 1, province: 3, molten: 1, regolith: 0 };
+  expect(field.height(-28, 42)).toBe(0);
+  expect(field.sample(-28, 42, out)).toEqual({ ...createTerrainSample(), regolith: 1 });
+});
+
 test("a vista holds several landform provinces rather than one repeated process", () => {
   for (const profile of [MARS, MERCURY, EARTH, moon("Titan")]) {
     const stats = survey(fieldFor(profile));

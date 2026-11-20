@@ -184,6 +184,10 @@ export interface TerrainField {
 
 export function createTerrainField(geology: SurfaceGeology): TerrainField {
   const { seed, provinces } = geology;
+  if (provinces.length === 0) {
+    const flat = { ...createTerrainSample(), regolith: 1 };
+    return { geology, height: () => 0, sample: (_x, _z, out) => Object.assign(out, flat) };
+  }
   const yaw = siteBearing(seed);
   const sin = Math.sin(yaw);
   const cos = Math.cos(yaw);
@@ -195,6 +199,9 @@ export function createTerrainField(geology: SurfaceGeology): TerrainField {
     .map((p, index) => ({ ...p, index }))
     .sort((a, b) => b.weight - a.weight);
   const total = ordered.reduce((sum, p) => sum + p.weight, 0) || 1;
+  const blendWidths = ordered.map((p, i) =>
+    Math.min(0.055, (0.49 * Math.min(p.weight, ordered[i + 1]?.weight ?? 0)) / total),
+  );
   const first = createTerrainSample(),
     next = createTerrainSample();
 
@@ -214,8 +221,8 @@ export function createTerrainField(geology: SurfaceGeology): TerrainField {
       (0.51 + fbm(x * 0.021, z * 0.021, seed + 901, 2) * 0.9) * (1 - apron),
     );
     let index = 0,
-      limit = (ordered[0]?.weight ?? 1) / total;
-    while (index + 1 < ordered.length && territory > limit + 0.055) {
+      limit = ordered[0]!.weight / total;
+    while (index + 1 < ordered.length && territory > limit + blendWidths[index]!) {
       index++;
       limit += ordered[index]!.weight / total;
     }
@@ -327,13 +334,14 @@ export function createTerrainField(geology: SurfaceGeology): TerrainField {
       result.frost *= smoothstep(0, 0.25, geology.frostCoverage);
     }
 
-    const primary = ordered[index];
-    shape(primary?.archetype ?? "regolith-plain", first);
+    const primary = ordered[index]!;
+    shape(primary.archetype, first);
     Object.assign(out, first);
-    out.province = primary?.index ?? 0;
+    out.province = primary.index;
     const secondary = ordered[index + 1];
-    if (secondary && territory > limit - 0.055) {
-      const t = smoothstep(limit - 0.055, limit + 0.055, territory);
+    const width = blendWidths[index]!;
+    if (secondary && territory > limit - width) {
+      const t = smoothstep(limit - width, limit + width, territory);
       shape(secondary.archetype, next);
       out.height = lerp(first.height, next.height, t);
       out.regolith = lerp(first.regolith, next.regolith, t);
