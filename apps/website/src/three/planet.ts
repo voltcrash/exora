@@ -18,6 +18,7 @@ import { createPlanetGlobe } from "./planet-globe.ts";
 import { loadPlanetFields } from "./planet-fields.ts";
 import { createLandscape, surfaceSunDirection, type LandscapeTerrain } from "./landscape.ts";
 import { cloudDeckGeology, deriveSurfaceGeology } from "../surface-geology.ts";
+import { SURFACE_EYE_HEIGHT, SURFACE_WALK_LIMIT } from "../surface-landing.ts";
 import { SURFACE_GRID_RESOLUTION } from "../surface-vista-baking.ts";
 import { runTerrainJob } from "../terrain-worker-client.ts";
 import type { Observatory, Observation } from "./observatory.ts";
@@ -140,7 +141,7 @@ export async function createPlanetWorld(
     pitch = 0,
     pinch = 0;
   function look() {
-    walk.y = surface!.floorAt(walk.x, walk.z) + 1.65;
+    walk.y = surface!.floorAt(walk.x, walk.z) + SURFACE_EYE_HEIGHT;
     camera.position.copy(walk);
     surface!.follow(walk.x, walk.z);
     direction.set(
@@ -163,9 +164,10 @@ export async function createPlanetWorld(
     controls.enableDamping = false;
     controls.minDistance = 0.2;
     controls.maxDistance = 100;
-    walk.set(0, 0, 5);
-    yaw = -0.22;
-    pitch = 0.035;
+    const landing = surface.landing;
+    walk.set(landing.x, 0, landing.z);
+    yaw = landing.yaw;
+    pitch = -0.068;
     look();
     onViewModeChange("surface");
   }
@@ -274,12 +276,18 @@ export async function createPlanetWorld(
           right = Number(keys.has("KeyD")) - Number(keys.has("KeyA"));
         const step = (inputDelta * 4.1) / Math.max(1, Math.hypot(forward, right));
         walk.x = Math.max(
-          -63,
-          Math.min(63, walk.x + step * (Math.sin(yaw) * forward + Math.cos(yaw) * right)),
+          -SURFACE_WALK_LIMIT,
+          Math.min(
+            SURFACE_WALK_LIMIT,
+            walk.x + step * (Math.sin(yaw) * forward + Math.cos(yaw) * right),
+          ),
         );
         walk.z = Math.max(
-          -63,
-          Math.min(63, walk.z + step * (-Math.cos(yaw) * forward + Math.sin(yaw) * right)),
+          -SURFACE_WALK_LIMIT,
+          Math.min(
+            SURFACE_WALK_LIMIT,
+            walk.z + step * (-Math.cos(yaw) * forward + Math.sin(yaw) * right),
+          ),
         );
         look();
       }

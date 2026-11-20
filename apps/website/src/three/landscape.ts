@@ -19,6 +19,7 @@ import {
   type Texture,
 } from "three";
 
+import { chooseSurfaceLanding } from "../surface-landing.ts";
 import type { SurfaceGeology } from "../surface-geology.ts";
 import { createSurfaceFloor, type SurfaceTerrainData } from "../surface-terrain-kernel.ts";
 import { SURFACE_HALF_EXTENT } from "../surface-vista-baking.ts";
@@ -168,6 +169,9 @@ export function createLandscape(
     root,
     star,
     floorAt,
+    landing: terrain
+      ? chooseSurfaceLanding(floorAt, water, surfaceSunDirection)
+      : { x: 0, z: 5, yaw: -0.22 },
     setDetail(texture: Texture) {
       ground.material.uniforms.detail!.value = texture;
     },
