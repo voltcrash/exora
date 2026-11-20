@@ -16,7 +16,7 @@ import {
 import { skyViewpointFrom } from "../sky-catalog.ts";
 import { createPlanetGlobe } from "./planet-globe.ts";
 import { loadPlanetFields } from "./planet-fields.ts";
-import { createLandscape, surfaceSunDirection, type LandscapeTerrain } from "./landscape.ts";
+import { createLandscape, siteSun, type LandscapeTerrain } from "./landscape.ts";
 import { cloudDeckGeology, deriveSurfaceGeology } from "../surface-geology.ts";
 import { SURFACE_EYE_HEIGHT, SURFACE_WALK_LIMIT } from "../surface-landing.ts";
 import { SURFACE_GRID_RESOLUTION } from "../surface-vista-baking.ts";
@@ -116,7 +116,7 @@ export async function createPlanetWorld(
         input: {
           geology,
           resolution: SURFACE_GRID_RESOLUTION[host.profile.tier],
-          sunDirection: surfaceSunDirection,
+          sunDirection: siteSun(recipe.seed),
         },
       },
       signal,
@@ -172,7 +172,7 @@ export async function createPlanetWorld(
     const landing = surface.landing;
     walk.set(landing.x, 0, landing.z);
     yaw = landing.yaw;
-    pitch = -0.068;
+    pitch = 0.055;
     look();
     onViewModeChange("surface");
   }

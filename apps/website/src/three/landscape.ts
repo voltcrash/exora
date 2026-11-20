@@ -18,7 +18,7 @@ import {
   type Texture,
 } from "three";
 
-import { chooseSurfaceLanding } from "../surface-landing.ts";
+import { siteBearing, sitePosition } from "../surface-landing.ts";
 import type { SurfaceGeology } from "../surface-geology.ts";
 import { createSurfaceFloor, type SurfaceTerrainData } from "../surface-terrain-kernel.ts";
 import landscapeFragment from "./landscape.frag?raw";
@@ -26,7 +26,10 @@ import landscapeVertex from "./landscape.vert?raw";
 import shorelineFragment from "./shoreline.frag?raw";
 import { createOutcrops } from "./outcrops.ts";
 
-export const surfaceSunDirection = new Vector3(-0.76, 0.34, -0.56).normalize();
+export const siteSun = (seed: number) => {
+  const { x, z } = sitePosition(seed, -0.84, -0.38);
+  return new Vector3(x, 0.52, z).normalize();
+};
 const sunDistance = 620;
 const color = (rgb: Rgb) => new Color().setRGB(...rgb);
 
@@ -42,6 +45,7 @@ export function createLandscape(
   constrained = false,
 ) {
   const root = new Group();
+  const surfaceSunDirection = siteSun(recipe.seed);
   const geology = terrain?.geology;
   const cloudDeck = geology?.medium === "cloud";
   const air = geology?.hazeDensity ?? 0;
@@ -190,9 +194,7 @@ export function createLandscape(
     root,
     star,
     floorAt,
-    landing: terrain
-      ? chooseSurfaceLanding(floorAt, water, surfaceSunDirection)
-      : { x: 0, z: 5, yaw: -0.22 },
+    landing: { ...sitePosition(recipe.seed, 0, -7), yaw: siteBearing(recipe.seed) },
     update(delta: number) {
       time.value += delta;
     },
