@@ -173,30 +173,23 @@ const craterLayer = (
       if ((h & 0xff) / 255 > density) continue;
 
       const sizeRoll = ((h >>> 8) & 0xff) / 255;
-      const radius = cellSize * (0.14 + sizeRoll * sizeRoll * 0.42);
+      const radius = cellSize * (0.16 + sizeRoll * sizeRoll * 0.33);
       const centerX = (cx + 0.5 + ((((h >>> 16) & 0xff) / 255) * 2 - 1) * 0.42) * cellSize;
       const centerZ = (cz + 0.5 + ((((h >>> 24) & 0xff) / 255) * 2 - 1) * 0.42) * cellSize;
       const dx = x - centerX;
       const dz = z - centerZ;
       const distance = Math.sqrt(dx * dx + dz * dz) / radius;
-      if (distance > 2.4) continue;
+      if (distance > 2.2) continue;
 
-      const rough = gradientNoise(x * 0.35, z * 0.35, seed + (h & 0xffff)) * 0.12;
-      const depth = depthScale * radius * (0.22 - sizeRoll * 0.08);
-
-      if (distance < 0.82) {
-        const bowl = 1 - (distance / 0.82) * (distance / 0.82);
-        displacement -= depth * bowl * (1 + rough);
-        if (sizeRoll > 0.72 && distance < 0.26) {
-          displacement += depth * 0.85 * (1 - distance / 0.26) ** 1.4;
-        }
-      } else if (distance < 1.16) {
-        const rim = 1 - Math.abs(distance - 0.95) / 0.21;
-        displacement += depth * 0.55 * Math.max(0, rim) * (1 + rough * 2);
-      } else {
-        const ejecta = (1 - (distance - 1.16) / 1.24) ** 3;
-        displacement += depth * 0.16 * Math.max(0, ejecta) * (0.6 + rough * 3);
-      }
+      const rough = gradientNoise(x * 0.35, z * 0.35, seed + (h & 0xffff));
+      const depth = depthScale * radius * (0.28 - sizeRoll * 0.09);
+      const bowl = 1 - smoothstep(0.25 + sizeRoll * 0.25, 0.95, distance);
+      const rim = smoothstep(0.57, 0.99, distance) * (1 - smoothstep(1, 1.48, distance));
+      const ejecta = smoothstep(0.86, 1.08, distance) * (1 - smoothstep(1.16, 2.2, distance));
+      const peak = smoothstep(0.72, 1, sizeRoll) * (1 - smoothstep(0, 0.24, distance));
+      displacement +=
+        depth *
+        (-bowl + rim * (0.52 + rough * 0.16) + ejecta * (0.11 + rough * 0.09) + peak * 0.62);
     }
   }
 
@@ -239,10 +232,10 @@ type ArchetypeField = (x: number, z: number, context: FieldContext, out: Terrain
 const impactHighlands: ArchetypeField = (x, z, context, out) => {
   const base = fbm(x * 0.012, z * 0.012, context.seed + 3, 4) * 0.55;
   const craters = craterField(x, z, context.seed, Math.max(0.15, context.craterDensity));
-  const height = base + craters * 0.42;
+  const height = base + craters * 0.54;
   const rubble = fbm(x * 0.4, z * 0.4, context.seed + 17, 2);
   out.regolith = clamp01(0.62 - craters * 0.5 + rubble * 0.15);
-  out.scarp = clamp01(Math.abs(craters) * 0.9);
+  out.scarp = clamp01(craters * 0.95 + rubble * 0.2);
   out.frost = 0;
   out.molten = 0;
   return height;
