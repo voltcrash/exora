@@ -254,3 +254,5 @@ vertex pigment. Regenerate them with `art/model-terrain-outcrops.py` in Blender.
 contains fractured columns of cooled lava.
 
 The accretion disk uses an original 1024 × 256 Blender bake, `textures/fields/accretion.png`. The shader reads azimuth along the horizontal axis and disk radius along the vertical axis. Red controls filament density, green traces compression bands, and blue varies local emission. Regenerate the data with `art/bake-accretion.py` from Blender's Python Console.
+
+The original cloud billows in `textures/fields/billows.png` store lobe height and horizontal gradients for gas and ice giants. Regenerate the tile with `art/bake-cloud-billows.py` in Blender.

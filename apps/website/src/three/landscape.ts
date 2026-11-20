@@ -13,7 +13,9 @@ import {
   Mesh,
   MeshBasicMaterial,
   PlaneGeometry,
+  RepeatWrapping,
   ShaderMaterial,
+  TextureLoader,
   SphereGeometry,
   SRGBColorSpace,
   Vector2,
@@ -61,6 +63,7 @@ export function createLandscape(
   const cloudDeck = geology?.medium === "cloud";
   const air = geology?.hazeDensity ?? 0;
   const skyTint = geology ? color(geology.skyColor) : new Color(0);
+  if (geology && cloudDeck) skyTint.lerp(color(geology.ramp[2]!), 0.73);
   const sunTint = new Color().setRGB(...recipe.star.color, SRGBColorSpace);
   const sunLight = sunTint.clone().lerp(new Color(1, 1, 1), 0.42);
   const neutralColor = new Color(0.29, 0.31, 0.33);
@@ -71,7 +74,7 @@ export function createLandscape(
       : -Infinity;
   const terrainFloor = terrain ? createSurfaceFloor(terrain.data) : () => 0;
   const floorAt = (x: number, z: number) =>
-    Math.max(water, terrainFloor(x, z)) + (cloudDeck ? 4.5 : 0);
+    Math.max(water, terrainFloor(x, z)) + (cloudDeck ? 10.5 : 0);
   const geometry =
     terrain && !cloudDeck
       ? new BufferGeometry()
@@ -124,7 +127,12 @@ export function createLandscape(
       ? createShoreline(terrain, water, constrained, skyTint, sunLight, surfaceSunDirection, time)
       : null;
   if (sea) root.add(sea);
-  const cloudHeights = terrain && cloudDeck ? createCloudHeights(terrain.data, terrainFloor) : null;
+  const cloudHeights =
+    terrain && cloudDeck
+      ? createCloudHeights(terrain.data, terrainFloor, surfaceSunDirection)
+      : null;
+  const billows = cloudDeck ? new TextureLoader().load("/textures/fields/billows.png") : null;
+  if (billows) billows.wrapS = billows.wrapT = RepeatWrapping;
   const sky = new Mesh(
     new SphereGeometry(760, 40, 28),
     new ShaderMaterial({
@@ -136,14 +144,15 @@ export function createLandscape(
         air: { value: air },
         time,
         cover: {
-          value: cloudDeck ? 0.85 : recipe.renderer === "rocky" ? recipe.surface.cloudCover : 0,
+          value: cloudDeck ? 0.35 : recipe.renderer === "rocky" ? recipe.surface.cloudCover : 0,
         },
         weather: { value: weather },
         cloudHeights: { value: cloudHeights },
+        billows: { value: billows },
         heightRange: { value: new Vector2(terrain?.data.low ?? 0, terrain?.data.high ?? 1) },
         cloudExtent: { value: SURFACE_HALF_EXTENT },
         cloudLight: { value: ramp[4] },
-        cloudDark: { value: ramp[0] },
+        cloudDark: { value: ramp[0]!.clone().multiplyScalar(0.52) },
         seedOffset: { value: new Vector2(offset, offset * 2.89) },
         skyTint: { value: skyTint },
         sunTint: { value: sunLight },
@@ -234,6 +243,7 @@ export function createLandscape(
       ground.material.uniforms.hasScans!.value = true;
     },
     dispose() {
+      billows?.dispose();
       cloudHeights?.dispose();
       parent?.dispose();
       formations?.dispose();
