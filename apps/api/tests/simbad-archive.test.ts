@@ -313,3 +313,30 @@ test("keeps asking the SIMBAD mirror that answered until the primary is due a re
   await repository.findByName("Kepler-22");
   expect(hosts).toEqual([primaryHost, firstMirrorHost]);
 });
+
+test("keeps its own SIMBAD host order while a concurrent lookup promotes a mirror", async () => {
+  let releasePrimary!: () => void;
+  const stalledPrimary = new Promise<Response>((resolve) => {
+    releasePrimary = () => resolve(outagePage());
+  });
+  const slowHosts: string[] = [];
+  let primaryRequests = 0;
+  const repository = new SimbadStarRepository({
+    fetcher: async (input) => {
+      const url = new URL(
+        typeof input === "string" ? input : input instanceof URL ? input.href : input.url,
+      );
+      if (url.searchParams.get("query")?.includes("GJ 674")) slowHosts.push(url.host);
+      if (url.host !== primaryHost) return Response.json({ metadata, data: [siriusRow] });
+      primaryRequests += 1;
+      return primaryRequests === 1 ? stalledPrimary : outagePage();
+    },
+  });
+
+  const slow = repository.findByName("GJ 674");
+  await repository.findByName("TRAPPIST-1");
+  releasePrimary();
+  await slow;
+
+  expect(slowHosts).toEqual([primaryHost, firstMirrorHost]);
+});
