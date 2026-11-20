@@ -13,6 +13,7 @@ import {
   type CSSProperties,
 } from "react";
 
+import type { StarLoadResult } from "./api-client.ts";
 import { reachStar, reachSystem } from "./destination-cache.ts";
 import { PlanetExperience } from "./components/PlanetExperience.tsx";
 import { OfflineNotice } from "./components/OfflineNotice.tsx";
@@ -311,11 +312,19 @@ export const App = () => {
     [navigation, navigationFailed],
   );
 
+  /** Resolves false when SIMBAD has no such star, and rejects when SIMBAD could not be asked. */
   const selectHostStar = useCallback(
     async (hostStar: string): Promise<boolean> => {
       const current = navigation.start();
       setResolving(true);
-      const result = await reachStar(hostStar).catch(() => null);
+      let result: StarLoadResult | null;
+      try {
+        result = await reachStar(hostStar);
+      } catch (error) {
+        if (!current()) return true;
+        setResolving(false);
+        throw error;
+      }
       if (!current()) return true;
       setResolving(false);
       if (!result) return false;

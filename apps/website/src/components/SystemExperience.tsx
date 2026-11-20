@@ -9,6 +9,7 @@ import {
   type PanelBlock,
   type PanelFact,
 } from "../destination-panel.ts";
+import { hostStarJumpError, settleHostStarJump, type HostStarJump } from "../host-star-jump.ts";
 import { formatNumber } from "../planet-utils.tsx";
 import type { Observatory } from "../three/observatory.ts";
 import {
@@ -86,7 +87,7 @@ export const SystemExperience = ({
 }: SystemExperienceProps) => {
   const [layout, setLayout] = useState<SystemLayout | null>(null);
   const [sceneState, setSceneState] = useState<SceneState>("loading");
-  const [starJumpState, setStarJumpState] = useState<"error" | "idle" | "loading">("idle");
+  const [starJumpState, setStarJumpState] = useState<HostStarJump>("idle");
   const [ephemeris, setEphemeris] = useState(false);
   const [displayedAt, setDisplayedAt] = useState(() => new Date());
   const [playing, setPlaying] = useState(false);
@@ -137,10 +138,10 @@ export const SystemExperience = ({
     starJumpRef.current = true;
     setStarJumpState("loading");
     host?.beginTravel();
-    const found = await onSelectHostStar(hostStar).catch(() => false);
-    if (!found) host?.cancelTravel();
+    const jump = await settleHostStarJump(onSelectHostStar(hostStar));
+    if (jump !== "idle") host?.cancelTravel();
     starJumpRef.current = false;
-    setStarJumpState(found ? "idle" : "error");
+    setStarJumpState(jump);
   };
 
   useEffect(() => {
@@ -506,6 +507,7 @@ export const SystemExperience = ({
     },
   ]);
 
+  const starJumpError = hostStarJumpError(starJumpState, hostStar);
   const panel: DestinationPanelModel = {
     footer: ephemeris
       ? "Local two-body orbital model · derived · UTC 1900–2100"
@@ -515,9 +517,7 @@ export const SystemExperience = ({
       {
         busy: starJumpState === "loading",
         disabled: starJumpState === "loading",
-        ...(starJumpState === "error"
-          ? { error: `SIMBAD could not find a star called ${hostStar}.` }
-          : {}),
+        ...(starJumpError ? { error: starJumpError } : {}),
         icon: "star",
         id: "host-star",
         label: `Visit ${hostStar}`,

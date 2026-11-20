@@ -1,9 +1,21 @@
 import { expect, test } from "vite-plus/test";
 import {
   normalizeSimbadStar,
+  SIMBAD_TAP_ENDPOINTS,
   SimbadArchiveError,
   SimbadStarRepository,
 } from "../src/simbad-archive.ts";
+
+const requestHost = (input: string | URL | Request): string =>
+  new URL(typeof input === "string" ? input : input instanceof URL ? input.href : input.url).host;
+const [primaryHost, firstMirrorHost, secondMirrorHost] = SIMBAD_TAP_ENDPOINTS.map(
+  (endpoint) => new URL(endpoint).host,
+);
+const outagePage = () =>
+  new Response("<!doctype html><title>Page unavailable</title>", {
+    headers: { "content-type": "text/html" },
+    status: 404,
+  });
 
 const metadata = [
   "matched_id",
@@ -218,4 +230,133 @@ test("ends stellar paging once a page is not full", async () => {
   });
 
   expect((await repository.browse(24)).nextCursor).toBeNull();
+});
+
+test("answers from a mirror while the primary SIMBAD host serves an outage page", async () => {
+  const hosts: string[] = [];
+  const repository = new SimbadStarRepository({
+    fetcher: async (input) => {
+      const host = requestHost(input);
+      hosts.push(host);
+      return host === primaryHost ? outagePage() : Response.json({ metadata, data: [siriusRow] });
+    },
+  });
+
+  const result = await repository.findByName("Sirius");
+
+  expect(result.value?.name).toBe("Sirius");
+  expect(hosts).toEqual([primaryHost, firstMirrorHost]);
+});
+
+test("moves past SIMBAD hosts that cannot be reached or answer with non-TAP pages", async () => {
+  const hosts: string[] = [];
+  const repository = new SimbadStarRepository({
+    fetcher: async (input) => {
+      const host = requestHost(input);
+      hosts.push(host);
+      if (host === primaryHost) throw new TypeError("fetch failed");
+      if (host === firstMirrorHost) return new Response("<html>maintenance</html>");
+      return Response.json({ metadata, data: [siriusRow] });
+    },
+  });
+
+  expect((await repository.search("sirius", 12)).value[0]?.name).toBe("Sirius");
+  expect(hosts).toEqual([primaryHost, firstMirrorHost, secondMirrorHost]);
+});
+
+test("reports SIMBAD as unavailable only after every mirror fails", async () => {
+  let requests = 0;
+  const repository = new SimbadStarRepository({
+    fetcher: async () => {
+      requests += 1;
+      return outagePage();
+    },
+  });
+
+  await expect(repository.findByName("GJ 674")).rejects.toBeInstanceOf(SimbadArchiveError);
+  expect(requests).toBe(SIMBAD_TAP_ENDPOINTS.length);
+});
+
+test("does not ask mirrors again when SIMBAD answers with malformed measurements", async () => {
+  const malformed = [...siriusRow];
+  malformed[4] = "101.287";
+  let requests = 0;
+  const repository = new SimbadStarRepository({
+    fetcher: async () => {
+      requests += 1;
+      return Response.json({ data: [malformed], metadata });
+    },
+  });
+
+  await expect(repository.search("sirius", 12)).rejects.toBeInstanceOf(SimbadArchiveError);
+  expect(requests).toBe(1);
+});
+
+test("keeps asking the SIMBAD mirror that answered until the primary is due a retry", async () => {
+  let clock = Date.parse("2026-11-20T00:00:00Z");
+  const hosts: string[] = [];
+  const repository = new SimbadStarRepository({
+    now: () => clock,
+    fetcher: async (input) => {
+      const host = requestHost(input);
+      hosts.push(host);
+      return host === primaryHost ? outagePage() : Response.json({ metadata, data: [siriusRow] });
+    },
+  });
+
+  await repository.findByName("GJ 674");
+  await repository.findByName("TRAPPIST-1");
+  expect(hosts).toEqual([primaryHost, firstMirrorHost, firstMirrorHost]);
+
+  hosts.length = 0;
+  clock += 5 * 60_000;
+  await repository.findByName("Kepler-22");
+  expect(hosts).toEqual([primaryHost, firstMirrorHost]);
+});
+
+test("leaves the last SIMBAD mirror time to answer after earlier hosts hang", async () => {
+  const hangUntilAborted = (signal: AbortSignal | null | undefined) =>
+    new Promise<Response>((_, reject) => {
+      signal?.addEventListener("abort", () => reject(signal.reason), { once: true });
+    });
+  const repository = new SimbadStarRepository({
+    timeoutMs: 600,
+    fetcher: (input, init) =>
+      requestHost(input) === secondMirrorHost
+        ? Promise.resolve(Response.json({ metadata, data: [siriusRow] }))
+        : hangUntilAborted(init?.signal),
+  });
+
+  const started = performance.now();
+  const result = await repository.findByName("Sirius");
+
+  expect(result.value?.name).toBe("Sirius");
+  expect(performance.now() - started).toBeLessThan(600);
+});
+
+test("keeps its own SIMBAD host order while a concurrent lookup promotes a mirror", async () => {
+  let releasePrimary!: () => void;
+  const stalledPrimary = new Promise<Response>((resolve) => {
+    releasePrimary = () => resolve(outagePage());
+  });
+  const slowHosts: string[] = [];
+  let primaryRequests = 0;
+  const repository = new SimbadStarRepository({
+    fetcher: async (input) => {
+      const url = new URL(
+        typeof input === "string" ? input : input instanceof URL ? input.href : input.url,
+      );
+      if (url.searchParams.get("query")?.includes("GJ 674")) slowHosts.push(url.host);
+      if (url.host !== primaryHost) return Response.json({ metadata, data: [siriusRow] });
+      primaryRequests += 1;
+      return primaryRequests === 1 ? stalledPrimary : outagePage();
+    },
+  });
+
+  const slow = repository.findByName("GJ 674");
+  await repository.findByName("TRAPPIST-1");
+  releasePrimary();
+  await slow;
+
+  expect(slowHosts).toEqual([primaryHost, firstMirrorHost]);
 });

@@ -1380,6 +1380,48 @@ test("a failed star-system request is unavailable rather than confirmed empty", 
   expect(container?.textContent).not.toContain("The archive lists no confirmed worlds");
 });
 
+test("an unreachable star archive is not reported as a missing host star", async () => {
+  resetDestinationCacheForTesting();
+  stubArchive();
+  const archive = globalThis.fetch;
+  vi.stubGlobal("fetch", (input: string | URL | Request, init?: RequestInit) => {
+    const path = typeof input === "string" ? input : input instanceof URL ? input.href : input.url;
+    return path.startsWith("/api/stars/") && !path.includes("/planets")
+      ? Promise.resolve(
+          Response.json(
+            {
+              error: {
+                code: "UPSTREAM_UNAVAILABLE",
+                message: "SIMBAD star archive is temporarily unavailable.",
+              },
+            },
+            { status: 502 },
+          ),
+        )
+      : archive(input, init);
+  });
+  mountApp();
+  await userEvent.click(
+    page.getByRole("button", { name: `Visit ${featuredPlanet.hostStar}`, exact: true }),
+  );
+  await expect
+    .element(page.getByText("SIMBAD could not be reached. Try again in a moment."))
+    .toBeVisible();
+  expect(container?.textContent).not.toContain("could not find a star");
+});
+
+test("a host star SIMBAD does not list is still reported by name", async () => {
+  resetDestinationCacheForTesting();
+  stubArchive({ missing: [featuredPlanet.hostStar] });
+  mountApp();
+  await userEvent.click(
+    page.getByRole("button", { name: `Visit ${featuredPlanet.hostStar}`, exact: true }),
+  );
+  await expect
+    .element(page.getByText(`SIMBAD could not find a star called ${featuredPlanet.hostStar}.`))
+    .toBeVisible();
+});
+
 test("returning to the mounted featured world cancels a pending departure", async () => {
   resetDestinationCacheForTesting();
   stubArchive();

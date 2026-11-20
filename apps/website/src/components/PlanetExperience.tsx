@@ -21,6 +21,7 @@ import { detectionFacts, readDetectionSignal } from "../detection-signal.ts";
 import { nextTransitFact, predictTransits } from "../transit-ephemeris.ts";
 import type { ViewMode } from "../three/planet.ts";
 import { readHabitableZone } from "../habitable-zone-reading.ts";
+import { hostStarJumpError, settleHostStarJump, type HostStarJump } from "../host-star-jump.ts";
 import { readProvenance } from "../measurement-provenance.ts";
 import { derivePlanetPhysics } from "../planet-physics.ts";
 import { skyFacts } from "../sky-position.ts";
@@ -152,7 +153,7 @@ export const PlanetExperience = ({
   const [sceneMode, setSceneMode] = useState<"subsystem" | "world">("world");
   const [subsystem, setSubsystem] = useState<PlanetarySubsystem | null>(null);
   const [viewMode, setViewMode] = useState<ViewMode>("orbit");
-  const [hostJumpState, setHostJumpState] = useState<"idle" | "loading" | "error">("idle");
+  const [hostJumpState, setHostJumpState] = useState<HostStarJump>("idle");
   const [systemJumpState, setSystemJumpState] = useState<"idle" | "loading" | "error">("idle");
   const [findSolarWorld, setFindSolarWorld] = useState<
     ((name: string) => ExoplanetProfile | null) | null
@@ -198,10 +199,10 @@ export const PlanetExperience = ({
     hostJumpRef.current = true;
     setHostJumpState("loading");
     host?.beginTravel();
-    const found = await onSelectHostStar(planet.hostStar).catch(() => false);
+    const jump = await settleHostStarJump(onSelectHostStar(planet.hostStar));
     hostJumpRef.current = false;
-    if (!found) host?.cancelTravel();
-    setHostJumpState(found ? "idle" : "error");
+    if (jump !== "idle") host?.cancelTravel();
+    setHostJumpState(jump);
   };
 
   const openHostSystem = async (): Promise<void> => {
@@ -464,6 +465,7 @@ export const PlanetExperience = ({
       : null,
   ]);
 
+  const hostJumpError = hostStarJumpError(hostJumpState, planet.hostStar);
   const panel: DestinationPanelModel = {
     footer: `${planet.source.archive} · ${planet.source.table} · ${planet.source.retrievedOn}`,
     label: custom ? "Custom planet data" : "Observed planet data",
@@ -479,9 +481,7 @@ export const PlanetExperience = ({
         !subsystemActive && {
           busy: hostJumpState === "loading",
           disabled: hostJumpState === "loading",
-          ...(hostJumpState === "error"
-            ? { error: `SIMBAD could not find a star called ${planet.hostStar}.` }
-            : {}),
+          ...(hostJumpError ? { error: hostJumpError } : {}),
           icon: "star" as const,
           id: "host-star",
           label: `Visit ${planet.hostStar}`,
