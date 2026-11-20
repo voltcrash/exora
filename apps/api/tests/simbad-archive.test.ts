@@ -291,3 +291,25 @@ test("does not ask mirrors again when SIMBAD answers with malformed measurements
   await expect(repository.search("sirius", 12)).rejects.toBeInstanceOf(SimbadArchiveError);
   expect(requests).toBe(1);
 });
+
+test("keeps asking the SIMBAD mirror that answered until the primary is due a retry", async () => {
+  let clock = Date.parse("2026-11-20T00:00:00Z");
+  const hosts: string[] = [];
+  const repository = new SimbadStarRepository({
+    now: () => clock,
+    fetcher: async (input) => {
+      const host = requestHost(input);
+      hosts.push(host);
+      return host === primaryHost ? outagePage() : Response.json({ metadata, data: [siriusRow] });
+    },
+  });
+
+  await repository.findByName("GJ 674");
+  await repository.findByName("TRAPPIST-1");
+  expect(hosts).toEqual([primaryHost, firstMirrorHost, firstMirrorHost]);
+
+  hosts.length = 0;
+  clock += 5 * 60_000;
+  await repository.findByName("Kepler-22");
+  expect(hosts).toEqual([primaryHost, firstMirrorHost]);
+});
