@@ -84,6 +84,8 @@ const visualNote = ({
   if (solarIdentity?.surfaceStatus === "unresolved" || solarIdentity?.surfaceStatus === "modeled") {
     return "Catalogued measurements set the scale. The surface is an original procedural illustration.";
   }
+  if (solarIdentity?.bodyType === "planet")
+    return "Orbital globe rebuilt in Blender from NASA’s textured planet model.";
   return "Original Blender surface fields, shaded using the world's catalogued properties.";
 };
 
