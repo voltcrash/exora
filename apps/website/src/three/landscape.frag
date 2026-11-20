@@ -8,7 +8,7 @@ uniform sampler2D detail, cliffScan;
 uniform vec3 ramp[5], regolith, bedrock, frost, lava, skyTint, sunTint, sunDirection;
 uniform float air, strata, strataSpacing, datum, lavaGlow, oxide, time;
 uniform vec2 detailOffset;
-uniform bool neutral, hasScans;
+uniform bool neutral, hasScans, vegetated;
 varying vec3 groundPoint, groundNormal;
 varying vec4 surfaceMask;
 varying vec2 terrainShade;
@@ -58,6 +58,13 @@ void main() {
     vec3 stone = mix(bedrock * .56, ramp[3], (.17 + .34 * smoothstep(.24,.99, mineral)) * strata);
     vec3 fines = mix(ramp[1], regolith, .38 + .62 * deposit);
     color = mix(stone, fines, crust * (1. - exposure * .91));
+    if (vegetated) {
+      float grass = smoothstep(datum + .12, datum + 1.5, P.y)
+                  * (1. - smoothstep(8., 18., P.y + 5. * deposit))
+                  * smoothstep(.73, .92, N.y) * (1. - ice);
+      vec3 turf = mix(vec3(.045, .073, .031), vec3(.20, .218, .079), deposit);
+      color = mix(color, turf, grass * (.5 + .72 * deposit));
+    }
     color *= (.69 + .55 * deposit) * albedo;
     color *= mix(vec3(1.), vec3(1.35, .63, .41), oxide * (1.2 + deposit));
     float snow = ice * smoothstep(.34,.91, N.y + .24 * (deposit - .5));

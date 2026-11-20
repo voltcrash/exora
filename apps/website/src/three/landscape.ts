@@ -35,6 +35,7 @@ import { createShoreline } from "./shoreline.ts";
 import { createCloudHeights } from "./cloud-deck.ts";
 import { SURFACE_HALF_EXTENT } from "../surface-vista-baking.ts";
 import { createLandmarks } from "./landmarks.ts";
+import { createAlpineForest } from "./alpine-forest.ts";
 import { createOutcrops } from "./outcrops.ts";
 
 export const siteSun = (seed: number) => {
@@ -61,6 +62,7 @@ export function createLandscape(
   const surfaceSunDirection = siteSun(recipe.seed);
   const geology = terrain?.geology;
   const cloudDeck = geology?.medium === "cloud";
+  const alpineForest = planet?.solarSystem?.naifId === 399 && geology?.medium === "rock";
   const air = geology?.hazeDensity ?? 0;
   const skyTint = geology ? color(geology.skyColor) : new Color(0);
   if (geology && cloudDeck) skyTint.lerp(color(geology.ramp[2]!), 0.73);
@@ -112,6 +114,7 @@ export function createLandscape(
         sunDirection: { value: surfaceSunDirection },
         air: { value: air },
         neutral: { value: !terrain },
+        vegetated: { value: alpineForest },
         strata: { value: geology?.strataStrength ?? 0 },
         strataSpacing: { value: Math.max(0.24, (geology?.strataSpacing ?? 1) * 0.42) },
         datum: { value: Number.isFinite(water) ? water : -1000 },
@@ -213,6 +216,9 @@ export function createLandscape(
     geology?.medium === "rock"
       ? createOutcrops(root, geology, terrainFloor, water, constrained, updateShadows)
       : null;
+  const forest = alpineForest
+    ? createAlpineForest(root, recipe.seed, terrainFloor, water, constrained, updateShadows)
+    : null;
   const landing = sitePosition(recipe.seed, 0, -7);
   if (terrain && (Number.isFinite(water) || terrain.geology.lavaGlow > 0)) {
     const surface = createTerrainField(terrain.geology);
@@ -232,7 +238,10 @@ export function createLandscape(
     root,
     star,
     floorAt,
-    blocks: formations?.blocks,
+    blocks(x: number, z: number, nextX: number, nextZ: number, eyeY: number) {
+      if (x === nextX && z === nextZ) return false;
+      return !!(forest?.blocks(nextX, nextZ) || formations?.blocks(x, z, nextX, nextZ, eyeY));
+    },
     landing: { ...landing, yaw: siteBearing(recipe.seed) },
     update(delta: number) {
       time.value += delta;
@@ -247,6 +256,7 @@ export function createLandscape(
       cloudHeights?.dispose();
       parent?.dispose();
       formations?.dispose();
+      forest?.dispose();
       clearRocks?.();
       sunlight.dispose();
       sea?.geometry.dispose();
