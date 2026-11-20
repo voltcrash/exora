@@ -277,6 +277,7 @@ export async function createPlanetWorld(
         }
       }
       if (mode === "surface") {
+        surface?.update(delta);
         const forward = Number(keys.has("KeyW")) - Number(keys.has("KeyS")),
           right = Number(keys.has("KeyD")) - Number(keys.has("KeyA"));
         const step = (inputDelta * 4.1) / Math.max(1, Math.hypot(forward, right));

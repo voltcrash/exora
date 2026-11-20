@@ -9,7 +9,6 @@ import {
   HemisphereLight,
   Mesh,
   MeshBasicMaterial,
-  MeshStandardMaterial,
   PlaneGeometry,
   ShaderMaterial,
   SphereGeometry,
@@ -22,9 +21,9 @@ import {
 import { chooseSurfaceLanding } from "../surface-landing.ts";
 import type { SurfaceGeology } from "../surface-geology.ts";
 import { createSurfaceFloor, type SurfaceTerrainData } from "../surface-terrain-kernel.ts";
-import { SURFACE_HALF_EXTENT } from "../surface-vista-baking.ts";
 import landscapeFragment from "./landscape.frag?raw";
 import landscapeVertex from "./landscape.vert?raw";
+import shorelineFragment from "./shoreline.frag?raw";
 import { createOutcrops } from "./outcrops.ts";
 
 export const surfaceSunDirection = new Vector3(-0.76, 0.34, -0.56).normalize();
@@ -97,19 +96,40 @@ export function createLandscape(
     }),
   );
   root.add(ground);
+  const time = { value: 0 };
   const sea =
-    geology && Number.isFinite(water)
+    terrain && Number.isFinite(water)
       ? new Mesh(
-          new PlaneGeometry(2 * SURFACE_HALF_EXTENT, 2 * SURFACE_HALF_EXTENT).rotateX(-Math.PI / 2),
-          new MeshStandardMaterial({
-            color: color(geology.liquidColor),
-            roughness: 0.25,
-            metalness: 0.1,
+          new BufferGeometry()
+            .setAttribute("position", new BufferAttribute(terrain.data.positions, 3))
+            .setIndex(new BufferAttribute(terrain.data.indices, 1)),
+          new ShaderMaterial({
+            uniforms: {
+              time,
+              datum: { value: water },
+              deepColor: { value: color(terrain.geology.liquidColor) },
+              shallowColor: { value: color(terrain.geology.liquidShallowColor) },
+              skyTint: { value: skyTint },
+              sunTint: { value: sunLight },
+              sunDirection: { value: surfaceSunDirection },
+              air: { value: air },
+            },
+            vertexShader: `
+              uniform float datum;
+              varying vec3 waterPoint;
+              varying float depth;
+              void main() {
+                waterPoint = vec3(position.x, datum, position.z);
+                depth = datum - position.y;
+                gl_Position = projectionMatrix * modelViewMatrix * vec4(waterPoint, 1.);
+              }
+            `,
+            fragmentShader: shorelineFragment,
           }),
         )
       : null;
   if (sea) {
-    sea.position.y = water;
+    sea.raycast = () => {};
     root.add(sea);
   }
   const sky = new Mesh(
@@ -173,6 +193,9 @@ export function createLandscape(
     landing: terrain
       ? chooseSurfaceLanding(floorAt, water, surfaceSunDirection)
       : { x: 0, z: 5, yaw: -0.22 },
+    update(delta: number) {
+      time.value += delta;
+    },
     setDetail(texture: Texture) {
       ground.material.uniforms.detail!.value = texture;
     },
