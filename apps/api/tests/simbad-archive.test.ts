@@ -314,6 +314,26 @@ test("keeps asking the SIMBAD mirror that answered until the primary is due a re
   expect(hosts).toEqual([primaryHost, firstMirrorHost]);
 });
 
+test("leaves the last SIMBAD mirror time to answer after earlier hosts hang", async () => {
+  const hangUntilAborted = (signal: AbortSignal | null | undefined) =>
+    new Promise<Response>((_, reject) => {
+      signal?.addEventListener("abort", () => reject(signal.reason), { once: true });
+    });
+  const repository = new SimbadStarRepository({
+    timeoutMs: 600,
+    fetcher: (input, init) =>
+      requestHost(input) === secondMirrorHost
+        ? Promise.resolve(Response.json({ metadata, data: [siriusRow] }))
+        : hangUntilAborted(init?.signal),
+  });
+
+  const started = performance.now();
+  const result = await repository.findByName("Sirius");
+
+  expect(result.value?.name).toBe("Sirius");
+  expect(performance.now() - started).toBeLessThan(600);
+});
+
 test("keeps its own SIMBAD host order while a concurrent lookup promotes a mirror", async () => {
   let releasePrimary!: () => void;
   const stalledPrimary = new Promise<Response>((resolve) => {
