@@ -5,7 +5,12 @@ import { UpstreamError } from "./errors.ts";
 import type { RepositoryPage, RepositoryResult } from "./nasa-archive.ts";
 import { type Fetcher, globalFetch } from "./fetcher.ts";
 
-const SIMBAD_TAP_ENDPOINT = "https://simbad.cds.unistra.fr/simbad/sim-tap/sync";
+export const SIMBAD_TAP_ENDPOINTS = [
+  "https://simbad.cds.unistra.fr/simbad/sim-tap/sync",
+  // Mirrors CDS points to while Strasbourg is offline.
+  "https://simbad.idia.ac.za/simbad/sim-tap/sync",
+  "https://simbad.cfa.harvard.edu/simbad/sim-tap/sync",
+] as const;
 const FEATURED_NAMES = [
   "Altair",
   "Antares",
@@ -87,6 +92,7 @@ const simbadPayloadSchema = z.object({
   data: z.array(z.array(z.unknown())),
   metadata: z.array(z.object({ name: z.string().min(1) })),
 });
+type SimbadPayload = z.infer<typeof simbadPayloadSchema>;
 const expectedSimbadColumns = new Set(Object.keys(simbadStarRowSchema.shape));
 
 export interface StarRepository {
@@ -177,6 +183,8 @@ const STAR_DISCOVERY_FILTERS: Record<StarDiscoveryCategory, { order: string; whe
 
 export interface SimbadStarRepositoryOptions {
   cacheTtlMs?: number;
+  /** TAP sync endpoints, tried in order until one answers. */
+  endpoints?: readonly string[];
   fetcher?: Fetcher;
   now?: () => number;
   timeoutMs?: number;
@@ -385,6 +393,7 @@ type CachedStarQuery = Omit<StarQueryResult, "cached">;
 export class SimbadStarRepository implements StarRepository {
   readonly #cache = createArchiveCache<CachedStarQuery>();
   readonly #cacheTtlMs: number;
+  readonly #endpoints: readonly string[];
   readonly #fetcher: Fetcher;
   readonly #now: () => number;
   readonly #requests = createRequestCoalescer<StarQueryResult>();
@@ -392,6 +401,7 @@ export class SimbadStarRepository implements StarRepository {
 
   constructor(options: SimbadStarRepositoryOptions = {}) {
     this.#cacheTtlMs = options.cacheTtlMs ?? 1000 * 60 * 60 * 12;
+    this.#endpoints = options.endpoints ?? SIMBAD_TAP_ENDPOINTS;
     this.#fetcher = options.fetcher ?? globalFetch;
     this.#now = options.now ?? Date.now;
     this.#timeoutMs = options.timeoutMs ?? 10_000;
@@ -463,27 +473,9 @@ export class SimbadStarRepository implements StarRepository {
     if (cached) return { ...cached, cached: true };
 
     return this.#requests.run(adql, async () => {
-      const url = new URL(SIMBAD_TAP_ENDPOINT);
-      url.searchParams.set("request", "doQuery");
-      url.searchParams.set("lang", "adql");
-      url.searchParams.set("format", "json");
-      url.searchParams.set("query", adql);
-
       try {
-        const response = await this.#fetcher(url, {
-          headers: { accept: "application/json" },
-          signal: AbortSignal.timeout(this.#timeoutMs),
-        });
-        if (!response.ok) {
-          throw new SimbadArchiveError(`SIMBAD TAP responded with status ${response.status}.`);
-        }
-
-        const payload = simbadPayloadSchema.safeParse(await response.json());
-        if (!payload.success) {
-          throw new SimbadArchiveError("SIMBAD TAP returned an unexpected response shape.");
-        }
-
-        const columns = payload.data.metadata.map((column) => column.name);
+        const payload = await this.#fetchPayload(adql);
+        const columns = payload.metadata.map((column) => column.name);
         if (
           columns.length !== expectedSimbadColumns.size ||
           new Set(columns).size !== columns.length ||
@@ -493,9 +485,9 @@ export class SimbadStarRepository implements StarRepository {
         }
         const retrievedOn = new Date(requestTime).toISOString().slice(0, 10);
         const matchedIdColumn = columns.indexOf("matched_id");
-        const lastRow = payload.data.data.at(-1);
+        const lastRow = payload.data.at(-1);
         const lastMatchedId = lastRow?.[matchedIdColumn];
-        const stars = payload.data.data
+        const stars = payload.data
           .map((values) => {
             if (values.length !== columns.length) {
               throw new SimbadArchiveError("SIMBAD TAP returned a truncated result row.");
@@ -513,7 +505,7 @@ export class SimbadStarRepository implements StarRepository {
 
         const outcome: CachedStarQuery = {
           cursor: typeof lastMatchedId === "string" ? lastMatchedId : null,
-          rowCount: payload.data.data.length,
+          rowCount: payload.data.length,
           value: stars,
         };
         this.#cache.set(adql, outcome, this.#now() + this.#cacheTtlMs);
@@ -523,5 +515,46 @@ export class SimbadStarRepository implements StarRepository {
         throw new SimbadArchiveError("SIMBAD TAP request failed.", { cause: error });
       }
     });
+  }
+
+  /** Asks each endpoint in turn, moving on only when one is unreachable or not answering TAP. */
+  async #fetchPayload(adql: string): Promise<SimbadPayload> {
+    const failures: unknown[] = [];
+    for (const endpoint of this.#endpoints) {
+      try {
+        return await this.#request(endpoint, adql);
+      } catch (error) {
+        failures.push(error);
+      }
+    }
+    throw new SimbadArchiveError("No SIMBAD TAP endpoint answered.", {
+      cause: new AggregateError(failures),
+    });
+  }
+
+  async #request(endpoint: string, adql: string): Promise<SimbadPayload> {
+    const url = new URL(endpoint);
+    url.searchParams.set("request", "doQuery");
+    url.searchParams.set("lang", "adql");
+    url.searchParams.set("format", "json");
+    url.searchParams.set("query", adql);
+
+    const response = await this.#fetcher(url, {
+      headers: { accept: "application/json" },
+      signal: AbortSignal.timeout(this.#timeoutMs),
+    });
+    if (!response.ok) {
+      throw new SimbadArchiveError(
+        `SIMBAD TAP at ${url.host} responded with status ${response.status}.`,
+      );
+    }
+
+    const payload = simbadPayloadSchema.safeParse(await response.json());
+    if (!payload.success) {
+      throw new SimbadArchiveError(
+        `SIMBAD TAP at ${url.host} returned an unexpected response shape.`,
+      );
+    }
+    return payload.data;
   }
 }
