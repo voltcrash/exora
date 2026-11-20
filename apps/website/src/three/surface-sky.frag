@@ -67,7 +67,7 @@ void main() {
     float density = smoothstep(.68 - cover * .23, .76 - cover * .22, field);
     float sunSide = cloudNoise(plane + sunDirection.xz * .031) - body;
     vec3 cloud = mix(skyTint * .58, sunTint * .96, clamp(.51 + sunSide * 2.6 + .27 * wisps, 0., 1.));
-    sky = mix(sky, cloud, density * smoothstep(.012,.15,altitude) * min(.91,cover * 1.6));
+    sky = mix(sky, cloud, density * smoothstep(.012,.15,altitude) * min(.82,cover * 1.4) * (1. - .62 * air));
   }
   float opacity = smoothstep(.015,.16,air) + (1. - smoothstep(.015,.16,air)) * air * horizon;
   #ifdef CLOUD_STEPS

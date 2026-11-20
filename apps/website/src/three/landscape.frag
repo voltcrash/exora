@@ -6,7 +6,7 @@
 
 uniform sampler2D detail, cliffScan;
 uniform vec3 ramp[5], regolith, bedrock, frost, lava, skyTint, sunTint, sunDirection;
-uniform float air, strata, strataSpacing, datum, lavaGlow, time;
+uniform float air, strata, strataSpacing, datum, lavaGlow, oxide, time;
 uniform vec2 detailOffset;
 uniform bool neutral, hasScans;
 varying vec3 groundPoint, groundNormal;
@@ -59,6 +59,7 @@ void main() {
     vec3 fines = mix(ramp[1], regolith, .38 + .62 * deposit);
     color = mix(stone, fines, crust * (1. - exposure * .91));
     color *= (.69 + .55 * deposit) * albedo;
+    color *= mix(vec3(1.), vec3(1.35, .63, .41), oxide * (1.2 + deposit));
     float snow = ice * smoothstep(.34,.91, N.y + .24 * (deposit - .5));
     color = mix(color, mix(vec3(.075,.22,.31), frost * .68, snow) * mix(albedo, 1., .52), ice);
     if (lavaGlow > .05) {
@@ -70,14 +71,14 @@ void main() {
     float shadow = min(terrainShade.y, getShadowMask());
     color *= ambient * (.42 + .71 * terrainShade.x) + sunTint * (1.46 * direct * shadow);
     color += ice * (.024 + .12 * pow(max(0., dot(microNormal,normalize(sunDirection + V))), 28.)) * shadow;
-    float flow = surfaceMask.w;
+    float flow = surfaceMask.w * smoothstep(.42,.95,N.y);
     if (flow > .001) {
       float fracture = valueNoise(P.xz * 2.7 + .23 * sin(time * .22)) * .22 + deposit * .22;
       float hot = smoothstep(.05,.56, flow * (1.08 - fracture));
       vec2 cooledPlate = P.xz * vec2(.74, 1.18) + deposit * .9;
       float plate = valueNoise(cooledPlate) * .71 + .29 * valueNoise(cooledPlate * 4. + time * .014);
       float skin = smoothstep(.43, .61, plate);
-      vec3 melt = mix(vec3(.61,.025,.002), vec3(2.4,.73,.06), hot * (1. - skin));
+      vec3 melt = mix(lava * vec3(.7,.085,.025), lava * vec3(2.4,1.8,.85), hot * (1. - skin));
       color = mix(color, mix(melt, vec3(.049,.018,.014) * albedo, skin * .95), hot);
     }
     if (P.y < datum) color *= .58;

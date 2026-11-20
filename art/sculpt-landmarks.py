@@ -95,7 +95,13 @@ def prism(name, x, y, width, depth, height, sides, ice):
             a, b = ring * sides + i, ring * sides + (i + 1) % sides
             faces.append((a, b, b + sides, a + sides))
     faces.append(tuple(range(3 * sides, 4 * sides)))
-    return mesh(name, verts, faces)
+    obj = mesh(name, verts, faces)
+    bevel = obj.modifiers.new("Chipped edges", "BEVEL")
+    bevel.width = min(width, depth) * (.15 if ice else .085)
+    bevel.segments = 1
+    bpy.context.view_layer.objects.active = obj
+    bpy.ops.object.modifier_apply(modifier=bevel.name)
+    return obj
 
 
 plates = []

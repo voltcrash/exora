@@ -52,6 +52,9 @@ sculpt("Spire", (0.64, 0.49, 1.44), 128, 3,
 sculpt("IceShard", (0.48, 0.62, 1.32), 209, 3,
        [((0.88, 0.2, 0.31), 0.38), ((-0.56, 0.82, -0.1), 0.39), ((0.2, -0.87, 0.16), 0.36)], 0.18)
 
+sculpt("Pebble", (1, 0.72, 0.53), 93, 2,
+       [((0.27, -0.54, 0.71), 0.73)], 0.4)
+
 bpy.ops.export_scene.gltf(
     filepath=str(output), export_format="GLB", export_texcoords=False, export_animations=False
 )

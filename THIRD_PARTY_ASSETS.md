@@ -244,8 +244,8 @@ centered mesh with its material embedded.
 | `models/comet-nucleus.glb`   | Dark bilobed nucleus with a narrow neck         |
 | `models/ice-fragment.glb`    | Elongated ice-rich fragment with shallow basins |
 
-`models/terrain-outcrops.glb` contains four original Blender meshes for local
-exploration. The boulder, slab, spire, and ice shard use clipped rock faces and
+`models/terrain-outcrops.glb` contains five original Blender meshes for local
+exploration. The pebble, boulder, slab, spire, and ice shard use clipped rock faces and
 vertex pigment. Regenerate them with `art/model-terrain-outcrops.py` in Blender.
 
 `art/sculpt-landmarks.py` builds three original local formations in Blender.

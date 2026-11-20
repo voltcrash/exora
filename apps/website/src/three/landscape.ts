@@ -22,6 +22,7 @@ import {
 } from "three";
 
 import { siteBearing, sitePosition } from "../surface-landing.ts";
+import { createTerrainField, createTerrainSample } from "../surface-terrain.ts";
 import type { SurfaceGeology } from "../surface-geology.ts";
 import { createSurfaceFloor, type SurfaceTerrainData } from "../surface-terrain-kernel.ts";
 import landscapeFragment from "./landscape.frag?raw";
@@ -100,6 +101,9 @@ export function createLandscape(
         bedrock: { value: geology ? color(geology.bedrockColor) : neutralColor },
         frost: { value: geology ? color(geology.frostColor) : neutralColor },
         lava: { value: geology ? color(geology.lavaColor) : neutralColor },
+        oxide: {
+          value: geology?.detail.chemistry === "oxidized" ? geology.detail.chemistryStrength : 0,
+        },
         skyTint: { value: skyTint },
         sunTint: { value: sunLight },
         sunDirection: { value: surfaceSunDirection },
@@ -201,9 +205,12 @@ export function createLandscape(
       ? createOutcrops(root, geology, terrainFloor, water, constrained, updateShadows)
       : null;
   const landing = sitePosition(recipe.seed, 0, -7);
-  if (terrain && Number.isFinite(water)) {
+  if (terrain && (Number.isFinite(water) || terrain.geology.lavaGlow > 0)) {
+    const surface = createTerrainField(terrain.geology);
+    const sample = createTerrainSample();
     for (const across of [-8, 8, -14, 14, -23, 23]) {
-      if (terrainFloor(landing.x, landing.z) > water + 0.3) break;
+      surface.sample(landing.x, landing.z, sample);
+      if (terrainFloor(landing.x, landing.z) > water + 0.3 && sample.molten < 0.03) break;
       Object.assign(landing, sitePosition(recipe.seed, across, -11));
     }
   }
