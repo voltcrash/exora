@@ -216,9 +216,6 @@ export function createLandscape(
     geology?.medium === "rock"
       ? createOutcrops(root, geology, terrainFloor, water, constrained, updateShadows)
       : null;
-  const forest = alpineForest
-    ? createAlpineForest(root, recipe.seed, terrainFloor, water, constrained, updateShadows)
-    : null;
   const landing = sitePosition(recipe.seed, 0, -7);
   if (terrain && (Number.isFinite(water) || terrain.geology.lavaGlow > 0)) {
     const surface = createTerrainField(terrain.geology);
@@ -229,6 +226,17 @@ export function createLandscape(
       Object.assign(landing, sitePosition(recipe.seed, across, -11));
     }
   }
+  const forest = alpineForest
+    ? createAlpineForest(
+        root,
+        recipe.seed,
+        terrainFloor,
+        water,
+        landing,
+        constrained,
+        updateShadows,
+      )
+    : null;
   return {
     follow(x: number, z: number) {
       sky.position.set(x, 0, z);

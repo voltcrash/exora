@@ -1,12 +1,12 @@
 import { Color, Group, InstancedMesh, Mesh, MeshStandardMaterial, Object3D } from "three";
 import { GLTFLoader } from "three/addons/loaders/GLTFLoader.js";
-import { sitePosition } from "../surface-landing.ts";
 
 export function createAlpineForest(
   root: Group,
   seed: number,
   height: (x: number, z: number) => number,
   water: number,
+  landing: { x: number; z: number },
   constrained: boolean,
   onReady: () => void,
 ) {
@@ -14,7 +14,6 @@ export function createAlpineForest(
   let stand: InstancedMesh | undefined;
   let release: (() => void) | undefined;
   const trunks: { x: number; z: number; radius: number }[] = [];
-  const start = sitePosition(seed, 0, -7);
   void new GLTFLoader()
     .loadAsync("/models/alpine-fir.glb")
     .then(({ scene }) => {
@@ -49,7 +48,7 @@ export function createAlpineForest(
             y < water + 0.13 ||
             y > 11 + moisture * 4 ||
             moisture < -0.57 ||
-            Math.hypot(x - start.x, z - start.z) < 7
+            Math.hypot(x - landing.x, z - landing.z) < 7
           )
             continue;
           const slope = Math.hypot(height(x + 1, z) - y, height(x, z + 1) - y);
