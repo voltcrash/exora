@@ -1,3 +1,4 @@
+import type { ExoplanetProfile } from "@exora/contracts";
 import type { Rgb, WorldRecipe } from "@exora/worldgen";
 import {
   BackSide,
@@ -25,6 +26,8 @@ import type { SurfaceGeology } from "../surface-geology.ts";
 import { createSurfaceFloor, type SurfaceTerrainData } from "../surface-terrain-kernel.ts";
 import landscapeFragment from "./landscape.frag?raw";
 import landscapeVertex from "./landscape.vert?raw";
+import skyFragment from "./surface-sky.frag?raw";
+import { createHorizonPlanet } from "./moon-horizon.ts";
 import shorelineFragment from "./shoreline.frag?raw";
 import { createLandmarks } from "./landmarks.ts";
 import { createOutcrops } from "./outcrops.ts";
@@ -46,6 +49,8 @@ export function createLandscape(
   texture: Texture,
   terrain: LandscapeTerrain | null,
   constrained = false,
+  weather = texture,
+  planet?: ExoplanetProfile,
 ) {
   const root = new Group();
   const surfaceSunDirection = siteSun(recipe.seed);
@@ -154,23 +159,19 @@ export function createLandscape(
       depthWrite: false,
       uniforms: {
         air: { value: air },
+        time,
+        cover: {
+          value: cloudDeck ? 0.85 : recipe.renderer === "rocky" ? recipe.surface.cloudCover : 0,
+        },
+        weather: { value: weather },
+        seedOffset: { value: new Vector2(offset, offset * 2.89) },
         skyTint: { value: skyTint },
         sunTint: { value: sunLight },
         sunDirection: { value: surfaceSunDirection },
       },
       vertexShader:
         "varying vec3 bearing;void main(){bearing=position;gl_Position=projectionMatrix*modelViewMatrix*vec4(position,1.);}",
-      fragmentShader: `varying vec3 bearing;uniform vec3 skyTint,sunTint,sunDirection;uniform float air;
-      void main() {
-        vec3 p = normalize(bearing);
-        float altitude = max(0., p.y);
-        float horizon = exp(-altitude * 5.2);
-        float beam = max(0., dot(p, sunDirection));
-        vec3 tint = skyTint * (.15 + .51 * horizon);
-        tint += sunTint * (pow(beam, 18.) * .12 + pow(beam, 240.) * .22) * air;
-        gl_FragColor = vec4(tint, 1. - exp(-air * (2.4 + 6. * horizon)));
-        #include <colorspace_fragment>
-      }`,
+      fragmentShader: skyFragment,
     }),
   );
   const star = new Mesh(
@@ -185,6 +186,11 @@ export function createLandscape(
   star.position.copy(sunOffset);
   root.add(star);
   if (air > 0) root.add(sky);
+  const parent =
+    terrain && air < 0.5
+      ? createHorizonPlanet(planet, recipe.seed, texture, weather, surfaceSunDirection)
+      : null;
+  if (parent) root.add(parent.root);
 
   const sunlight = new DirectionalLight(sunLight, 2.35);
   sunlight.position.copy(surfaceSunDirection).multiplyScalar(160);
@@ -221,6 +227,7 @@ export function createLandscape(
   return {
     follow(x: number, z: number) {
       sky.position.set(x, 0, z);
+      parent?.follow(x, z);
       star.position.set(sunOffset.x + x, sunOffset.y, sunOffset.z + z);
     },
     root,
@@ -237,6 +244,7 @@ export function createLandscape(
       ground.material.uniforms.hasScans!.value = true;
     },
     dispose() {
+      parent?.dispose();
       formations?.dispose();
       clearRocks?.();
       sunlight.dispose();

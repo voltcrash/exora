@@ -87,7 +87,7 @@ export function createLandmarks(
   const eye = new Vector3(),
     direction = new Vector3();
   return {
-    blocks(x: number, z: number, nextX: number, nextZ: number, eyeY: number) {
+    blocks(this: void, x: number, z: number, nextX: number, nextZ: number, eyeY: number) {
       direction.set(nextX - x, 0, nextZ - z);
       const step = direction.length();
       if (!step) return false;

@@ -153,6 +153,8 @@ export async function createPlanetWorld(
         fields.surface,
         surfaceTerrain,
         host.profile.tier === "mobile",
+        fields.flow,
+        planet,
       );
       if (scans) surface.setScans(scans.ground, scans.cliff);
       root.add(surface.root);
