@@ -6,9 +6,9 @@
 
 uniform sampler2D detail, cliffScan;
 uniform vec3 ramp[5], regolith, bedrock, frost, lava, skyTint, sunTint, sunDirection;
-uniform float air, relief, strata, strataSpacing, datum, windStreaks, lavaGlow, time;
+uniform float air, strata, strataSpacing, datum, lavaGlow, time;
 uniform vec2 detailOffset;
-uniform bool neutral, cloudDeck, hasScans;
+uniform bool neutral, hasScans;
 varying vec3 groundPoint, groundNormal;
 varying vec4 surfaceMask;
 varying vec2 terrainShade;
@@ -27,14 +27,6 @@ void main() {
   vec3 color;
   if (neutral) {
     color = ramp[2] * (.52 + .72 * max(dot(N, sunDirection), 0.));
-  } else if (cloudDeck) {
-    vec2 uv = P.xz * .017 + detailOffset;
-    vec2 curl = vec2(valueNoise(uv), valueNoise(uv * 1.6 + 4.));
-    float mist = .64 * valueNoise(uv * 5. + curl * 3.) + .36 * valueNoise(uv * 14. + curl * 6.);
-    float bank = clamp(.37 + P.y * .014 + mist * .38, 0., 1.);
-    color = mix(ramp[1], ramp[4], bank);
-    color *= .51 + .57 * max(dot(N,sunDirection),0.) + .29 * mist;
-    color = mix(color, ramp[3], .24 + .59 * (1. - exp(-distanceToEye * .025)));
   } else {
     vec2 field = P.xz * .062 + detailOffset * 8.;
     float deposit = .57 * valueNoise(field) + .29 * valueNoise(field * 2.87) + .14 * valueNoise(field * 8.1);

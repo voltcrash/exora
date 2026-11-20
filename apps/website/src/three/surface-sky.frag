@@ -9,6 +9,46 @@ float cloudNoise(vec2 uv) {
   return texture2D(weather, p).r;
 }
 
+#ifdef CLOUD_STEPS
+uniform sampler2D cloudHeights;
+uniform vec2 heightRange;
+uniform float cloudExtent;
+uniform vec3 cloudLight, cloudDark;
+float cloudTop(vec3 p) {
+  float form = texture2D(cloudHeights, p.xz / (2. * cloudExtent) + .5).r;
+  vec2 drift = vec2(time * .001, time * -.0004);
+  vec2 uv = p.xz * .013 + p.y * vec2(.014, -.009) + seedOffset + drift;
+  float wisps = cloudNoise(uv) * .64 + .36 * cloudNoise(uv * 3.81);
+  return mix(heightRange.x, heightRange.y, form) + (wisps - .5) * 10.;
+}
+vec3 cloudLayer(vec3 ray, vec3 sky) {
+  vec3 scattering = vec3(0.);
+  float transmission = 1.;
+  float previous = 0.;
+  float jitter = fract(52.9829189 * fract(dot(gl_FragCoord.xy, vec2(.06711056,.00583715))));
+  for (int i = 0; i < CLOUD_STEPS; i++) {
+    float u = float(i + 1) / float(CLOUD_STEPS);
+    float end = 200. * u * u;
+    float distance = mix(previous, end, .32 + jitter * .36);
+    vec3 p = cameraPosition + ray * distance;
+    float top = cloudTop(p);
+    float density = smoothstep(-2.9, 5.4, top - p.y);
+    float opacity = 1. - exp(-density * (end - previous) * .31);
+    if (opacity > .002) {
+      float shade = clamp(.57 + .088 * (top - cloudTop(p + sunDirection * 6.)) + .08 * (p.y - top), 0., 1.);
+      float silver = pow(max(0., dot(ray, sunDirection)), 7.) * (1. - density);
+      vec3 tint = mix(cloudDark, cloudLight, .11 + .81 * shade) + sunTint * silver * .24;
+      tint = mix(tint, sky, 1. - exp(-distance * .004));
+      scattering += transmission * opacity * tint;
+      transmission *= 1. - opacity;
+    }
+    previous = end;
+    if (transmission < .018) break;
+  }
+  return scattering + transmission * sky;
+}
+#endif
+
 void main() {
   vec3 p = normalize(bearing);
   float altitude = max(0., p.y);
@@ -30,6 +70,10 @@ void main() {
     sky = mix(sky, cloud, density * smoothstep(.012,.15,altitude) * min(.91,cover * 1.6));
   }
   float opacity = smoothstep(.015,.16,air) + (1. - smoothstep(.015,.16,air)) * air * horizon;
+  #ifdef CLOUD_STEPS
+    sky = cloudLayer(p, sky);
+    opacity = 1.;
+  #endif
   gl_FragColor = vec4(sky / (1. + .34 * sky), opacity);
   #include <colorspace_fragment>
 }

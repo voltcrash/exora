@@ -29,6 +29,8 @@ import landscapeVertex from "./landscape.vert?raw";
 import skyFragment from "./surface-sky.frag?raw";
 import { createHorizonPlanet } from "./moon-horizon.ts";
 import shorelineFragment from "./shoreline.frag?raw";
+import { createCloudHeights } from "./cloud-deck.ts";
+import { SURFACE_HALF_EXTENT } from "../surface-vista-baking.ts";
 import { createLandmarks } from "./landmarks.ts";
 import { createOutcrops } from "./outcrops.ts";
 
@@ -67,17 +69,18 @@ export function createLandscape(
       ? (geology.liquidLevel - 0.42) * geology.relief * 1.15
       : -Infinity;
   const terrainFloor = terrain ? createSurfaceFloor(terrain.data) : () => 0;
-  const floorAt = (x: number, z: number) => Math.max(water, terrainFloor(x, z));
-  const geometry = terrain
-    ? new BufferGeometry()
-        .setAttribute("position", new BufferAttribute(terrain.data.positions, 3))
-        .setAttribute("masks", new BufferAttribute(terrain.data.colors, 4))
-        .setAttribute("shade", new BufferAttribute(terrain.data.shade, 2))
-        .setIndex(new BufferAttribute(terrain.data.indices, 1))
-    : new PlaneGeometry(4000, 4000).rotateX(-Math.PI / 2);
+  const floorAt = (x: number, z: number) =>
+    Math.max(water, terrainFloor(x, z)) + (cloudDeck ? 4.5 : 0);
+  const geometry =
+    terrain && !cloudDeck
+      ? new BufferGeometry()
+          .setAttribute("position", new BufferAttribute(terrain.data.positions, 3))
+          .setAttribute("masks", new BufferAttribute(terrain.data.colors, 4))
+          .setAttribute("shade", new BufferAttribute(terrain.data.shade, 2))
+          .setIndex(new BufferAttribute(terrain.data.indices, 1))
+      : new PlaneGeometry(4000, 4000).rotateX(-Math.PI / 2);
   geometry.computeVertexNormals();
 
-  const wind = geology?.windDirection ?? 0;
   const offset = recipe.seed / 4_294_967_296;
   const time = { value: 0 };
   const ground = new Mesh(
@@ -102,20 +105,16 @@ export function createLandscape(
         sunDirection: { value: surfaceSunDirection },
         air: { value: air },
         neutral: { value: !terrain },
-        cloudDeck: { value: cloudDeck },
-        relief: { value: geology?.relief ?? 1 },
         strata: { value: geology?.strataStrength ?? 0 },
         strataSpacing: { value: Math.max(0.24, (geology?.strataSpacing ?? 1) * 0.42) },
         datum: { value: Number.isFinite(water) ? water : -1000 },
-        windDirection: { value: new Vector2(Math.cos(wind), Math.sin(wind)) },
-        windStreaks: { value: geology?.windStreaks ?? 0 },
       },
       vertexShader: landscapeVertex,
       fragmentShader: landscapeFragment,
     }),
   );
   ground.castShadow = ground.receiveShadow = !!terrain && !cloudDeck;
-  root.add(ground);
+  if (!cloudDeck) root.add(ground);
   const sea =
     terrain && Number.isFinite(water)
       ? new Mesh(
@@ -151,10 +150,12 @@ export function createLandscape(
     sea.raycast = () => {};
     root.add(sea);
   }
+  const cloudHeights = terrain && cloudDeck ? createCloudHeights(terrain.data, terrainFloor) : null;
   const sky = new Mesh(
     new SphereGeometry(760, 40, 28),
     new ShaderMaterial({
       side: BackSide,
+      defines: cloudHeights ? { CLOUD_STEPS: constrained ? 16 : 26 } : {},
       transparent: true,
       depthWrite: false,
       uniforms: {
@@ -164,6 +165,11 @@ export function createLandscape(
           value: cloudDeck ? 0.85 : recipe.renderer === "rocky" ? recipe.surface.cloudCover : 0,
         },
         weather: { value: weather },
+        cloudHeights: { value: cloudHeights },
+        heightRange: { value: new Vector2(terrain?.data.low ?? 0, terrain?.data.high ?? 1) },
+        cloudExtent: { value: SURFACE_HALF_EXTENT },
+        cloudLight: { value: ramp[4] },
+        cloudDark: { value: ramp[0] },
         seedOffset: { value: new Vector2(offset, offset * 2.89) },
         skyTint: { value: skyTint },
         sunTint: { value: sunLight },
@@ -251,6 +257,7 @@ export function createLandscape(
       ground.material.uniforms.hasScans!.value = true;
     },
     dispose() {
+      cloudHeights?.dispose();
       parent?.dispose();
       formations?.dispose();
       clearRocks?.();
