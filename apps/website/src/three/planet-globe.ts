@@ -14,6 +14,7 @@ import {
 } from "three";
 import vertexShader from "./globe.vert?raw";
 import fragmentShader from "./globe.frag?raw";
+import { createSolarGlobe } from "./solar-planet-models.ts";
 
 const linearColor = (color: Rgb) => new Color().setRGB(...color, SRGBColorSpace);
 
@@ -25,8 +26,14 @@ export function createPlanetGlobe(
   {
     drawRings = true,
     identity,
-  }: { drawRings?: boolean; identity?: ExoplanetProfile["solarSystem"] } = {},
+    model,
+  }: {
+    drawRings?: boolean;
+    model?: Group | undefined;
+    identity?: ExoplanetProfile["solarSystem"];
+  } = {},
 ) {
+  if (model) return createSolarGlobe(recipe, model, drawRings);
   const rocky = recipe.renderer === "rocky" ? recipe.surface : null;
   const palette =
     recipe.renderer === "rocky"

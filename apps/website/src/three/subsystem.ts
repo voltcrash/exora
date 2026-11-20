@@ -35,7 +35,7 @@ export async function createSubsystemWorld(
   host: Observatory,
   { planet, subsystem, onFirstFrame, onSelectMoon }: SubsystemOptions,
 ): Promise<Observation> {
-  const fields = await loadPlanetFields();
+  const fields = await loadPlanetFields(true, [planet]);
   const root = new Group(),
     equator = new Group();
   const segments = host.profile.systemOrbitSegments,
@@ -49,7 +49,11 @@ export async function createSubsystemWorld(
     fields.surface,
     fields.flow,
     segments / 2,
-    { drawRings: false, identity: planet.solarSystem },
+    {
+      drawRings: false,
+      identity: planet.solarSystem,
+      model: fields.models.get(planet.name.toLowerCase()),
+    },
   );
   primary.root.scale.setScalar(primaryRadius / parentRecipe.radiusSceneUnits);
   equator.add(primary.root);

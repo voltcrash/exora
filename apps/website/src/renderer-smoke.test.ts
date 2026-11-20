@@ -11,6 +11,8 @@ import {
   TextureLoader,
   Vector3,
 } from "three";
+import { readFile } from "node:fs/promises";
+import { GLTFLoader } from "three/addons/loaders/GLTFLoader.js";
 import { BLACK_HOLES } from "./black-holes.ts";
 import { findPlanetarySubsystem } from "./planetary-subsystems.ts";
 import { deriveRenderQuality } from "./render-quality.ts";
@@ -40,11 +42,20 @@ const camera = new PerspectiveCamera();
 const host = { profile, qualityTier: profile.tier, camera } as Observatory;
 const onFirstFrame = () => {};
 beforeEach(() => {
+  vi.stubGlobal("self", globalThis);
+  vi.stubGlobal("createImageBitmap", async () => ({ width: 1, height: 1 }));
+  vi.spyOn(GLTFLoader.prototype, "loadAsync").mockImplementation(async (path) => {
+    const bytes = await readFile(new URL("../public" + path, import.meta.url));
+    return new GLTFLoader().parseAsync(Uint8Array.from(bytes).buffer, "");
+  });
   vi.spyOn(TextureLoader.prototype, "loadAsync").mockImplementation(
     async () => new Texture<HTMLImageElement>(),
   );
 });
-afterEach(() => vi.restoreAllMocks());
+afterEach(() => {
+  vi.restoreAllMocks();
+  vi.unstubAllGlobals();
+});
 
 test.each([MARS, JUPITER, NEPTUNE, SATURN, HAUMEA])(
   "$name uses its recipe, smooth normals, measured shape and owned material",
@@ -63,7 +74,9 @@ test.each([MARS, JUPITER, NEPTUNE, SATURN, HAUMEA])(
     expect(body.geometry.getAttribute("normal").count).toBe(
       body.geometry.getAttribute("position").count,
     );
-    expect((body.material as ShaderMaterial).uniforms.seed!.value).toBe(recipe.seed / 4294967296);
+    const uniforms = (body.material as ShaderMaterial).uniforms;
+    if (planet === HAUMEA) expect(uniforms.seed!.value).toBe(recipe.seed / 4294967296);
+    else expect(uniforms.albedo!.value).toBeInstanceOf(Texture);
     if (planet === SATURN) expect(globe!.children).toHaveLength(2);
     if (planet === HAUMEA) {
       expect(body.scale.x / body.scale.y).toBeCloseTo(2322 / 1026);

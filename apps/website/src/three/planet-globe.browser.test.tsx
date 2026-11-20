@@ -1,7 +1,25 @@
 import { expect, test } from "vite-plus/test";
 import { deriveWorldRecipe } from "@exora/worldgen";
-import { PerspectiveCamera, RepeatWrapping, Scene, TextureLoader, WebGLRenderer } from "three";
-import { EARTH, JUPITER, NEPTUNE } from "../solar-system.ts";
+import {
+  Mesh,
+  PerspectiveCamera,
+  RepeatWrapping,
+  Scene,
+  TextureLoader,
+  WebGLRenderer,
+} from "three";
+import {
+  MERCURY,
+  VENUS,
+  EARTH,
+  MARS,
+  JUPITER,
+  SATURN,
+  URANUS,
+  NEPTUNE,
+  tuneSolarWorldRecipe,
+} from "../solar-system.ts";
+import { loadPlanetFields } from "./planet-fields.ts";
 import { createPlanetGlobe } from "./planet-globe.ts";
 
 test("Blender fields shade rocky, gas and ice planets with distinct lit surfaces", async () => {
@@ -55,5 +73,52 @@ test("Blender fields shade rocky, gas and ice planets with distinct lit surfaces
   } finally {
     for (const map of maps) map.dispose();
     renderer.dispose();
+  }
+});
+
+test("the eight Solar System GLBs render with mapped surfaces and the source polar radii", async () => {
+  const profiles = [MERCURY, VENUS, EARTH, MARS, JUPITER, SATURN, URANUS, NEPTUNE];
+  const polarRadii = [1, 1, 0.99665, 0.99411, 0.93513, 0.90204, 0.97707, 0.98292];
+  const fields = await loadPlanetFields(false, profiles);
+  const renderer = new WebGLRenderer();
+  renderer.setSize(96, 96, false);
+  const gl = renderer.getContext();
+  const camera = new PerspectiveCamera(40, 1, 0.01, 100);
+  const scene = new Scene();
+  const signatures = new Set<string>();
+  try {
+    for (const [index, profile] of profiles.entries()) {
+      const model = fields.models.get(profile.name.toLowerCase())!;
+      const source = model.getObjectByName("Body");
+      expect(source).toBeInstanceOf(Mesh);
+      if (!(source instanceof Mesh)) throw new Error("Missing planet mesh");
+      source.geometry.computeBoundingBox();
+      expect(source.geometry.boundingBox.max.y).toBeCloseTo(polarRadii[index]!, 4);
+      const recipe = tuneSolarWorldRecipe(profile, deriveWorldRecipe(profile));
+      const globe = createPlanetGlobe(recipe, fields.surface, fields.flow, 64, { model });
+      try {
+        expect(globe.extent / recipe.radiusSceneUnits).toBeCloseTo(
+          profile === SATURN ? 2.33 : 1,
+          2,
+        );
+        expect(Boolean(globe.root.getObjectByName("Rings"))).toBe(profile === SATURN);
+        scene.add(globe.root);
+        camera.position.z = recipe.radiusSceneUnits * 4;
+        globe.update(0);
+        renderer.render(scene, camera);
+        const pixels = new Uint8Array(96 * 96 * 4);
+        gl.readPixels(0, 0, 96, 96, gl.RGBA, gl.UNSIGNED_BYTE, pixels);
+        const center = (48 * 96 + 48) * 4;
+        const rgb = Array.from(pixels.subarray(center, center + 3));
+        expect(Math.max(...rgb)).toBeGreaterThan(20);
+        signatures.add(rgb.join(","));
+      } finally {
+        globe.dispose();
+      }
+    }
+    expect(signatures.size).toBe(8);
+  } finally {
+    renderer.dispose();
+    fields.dispose();
   }
 });

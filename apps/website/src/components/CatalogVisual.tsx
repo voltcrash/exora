@@ -47,8 +47,14 @@ export function CatalogPortrait({
 }) {
   const index = names.indexOf(name);
   if (index < 0) return null;
+  const mapped = !filter && index >= 1 && index <= 8;
   const style: CustomStyle = {
     backgroundPosition: `${((index % 8) * 100) / 7}% ${Math.floor(index / 8) * 25}%`,
+    ...(mapped && {
+      backgroundImage: 'url("/textures/solar-planets.webp")',
+      backgroundPosition: `${((index - 1) * 100) / 7}% 0%`,
+      backgroundSize: "800% 100%",
+    }),
     filter,
     transform: `rotate(${rotation}rad) scale(${scale})`,
   };

@@ -36,7 +36,7 @@ export async function createPlanetWorld(
   options: PlanetOptions,
 ): Promise<Observation> {
   const { planet, recipe, onViewModeChange, signal } = options;
-  const fields = await loadPlanetFields(recipe.renderer === "rocky");
+  const fields = await loadPlanetFields(recipe.renderer === "rocky", [planet]);
   if (signal?.aborted) {
     fields.dispose();
     signal.throwIfAborted();
@@ -49,6 +49,7 @@ export async function createPlanetWorld(
     host.profile.planetSegments,
     {
       identity: planet.solarSystem,
+      model: fields.models.get(planet.name.toLowerCase()),
     },
   );
   const hours =
@@ -157,6 +158,7 @@ export async function createPlanetWorld(
         host.profile.tier === "mobile",
         fields.flow,
         planet,
+        fields.models.get(planet.solarSystem?.parent?.toLowerCase() ?? ""),
       );
       if (scans) surface.setScans(scans.ground, scans.cliff);
       root.add(surface.root);
