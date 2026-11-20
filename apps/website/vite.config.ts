@@ -58,6 +58,7 @@ export default defineConfig(({ mode }) => {
               "react/compiler-runtime",
               "three/addons/controls/OrbitControls.js",
               "three/addons/loaders/GLTFLoader.js",
+              "three/addons/objects/Reflector.js",
             ],
           },
           test: {

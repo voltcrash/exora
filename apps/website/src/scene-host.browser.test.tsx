@@ -1,4 +1,4 @@
-import { Group, Mesh } from "three";
+import { Group, Mesh, Vector3 } from "three";
 import { expect, test, vi } from "vite-plus/test";
 import { deriveWorldRecipe } from "@exora/worldgen";
 import { createObservatory } from "./three/observatory.ts";
@@ -235,6 +235,37 @@ test("the walking floor matches mesh vertices and the surface sun follows the ob
     expect(view.star.position.z - original.z).toBeCloseTo(-4);
   } finally {
     view.dispose();
+    fields.dispose();
+  }
+});
+
+test("the Martian window admits walkers through its opening and blocks its stone foot", async () => {
+  const fields = await loadPlanetFields();
+  const request = surfaceTerrainFixture(MARS, 32);
+  if (request.kind !== "surface") throw new Error("Expected a surface request");
+  const landscape = createLandscape(
+    tuneSolarWorldRecipe(MARS, deriveWorldRecipe(MARS)),
+    fields.surface,
+    {
+      geology: request.input.geology,
+      data: buildSurfaceTerrain(request.input),
+    },
+  );
+  try {
+    const arch = await vi.waitFor(() => {
+      const mesh = landscape.root.getObjectByName("sandstone-window");
+      if (!mesh) throw new Error("Waiting for the sandstone window");
+      return mesh;
+    });
+    const crossesStone = (x: number) => {
+      const start = arch.localToWorld(new Vector3(x, 1.65, 8));
+      const end = arch.localToWorld(new Vector3(x, 1.65, -8));
+      return landscape.blocks?.(start.x, start.z, end.x, end.z, start.y);
+    };
+    expect(crossesStone(0.4)).toBe(false);
+    expect(crossesStone(-5.5)).toBe(true);
+  } finally {
+    landscape.dispose();
     fields.dispose();
   }
 });
