@@ -290,9 +290,14 @@ export function createTerrainField(geology: SurfaceGeology): TerrainField {
           const radius = Math.hypot(dx, dz) * (1 + lobes) + drainage * 0.19 + detail * 0.05;
           let profile: number;
           if (alpine) {
-            const buttress = 0.16 * Math.cos(theta * 6 + m.angle + regional * 2);
+            const buttress = 0.27 * Math.cos(theta * 5 + m.angle + regional * 2.7);
+            const strike = dx * Math.cos(m.angle) + dz * Math.sin(m.angle);
+            const cross = dz * Math.cos(m.angle) - dx * Math.sin(m.angle);
+            const crest =
+              0.48 * Math.abs(strike) + 1.28 * Math.abs(cross + 0.23 * Math.sin(strike * 4.4));
+            const spur = radius * 0.52 + crest * 0.48 + drainage * (0.12 + 0.12 * radius);
             profile =
-              Math.max(0, 1 - Math.max(0, radius + buttress * Math.min(1, radius)) / 1.85) ** 1.67;
+              Math.max(0, 1 - Math.max(0, spur + buttress * Math.min(1, radius)) / 1.85) ** 1.67;
             profile *= (1.38 + 0.26 * drainage) * (kind === "coastal-shelf" ? 0.6 : 1);
           } else if (volcanic) {
             profile =
@@ -313,7 +318,7 @@ export function createTerrainField(geology: SurfaceGeology): TerrainField {
           const valley = 1 - smoothstep(2, 13, Math.abs(x - braid + z * 0.12));
           result.height += 2.4 - valley * 5.2 + drainage * (1.1 + relief * 0.23);
           result.scarp = smoothstep(2.5, 16, relief);
-          result.frost = smoothstep(17, 36, relief + 8 * drainage);
+          result.frost = smoothstep(11, 32, relief + 13 * drainage + 4 * detail);
         } else if (volcanic) {
           const fault = Math.abs(x - braid - 2.5 - z * 0.12);
           const crust = smoothstep(1.7, 3.8, fault);
