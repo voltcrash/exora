@@ -219,10 +219,18 @@ the longitude wraps and the poles converge. The channels have distinct uses.
 | `textures/fields/convection.png`  | Cloud density         | Zonal shear     | Turbulent filaments |
 | `textures/fields/photosphere.png` | Convection cells      | Active regions  | Bright plage        |
 
-`textures/fields/terrain-materials.png` is an original 512 × 512 Blender bake for local
-terrain. Red packs wind ripples and sand grain, green packs fractured bedrock, and
-blue packs ice faults and grain. The bake samples a periodic domain so the channels
-tile across the ground. Regenerate it with `art/bake-terrain-materials.py` in Blender.
+## Ground materials
+
+Exora packs the tangent-space normals and luminance of these 1k Poly Haven scans in Blender
+with `art/pack-terrain-scans.py`. The local geology supplies the surface colors. The scans are
+distributed under [CC0](https://polyhaven.com/license).
+
+| File                          | Source                                                 | Artists                           |
+| ----------------------------- | ------------------------------------------------------ | --------------------------------- |
+| `textures/terrain/scree.webp` | [Rocky Gravel](https://polyhaven.com/a/rocky_gravel)   | Dimitrios Savva and Dario Barresi |
+| `textures/terrain/sand.webp`  | [Gravelly Sand](https://polyhaven.com/a/gravelly_sand) | Dario Barresi                     |
+| `textures/terrain/frost.webp` | [Snow 03](https://polyhaven.com/a/snow_03)             | Rob Tuytel                        |
+| `textures/terrain/cliff.webp` | [Rock Face 04](https://polyhaven.com/a/rock_face_04)   | Dimitrios Savva                   |
 
 ## Original Blender small bodies
 

@@ -5,16 +5,14 @@ import {
   Group,
   Mesh,
   MeshBasicMaterial,
-  RepeatWrapping,
   SphereGeometry,
   SRGBColorSpace,
-  TextureLoader,
-  type Texture,
   Vector2,
   Vector3,
 } from "three";
 import { skyViewpointFrom } from "../sky-catalog.ts";
 import { createPlanetGlobe } from "./planet-globe.ts";
+import { loadTerrainScans } from "./terrain-scans.ts";
 import { loadPlanetFields } from "./planet-fields.ts";
 import { createLandscape, siteSun, type LandscapeTerrain } from "./landscape.ts";
 import { cloudDeckGeology, deriveSurfaceGeology } from "../surface-geology.ts";
@@ -82,7 +80,7 @@ export async function createPlanetWorld(
   let surface: ReturnType<typeof createLandscape> | null = null;
   const surfaceAbort = new AbortController();
   let surfaceTerrain: LandscapeTerrain | null = null;
-  let surfaceDetail: Texture | null = null;
+  let scans: Awaited<ReturnType<typeof loadTerrainScans>> = null;
   let terrainStarted = false;
   let terrainError: Error | undefined;
 
@@ -93,22 +91,17 @@ export async function createPlanetWorld(
     if (!geology) return;
     const signal = surfaceAbort.signal;
     if (geology.medium === "rock") {
-      void new TextureLoader()
-        .loadAsync("/textures/fields/terrain-materials.png")
-        .then((texture) => {
-          if (signal.aborted) {
-            texture.dispose();
-            return;
-          }
-          texture.wrapS = texture.wrapT = RepeatWrapping;
-          texture.anisotropy = Math.min(
-            host.profile.anisotropicFiltering,
-            host.renderer.capabilities.getMaxAnisotropy(),
-          );
-          surfaceDetail = texture;
-          surface?.setDetail(texture);
-        })
-        .catch(() => undefined);
+      const anisotropy = Math.min(
+        host.profile.anisotropicFiltering,
+        host.renderer.capabilities.getMaxAnisotropy(),
+      );
+      void loadTerrainScans(geology, anisotropy).then((loaded) => {
+        if (signal.aborted) loaded?.dispose();
+        else if (loaded) {
+          scans = loaded;
+          surface?.setScans(loaded.ground, loaded.cliff);
+        }
+      });
     }
     void runTerrainJob(
       {
@@ -156,10 +149,11 @@ export async function createPlanetWorld(
     if (!surface) {
       surface = createLandscape(
         recipe,
-        surfaceDetail ?? fields.surface,
+        fields.surface,
         surfaceTerrain,
         host.profile.tier === "mobile",
       );
+      if (scans) surface.setScans(scans.ground, scans.cliff);
       root.add(surface.root);
     }
     mode = "surface";
@@ -307,7 +301,7 @@ export async function createPlanetWorld(
       if (attached && mode === "surface")
         controls.enableRotate = controls.enableZoom = controls.enableDamping = true;
       surface?.dispose();
-      surfaceDetail?.dispose();
+      scans?.dispose();
       globe.dispose();
       fields.dispose();
       sun.geometry.dispose();

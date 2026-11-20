@@ -5,6 +5,8 @@ import {
   BufferGeometry,
   Color,
   DirectionalLight,
+  UniformsLib,
+  UniformsUtils,
   Group,
   HemisphereLight,
   Mesh,
@@ -71,10 +73,17 @@ export function createLandscape(
 
   const wind = geology?.windDirection ?? 0;
   const offset = recipe.seed / 4_294_967_296;
+  const time = { value: 0 };
   const ground = new Mesh(
     geometry,
     new ShaderMaterial({
+      lights: true,
       uniforms: {
+        ...UniformsUtils.clone(UniformsLib.lights),
+        time,
+        cliffScan: { value: texture },
+        hasScans: { value: false },
+        lavaGlow: { value: geology?.lavaGlow ?? 0 },
         detail: { value: texture },
         detailOffset: { value: new Vector2(offset, offset * 2.89) },
         ramp: { value: ramp },
@@ -100,7 +109,6 @@ export function createLandscape(
     }),
   );
   root.add(ground);
-  const time = { value: 0 };
   const sea =
     terrain && Number.isFinite(water)
       ? new Mesh(
@@ -198,8 +206,10 @@ export function createLandscape(
     update(delta: number) {
       time.value += delta;
     },
-    setDetail(texture: Texture) {
-      ground.material.uniforms.detail!.value = texture;
+    setScans(sediment: Texture, cliff: Texture) {
+      ground.material.uniforms.detail!.value = sediment;
+      ground.material.uniforms.cliffScan!.value = cliff;
+      ground.material.uniforms.hasScans!.value = true;
     },
     dispose() {
       clearRocks?.();
