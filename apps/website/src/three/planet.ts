@@ -145,6 +145,7 @@ export async function createPlanetWorld(
     controls.target.copy(walk).add(direction);
     camera.lookAt(controls.target);
   }
+  let previousShadows = false;
   function land() {
     if (!surface) {
       surface = createLandscape(
@@ -156,6 +157,8 @@ export async function createPlanetWorld(
       if (scans) surface.setScans(scans.ground, scans.cliff);
       root.add(surface.root);
     }
+    previousShadows = host.renderer.shadowMap.enabled;
+    host.renderer.shadowMap.enabled = !!surfaceTerrain && surfaceTerrain.geology.medium === "rock";
     mode = "surface";
     space.visible = false;
     surface.root.visible = true;
@@ -171,6 +174,7 @@ export async function createPlanetWorld(
     onViewModeChange("surface");
   }
   function orbit() {
+    host.renderer.shadowMap.enabled = previousShadows;
     mode = "orbit";
     space.visible = true;
     if (surface) surface.root.visible = false;
@@ -275,20 +279,24 @@ export async function createPlanetWorld(
         const forward = Number(keys.has("KeyW")) - Number(keys.has("KeyS")),
           right = Number(keys.has("KeyD")) - Number(keys.has("KeyA"));
         const step = (inputDelta * 4.1) / Math.max(1, Math.hypot(forward, right));
-        walk.x = Math.max(
+        const nextX = Math.max(
           -SURFACE_WALK_LIMIT,
           Math.min(
             SURFACE_WALK_LIMIT,
             walk.x + step * (Math.sin(yaw) * forward + Math.cos(yaw) * right),
           ),
         );
-        walk.z = Math.max(
+        const nextZ = Math.max(
           -SURFACE_WALK_LIMIT,
           Math.min(
             SURFACE_WALK_LIMIT,
             walk.z + step * (-Math.cos(yaw) * forward + Math.sin(yaw) * right),
           ),
         );
+        if (!surface?.blocks?.(walk.x, walk.z, nextX, nextZ, walk.y)) {
+          walk.x = nextX;
+          walk.z = nextZ;
+        }
         look();
       }
     },
@@ -300,6 +308,7 @@ export async function createPlanetWorld(
       surfaceAbort.abort();
       if (attached && mode === "surface")
         controls.enableRotate = controls.enableZoom = controls.enableDamping = true;
+      if (mode === "surface") host.renderer.shadowMap.enabled = previousShadows;
       surface?.dispose();
       scans?.dispose();
       globe.dispose();

@@ -1,13 +1,11 @@
 import {
   BufferGeometry,
   Color,
-  Float32BufferAttribute,
   Group,
   InstancedMesh,
   Mesh,
   MeshStandardMaterial,
   Object3D,
-  ShaderMaterial,
 } from "three";
 import { GLTFLoader } from "three/addons/loaders/GLTFLoader.js";
 import type { SurfaceGeology } from "../surface-geology.ts";
@@ -24,6 +22,7 @@ export function createOutcrops(
   height: (x: number, z: number) => number,
   water: number,
   constrained: boolean,
+  onReady: () => void,
 ) {
   const field = createTerrainField(geology);
   const sample = createTerrainSample();
@@ -32,7 +31,6 @@ export function createOutcrops(
   const frost = new Color().setRGB(...geology.frostColor);
   const instances: Outcrop[] = [];
   let clearModels: (() => void) | undefined;
-  let shadows: Mesh<BufferGeometry, ShaderMaterial> | undefined;
   let closed = false;
   let state = geology.seed >>> 0;
   const random = () => {
@@ -68,6 +66,7 @@ export function createOutcrops(
         const model = scene.getObjectByName(name);
         if (!(model instanceof Mesh) || !(model.material instanceof MeshStandardMaterial)) continue;
         const mesh = new InstancedMesh(model.geometry, model.material, capacity);
+        mesh.castShadow = mesh.receiveShadow = true;
         mesh.count = 0;
         mesh.raycast = () => {};
         byForm.set(name, mesh);
@@ -75,10 +74,6 @@ export function createOutcrops(
       }
       const transform = new Object3D();
       const tint = new Color();
-      const vertices: number[] = [];
-      const opacity: number[] = [];
-      const indices: number[] = [];
-
       for (let cluster = 0; cluster < clusters; cluster += 1) {
         const angle = random() * 2 * Math.PI;
         const radius = 2.5 + Math.sqrt(random()) * (SURFACE_WALK_LIMIT + 12) * 0.8;
@@ -127,47 +122,11 @@ export function createOutcrops(
             .multiplyScalar(0.68 + random() * 0.7);
           mesh.setColorAt(mesh.count, tint);
           mesh.count += 1;
-
-          if (size < 0.19) continue;
-          const index = opacity.length;
-          const edges = 10;
-          vertices.push(x, y + 0.023, z);
-          opacity.push(0.56);
-          for (let edge = 0; edge < edges; edge += 1) {
-            const turn = (edge / edges) * 2 * Math.PI;
-            const px = x + Math.cos(turn) * size * 1.64;
-            const pz = z + Math.sin(turn) * size * 1.56;
-            vertices.push(px, height(px, pz) + 0.023, pz);
-            opacity.push(0);
-            indices.push(index, index + 1 + ((edge + 1) % edges), index + 1 + edge);
-          }
         }
       }
 
       for (const mesh of instances) if (mesh.count) root.add(mesh);
-      const geometry = new BufferGeometry()
-        .setAttribute("position", new Float32BufferAttribute(vertices, 3))
-        .setAttribute("opacity", new Float32BufferAttribute(opacity, 1))
-        .setIndex(indices);
-      const shadow = new ShaderMaterial({
-        transparent: true,
-        depthWrite: false,
-        vertexShader: `
-          attribute float opacity;
-          varying float shade;
-          void main() {
-            shade = opacity;
-            gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.);
-          }
-        `,
-        fragmentShader: `
-          varying float shade;
-          void main() { gl_FragColor = vec4(.012, .009, .008, shade * shade); }
-        `,
-      });
-      shadows = new Mesh(geometry, shadow);
-      shadows.raycast = () => {};
-      root.add(shadows);
+      onReady();
     })
     .catch(() => undefined);
   return () => {
@@ -177,8 +136,5 @@ export function createOutcrops(
       mesh.dispose();
     }
     clearModels?.();
-    shadows?.removeFromParent();
-    shadows?.geometry.dispose();
-    shadows?.material.dispose();
   };
 }

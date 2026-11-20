@@ -26,6 +26,7 @@ import { createSurfaceFloor, type SurfaceTerrainData } from "../surface-terrain-
 import landscapeFragment from "./landscape.frag?raw";
 import landscapeVertex from "./landscape.vert?raw";
 import shorelineFragment from "./shoreline.frag?raw";
+import { createLandmarks } from "./landmarks.ts";
 import { createOutcrops } from "./outcrops.ts";
 
 export const siteSun = (seed: number) => {
@@ -108,6 +109,7 @@ export function createLandscape(
       fragmentShader: landscapeFragment,
     }),
   );
+  ground.castShadow = ground.receiveShadow = !!terrain && !cloudDeck;
   root.add(ground);
   const sea =
     terrain && Number.isFinite(water)
@@ -185,14 +187,36 @@ export function createLandscape(
   if (air > 0) root.add(sky);
 
   const sunlight = new DirectionalLight(sunLight, 2.35);
-  sunlight.position.copy(surfaceSunDirection);
+  sunlight.position.copy(surfaceSunDirection).multiplyScalar(160);
+  sunlight.castShadow = !!terrain && !cloudDeck;
+  sunlight.shadow.mapSize.setScalar(constrained ? 512 : 1024);
+  Object.assign(sunlight.shadow.camera, {
+    left: -74,
+    right: 74,
+    top: 80,
+    bottom: -76,
+    near: 25,
+    far: 325,
+  });
+  sunlight.shadow.camera.updateProjectionMatrix();
+  sunlight.shadow.autoUpdate = false;
+  sunlight.shadow.normalBias = 0.09;
+  sunlight.shadow.bias = -0.0003;
+  const updateShadows = () => {
+    sunlight.shadow.needsUpdate = true;
+  };
+  updateShadows();
+  const formations =
+    geology?.medium === "rock"
+      ? createLandmarks(root, geology, terrainFloor, ground.material, updateShadows)
+      : null;
   root.add(
     sunlight,
     new HemisphereLight(skyTint.clone().lerp(new Color(1, 1, 1), 0.62), ramp[1]!, 0.82),
   );
   const clearRocks =
     geology?.medium === "rock"
-      ? createOutcrops(root, geology, terrainFloor, water, constrained)
+      ? createOutcrops(root, geology, terrainFloor, water, constrained, updateShadows)
       : null;
   return {
     follow(x: number, z: number) {
@@ -202,6 +226,7 @@ export function createLandscape(
     root,
     star,
     floorAt,
+    blocks: formations?.blocks,
     landing: { ...sitePosition(recipe.seed, 0, -7), yaw: siteBearing(recipe.seed) },
     update(delta: number) {
       time.value += delta;
@@ -212,7 +237,9 @@ export function createLandscape(
       ground.material.uniforms.hasScans!.value = true;
     },
     dispose() {
+      formations?.dispose();
       clearRocks?.();
+      sunlight.dispose();
       for (const mesh of [ground, sea, sky, star]) {
         mesh?.geometry.dispose();
         mesh?.material.dispose();
