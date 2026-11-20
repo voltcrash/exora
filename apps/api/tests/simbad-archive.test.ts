@@ -1,9 +1,21 @@
 import { expect, test } from "vite-plus/test";
 import {
   normalizeSimbadStar,
+  SIMBAD_TAP_ENDPOINTS,
   SimbadArchiveError,
   SimbadStarRepository,
 } from "../src/simbad-archive.ts";
+
+const requestHost = (input: string | URL | Request): string =>
+  new URL(typeof input === "string" ? input : input instanceof URL ? input.href : input.url).host;
+const [primaryHost, firstMirrorHost, secondMirrorHost] = SIMBAD_TAP_ENDPOINTS.map(
+  (endpoint) => new URL(endpoint).host,
+);
+const outagePage = () =>
+  new Response("<!doctype html><title>Page unavailable</title>", {
+    headers: { "content-type": "text/html" },
+    status: 404,
+  });
 
 const metadata = [
   "matched_id",
@@ -218,4 +230,64 @@ test("ends stellar paging once a page is not full", async () => {
   });
 
   expect((await repository.browse(24)).nextCursor).toBeNull();
+});
+
+test("answers from a mirror while the primary SIMBAD host serves an outage page", async () => {
+  const hosts: string[] = [];
+  const repository = new SimbadStarRepository({
+    fetcher: async (input) => {
+      const host = requestHost(input);
+      hosts.push(host);
+      return host === primaryHost ? outagePage() : Response.json({ metadata, data: [siriusRow] });
+    },
+  });
+
+  const result = await repository.findByName("Sirius");
+
+  expect(result.value?.name).toBe("Sirius");
+  expect(hosts).toEqual([primaryHost, firstMirrorHost]);
+});
+
+test("moves past SIMBAD hosts that cannot be reached or answer with non-TAP pages", async () => {
+  const hosts: string[] = [];
+  const repository = new SimbadStarRepository({
+    fetcher: async (input) => {
+      const host = requestHost(input);
+      hosts.push(host);
+      if (host === primaryHost) throw new TypeError("fetch failed");
+      if (host === firstMirrorHost) return new Response("<html>maintenance</html>");
+      return Response.json({ metadata, data: [siriusRow] });
+    },
+  });
+
+  expect((await repository.search("sirius", 12)).value[0]?.name).toBe("Sirius");
+  expect(hosts).toEqual([primaryHost, firstMirrorHost, secondMirrorHost]);
+});
+
+test("reports SIMBAD as unavailable only after every mirror fails", async () => {
+  let requests = 0;
+  const repository = new SimbadStarRepository({
+    fetcher: async () => {
+      requests += 1;
+      return outagePage();
+    },
+  });
+
+  await expect(repository.findByName("GJ 674")).rejects.toBeInstanceOf(SimbadArchiveError);
+  expect(requests).toBe(SIMBAD_TAP_ENDPOINTS.length);
+});
+
+test("does not ask mirrors again when SIMBAD answers with malformed measurements", async () => {
+  const malformed = [...siriusRow];
+  malformed[4] = "101.287";
+  let requests = 0;
+  const repository = new SimbadStarRepository({
+    fetcher: async () => {
+      requests += 1;
+      return Response.json({ data: [malformed], metadata });
+    },
+  });
+
+  await expect(repository.search("sirius", 12)).rejects.toBeInstanceOf(SimbadArchiveError);
+  expect(requests).toBe(1);
 });
