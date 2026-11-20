@@ -272,42 +272,35 @@ const floodBasalt: ArchetypeField = (x, z, context, out) => {
 const duneSea: ArchetypeField = (x, z, context, out) => {
   const along = (x * context.windCos + z * context.windSin) / context.featureScale;
   const across = (-x * context.windSin + z * context.windCos) / context.featureScale;
-  const meander = fbm(across * 0.02, along * 0.006, context.seed + 41, 3) * 9;
-  const draa = fbm(along * 0.006, across * 0.004, context.seed + 43, 2);
-  const wavelength = 19 * context.featureScale * (1 + draa * 0.4);
-  const phase = ((along + meander) / wavelength) % 1;
-  const t = phase < 0 ? phase + 1 : phase;
-  const profile = t < 0.72 ? (t / 0.72) ** 1.35 : 1 - (t - 0.72) / 0.28;
-  const crestBreak = fbm(across * 0.05, along * 0.05, context.seed + 47, 3) * 0.3;
-  const height = (profile - 0.45) * (1.15 + draa * 0.55) + draa * 0.45 + crestBreak * 0.12;
-  const ripple =
-    Math.sin(along * 1.6 + fbm(along * 0.1, across * 0.1, context.seed + 49, 2) * 5) * 0.01;
-  out.regolith = 1;
-  out.scarp = clamp01((t > 0.74 && t < 0.98 ? 0.35 : 0) * 0.6);
+  const meander = fbm(across * 0.045, along * 0.014, context.seed + 41, 3) * 13;
+  const erg = fbm(along * 0.012, across * 0.008, context.seed + 43, 2);
+  const phase = (along + meander + erg * 18) / 13;
+  const t = phase - Math.floor(phase);
+  const profile = smoothstep(0.03, 0.76, t) * (1 - smoothstep(0.76, 1, t));
+  const drift = smoothstep(-0.56, 0.22, erg);
+  const ripple = Math.sin(along * 2.7 + meander * 0.6) * 0.027;
+  out.regolith = 0.83 + drift * 0.17;
+  out.scarp = smoothstep(0.76, 0.84, t) * (1 - smoothstep(0.9, 1, t)) * drift * 0.28;
   out.frost = 0;
   out.molten = 0;
-  return height + ripple;
+  return (profile - 0.26) * (0.45 + drift * 1.62) + erg * 1.1 + ripple;
 };
 
 const yardangBadlands: ArchetypeField = (x, z, context, out) => {
   const along = (x * context.windCos + z * context.windSin) / context.featureScale;
   const across = (-x * context.windSin + z * context.windCos) / context.featureScale;
-  const warpX = fbm(across * 0.03, along * 0.008, context.seed + 59, 2) * 3;
-  const carve = ridged(across * 0.11 + warpX * 0.05, along * 0.014, context.seed + 61, 4);
-  const platform = fbm(along * 0.007, across * 0.009, context.seed + 67, 3) * 0.5;
-  const raw = platform + (carve ** 1.6 - 0.3) * 0.85;
-  const height = stratify(
-    raw,
-    context,
-    1,
-    fbm(across * 0.4, along * 0.4, context.seed + 63, 2) * 2,
-  );
-  const flank = clamp01((1 - carve) * 1.5);
-  out.regolith = clamp01(0.3 + flank * 0.5);
-  out.scarp = clamp01((carve - 0.42) * 2.4);
+  const warp = fbm(across * 0.036, along * 0.015, context.seed + 59, 2);
+  const spine = ridged(across * 0.064 + warp * 0.8, along * 0.017, context.seed + 61, 4);
+  const massif = fbm(along * 0.016, across * 0.017, context.seed + 67, 3);
+  const plateau = smoothstep(0.38, 0.82, spine + massif * 0.36);
+  const cap = smoothstep(0.67, 0.88, plateau);
+  const talus = smoothstep(0.27, 0.55, spine) * (1 - plateau);
+  const raw = -0.48 + massif * 0.8 + plateau * 1.75 + cap * 0.32 + talus * 0.36;
+  out.regolith = clamp01(0.88 - plateau * 0.72 + cap * 0.28);
+  out.scarp = smoothstep(0.13, 0.51, plateau) * (1 - cap * 0.58);
   out.frost = 0;
   out.molten = 0;
-  return height;
+  return stratify(raw, context, 1.7, warp);
 };
 
 const canyonRift: ArchetypeField = (x, z, context, out) => {
@@ -317,17 +310,15 @@ const canyonRift: ArchetypeField = (x, z, context, out) => {
   const cell = cellular((x + warpX) * scale, (z + warpZ) * scale, context.seed + 79, 0.95);
   const edge = cell.f2 - cell.f1;
   const plateau = fbm(x * 0.006, z * 0.006, context.seed + 83, 3) * 0.34 + 0.42;
-  const cut = 1 - smoothstep(0, 0.42, edge);
-  const depth = cut ** 1.7;
-  const floorNoise = fbm(x * 0.05, z * 0.05, context.seed + 89, 3) * 0.06;
-  const talus = smoothstep(0.06, 0.3, edge) * (1 - smoothstep(0.3, 0.5, edge)) * 0.12;
-  const height =
-    stratify(plateau - depth * 1.35 + talus, context, 0.9, floorNoise / 0.06) + floorNoise * depth;
-  out.regolith = clamp01(0.25 + depth * 0.55);
-  out.scarp = clamp01(smoothstep(0.02, 0.24, edge) * (1 - smoothstep(0.24, 0.48, edge)) * 1.6);
+  const floorNoise = fbm(x * 0.045, z * 0.045, context.seed + 89, 3);
+  const wall = smoothstep(0.08, 0.36 + floorNoise * 0.14, edge);
+  const bench = smoothstep(0.06, 0.16, edge) * 0.28;
+  const height = plateau + (wall - 1) * 2.12 + bench + floorNoise * (0.09 + wall * 0.12);
+  out.regolith = clamp01(0.88 - wall * 0.58 + smoothstep(0.8, 1, wall) * 0.22);
+  out.scarp = smoothstep(0.02, 0.32, wall) * (1 - smoothstep(0.74, 1, wall));
   out.frost = 0;
   out.molten = 0;
-  return height;
+  return stratify(height, context, 1.85, floorNoise);
 };
 
 const volcanicShield: ArchetypeField = (x, z, context, out) => {
@@ -336,19 +327,21 @@ const volcanicShield: ArchetypeField = (x, z, context, out) => {
   const size = 0.55 + ((cell.cell >>> 12) & 0xff) / 255;
   const radial = cell.f1 / size;
   const flank = Math.exp(-(radial * radial) * 2.4);
-  const caldera = smoothstep(0.2, 0.05, radial) * 0.55;
+  const caldera = smoothstep(0.24, 0.11, radial);
+  const rim = smoothstep(0.14, 0.25, radial) * (1 - smoothstep(0.28, 0.45, radial));
   const fissures = ridged(x * 0.05, z * 0.05, context.seed + 101, 3) ** 3 * flank * 0.3;
   const apron = fbm(x * 0.02, z * 0.02, context.seed + 103, 3) * 0.16;
-  const height = flank * 0.95 - caldera * flank + fissures + apron - 0.3;
-  out.regolith = clamp01(0.55 - flank * 0.3);
-  out.scarp = clamp01(caldera * 1.4 + fissures * 2);
+  const height = flank * 1.75 - caldera * 1.12 + rim * 0.38 + fissures + apron - 0.32;
+  out.regolith = clamp01(0.72 - flank * 0.48);
+  out.scarp = clamp01(rim + caldera * 0.45 + fissures * 2);
   out.frost = 0;
-  out.molten = 0;
+  out.molten = caldera * smoothstep(0.05, 0.24, apron + fissures);
   return height;
 };
 
 const lavaFields: ArchetypeField = (x, z, context, out) => {
-  const cell = cellular(x * 0.035, z * 0.035, context.seed + 107, 0.95);
+  const warp = fbm(x * 0.04, z * 0.04, context.seed + 105, 2);
+  const cell = cellular(x * 0.021 + warp * 0.56, z * 0.038 - warp * 0.38, context.seed + 107, 0.95);
   const edge = cell.f2 - cell.f1;
   const plate = ((cell.cell >>> 7) & 0xff) / 255;
   const crack = 1 - smoothstep(0, 0.11, edge);
@@ -359,11 +352,12 @@ const lavaFields: ArchetypeField = (x, z, context, out) => {
     0.88,
     fbm(x * 0.014, z * 0.014, context.seed + 113, 3) * 0.5 + 0.5,
   );
-  const height = (plate - 0.5) * 0.22 + surface - crack * 0.16 - vents * 0.25 + ropey;
-  out.regolith = clamp01(0.2 + (1 - crack) * 0.2);
-  out.scarp = clamp01(crack * 1.2);
+  const levee = smoothstep(0.01, 0.08, edge) * (1 - smoothstep(0.08, 0.22, edge));
+  const height = (plate - 0.5) * 0.28 * (1 - crack) + surface + levee * 0.2 - crack * 0.25 + ropey;
+  out.regolith = clamp01(0.28 + plate * 0.6 - crack * 0.22);
+  out.scarp = clamp01(levee + crack * 0.64);
   out.frost = 0;
-  out.molten = clamp01(crack * 1.15 + vents * 1.1);
+  out.molten = clamp01(crack ** 2 * (0.62 + vents * 1.4));
   return height;
 };
 
@@ -394,20 +388,21 @@ const glacialPlain: ArchetypeField = (x, z, context, out) => {
 
 const fracturedIce: ArchetypeField = (x, z, context, out) => {
   const scale = 0.02 / context.featureScale;
-  const warpX = fbm(x * 0.006, z * 0.006, context.seed + 149, 2) * 18;
-  const cell = cellular((x + warpX) * scale, z * scale, context.seed + 151, 0.9);
+  const warp = fbm(x * 0.021, z * 0.015, context.seed + 149, 3) * 19;
+  const cell = cellular((x + warp) * scale, (z - warp * 0.68) * scale, context.seed + 151, 0.9);
   const edge = cell.f2 - cell.f1;
   const plate = cell.cell;
-  const ridgePair =
-    Math.exp(-(((edge - 0.055) / 0.035) ** 2)) - Math.exp(-((edge / 0.03) ** 2)) * 0.55;
+  const rille = 1 - smoothstep(0.008, 0.06, edge);
+  const shoulder = smoothstep(0.018, 0.078, edge) * (1 - smoothstep(0.083, 0.2, edge));
+  const ridgePair = shoulder - rille * 0.42;
   const secondary = cellular(x * scale * 3.1 + 7.3, z * scale * 3.1, context.seed + 157, 0.9);
   const hairline = Math.exp(-(((secondary.f2 - secondary.f1) / 0.05) ** 2)) * 0.22;
   const chaos = smoothstep(0.68, 0.9, fbm(x * 0.012, z * 0.012, context.seed + 163, 3) * 0.5 + 0.5);
-  const raft = chaos * (((plate >>> 5) & 0xff) / 255 - 0.5) * 0.9;
+  const raft = chaos * (((plate >>> 5) & 0xff) / 255 - 0.5) * (1 - rille) * 0.9;
   const plain = fbm(x * 0.02, z * 0.02, context.seed + 167, 3) * 0.12;
-  out.regolith = clamp01(0.3 + chaos * 0.3);
-  out.scarp = clamp01(Math.abs(ridgePair) * 1.6 + chaos * 0.8);
-  out.frost = clamp01(0.9 - chaos * 0.4);
+  out.regolith = clamp01(0.38 + chaos * 0.3 - rille * 0.36);
+  out.scarp = clamp01(shoulder * 0.45 + rille + chaos * 0.8);
+  out.frost = clamp01(0.84 + shoulder * 0.12 - rille * 0.76 - chaos * 0.4);
   out.molten = 0;
   return plain + ridgePair * 1.15 + hairline * 0.35 + raft;
 };
