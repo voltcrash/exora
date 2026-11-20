@@ -1,5 +1,7 @@
 uniform vec3 deepColor, shallowColor, skyTint, sunTint, sunDirection;
 uniform float air, time;
+uniform sampler2D tDiffuse;
+varying vec4 reflectionUV;
 varying vec3 waterPoint;
 varying float depth;
 
@@ -18,9 +20,11 @@ void main() {
     1.,
     .032 * crossWave + .019 * ripple * smallWaves
   ));
-  float fresnel = .025 + .63 * pow(1. - clamp(dot(V, N), 0., 1.), 5.);
+  float fresnel = .07 + .88 * pow(1. - clamp(dot(V, N), 0., 1.), 5.);
   vec3 liquid = mix(shallowColor, deepColor, 1. - exp(-depth * 1.82));
-  vec3 reflection = skyTint * (.32 + .25 * (1. - V.y));
+  vec2 uv = reflectionUV.xy / reflectionUV.w;
+  uv += N.xz * (.084 + .12 * smallWaves);
+  vec3 reflection = texture2D(tDiffuse, clamp(uv, .002, .998)).rgb;
   float glint = pow(max(0., dot(N, normalize(sunDirection + V))), 145.);
   vec3 water = mix(liquid, reflection, fresnel) + sunTint * glint * .76;
   float shore = 1. - smoothstep(.015, .19, depth);

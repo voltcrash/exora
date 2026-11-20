@@ -28,7 +28,7 @@ import landscapeFragment from "./landscape.frag?raw";
 import landscapeVertex from "./landscape.vert?raw";
 import skyFragment from "./surface-sky.frag?raw";
 import { createHorizonPlanet } from "./moon-horizon.ts";
-import shorelineFragment from "./shoreline.frag?raw";
+import { createShoreline } from "./shoreline.ts";
 import { createCloudHeights } from "./cloud-deck.ts";
 import { SURFACE_HALF_EXTENT } from "../surface-vista-baking.ts";
 import { createLandmarks } from "./landmarks.ts";
@@ -117,39 +117,9 @@ export function createLandscape(
   if (!cloudDeck) root.add(ground);
   const sea =
     terrain && Number.isFinite(water)
-      ? new Mesh(
-          new BufferGeometry()
-            .setAttribute("position", new BufferAttribute(terrain.data.positions, 3))
-            .setIndex(new BufferAttribute(terrain.data.indices, 1)),
-          new ShaderMaterial({
-            uniforms: {
-              time,
-              datum: { value: water },
-              deepColor: { value: color(terrain.geology.liquidColor) },
-              shallowColor: { value: color(terrain.geology.liquidShallowColor) },
-              skyTint: { value: skyTint },
-              sunTint: { value: sunLight },
-              sunDirection: { value: surfaceSunDirection },
-              air: { value: air },
-            },
-            vertexShader: `
-              uniform float datum;
-              varying vec3 waterPoint;
-              varying float depth;
-              void main() {
-                waterPoint = vec3(position.x, datum, position.z);
-                depth = datum - position.y;
-                gl_Position = projectionMatrix * modelViewMatrix * vec4(waterPoint, 1.);
-              }
-            `,
-            fragmentShader: shorelineFragment,
-          }),
-        )
+      ? createShoreline(terrain, water, constrained, skyTint, sunLight, surfaceSunDirection, time)
       : null;
-  if (sea) {
-    sea.raycast = () => {};
-    root.add(sea);
-  }
+  if (sea) root.add(sea);
   const cloudHeights = terrain && cloudDeck ? createCloudHeights(terrain.data, terrainFloor) : null;
   const sky = new Mesh(
     new SphereGeometry(760, 40, 28),
@@ -262,7 +232,9 @@ export function createLandscape(
       formations?.dispose();
       clearRocks?.();
       sunlight.dispose();
-      for (const mesh of [ground, sea, sky, star]) {
+      sea?.geometry.dispose();
+      sea?.dispose();
+      for (const mesh of [ground, sky, star]) {
         mesh?.geometry.dispose();
         mesh?.material.dispose();
       }
