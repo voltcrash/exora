@@ -69,6 +69,7 @@ export async function createPlanetWorld(
     planet.solarSystem?.surfaceStatus === "modeled";
   const nearDistance = (neutralSurface ? globe.extent : radius) * 1.28;
   const terrainPrepareDistance = distance * 0.96;
+  const descentDistance = distance * 0.76;
   const sun = new Mesh(
     new SphereGeometry(Math.max(0.4, recipe.star.radiusSceneUnits * 0.6), 28, 20),
     new MeshBasicMaterial({ color: new Color().setRGB(...recipe.star.color, SRGBColorSpace) }),
@@ -286,7 +287,7 @@ export async function createPlanetWorld(
         const approach = controls.getDistance();
         if (!neutralSurface && !terrainStarted && approach <= terrainPrepareDistance)
           prepareTerrain();
-        if (approach <= nearDistance * 1.025) {
+        if (approach <= descentDistance) {
           if (terrainError) throw terrainError;
           if (neutralSurface || surfaceTerrain) land();
         }
