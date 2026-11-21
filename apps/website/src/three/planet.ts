@@ -10,6 +10,7 @@ import {
   Vector2,
   Vector3,
 } from "three";
+import { easeAway, SURFACE_SWAP_AT, SURFACE_TRANSITION_MS } from "../travel-transition.ts";
 import { skyViewpointFrom } from "../sky-catalog.ts";
 import { createPlanetGlobe } from "./planet-globe.ts";
 import { loadTerrainScans } from "./terrain-scans.ts";
@@ -128,6 +129,9 @@ export async function createPlanetWorld(
   let mode: "orbit" | "surface" = "orbit",
     attached = false,
     elapsed = 0;
+  let transitionStart: number | null = null;
+  let approachDistance = distance;
+  const orbitDirection = new Vector3();
   const walk = new Vector3(),
     direction = new Vector3(),
     mouse = new Vector2();
@@ -182,14 +186,14 @@ export async function createPlanetWorld(
     onViewModeChange("surface");
   }
   function orbit() {
-    host.renderer.shadowMap.enabled = previousShadows;
+    if (mode === "surface") host.renderer.shadowMap.enabled = previousShadows;
     mode = "orbit";
     space.visible = true;
     if (surface) surface.root.visible = false;
     controls.enableRotate = controls.enableZoom = controls.enableDamping = true;
     controls.minDistance = nearDistance;
     controls.maxDistance = distance * 3;
-    camera.position.set(0.12, 0.53, 1).normalize().multiplyScalar(distance);
+    camera.position.copy(orbitDirection).multiplyScalar(distance);
     controls.target.set(0, 0, 0);
     controls.update();
     keys.clear();
@@ -198,11 +202,26 @@ export async function createPlanetWorld(
     pinch = 0;
     onViewModeChange("orbit");
   }
+  function beginTransition() {
+    if (transitionStart !== null) return;
+    if (mode === "orbit") {
+      approachDistance = controls.getDistance();
+      orbitDirection.copy(camera.position).sub(controls.target).normalize();
+    }
+    if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) {
+      if (mode === "orbit") land();
+      else orbit();
+      return;
+    }
+    controls.enableZoom = controls.enableRotate = false;
+    transitionStart = performance.now();
+    onViewModeChange("transition");
+  }
   function wheel(e: WheelEvent) {
     if (host.isInXr() || mode !== "surface") return;
     if (e.deltaY > 0) {
       e.preventDefault();
-      orbit();
+      beginTransition();
     }
   }
   const typing = (e: KeyboardEvent) =>
@@ -238,7 +257,7 @@ export async function createPlanetWorld(
     if (fingers.size === 2) {
       const [a, b] = fingers.values();
       const span = a!.distanceTo(b!);
-      if (pinch && span < pinch * 0.85) orbit();
+      if (pinch && span < pinch * 0.85) beginTransition();
       else if (!pinch) pinch = span;
       return;
     }
@@ -280,8 +299,26 @@ export async function createPlanetWorld(
       globe.update(elapsed, spin);
       if (!attached) return;
       if (host.isInXr()) {
-        if (mode === "surface") orbit();
+        if (mode === "surface" || transitionStart !== null) {
+          transitionStart = null;
+          orbit();
+        }
         return;
+      }
+      if (transitionStart !== null) {
+        const progress =
+          (performance.now() - transitionStart) / (SURFACE_TRANSITION_MS * SURFACE_SWAP_AT);
+        if (progress < 1) {
+          if (mode === "orbit") {
+            const radius =
+              approachDistance + (nearDistance - approachDistance) * easeAway(progress);
+            camera.position.copy(controls.target).addScaledVector(orbitDirection, radius);
+          }
+          return;
+        }
+        transitionStart = null;
+        if (mode === "orbit") land();
+        else orbit();
       }
       if (mode === "orbit") {
         const approach = controls.getDistance();
@@ -289,7 +326,7 @@ export async function createPlanetWorld(
           prepareTerrain();
         if (approach <= descentDistance) {
           if (terrainError) throw terrainError;
-          if (neutralSurface || surfaceTerrain) land();
+          if (neutralSurface || surfaceTerrain) beginTransition();
         }
       }
       if (mode === "surface") {
@@ -325,7 +362,7 @@ export async function createPlanetWorld(
     dispose() {
       listeners.abort();
       surfaceAbort.abort();
-      if (attached && mode === "surface")
+      if (attached && (mode === "surface" || transitionStart !== null))
         controls.enableRotate = controls.enableZoom = controls.enableDamping = true;
       if (mode === "surface") host.renderer.shadowMap.enabled = previousShadows;
       surface?.dispose();
