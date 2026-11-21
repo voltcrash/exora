@@ -14,32 +14,13 @@
 .surface-veil {
   z-index: var(--layer-veil);
   background: var(--void);
-  visibility: hidden;
   opacity: 0;
+  transition: opacity calc(var(--surface-transition, 760ms) / 2) ease-out;
 }
 
-/*
- * The dark a descent passes through. One timeline with the camera, run from
- * `travel-transition.ts`: full dark across the middle, which is where the scene hands one half of
- * the world over to the other. It is held wide because the timeline starts with a React commit a
- * frame or two after the scene's own clock, a gap that is a fifth of a second on a slow machine.
- */
 :global(.view-transition) .surface-veil {
-  visibility: visible;
-  animation: surface-dip var(--surface-transition, 760ms) linear both;
-}
-
-@keyframes surface-dip {
-  0% {
-    opacity: 0;
-  }
-  28%,
-  72% {
-    opacity: 1;
-  }
-  100% {
-    opacity: 0;
-  }
+  opacity: 1;
+  transition-duration: calc(var(--surface-transition, 760ms) / 3);
 }
 
 /*
