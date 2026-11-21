@@ -174,10 +174,12 @@ test.each([MARS, HAUMEA])(
         }),
       );
       await arrived;
-      host.camera.position.set(0, 0, world!.nearDistance);
-      host.controls.update();
+      for (let tick = 0; tick < 6; tick++)
+        canvas.dispatchEvent(new WheelEvent("wheel", { deltaY: -100, cancelable: true }));
+      expect(host.controls.getDistance()).toBeGreaterThan(world!.nearDistance);
+      await vi.waitFor(() => expect(modes).toContain("transition"), { timeout: 3000 });
       await landed;
-      expect(modes.at(-1)).toBe("surface");
+      expect(modes).toEqual(["transition", "surface"]);
       if (planet === HAUMEA) expect(host.camera.position.y).toBeCloseTo(1.65);
       const before = host.camera.position.clone();
       window.dispatchEvent(new KeyboardEvent("keydown", { code: "KeyW" }));
@@ -223,7 +225,8 @@ test.each([MARS, HAUMEA])(
         }
       }
       canvas.dispatchEvent(new WheelEvent("wheel", { deltaY: 10, cancelable: true }));
-      expect(modes.at(-1)).toBe("orbit");
+      expect(modes.at(-1)).toBe("transition");
+      await vi.waitFor(() => expect(modes.at(-1)).toBe("orbit"));
       expect(host.controls.enableRotate).toBe(true);
     } finally {
       close();
